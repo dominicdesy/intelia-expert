@@ -10,537 +10,48 @@ import uuid
 import asyncio
 import logging
 import json
-import re
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Request, HTTPException, File, UploadFile, Form
 from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field, field_validator
 
 from config.config import BASE_PATH, MAX_REQUEST_SIZE, STREAM_CHUNK_LEN
 from utils.utilities import (
     safe_get_attribute,
-    safe_dict_get,
     sse_event,
     smart_chunk_text,
     get_out_of_domain_message,
-    get_aviculture_response,
     detect_language_enhanced,
 )
 from .endpoints_utils import (
     safe_serialize_for_json,
     metrics_collector,
-    add_to_conversation_memory,
 )
 
+# Imports des nouveaux modules
+from .chat_models import (
+    JSONValidationRequest,
+    IngestionRequest,
+    ExpertQueryRequest,
+)
+from .conversation_context import (
+    ConversationContextManager,
+)
+from .chat_handlers import ChatHandlers
+
 logger = logging.getLogger(__name__)
-
-
-# === NOUVEAUX MODÈLES PYDANTIC POUR JSON ===
-
-
-class JSONValidationRequest(BaseModel):
-    """Requête de validation JSON avicole"""
-
-    json_data: Dict[str, Any] = Field(..., description="Données JSON à valider")
-    strict_mode: bool = Field(False, description="Mode de validation strict")
-    auto_enrich: bool = Field(
-        True, description="Enrichissement automatique des métadonnées"
-    )
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "json_data": {
-                    "title": "Ross 308 Performance Guide",
-                    "text": "Performance objectives for Ross 308 broilers...",
-                    "metadata": {"genetic_line": "ross308"},
-                    "tables": [],
-                },
-                "strict_mode": False,
-                "auto_enrich": True,
-            }
-        }
-    }
-
-
-class IngestionRequest(BaseModel):
-    """Requête d'ingestion de fichiers JSON"""
-
-    json_files: List[Dict[str, Any]] = Field(..., description="Liste des fichiers JSON")
-    batch_size: int = Field(5, ge=1, le=20, description="Taille des lots de traitement")
-    force_reprocess: bool = Field(
-        False, description="Forcer le retraitement des fichiers existants"
-    )
-
-    @field_validator("json_files")
-    @classmethod
-    def validate_json_files(cls, v):
-        if len(v) > 100:
-            raise ValueError("Maximum 100 fichiers par lot")
-        return v
-
-
-class ExpertQueryRequest(BaseModel):
-    """Requête d'expertise avicole avec support JSON"""
-
-    question: str = Field(
-        ..., min_length=5, max_length=500, description="Question de l'utilisateur"
-    )
-    language: str = Field(
-        "fr", pattern="^(fr|en|es|zh|ar)$", description="Langue de la réponse"
-    )
-    genetic_line: Optional[str] = Field(None, description="Lignée génétique spécifique")
-    user_id: Optional[str] = Field(None, description="Identifiant utilisateur")
-    context: Optional[Dict[str, Any]] = Field(None, description="Contexte additionnel")
-    response_format: str = Field(
-        "detailed", pattern="^(ultra_concise|concise|standard|detailed)$"
-    )
-    use_json_search: bool = Field(
-        True, description="Utiliser la recherche JSON prioritaire"
-    )
-    performance_metrics: Optional[List[str]] = Field(
-        None, description="Métriques de performance à filtrer"
-    )
-    age_range: Optional[Dict[str, int]] = Field(
-        None, description="Plage d'âge en jours"
-    )
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "question": "Quel est le poids cible à 35 jours pour du Ross 308 mâle?",
-                "language": "fr",
-                "genetic_line": "ross308",
-                "use_json_search": True,
-                "performance_metrics": ["poids", "fcr"],
-                "age_range": {"min": 30, "max": 40},
-            }
-        }
-    }
-
-
-class ChatRequest(BaseModel):
-    """Requête de chat étendue avec support JSON"""
-
-    message: str = Field(
-        ..., min_length=1, max_length=2000, description="Message utilisateur"
-    )
-    language: Optional[str] = Field(None, description="Langue de la réponse")
-    tenant_id: Optional[str] = Field(None, description="Identifiant du tenant")
-    genetic_line_filter: Optional[str] = Field(
-        None, description="Filtre lignée génétique"
-    )
-    use_json_search: bool = Field(True, description="Utiliser le système JSON")
-    performance_context: Optional[Dict[str, Any]] = Field(
-        None, description="Contexte performance"
-    )
-
-
-# === SYSTÈME DE MÉMOIRE CONVERSATIONNELLE POUR CONTEXTUALISATION ===
-
-
-class ConversationContextManager:
-    """
-    Gestionnaire de contexte conversationnel pour clarifications
-    VERSION 4.2.3 - DÉTECTION AMÉLIORÉE + AMBIGUÏTÉ + ABANDON
-    """
-
-    # NOUVEAUX PATTERNS D'AMBIGUÏTÉ
-    AMBIGUOUS_PATTERNS = [
-        r"je ne sais pas",
-        r"pas sûr",
-        r"peut-être",
-        r"probablement",
-        r"je pense",
-        r"environ",
-        r"à peu près",
-        r"not sure",
-        r"maybe",
-        r"probably",
-        r"i think",
-        r"approximately",
-    ]
-
-    # NOUVEAUX PATTERNS D'ABANDON
-    ABANDON_PATTERNS = [
-        r"peu importe",
-        r"laisse tomber",
-        r"oublie",
-        r"moyenne générale",
-        r"sans précision",
-        r"approximativement",
-        r"never mind",
-        r"forget it",
-        r"skip",
-        r"general average",
-        r"no importa",
-    ]
-
-    def __init__(self, intents_config_path: str = None):
-        self.pending_clarifications = {}
-        self.clarification_patterns = self._load_clarification_patterns(
-            intents_config_path
-        )
-
-    def _load_clarification_patterns(self, config_path: str = None) -> Dict:
-        """Charge les patterns de clarification depuis intents.json"""
-        from pathlib import Path
-        import json
-
-        if config_path is None:
-            # Chemins par défaut
-            possible_paths = [
-                Path(__file__).parent.parent / "config" / "intents.json",
-                Path(__file__).parent / "config" / "intents.json",
-                Path.cwd() / "config" / "intents.json",
-                Path.cwd() / "llm" / "config" / "intents.json",
-            ]
-
-            for path in possible_paths:
-                if path.exists():
-                    config_path = str(path)
-                    break
-
-        if not config_path or not Path(config_path).exists():
-            logger.warning("intents.json non trouvé - utilisation patterns par défaut")
-            return self._get_default_patterns()
-
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = json.load(f)
-
-            # Extraire les patterns pertinents
-            patterns = {
-                "age": self._extract_age_patterns(config),
-                "breed": self._extract_breed_patterns(config),
-                "sex": self._extract_sex_patterns(config),
-                "metric": self._extract_metric_patterns(config),
-            }
-
-            logger.info(f"Patterns de clarification chargés depuis {config_path}")
-            return patterns
-
-        except Exception as e:
-            logger.error(f"Erreur chargement intents.json: {e}")
-            return self._get_default_patterns()
-
-    def _extract_age_patterns(self, config: Dict) -> Dict:
-        """Extrait les patterns d'âge depuis intents.json"""
-        return {"regex": r"\d+\s*(jour|day|j\b|d\b|semaine|week|sem)", "keywords": []}
-
-    def _extract_breed_patterns(self, config: Dict) -> Dict:
-        """Extrait les patterns de races depuis intents.json"""
-        breeds = []
-        aliases = config.get("aliases", {}).get("line", {})
-
-        for line, line_breeds in aliases.items():
-            if isinstance(line_breeds, list):
-                breeds.extend([b.lower() for b in line_breeds])
-
-        # Ajouter patterns communs
-        breeds.extend(
-            ["ross", "cobb", "hubbard", "aviagen", "308", "500", "700", "708"]
-        )
-
-        return {"regex": None, "keywords": list(set(breeds))}
-
-    def _extract_sex_patterns(self, config: Dict) -> Dict:
-        """Extrait les patterns de sexe depuis intents.json"""
-        sex_aliases = config.get("aliases", {}).get("sex", {})
-
-        keywords = []
-        for sex_type, variants in sex_aliases.items():
-            if isinstance(variants, list):
-                keywords.extend([v.lower() for v in variants])
-
-        return {"regex": None, "keywords": keywords}
-
-    def _extract_metric_patterns(self, config: Dict) -> Dict:
-        """Extrait les patterns de métriques depuis intents.json"""
-        metric_aliases = config.get("aliases", {}).get("metric", {})
-
-        keywords = []
-        for metric_type, variants in metric_aliases.items():
-            if isinstance(variants, list):
-                keywords.extend([v.lower() for v in variants])
-
-        return {"regex": None, "keywords": keywords}
-
-    def _get_default_patterns(self) -> Dict:
-        """Patterns par défaut en cas d'échec de chargement"""
-        return {
-            "age": {"regex": r"\d+\s*(jour|day|j\b|d\b|semaine|week)", "keywords": []},
-            "breed": {
-                "regex": None,
-                "keywords": ["ross", "cobb", "hubbard", "aviagen", "308", "500", "700"],
-            },
-            "sex": {
-                "regex": None,
-                "keywords": ["mâle", "femelle", "male", "female", "mixte", "mixed"],
-            },
-            "metric": {
-                "regex": None,
-                "keywords": [
-                    "poids",
-                    "weight",
-                    "fcr",
-                    "conversion",
-                    "mortalité",
-                    "gain",
-                ],
-            },
-        }
-
-    def mark_pending(
-        self,
-        tenant_id: str,
-        original_query: str,
-        missing_fields: List[str],
-        suggestions: Dict,
-        language: str,
-    ):
-        """Marque une conversation en attente de clarification"""
-        self.pending_clarifications[tenant_id] = {
-            "original_query": original_query,
-            "missing_fields": missing_fields,
-            "suggestions": suggestions,
-            "language": language,
-            "original_language": language,
-            "timestamp": time.time(),
-            "clarification_count": 0,
-            "clarification_attempts": 0,
-        }
-        logger.info(
-            f"Clarification en attente pour {tenant_id}: {missing_fields} (langue: {language})"
-        )
-
-    def get_pending(self, tenant_id: str) -> Optional[Dict]:
-        """Récupère le contexte en attente"""
-        return self.pending_clarifications.get(tenant_id)
-
-    def clear_pending(self, tenant_id: str):
-        """Efface le contexte en attente"""
-        if tenant_id in self.pending_clarifications:
-            del self.pending_clarifications[tenant_id]
-            logger.info(f"Clarification résolue pour {tenant_id}")
-
-    def update_accumulated_query(self, tenant_id: str, new_info: str):
-        """Met à jour la requête accumulée sans effacer le contexte"""
-        if tenant_id in self.pending_clarifications:
-            context = self.pending_clarifications[tenant_id]
-            original = context["original_query"]
-
-            # Accumuler avec séparateur
-            context["original_query"] = f"{original} | {new_info}"
-            context["clarification_count"] = context.get("clarification_count", 0) + 1
-            context["timestamp"] = time.time()
-
-            logger.info(
-                f"Requête accumulée (tour {context['clarification_count']}): {context['original_query'][:100]}..."
-            )
-
-    def increment_clarification_attempt(self, tenant_id: str):
-        """Incrémente le compteur de tentatives de clarification"""
-        if tenant_id in self.pending_clarifications:
-            context = self.pending_clarifications[tenant_id]
-            context["clarification_attempts"] = (
-                context.get("clarification_attempts", 0) + 1
-            )
-            logger.info(
-                f"Tentative de clarification #{context['clarification_attempts']} pour {tenant_id}"
-            )
-
-    def is_clarification_response(self, message: str, pending_context: Dict) -> bool:
-        """
-        Détecte si le message est une réponse à une clarification
-
-        VERSION 4.2.3 - AMÉLIORATION CRITIQUE:
-        - Détection robuste âges numériques simples ("35", "35 jours")
-        - Détection races courtes (1-3 mots)
-        - Patterns depuis intents.json (existant)
-        """
-        if not pending_context:
-            return False
-
-        missing = pending_context.get("missing_fields", [])
-        msg = message.lower().strip()
-
-        # PRIORITÉ 1: Détection âge numérique simple
-        if any("age" in field.lower() for field in missing):
-            age_patterns = [
-                r"^\s*(\d+)\s*$",
-                r"^\s*(\d+)\s*(?:jours?|days?|j)\s*$",
-                r"^\s*à\s*(\d+)\s*(?:jours?|j)?\s*$",
-                r"^\s*(\d+)\s*semaines?\s*$",
-                r"^\s*(\d+)\s*weeks?\s*$",
-            ]
-
-            for pattern in age_patterns:
-                if re.search(pattern, msg):
-                    logger.info(f"Détection âge numérique: {message}")
-                    return True
-
-        # PRIORITÉ 2: Détection race simple (mots seuls)
-        if any(
-            "breed" in field.lower() or "race" in field.lower() for field in missing
-        ):
-            words = msg.split()
-
-            if 1 <= len(words) <= 3:
-                known_breeds = [
-                    "ross",
-                    "cobb",
-                    "hubbard",
-                    "aviagen",
-                    "isa",
-                    "lohmann",
-                    "hy-line",
-                    "but",
-                    "308",
-                    "500",
-                    "700",
-                    "708",
-                ]
-
-                if any(breed in msg for breed in known_breeds):
-                    logger.info(f"Détection race courte: {message}")
-                    return True
-
-                if len(words) == 1 and words[0].isdigit() and len(words[0]) == 3:
-                    logger.info(f"Détection variante numérique: {message}")
-                    return True
-
-        # EXISTANT: Vérifier patterns depuis intents.json
-        for field in missing:
-            normalized = field.replace("_days", "").replace("_type", "")
-
-            if normalized not in self.clarification_patterns:
-                continue
-
-            pattern_config = self.clarification_patterns[normalized]
-
-            if pattern_config.get("regex"):
-                if re.search(pattern_config["regex"], msg):
-                    return True
-
-            if pattern_config.get("keywords"):
-                if any(kw in msg for kw in pattern_config["keywords"]):
-                    return True
-
-        return False
-
-    def detect_ambiguous_response(self, message: str) -> bool:
-        """
-        Détecte si la réponse est ambiguë/incertaine
-        """
-        msg_lower = message.lower()
-
-        for pattern in self.AMBIGUOUS_PATTERNS:
-            if re.search(pattern, msg_lower):
-                logger.info(f"Réponse ambiguë détectée: {message}")
-                return True
-
-        return False
-
-    def detect_clarification_abandon(self, message: str) -> bool:
-        """
-        Détecte si l'utilisateur abandonne la clarification
-        """
-        msg_lower = message.lower()
-
-        for pattern in self.ABANDON_PATTERNS:
-            if re.search(pattern, msg_lower):
-                logger.info(f"Abandon de clarification détecté: {message}")
-                return True
-
-        return False
-
-    def generate_clarification_retry(
-        self, original_message: str, missing_field: str, language: str = "fr"
-    ) -> str:
-        """
-        Génère une demande de clarification plus précise
-        après détection d'ambiguïté
-        """
-        retry_templates = {
-            "fr": {
-                "breed": "Pourriez-vous confirmer la race exacte parmi ces options ?\n• Ross 308\n• Cobb 500\n• Hubbard Classic\n• Autre (précisez)",
-                "age": "Pourriez-vous confirmer l'âge exact en jours ? (exemple: 21, 35, 42)",
-                "sex": "Pourriez-vous préciser le sexe ?\n• Mâle\n• Femelle\n• Mixte",
-            },
-            "en": {
-                "breed": "Could you confirm the exact breed from these options?\n• Ross 308\n• Cobb 500\n• Hubbard Classic\n• Other (specify)",
-                "age": "Could you confirm the exact age in days? (example: 21, 35, 42)",
-                "sex": "Could you specify the sex?\n• Male\n• Female\n• Mixed",
-            },
-        }
-
-        field_normalized = missing_field.replace("_days", "").replace("_type", "")
-        templates = retry_templates.get(language, retry_templates["fr"])
-
-        return templates.get(field_normalized, "Pourriez-vous être plus précis ?")
 
 
 # Instance globale du gestionnaire
 context_manager = ConversationContextManager()
 
 
-def generate_clarification_question(
-    missing_fields: List[str], suggestions: Dict, language: str
-) -> str:
-    """Génère une question de clarification naturelle selon la langue"""
-
-    clarification_templates = {
-        "fr": {
-            "breed": "Pour vous donner une réponse précise, pourriez-vous me dire quelle race/souche vous élevez ? (par exemple : Ross 308, Cobb 500, Hubbard)",
-            "age_days": "À quel âge (en jours) souhaitez-vous connaître cette information ?",
-            "sex": "Cette information concerne-t-elle des mâles, des femelles, ou un élevage mixte ?",
-            "metric_type": "Quelle métrique spécifique vous intéresse ? (poids, FCR, mortalité, etc.)",
-            "multiple": "Pour vous aider au mieux, j'ai besoin de quelques précisions :\n{details}",
-        },
-        "en": {
-            "breed": "To give you an accurate answer, could you tell me which breed/strain you're raising? (e.g., Ross 308, Cobb 500, Hubbard)",
-            "age_days": "At what age (in days) would you like this information?",
-            "sex": "Is this information for males, females, or mixed flock?",
-            "metric_type": "Which specific metric are you interested in? (weight, FCR, mortality, etc.)",
-            "multiple": "To help you best, I need a few clarifications:\n{details}",
-        },
-    }
-
-    templates = clarification_templates.get(language, clarification_templates["fr"])
-
-    if len(missing_fields) == 1:
-        field = missing_fields[0]
-        question = templates.get(field, templates.get("breed"))
-
-        if suggestions and field in suggestions:
-            field_suggestions = suggestions[field]
-            if field_suggestions:
-                if language == "fr":
-                    question += f"\n\nSuggestions : {', '.join(field_suggestions[:5])}"
-                else:
-                    question += f"\n\nSuggestions: {', '.join(field_suggestions[:5])}"
-
-        return question
-
-    else:
-        details = []
-        for field in missing_fields:
-            field_template = templates.get(field, "")
-            if field_template and field != "multiple":
-                question_part = field_template.split("?")[0] + "?"
-                details.append(f"- {question_part}")
-
-        if details:
-            return templates["multiple"].format(details="\n".join(details))
-        else:
-            return templates.get("breed", "Pouvez-vous préciser votre question ?")
-
-
 def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
     """Crée les endpoints de chat et streaming avec système JSON"""
 
     router = APIRouter()
+
+    # Initialiser les handlers
+    chat_handlers = ChatHandlers(context_manager, services)
 
     def get_service(name: str) -> Any:
         """Helper pour récupérer un service"""
@@ -890,267 +401,57 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             if not tenant_id or len(tenant_id) > 50:
                 tenant_id = str(uuid.uuid4())[:8]
 
-            # NOUVEAU: Vérifier abandon de clarification
-            pending_context = context_manager.get_pending(tenant_id)
-            rag_result = None
+            # ✅ GESTION DU CONTEXTE DE CLARIFICATION (Tests 4, 8, 11)
+            clarification_result = await chat_handlers.handle_clarification_context(
+                message, tenant_id, language, total_start_time
+            )
 
-            if pending_context and context_manager.detect_clarification_abandon(
-                message
+            # Si c'est un résultat de clarification (abandon, ambiguïté, etc.)
+            if clarification_result and not isinstance(clarification_result, dict):
+                rag_result = clarification_result
+
+            # Si c'est une continuation avec requête accumulée
+            elif clarification_result and clarification_result.get(
+                "continue_processing"
             ):
-                logger.info(f"Abandon clarification pour {tenant_id}")
+                message = clarification_result["accumulated_query"]
+                language = clarification_result["language"]
+                rag_result = None
 
-                # Effacer le contexte en attente
-                context_manager.clear_pending(tenant_id)
+            # Sinon, flux normal
+            else:
+                rag_result = None
 
-                # Extraire contexte partiel
-                partial_entities = pending_context.get("partial_entities", {})
-                age = partial_entities.get("age_days")
-
-                # Générer réponse générique
-                generic_responses = {
-                    "fr": f"Je comprends. Voici une moyenne générale pour les poulets de chair{' à ' + str(age) + ' jours' if age else ''}: Le poids moyen se situe entre 300-2500g selon la souche et l'âge. L'indice de conversion (FCR) est généralement de 1.5-1.9.",
-                    "en": f"I understand. Here's a general average for broilers{' at ' + str(age) + ' days' if age else ''}: Average weight ranges from 300-2500g depending on strain and age. Feed conversion ratio (FCR) is typically 1.5-1.9.",
-                }
-
-                generic_answer = generic_responses.get(
-                    language, generic_responses["fr"]
+            # Si aucun résultat n'a été défini, générer via RAG
+            if rag_result is None:
+                rag_result = await chat_handlers.generate_rag_response(
+                    query=message,
+                    tenant_id=tenant_id,
+                    language=language,
+                    use_json_search=use_json_search,
+                    genetic_line_filter=genetic_line_filter,
+                    performance_context=performance_context,
                 )
 
-                # Créer résultat générique
-                class GenericResult:
-                    def __init__(self, answer):
-                        self.answer = answer
-                        self.source = "generic_fallback"
-                        self.confidence = 0.6
-                        self.processing_time = time.time() - total_start_time
-                        self.metadata = {
-                            "clarification_abandoned": True,
-                            "fallback_used": True,
-                        }
-                        self.context_docs = []
-
-                rag_result = GenericResult(generic_answer)
-
-            # ÉTAPE 1: Vérifier si c'est une réponse à une clarification
-            if rag_result is None:
-                pending_context = context_manager.get_pending(tenant_id)
-
-                if pending_context and context_manager.is_clarification_response(
-                    message, pending_context
-                ):
-                    logger.info(f"Détection réponse clarification pour {tenant_id}")
-
-                    # NOUVEAU: Vérifier ambiguïté AVANT accumulation
-                    if context_manager.detect_ambiguous_response(message):
-                        logger.warning(f"Réponse ambiguë détectée: {message}")
-
-                        # Générer demande de clarification plus précise
-                        missing_fields = pending_context.get("missing_fields", [])
-                        retry_message = context_manager.generate_clarification_retry(
-                            message,
-                            missing_fields[0] if missing_fields else "breed",
-                            language,
-                        )
-
-                        # Incrémenter compteur de tentatives
-                        context_manager.increment_clarification_attempt(tenant_id)
-
-                        # Créer résultat de clarification
-                        class AmbiguityResult:
-                            def __init__(self, question):
-                                self.answer = question
-                                self.source = "needs_clarification"
-                                self.confidence = 0.8
-                                self.processing_time = time.time() - total_start_time
-                                self.metadata = {
-                                    "needs_clarification": True,
-                                    "ambiguous_response_detected": True,
-                                    "clarification_pending": True,
-                                }
-                                self.context_docs = []
-
-                        rag_result = AmbiguityResult(retry_message)
-
-                    else:
-                        # FLUX EXISTANT (accumulation normale)
-                        context_manager.update_accumulated_query(tenant_id, message)
-
-                        # Récupérer la requête accumulée mise à jour
-                        pending_context = context_manager.get_pending(tenant_id)
-                        combined_query = pending_context["original_query"]
-
-                        # Préserver la langue originale
-                        original_language = pending_context.get("original_language")
-                        if original_language:
-                            language = original_language
-                            logger.info(
-                                f"Langue restaurée depuis contexte: {original_language}"
-                            )
-
-                        logger.info(f"Requête accumulée complète: {combined_query}")
-
-                        # Traiter la requête complète
-                        message = combined_query
-
-            # Si aucun résultat n'a été défini (pas d'abandon, pas d'ambiguïté)
-            if rag_result is None:
-                # Logique de réponse avec système JSON
-                use_fallback = False
-                fallback_reason = ""
-
-                rag_engine = get_rag_engine()
-                if rag_engine and safe_get_attribute(
-                    rag_engine, "is_initialized", False
-                ):
-                    try:
-                        if hasattr(rag_engine, "generate_response"):
-                            try:
-                                rag_result = await rag_engine.generate_response(
-                                    query=message,
-                                    tenant_id=tenant_id,
-                                    language=language,
-                                    use_json_search=use_json_search,
-                                    genetic_line_filter=genetic_line_filter,
-                                    performance_context=performance_context,
-                                    enable_preprocessing=True,
-                                )
-
-                                # ÉTAPE 2: Vérifier si contexte insuffisant
-                                if hasattr(rag_result, "metadata"):
-                                    validation_status = rag_result.metadata.get(
-                                        "validation_status"
-                                    )
-
-                                    if validation_status == "needs_fallback":
-                                        logger.warning(
-                                            f"Contexte insuffisant détecté pour {tenant_id}"
-                                        )
-
-                                        missing_fields = rag_result.metadata.get(
-                                            "missing_fields", []
-                                        )
-                                        suggestions = rag_result.metadata.get(
-                                            "suggestions", {}
-                                        )
-
-                                        # Si pas encore en attente, marquer maintenant
-                                        pending_context = context_manager.get_pending(
-                                            tenant_id
-                                        )
-                                        if not pending_context:
-                                            context_manager.mark_pending(
-                                                tenant_id=tenant_id,
-                                                original_query=message,
-                                                missing_fields=missing_fields,
-                                                suggestions=suggestions,
-                                                language=language,
-                                            )
-                                        # Sinon, mettre à jour les champs manquants
-                                        else:
-                                            context_manager.pending_clarifications[
-                                                tenant_id
-                                            ]["missing_fields"] = missing_fields
-                                            context_manager.pending_clarifications[
-                                                tenant_id
-                                            ]["suggestions"] = suggestions
-
-                                        # Utiliser le message déjà généré par le validator
-                                        clarification_msg = rag_result.answer
-
-                                        # Fallback si pas de message dans answer (sécurité)
-                                        if not clarification_msg:
-                                            clarification_msg = (
-                                                generate_clarification_question(
-                                                    missing_fields=missing_fields,
-                                                    suggestions=suggestions,
-                                                    language=language,
-                                                )
-                                            )
-
-                                        logger.info(
-                                            f"Question de clarification: {clarification_msg[:100]}..."
-                                        )
-
-                                        # Créer un résultat spécial pour la clarification
-                                        class ClarificationResult:
-                                            def __init__(self, question, missing):
-                                                self.answer = question
-                                                self.source = "needs_clarification"
-                                                self.confidence = 0.9
-                                                self.processing_time = (
-                                                    time.time() - total_start_time
-                                                )
-                                                self.metadata = {
-                                                    "needs_clarification": True,
-                                                    "missing_fields": missing,
-                                                    "original_query": message,
-                                                    "clarification_pending": True,
-                                                }
-                                                self.context_docs = []
-
-                                        rag_result = ClarificationResult(
-                                            clarification_msg, missing_fields
-                                        )
-
-                                    else:
-                                        # Validation réussie: effacer le contexte en attente
-                                        pending_context = context_manager.get_pending(
-                                            tenant_id
-                                        )
-                                        if pending_context:
-                                            logger.info(
-                                                f"Requête complète validée pour {tenant_id}"
-                                            )
-                                            context_manager.clear_pending(tenant_id)
-
-                                logger.info(
-                                    f"RAG generate_response réussi (JSON: {use_json_search}, preprocessing: enabled)"
-                                )
-
-                            except Exception as generate_error:
-                                logger.warning(
-                                    f"generate_response échoué: {generate_error}"
-                                )
-                                use_fallback = True
-                                fallback_reason = (
-                                    f"generate_response_failed: {str(generate_error)}"
-                                )
-                        else:
-                            use_fallback = True
-                            fallback_reason = "generate_response_not_available"
-
-                    except Exception as e:
-                        logger.error(f"Erreur générale RAG: {e}")
-                        use_fallback = True
-                        fallback_reason = f"rag_general_error: {str(e)}"
-                else:
-                    use_fallback = True
-                    fallback_reason = "rag_not_initialized"
-
-                if use_fallback or not rag_result:
-                    logger.info(
-                        f"Utilisation fallback aviculture - Raison: {fallback_reason}"
+                # ✅ VÉRIFIER SI CONTEXTE INSUFFISANT (demande de clarification)
+                if rag_result:
+                    validation_check = await chat_handlers.handle_validation_status(
+                        rag_result, message, tenant_id, language, total_start_time
                     )
 
-                    aviculture_response = get_aviculture_response(message, language)
+                    if validation_check:
+                        rag_result = validation_check
 
-                    class FallbackResult:
-                        def __init__(self, answer, reason):
-                            self.answer = answer
-                            self.source = "aviculture_fallback"
-                            self.confidence = 0.8
-                            self.processing_time = time.time() - total_start_time
-                            self.metadata = {
-                                "fallback_used": True,
-                                "fallback_reason": reason,
-                                "source_type": "integrated_knowledge",
-                                "json_system_attempted": use_json_search,
-                                "genetic_line_filter": genetic_line_filter,
-                                "preprocessing_enabled": True,
-                            }
-                            self.context_docs = []
-
-                    rag_result = FallbackResult(aviculture_response, fallback_reason)
+                # Si toujours pas de résultat, utiliser fallback
+                if not rag_result:
+                    rag_result = chat_handlers.create_fallback_result(
+                        message=message,
+                        language=language,
+                        fallback_reason="rag_not_available",
+                        total_start_time=total_start_time,
+                        use_json_search=use_json_search,
+                        genetic_line_filter=genetic_line_filter,
+                    )
 
             total_processing_time = time.time() - total_start_time
             metrics_collector.record_query(
@@ -1158,147 +459,12 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             )
 
             # Streaming de la réponse
-            async def generate_response():
-                try:
-                    metadata = safe_get_attribute(rag_result, "metadata", {}) or {}
-                    source = safe_get_attribute(rag_result, "source", "unknown")
-                    confidence = safe_get_attribute(rag_result, "confidence", 0.5)
-                    processing_time = safe_get_attribute(
-                        rag_result, "processing_time", 0
-                    )
-
-                    if hasattr(source, "value"):
-                        source = source.value
-                    else:
-                        source = str(source)
-
-                    # Récupérer le contexte actuel pour les métadonnées
-                    current_pending = context_manager.get_pending(tenant_id)
-
-                    start_data = {
-                        "type": "start",
-                        "source": source,
-                        "confidence": float(confidence),
-                        "processing_time": float(processing_time),
-                        "fallback_used": safe_dict_get(
-                            metadata, "fallback_used", False
-                        ),
-                        "architecture": "modular-endpoints-json-improved",
-                        "serialization_version": "optimized_cached",
-                        "preprocessing_enabled": True,
-                        "needs_clarification": metadata.get(
-                            "needs_clarification", False
-                        ),
-                        "clarification_count": (
-                            current_pending.get("clarification_count", 0)
-                            if current_pending
-                            else 0
-                        ),
-                        "clarification_attempts": (
-                            current_pending.get("clarification_attempts", 0)
-                            if current_pending
-                            else 0
-                        ),
-                        "ambiguous_response_detected": metadata.get(
-                            "ambiguous_response_detected", False
-                        ),
-                        "clarification_abandoned": metadata.get(
-                            "clarification_abandoned", False
-                        ),
-                        "json_system_used": metadata.get("json_system", {}).get(
-                            "used", False
-                        ),
-                        "json_results_count": metadata.get("json_system", {}).get(
-                            "results_count", 0
-                        ),
-                        "genetic_line_detected": metadata.get("json_system", {}).get(
-                            "genetic_line_filter"
-                        ),
-                    }
-
-                    yield sse_event(safe_serialize_for_json(start_data))
-
-                    answer = safe_get_attribute(rag_result, "answer", "")
-                    if not answer:
-                        answer = safe_get_attribute(rag_result, "response", "")
-                        if not answer:
-                            answer = safe_get_attribute(rag_result, "text", "")
-                            if not answer:
-                                answer = get_aviculture_response(message, language)
-
-                    if answer:
-                        chunks = smart_chunk_text(str(answer), STREAM_CHUNK_LEN)
-                        for i, chunk in enumerate(chunks):
-                            yield sse_event(
-                                {"type": "chunk", "content": chunk, "chunk_index": i}
-                            )
-                            await asyncio.sleep(0.01)
-
-                    context_docs = safe_get_attribute(rag_result, "context_docs", [])
-                    if not isinstance(context_docs, list):
-                        context_docs = []
-
-                    documents_used = 0
-                    if hasattr(rag_result, "metadata") and rag_result.metadata:
-                        documents_used = rag_result.metadata.get("documents_used", 0)
-
-                    if documents_used == 0:
-                        documents_used = len(context_docs)
-
-                    end_data = {
-                        "type": "end",
-                        "total_time": total_processing_time,
-                        "confidence": float(confidence),
-                        "documents_used": documents_used,
-                        "source": source,
-                        "architecture": "modular-endpoints-json-improved",
-                        "preprocessing_enabled": True,
-                        "needs_clarification": metadata.get(
-                            "needs_clarification", False
-                        ),
-                        "clarification_pending": metadata.get(
-                            "clarification_pending", False
-                        ),
-                        "clarification_count": (
-                            current_pending.get("clarification_count", 0)
-                            if current_pending
-                            else 0
-                        ),
-                        "clarification_attempts": (
-                            current_pending.get("clarification_attempts", 0)
-                            if current_pending
-                            else 0
-                        ),
-                        "ambiguous_response_detected": metadata.get(
-                            "ambiguous_response_detected", False
-                        ),
-                        "clarification_abandoned": metadata.get(
-                            "clarification_abandoned", False
-                        ),
-                        "json_system_used": metadata.get("json_system", {}).get(
-                            "used", False
-                        ),
-                        "json_results_count": metadata.get("json_system", {}).get(
-                            "results_count", 0
-                        ),
-                        "genetic_lines_detected": metadata.get("json_system", {}).get(
-                            "genetic_lines_detected", []
-                        ),
-                        "detection_version": "4.2.3_improved",
-                    }
-
-                    yield sse_event(safe_serialize_for_json(end_data))
-
-                    if answer and source and not metadata.get("needs_clarification"):
-                        add_to_conversation_memory(
-                            tenant_id, message, str(answer), "rag_enhanced_json"
-                        )
-
-                except Exception as e:
-                    logger.error(f"Erreur streaming: {e}")
-                    yield sse_event({"type": "error", "message": str(e)})
-
-            return StreamingResponse(generate_response(), media_type="text/plain")
+            return StreamingResponse(
+                chat_handlers.generate_streaming_response(
+                    rag_result, message, tenant_id, language, total_processing_time
+                ),
+                media_type="text/plain",
+            )
 
         except HTTPException:
             raise
@@ -1325,26 +491,16 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 if request.age_range:
                     performance_context["age_range"] = request.age_range
 
-            rag_result = None
-            rag_engine = get_rag_engine()
+            rag_result = await chat_handlers.generate_rag_response(
+                query=request.question,
+                tenant_id=request.user_id or str(uuid.uuid4())[:8],
+                language=request.language,
+                use_json_search=request.use_json_search,
+                genetic_line_filter=request.genetic_line,
+                performance_context=performance_context,
+            )
 
-            if rag_engine and safe_get_attribute(rag_engine, "is_initialized", False):
-                try:
-                    rag_result = await rag_engine.generate_response(
-                        query=request.question,
-                        tenant_id=request.user_id or str(uuid.uuid4())[:8],
-                        language=request.language,
-                        use_json_search=request.use_json_search,
-                        genetic_line_filter=request.genetic_line,
-                        performance_context=performance_context,
-                        enable_preprocessing=True,
-                    )
-                except Exception as e:
-                    logger.error(f"Erreur expert chat: {e}")
-                    raise HTTPException(
-                        status_code=500, detail=f"Erreur traitement: {str(e)}"
-                    )
-            else:
+            if not rag_result:
                 raise HTTPException(status_code=503, detail="RAG Engine non disponible")
 
             async def generate_expert_response():
@@ -1527,11 +683,12 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 test_results["json_search"] = {"success": False, "error": str(e)}
 
             try:
-                generation_result = await rag_engine.generate_response(
+                generation_result = await chat_handlers.generate_rag_response(
                     query="Quel est le poids cible Ross 308 à 35 jours ?",
+                    tenant_id="test",
+                    language="fr",
                     use_json_search=True,
                     genetic_line_filter="ross308",
-                    enable_preprocessing=True,
                 )
 
                 metadata = getattr(generation_result, "metadata", {})
@@ -1607,13 +764,12 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 try:
                     start_time = time.time()
 
-                    result = await rag_engine.generate_response(
+                    result = await chat_handlers.generate_rag_response(
                         query=query,
                         tenant_id="test_ross308",
                         language="fr",
                         use_json_search=True,
                         genetic_line_filter="ross308",
-                        enable_preprocessing=True,
                     )
 
                     processing_time = time.time() - start_time

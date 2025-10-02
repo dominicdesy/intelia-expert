@@ -2,12 +2,12 @@
 """
 entity_extractor.py - Extracteur d'entités centralisé
 Remplace la logique éparpillée dans comparative_detector, query_preprocessor, etc.
-Version 2.1 - Migration vers breeds_registry dynamique + CONVERSION SEMAINES → JOURS
+Version 3.0 - Améliorations robustesse + support breeds_registry complet
 """
 
 import re
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -86,55 +86,61 @@ class EntityExtractor:
     """
     Extracteur d'entités unifié pour toutes les requêtes avicoles
 
-    Fonctionnalités:
+    Fonctionnalités v3.0:
     - Extraction breed, age, sex, metric avec patterns dynamiques depuis breeds_registry
-    - Détection de confiance par entité
-    - Support multi-patterns pour robustesse
-    - Normalisation automatique des valeurs
-    - 🆕 Conversion automatique semaines → jours
-
-    Version 2.1: Utilise breeds_registry + conversion semaines
+    - Support complet des 51 races + tous aliases
+    - Détection robuste dans phrases complètes
+    - Conversion automatique semaines → jours
+    - Gestion aliases complexes (avec /, -, etc.)
+    - Limites d'âge adaptatives (broilers vs layers)
+    - Validation complète via breeds_registry
     """
 
-    # Patterns centralisés - Sex (statiques, pas de races)
+    # Patterns centralisés - Sex (statiques)
     SEX_PATTERNS = {
         "male": [
             r"\bm[aâ]les?\b",
             r"\bmale\b",
             r"\bcoq(?:s)?\b",
             r"\bmasculin\b",
+            r"\brooster(?:s)?\b",
         ],
         "female": [
             r"\bfemelles?\b",
             r"\bfemale\b",
             r"\bpoule(?:s)?\b",
             r"\bf[ée]minin\b",
+            r"\bhen(?:s)?\b",
         ],
         "mixed": [
             r"\bmixte\b",
             r"\bmixed\b",
-            r"\bas\s*hatched\b",
+            r"\bas[\s\-_]?hatched\b",
+            r"\bsexes?\s+m[ée]lang[ée]s?\b",
         ],
     }
 
-    # 🆕 NOUVEAUX PATTERNS - Semaines (pour conversion automatique)
+    # Patterns semaines (pour conversion automatique)
     WEEK_PATTERNS = [
         r"(\d+)\s*semaines?",
         r"(\d+)\s*weeks?",
         r"(\d+)\s*sem\b",
         r"(\d+)\s*w\b",
+        r"(\d+)(?:e|ème|eme)?\s+semaine",
     ]
 
-    # Patterns centralisés - Age en jours (statiques)
+    # Patterns age en jours
     AGE_PATTERNS = [
         r"(\d+)\s*(?:jours?|days?|j)\b",
         r"à\s+(\d+)\s*(?:jours?|j)\b",
         r"age\s+(?:de\s+)?(\d+)",
         r"\b(\d+)\s*j\b",
         r"(\d+)(?:e|ème|eme)?\s+jour",
+        r"day\s+(\d+)",
+        r"\bD(\d+)\b",  # Format D35
     ]
 
-    # Patterns centralisés - Metrics (statiques)
+    # Patterns métriques
     METRIC_PATTERNS = {
         "weight": [
             "poids",
@@ -142,6 +148,7 @@ class EntityExtractor:
             "body weight",
             "poids vif",
             "masse",
+            "bw",
         ],
         "fcr": [
             "fcr",
@@ -157,6 +164,8 @@ class EntityExtractor:
             "mort",
             "décès",
             "pertes",
+            "viabilité",
+            "viability",
         ],
         "gain": [
             "gain",
@@ -165,12 +174,14 @@ class EntityExtractor:
             "gmq",
             "daily gain",
             "gain quotidien",
+            "adg",
         ],
         "feed_intake": [
             "consommation",
             "feed intake",
             "aliment",
             "ingéré",
+            "intake",
         ],
         "production": [
             "production",
@@ -178,8 +189,27 @@ class EntityExtractor:
             "laying",
             "œufs",
             "eggs",
+            "egg production",
+        ],
+        "water": [
+            "eau",
+            "water",
+            "hydratation",
+            "water consumption",
         ],
     }
+
+    # Mots-clés pour détection pondeuses/reproducteurs
+    LAYER_KEYWORDS = [
+        "ponte",
+        "poule",
+        "layer",
+        "production",
+        "œuf",
+        "egg",
+        "pondeuse",
+        "laying",
+    ]
 
     def __init__(self, intents_config_path: str = "config/intents.json"):
         """
@@ -195,8 +225,8 @@ class EntityExtractor:
         self._compile_patterns()
 
         logger.info(
-            f"EntityExtractor initialisé avec breeds_registry "
-            f"({len(self.breeds_registry.get_all_breeds())} races) + conversion semaines"
+            f"EntityExtractor v3.0 initialisé avec breeds_registry "
+            f"({len(self.breeds_registry.get_all_breeds())} races)"
         )
 
     def _compile_patterns(self):
@@ -213,7 +243,7 @@ class EntityExtractor:
                 re.compile(p, re.IGNORECASE) for p in patterns
             ]
 
-        # 🆕 Compilation semaines (PRIORITÉ sur jours)
+        # Compilation semaines (PRIORITÉ sur jours)
         self.compiled_weeks = [re.compile(p, re.IGNORECASE) for p in self.WEEK_PATTERNS]
 
         # Compilation age (statique)
@@ -229,7 +259,7 @@ class EntityExtractor:
     def _build_breed_patterns_from_registry(self):
         """
         Construit les patterns de breeds depuis le breeds_registry
-        Remplace les patterns hardcodés
+        Version améliorée avec gestion aliases complexes
         """
         for breed in self.breeds_registry.get_all_breeds():
             # Récupérer tous les aliases pour cette race
@@ -251,36 +281,84 @@ class EntityExtractor:
             self.compiled_breed[breed] = patterns
 
         logger.debug(
-            f"Patterns de breeds générés pour {len(self.compiled_breed)} races"
+            f"Patterns de breeds générés pour {len(self.compiled_breed)} races "
+            f"avec {sum(len(p) for p in self.compiled_breed.values())} patterns totaux"
         )
 
     def _create_pattern_from_text(self, text: str) -> str:
         """
         Crée un pattern regex flexible depuis un texte
+        Version améliorée pour gérer aliases complexes
 
         Args:
-            text: Texte source (ex: "ross 308", "cobb500")
+            text: Texte source (ex: "ross 308", "308/308 FF", "cobb-500")
 
         Returns:
             Pattern regex string
         """
-        # Échapper les caractères spéciaux
+        # Cas spécial 1: Aliases avec slash (308/308 FF)
+        if "/" in text:
+            # "308/308 FF" → "308[\s/]*308[\s]*FF"
+            parts = text.split("/")
+            escaped_parts = [re.escape(part.strip()) for part in parts]
+            pattern = r"[\s/]*".join(escaped_parts)
+            # Utiliser lookahead/lookbehind au lieu de \b
+            return r"(?<!\w)" + pattern + r"(?!\w)"
+
+        # Cas spécial 2: Nombres seuls (308, 500, 700)
+        if text.isdigit() and len(text) == 3:
+            # Éviter de matcher "2308" ou "5000"
+            return r"(?<!\d)" + re.escape(text) + r"(?!\d)"
+
+        # Cas standard: Échapper et rendre flexible
         escaped = re.escape(text)
 
         # Remplacer les espaces par des patterns flexibles
-        # "ross 308" -> "ross\s*308" (permet "ross308", "ross 308", "ross-308")
+        # Permet "ross 308", "ross308", "ross-308"
         pattern = escaped.replace(r"\ ", r"[\s\-_]*")
 
-        # Ajouter des word boundaries pour éviter les faux positifs
-        pattern = r"\b" + pattern + r"\b"
+        # Remplacer tirets échappés par patterns flexibles
+        pattern = pattern.replace(r"\-", r"[\s\-_]*")
 
-        return pattern
+        # Utiliser lookahead/lookbehind pour plus de flexibilité
+        # Meilleur que \b pour gérer tirets et caractères spéciaux
+        return r"(?<!\w)" + pattern + r"(?!\w)"
+
+    def _get_max_age_for_query(self, query: str) -> int:
+        """
+        Détermine la limite d'âge maximale selon le contexte
+        Version 3.0: Adaptatif selon type d'oiseau
+
+        Args:
+            query: Requête utilisateur
+
+        Returns:
+            Limite max en jours (100 pour broilers, 600 pour layers)
+        """
+        query_lower = query.lower()
+
+        # Détecter si contexte pondeuse/reproducteur
+        if any(keyword in query_lower for keyword in self.LAYER_KEYWORDS):
+            logger.debug("Contexte pondeuse détecté → limite 600 jours")
+            return 600
+
+        # Détecter via breed si disponible
+        for breed in self.breeds_registry.get_all_breeds():
+            if breed.lower() in query_lower:
+                species = self.breeds_registry.get_species(breed)
+                if species in ["layer", "breeder"]:
+                    logger.debug(f"Breed {breed} ({species}) → limite 600 jours")
+                    return 600
+
+        # Défaut: broilers
+        return 100
 
     def extract(
         self, query: str, entities_hint: Dict[str, Any] = None
     ) -> ExtractedEntities:
         """
         Extraction complète des entités depuis une requête
+        Version 3.0: Support phrases complètes + validation renforcée
 
         Args:
             query: Requête utilisateur
@@ -313,9 +391,9 @@ class EntityExtractor:
             if breed_result["value"]:
                 entities.raw_matches["breed"] = breed_result["match_text"]
 
-        # 🆕 Extraction age avec conversion semaines (si pas déjà défini)
+        # Extraction age avec conversion semaines (si pas déjà défini)
         if not entities.age_days:
-            age_result = self._extract_age_with_unit_conversion(query_lower)
+            age_result = self._extract_age_with_unit_conversion(query_lower, query)
             entities.age_days = age_result["value"]
             entities.confidence_breakdown["age"] = age_result["confidence"]
             entities.has_explicit_age = age_result["explicit"]
@@ -346,7 +424,7 @@ class EntityExtractor:
         entities.confidence = self._calculate_overall_confidence(entities)
 
         logger.debug(
-            f"Extraction completée: {entities.get_entity_count()} entités, "
+            f"Extraction complétée: {entities.get_entity_count()} entités, "
             f"confiance={entities.confidence:.2f}"
         )
 
@@ -355,27 +433,38 @@ class EntityExtractor:
     def _extract_breed(self, query: str) -> Dict[str, Any]:
         """
         Extrait la souche avec confiance en utilisant breeds_registry
+        Version 3.0: Support phrases complètes + aliases complexes
 
         Returns:
             Dict avec 'value', 'confidence', 'explicit', 'match_text'
         """
-        for breed_name, patterns in self.compiled_breed.items():
+        # Trier races par longueur décroissante pour matcher les plus spécifiques
+        sorted_breeds = sorted(
+            self.compiled_breed.items(), key=lambda x: len(x[0]), reverse=True
+        )
+
+        for breed_name, patterns in sorted_breeds:
             for idx, pattern in enumerate(patterns):
                 match = pattern.search(query)
                 if match:
                     # Normaliser via breeds_registry pour obtenir le nom canonique
-                    normalized = self.breeds_registry.normalize_breed_name(
-                        match.group(0)
-                    )
+                    matched_text = match.group(0)
+                    normalized = self.breeds_registry.normalize_breed_name(matched_text)
 
                     # Confiance basée sur la spécificité du pattern
-                    confidence = 0.95 if idx == 0 else 0.85 - (idx * 0.1)
+                    # Pattern 0 = canonique (0.98), aliases (0.95 → 0.85)
+                    confidence = 0.98 if idx == 0 else max(0.95 - (idx * 0.05), 0.75)
+
+                    logger.debug(
+                        f"Breed détecté: '{matched_text}' → '{normalized or breed_name}' "
+                        f"(confiance={confidence:.2f})"
+                    )
 
                     return {
                         "value": normalized or breed_name,
-                        "confidence": max(confidence, 0.6),
+                        "confidence": confidence,
                         "explicit": True,
-                        "match_text": match.group(0),
+                        "match_text": matched_text,
                     }
 
         return {
@@ -385,23 +474,26 @@ class EntityExtractor:
             "match_text": None,
         }
 
-    def _extract_age_with_unit_conversion(self, query: str) -> Dict[str, Any]:
+    def _extract_age_with_unit_conversion(
+        self, query: str, original_query: str = None
+    ) -> Dict[str, Any]:
         """
-        🆕 NOUVELLE MÉTHODE: Extrait l'âge avec conversion automatique semaines → jours
+        Extrait l'âge avec conversion automatique semaines → jours
+        Version 3.0: Limites adaptatives + meilleure détection
 
         Priorité de détection:
         1. SEMAINES d'abord (3 semaines → 21 jours)
         2. JOURS ensuite (si pas de semaines détectées)
 
-        Exemples:
-        - "3 semaines" → 21 jours
-        - "5 weeks" → 35 jours
-        - "2 sem" → 14 jours
-        - "21 jours" → 21 jours (pas de conversion)
+        Args:
+            query: Requête en minuscules
+            original_query: Requête originale (pour détection contexte)
 
         Returns:
             Dict avec 'value', 'confidence', 'explicit', 'match_text'
         """
+        # Déterminer limite max selon contexte
+        max_age = self._get_max_age_for_query(original_query or query)
 
         # 1️⃣ PRIORITÉ 1: Chercher SEMAINES d'abord
         for idx, pattern in enumerate(self.compiled_weeks):
@@ -410,21 +502,25 @@ class EntityExtractor:
                 try:
                     weeks = int(match.group(1))
 
-                    # Validation plausibilité (0-20 semaines = 0-140 jours)
-                    if 0 <= weeks <= 20:
+                    # Validation plausibilité (0-85 semaines pour layers)
+                    max_weeks = 85 if max_age == 600 else 20
+                    if 0 <= weeks <= max_weeks:
                         days = weeks * 7
                         logger.info(
-                            f"✅ Conversion automatique: {weeks} semaine(s) → {days} jours"
+                            f"Conversion automatique: {weeks} semaine(s) → {days} jours"
                         )
 
                         return {
                             "value": days,
-                            "confidence": 0.95,  # Haute confiance
+                            "confidence": 0.95,
                             "explicit": True,
                             "match_text": f"{match.group(0)} (converti: {days}j)",
                         }
                     else:
-                        logger.warning(f"Nombre de semaines hors plage: {weeks}")
+                        logger.warning(
+                            f"Nombre de semaines hors plage: {weeks} "
+                            f"(max: {max_weeks})"
+                        )
 
                 except (ValueError, IndexError) as e:
                     logger.debug(f"Erreur parsing semaines: {e}")
@@ -437,9 +533,11 @@ class EntityExtractor:
                 try:
                     age_value = int(match.group(1))
 
-                    # Validation plausibilité (0-100 jours)
-                    if 0 <= age_value <= 100:
+                    # Validation avec limite adaptative
+                    if 0 <= age_value <= max_age:
                         confidence = 0.95 if idx == 0 else 0.9
+                        logger.debug(f"Âge détecté: {age_value} jours (max={max_age})")
+
                         return {
                             "value": age_value,
                             "confidence": confidence,
@@ -447,7 +545,10 @@ class EntityExtractor:
                             "match_text": match.group(0),
                         }
                     else:
-                        logger.warning(f"Âge hors plage détecté: {age_value}")
+                        logger.warning(
+                            f"Âge hors plage détecté: {age_value} "
+                            f"(max={max_age}, contexte={'layer' if max_age == 600 else 'broiler'})"
+                        )
 
                 except (ValueError, IndexError) as e:
                     logger.debug(f"Erreur parsing age: {e}")
@@ -463,13 +564,13 @@ class EntityExtractor:
 
     def _extract_age(self, query: str) -> Dict[str, Any]:
         """
-        ⚠️ DÉPRÉCIÉ: Utiliser _extract_age_with_unit_conversion() à la place
+        DÉPRÉCIÉ: Utiliser _extract_age_with_unit_conversion() à la place
 
         Méthode conservée pour compatibilité ascendante.
         Redirige vers la nouvelle méthode avec conversion.
         """
         logger.warning(
-            "⚠️ _extract_age() est déprécié, utiliser _extract_age_with_unit_conversion()"
+            "_extract_age() est déprécié, utiliser _extract_age_with_unit_conversion()"
         )
         return self._extract_age_with_unit_conversion(query)
 
@@ -514,8 +615,7 @@ class EntityExtractor:
             for idx, keyword in enumerate(keywords):
                 if keyword in query:
                     # Confiance basée sur position dans liste (plus spécifique = plus haut)
-                    confidence = 0.9 if idx == 0 else 0.8 - (idx * 0.05)
-                    confidence = max(confidence, 0.5)
+                    confidence = 0.9 if idx == 0 else max(0.8 - (idx * 0.05), 0.5)
 
                     if confidence > best_confidence:
                         best_confidence = confidence
@@ -537,7 +637,7 @@ class EntityExtractor:
             breed: Nom de breed normalisé
 
         Returns:
-            Nom de la lignée génétique (ex: "broiler", "layer")
+            Nom de la lignée génétique (ex: "Broiler", "Layer")
         """
         # Utiliser get_species pour obtenir le type
         species = self.breeds_registry.get_species(breed)
@@ -590,6 +690,7 @@ class EntityExtractor:
     def extract_multiple_values(self, query: str, entity_type: EntityType) -> List[Any]:
         """
         Extrait potentiellement plusieurs valeurs d'un même type
+        Version 3.0: Évite duplications avec tracking positions
         Utile pour requêtes comparatives (ex: "mâle et femelle")
 
         Args:
@@ -623,34 +724,59 @@ class EntityExtractor:
                         break
 
         elif entity_type == EntityType.AGE:
-            # 🆕 Extraction de multiples âges avec conversion semaines
-            # 1. Chercher semaines
+            # Tracking des positions déjà matchées pour éviter duplications
+            matched_positions: Set[Tuple[int, int]] = set()
+
+            # 1. Chercher semaines D'ABORD
             for pattern in self.compiled_weeks:
                 for match in pattern.finditer(query_lower):
-                    try:
-                        weeks = int(match.group(1))
-                        if 0 <= weeks <= 20:
-                            days = weeks * 7
-                            if days not in values:
-                                values.append(days)
-                    except (ValueError, IndexError):
-                        continue
+                    span = match.span()
+                    if span not in matched_positions:
+                        try:
+                            weeks = int(match.group(1))
+                            max_age = self._get_max_age_for_query(query)
+                            max_weeks = 85 if max_age == 600 else 20
 
-            # 2. Chercher jours
+                            if 0 <= weeks <= max_weeks:
+                                days = weeks * 7
+                                if days not in values:
+                                    values.append(days)
+                                    matched_positions.add(span)
+                                    logger.debug(
+                                        f"Multi-age: {weeks}w → {days}d "
+                                        f"(pos {span})"
+                                    )
+                        except (ValueError, IndexError):
+                            continue
+
+            # 2. Chercher jours ENSUITE (skip si position déjà matchée)
             for pattern in self.compiled_age:
                 for match in pattern.finditer(query_lower):
-                    try:
-                        age = int(match.group(1))
-                        if 0 <= age <= 100 and age not in values:
-                            values.append(age)
-                    except (ValueError, IndexError):
-                        continue
+                    span = match.span()
+                    # Vérifier overlap avec positions déjà matchées
+                    overlaps = any(
+                        span[0] <= pos[1] and span[1] >= pos[0]
+                        for pos in matched_positions
+                    )
 
-        return values
+                    if not overlaps:
+                        try:
+                            age = int(match.group(1))
+                            max_age = self._get_max_age_for_query(query)
+
+                            if 0 <= age <= max_age and age not in values:
+                                values.append(age)
+                                matched_positions.add(span)
+                                logger.debug(f"Multi-age: {age}d (pos {span})")
+                        except (ValueError, IndexError):
+                            continue
+
+        return sorted(values) if entity_type == EntityType.AGE else values
 
     def validate_extraction(self, entities: ExtractedEntities) -> Dict[str, Any]:
         """
         Valide les entités extraites en utilisant breeds_registry
+        Version 3.0: Validation renforcée
 
         Returns:
             Dict avec 'is_valid', 'errors', 'warnings'
@@ -666,12 +792,26 @@ class EntityExtractor:
             elif canonical != entities.breed:
                 warnings.append(f"Race normalisée: {entities.breed} -> {canonical}")
 
-        # Validation âge
+        # Validation âge avec limites adaptatives
         if entities.age_days is not None:
             if entities.age_days < 0:
                 errors.append(f"Âge négatif: {entities.age_days}")
+            elif entities.age_days > 600:
+                errors.append(f"Âge hors limites: {entities.age_days} jours (max: 600)")
             elif entities.age_days > 100:
-                warnings.append(f"Âge inhabituel: {entities.age_days} jours")
+                # Vérifier si contexte pondeuse
+                if entities.breed:
+                    species = self.breeds_registry.get_species(entities.breed)
+                    if species == "broiler":
+                        warnings.append(
+                            f"Âge inhabituel pour broiler: {entities.age_days} jours "
+                            f"(max recommandé: 100)"
+                        )
+                else:
+                    warnings.append(
+                        f"Âge élevé: {entities.age_days} jours "
+                        f"(attendu <100 pour broilers)"
+                    )
 
         # Validation confiance
         if entities.confidence < 0.3:
@@ -680,9 +820,9 @@ class EntityExtractor:
             )
 
         # Validation cohérence breed + genetic_line via registry
-        if entities.breed:
+        if entities.breed and entities.genetic_line:
             expected_species = self.breeds_registry.get_species(entities.breed)
-            if expected_species and entities.genetic_line:
+            if expected_species:
                 if expected_species.lower() != entities.genetic_line.lower():
                     warnings.append(
                         f"Incohérence breed/species: {entities.breed} "
@@ -707,48 +847,49 @@ def create_entity_extractor(
 
 # Tests unitaires
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
+
+    print("=" * 70)
+    print("INITIALISATION ENTITY EXTRACTOR v3.0")
+    print("=" * 70)
 
     extractor = EntityExtractor()
 
-    test_queries = [
-        "Quel est le poids d'un Cobb 500 mâle à 21 jours ?",
-        "FCR du Ross 308 femelle à 35j",
-        "Différence de mortalité entre mâle et femelle",
-        "Croissance d'un poulet de 0 à 42 jours",
-        "Comparer ross308 et cobb500",
-        "ISA Brown pondeuse",
-        # 🆕 NOUVEAUX TESTS - Conversion semaines
-        "Poids à 3 semaines pour Ross 308",
-        "FCR à 5 weeks",
-        "Comparaison 2 sem vs 4 sem",
-        "Performance de 1 à 8 semaines",
-    ]
-
-    print("=" * 70)
-    print("🧪 TESTS ENTITY EXTRACTOR - VERSION 2.1 avec CONVERSION SEMAINES")
-    print("=" * 70)
-
-    # Test 1: Résumé breeds_registry
-    print(
-        f"\n📊 Breeds Registry: {len(extractor.breeds_registry.get_all_breeds())} races chargées"
-    )
+    # Résumé breeds_registry
+    print(f"\nBreeds Registry: {len(extractor.breeds_registry.get_all_breeds())} races")
     summary = extractor.breeds_registry.get_breeds_summary()
     print(f"  - Broilers: {summary['broilers']}")
     print(f"  - Layers: {summary['layers']}")
     print(f"  - Breeders: {summary['breeders']}")
+    print(f"  - Total aliases: {summary['aliases_total']}")
 
     print("\n" + "=" * 70)
-    print("EXTRACTION TESTS")
+    print("TESTS CRITIQUES - VERSION 3.0")
     print("=" * 70)
 
-    for query in test_queries:
-        print(f"\nQuery: {query}")
-        entities = extractor.extract(query)
-        print(f"  Breed: {entities.breed}")
-        print(f"  Age: {entities.age_days}")
+    critical_tests = {
+        "Test 11 - Phrase longue": "J'élève du Cobb 500 dans mon exploitation et j'aimerais connaître le poids",
+        "Test 12 - Conversion semaines": "Poids à 3 semaines pour Ross 308",
+        "Alias complexe avec /": "Performance 308/308 FF mâles à 35 jours",
+        "Race rare slow-growing": "Croissance Sasso X44 à 56 jours",
+        "Nouvelle race Arbor Acres": "FCR Arbor Acres à 42 jours",
+        "Alias numérique seul": "Poids 500 à 35j",
+        "Pondeuse âge élevé": "Production ISA Brown à 200 jours",
+        "Multiple âges": "Comparer 2 semaines et 35 jours",
+        "Format D35": "Poids Ross 308 D35",
+        "Alias JA87": "Performance Hubbard JA87",
+    }
 
-        # 🆕 Afficher info conversion si applicable
+    for test_name, query in critical_tests.items():
+        print(f"\n{test_name}:")
+        print(f"  Query: {query}")
+
+        entities = extractor.extract(query)
+        validation = extractor.validate_extraction(entities)
+
+        print(f"  Breed: {entities.breed} {'✓' if entities.breed else '✗'}")
+        print(f"  Age: {entities.age_days} {'✓' if entities.age_days else '✗'}")
+
         if entities.raw_matches.get("age") and "converti" in str(
             entities.raw_matches.get("age")
         ):
@@ -756,31 +897,46 @@ if __name__ == "__main__":
 
         print(f"  Sex: {entities.sex}")
         print(f"  Metric: {entities.metric_type}")
-        print(f"  Genetic Line: {entities.genetic_line}")
         print(f"  Confidence: {entities.confidence:.2f}")
-        print(f"  Count: {entities.get_entity_count()}")
 
-        validation = extractor.validate_extraction(entities)
-        status = "✅" if validation["is_valid"] else "❌"
-        print(f"  {status} Valid: {validation['is_valid']}")
+        status = "PASS" if validation["is_valid"] else "FAIL"
+        print(f"  Status: {status}")
 
         if validation["errors"]:
-            print(f"  ❌ Errors: {validation['errors']}")
+            print(f"  Errors: {validation['errors']}")
         if validation["warnings"]:
-            print(f"  ⚠️ Warnings: {validation['warnings']}")
+            print(f"  Warnings: {validation['warnings']}")
 
     print("\n" + "=" * 70)
-    print("🆕 TEST EXTRACTION MULTIPLES ÂGES AVEC CONVERSION")
+    print("TEST EXTRACTION MULTIPLES AGES")
     print("=" * 70)
 
-    multi_age_query = "Comparer le poids entre 2 semaines et 35 jours"
-    print(f"\nQuery: {multi_age_query}")
+    multi_queries = [
+        "Comparer 2 semaines et 35 jours",
+        "Performance de 3 à 6 semaines",
+        "Entre 14 jours et 4 semaines",
+    ]
 
-    ages = extractor.extract_multiple_values(multi_age_query, EntityType.AGE)
-    print(f"Âges extraits: {ages}")
-    print(f"  → 2 semaines converti en: {14 if 14 in ages else 'non trouvé'} jours")
-    print(f"  → 35 jours: {'trouvé' if 35 in ages else 'non trouvé'}")
+    for query in multi_queries:
+        print(f"\nQuery: {query}")
+        ages = extractor.extract_multiple_values(query, EntityType.AGE)
+        print(f"  Ages extraits: {ages}")
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - Entity Extractor v2.1 avec Conversion Semaines")
+    print("TEST COMPARAISON BREEDS")
+    print("=" * 70)
+
+    comp_query = "Comparer Ross 308 et Cobb 500"
+    print(f"\nQuery: {comp_query}")
+    breeds = extractor.extract_multiple_values(comp_query, EntityType.BREED)
+    print(f"  Breeds extraits: {breeds}")
+
+    if len(breeds) == 2:
+        compatible, reason = extractor.breeds_registry.are_comparable(
+            breeds[0], breeds[1]
+        )
+        print(f"  Comparables: {compatible} ({reason})")
+
+    print("\n" + "=" * 70)
+    print("TESTS TERMINÉS - Entity Extractor v3.0")
     print("=" * 70)

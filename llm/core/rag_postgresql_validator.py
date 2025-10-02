@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 4.2: Fusion OpenAI + Contextualisation intelligente + Format amélioré
+VERSION 4.3: Fusion OpenAI + Contextualisation intelligente + Format amélioré + Messages d'abandon
 - Préserve tous les champs originaux
 - Logs diagnostiques
 - Invalidation des métriques invalides
@@ -10,6 +10,7 @@ VERSION 4.2: Fusion OpenAI + Contextualisation intelligente + Format amélioré
 - 🆕 Génération de questions plutôt que de simples messages d'erreur
 - 🆕 FUSION avec OpenAI interpretation avant validation
 - 🆕 FORMAT AMÉLIORÉ pour questions multiples (numérotation + phrase de fermeture)
+- 🆕 Messages d'abandon génériques enrichis (v4.3)
 """
 
 import re
@@ -124,8 +125,9 @@ class PostgreSQLValidator:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        🆕 VERSION 4.2: Fusion avec OpenAI interpretation AVANT validation
+        🆕 VERSION 4.3: Fusion avec OpenAI interpretation AVANT validation
         + Format amélioré pour questions multiples
+        + Messages d'abandon génériques
 
         CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
         puis enrichit SEULEMENT les champs manquants avec auto-détection.
@@ -437,7 +439,7 @@ class PostgreSQLValidator:
         language: str = "fr",
     ) -> str:
         """
-        🆕 VERSION 4.2: Génère une question de clarification conversationnelle
+        🆕 VERSION 4.3: Génère une question de clarification conversationnelle
         avec format amélioré pour questions multiples (numérotation + fermeture)
 
         Args:
@@ -501,6 +503,125 @@ class PostgreSQLValidator:
             parts.append("\n\nVeuillez fournir les informations manquantes.")
 
         return "".join(parts)
+
+    def _generate_generic_fallback_message(
+        self, query: str, partial_entities: Dict, language: str = "fr"
+    ) -> str:
+        """
+        🆕 VERSION 4.3: Génère une réponse générique lorsque clarification abandonnée
+
+        Utilise le contexte partiel disponible pour fournir des informations
+        générales utiles selon le type d'oiseau détecté.
+
+        Args:
+            query: Requête originale de l'utilisateur
+            partial_entities: Entités partiellement extraites (breed, age_days, sex, etc.)
+            language: Langue de la réponse (fr, en, es)
+
+        Returns:
+            Message générique enrichi avec données moyennes appropriées
+        """
+
+        # Extraire ce qu'on sait déjà
+        breed = partial_entities.get("breed")
+        age_days = partial_entities.get("age_days")
+        sex = partial_entities.get("sex")
+
+        templates = {
+            "fr": {
+                "intro": "Je comprends. Voici des informations générales qui pourraient vous aider",
+                "with_breed": "pour {breed}",
+                "with_age": "à {age} jours",
+                "broiler_general": (
+                    "**Données moyennes pour poulets de chair :**\n"
+                    "- Poids : 300g (J1) à 2500g (J42)\n"
+                    "- FCR : 1.5-1.9 selon âge et souche\n"
+                    "- Consommation eau : 1.8-2.2x aliment\n"
+                    "- Mortalité cumulée : 3-5%"
+                ),
+                "layer_general": (
+                    "**Données moyennes pour poules pondeuses :**\n"
+                    "- Poids adulte : 1.8-2.0 kg\n"
+                    "- Production : 300-320 œufs/an\n"
+                    "- Consommation : 110-120g/jour\n"
+                    "- Pic de ponte : 24-28 semaines"
+                ),
+                "footer": "\n\nPour une réponse précise, indiquez la race et l'âge exacts.",
+            },
+            "en": {
+                "intro": "I understand. Here's general information that might help",
+                "with_breed": "for {breed}",
+                "with_age": "at {age} days",
+                "broiler_general": (
+                    "**Average data for broilers:**\n"
+                    "- Weight: 300g (D1) to 2500g (D42)\n"
+                    "- FCR: 1.5-1.9 depending on age and strain\n"
+                    "- Water consumption: 1.8-2.2x feed\n"
+                    "- Cumulative mortality: 3-5%"
+                ),
+                "layer_general": (
+                    "**Average data for layers:**\n"
+                    "- Adult weight: 1.8-2.0 kg\n"
+                    "- Production: 300-320 eggs/year\n"
+                    "- Consumption: 110-120g/day\n"
+                    "- Peak production: 24-28 weeks"
+                ),
+                "footer": "\n\nFor a precise answer, provide the exact breed and age.",
+            },
+            "es": {
+                "intro": "Entiendo. Aquí hay información general que podría ayudar",
+                "with_breed": "para {breed}",
+                "with_age": "a {age} días",
+                "broiler_general": (
+                    "**Datos promedio para pollos de engorde:**\n"
+                    "- Peso: 300g (D1) a 2500g (D42)\n"
+                    "- FCR: 1.5-1.9 según edad y cepa\n"
+                    "- Consumo de agua: 1.8-2.2x alimento\n"
+                    "- Mortalidad acumulada: 3-5%"
+                ),
+                "layer_general": (
+                    "**Datos promedio para gallinas ponedoras:**\n"
+                    "- Peso adulto: 1.8-2.0 kg\n"
+                    "- Producción: 300-320 huevos/año\n"
+                    "- Consumo: 110-120g/día\n"
+                    "- Pico de producción: 24-28 semanas"
+                ),
+                "footer": "\n\nPara una respuesta precisa, indique la raza y edad exactas.",
+            },
+        }
+
+        t = templates.get(language, templates["en"])
+
+        # Construire message
+        message_parts = [t["intro"]]
+
+        # Ajouter contexte partiel si disponible
+        if breed:
+            message_parts.append(t["with_breed"].format(breed=breed))
+        if age_days:
+            message_parts.append(t["with_age"].format(age=age_days))
+
+        message_parts.append(":\n\n")
+
+        # Déterminer type d'oiseau pour données appropriées
+        bird_type = "broiler"  # Défaut
+        if breed:
+            try:
+                species = self.breeds_registry.get_species(breed)
+                if species == "layer":
+                    bird_type = "layer"
+            except Exception as e:
+                logger.debug(f"Impossible de déterminer species pour {breed}: {e}")
+
+        # Ajouter données générales
+        if bird_type == "layer":
+            message_parts.append(t["layer_general"])
+        else:
+            message_parts.append(t["broiler_general"])
+
+        message_parts.append(t["footer"])
+
+        return " ".join(message_parts)
 
     def _generate_validation_help_message(
         self, query: str, missing: List[str], suggestions: List[str]
@@ -776,7 +897,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.2 FORMAT AMÉLIORÉ")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.3 FORMAT AMÉLIORÉ")
     print("=" * 70)
 
     validator = PostgreSQLValidator()
@@ -940,6 +1061,37 @@ if __name__ == "__main__":
         print(f"  → Question formatée:\n{result['helpful_message']}")
         print("\n  ✅ Vérifier: numérotation (1), 2), 3)) et phrase de fermeture")
 
+    # 🆕 Test 7: Messages d'abandon génériques
+    print("\n🆕 Test 7: Messages d'abandon génériques")
+    test_fallback_messages = [
+        {
+            "query": "Quel est le poids?",
+            "partial_entities": {"breed": "Ross 308"},
+            "language": "fr",
+        },
+        {
+            "query": "What is the weight?",
+            "partial_entities": {"age_days": 28},
+            "language": "en",
+        },
+        {
+            "query": "Datos generales",
+            "partial_entities": {},
+            "language": "es",
+        },
+    ]
+
+    for test in test_fallback_messages:
+        print(f"\n  Query: {test['query']}")
+        print(f"  Partial entities: {test['partial_entities']}")
+        print(f"  Language: {test['language']}")
+
+        fallback_message = validator._generate_generic_fallback_message(
+            test["query"], test["partial_entities"], test["language"]
+        )
+
+        print(f"  → Fallback message:\n{fallback_message}")
+
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.2")
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.3")
     print("=" * 70)

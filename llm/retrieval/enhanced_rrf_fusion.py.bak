@@ -671,6 +671,8 @@ class IntelligentRRFFusion:
             Nom normalisé de la lignée (avec underscore): "ross_308", "cobb_500", etc.
         """
 
+
+
         # PRIORITÉ 1: Utiliser le breeds_registry si disponible
         if self.breeds_registry:
             try:
@@ -699,6 +701,8 @@ class IntelligentRRFFusion:
             except Exception as e:
                 logger.warning(f"Erreur détection lignée via registry: {e}")
 
+
+
         # DÉTECTION DE LIGNÉE VIA BREEDS_REGISTRY
         # Utilise la source unique de vérité (intents.json) pour supporter les 51 races
 
@@ -712,34 +716,35 @@ class IntelligentRRFFusion:
         try:
             # Obtenir toutes les races du registry (51 races)
             all_breeds = self.breeds_registry.get_all_breeds()
-
+            
             # Trier par longueur décroissante pour matcher les plus spécifiques d'abord
             # Ex: "ross 308" avant "ross" pour éviter faux positifs
             sorted_breeds = sorted(all_breeds, key=len, reverse=True)
-
+            
             for breed in sorted_breeds:
                 # Normaliser le nom de la race
                 normalized = self.breeds_registry.normalize_breed_name(breed)
                 if not normalized:
                     continue
-
-                # 1. Vérifier le nom normalisé
+                
+                # 1. Vérifier le nom normalisé avec word boundaries
                 normalized_lower = normalized.lower()
-                if normalized_lower in query_lower:
+                if re.search(r'\b' + re.escape(normalized_lower) + r'\b', query_lower):
                     logger.debug(f"Lignée détectée (canonique): {normalized}")
                     return normalized.replace(" ", "_").replace("-", "_")
-
+                
                 # 2. Vérifier tous les aliases de cette race
                 aliases = self.breeds_registry.get_aliases(normalized)
-
+                
                 # Trier aliases par longueur décroissante aussi
                 sorted_aliases = sorted(aliases, key=len, reverse=True)
-
+                
                 for alias in sorted_aliases:
                     alias_lower = alias.lower()
-
-                    # Recherche simple dans la requête
-                    if alias_lower in query_lower:
+                    
+                    # Utiliser word boundaries pour éviter faux positifs
+                    # Ex: "308" ne doit pas matcher "2308"
+                    if re.search(r'\b' + re.escape(alias_lower) + r'\b', query_lower):
                         logger.debug(
                             f"Lignée détectée via alias: '{alias}' → {normalized}"
                         )
@@ -752,9 +757,14 @@ class IntelligentRRFFusion:
         except Exception as e:
             logger.error(
                 f"Erreur lors de la détection de lignée via breeds_registry: {e}",
-                exc_info=True,
+                exc_info=True
             )
             return None
+
+
+
+
+
 
     def _extract_performance_metrics(self, query_lower: str) -> List[str]:
         """Extrait les métriques de performance de la requête"""
