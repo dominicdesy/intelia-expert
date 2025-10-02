@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 4.3: Fusion OpenAI + Contextualisation intelligente + Format amélioré + Messages d'abandon
+VERSION 4.3.1: CORRECTION CRITIQUE - detected_entities dans tous les retours needs_fallback
 - Préserve tous les champs originaux
 - Logs diagnostiques
 - Invalidation des métriques invalides
 - Auto-détection enrichie dynamique
-- 🆕 Messages de clarification conversationnels multilingues
-- 🆕 Génération de questions plutôt que de simples messages d'erreur
-- 🆕 FUSION avec OpenAI interpretation avant validation
-- 🆕 FORMAT AMÉLIORÉ pour questions multiples (numérotation + phrase de fermeture)
-- 🆕 Messages d'abandon génériques enrichis (v4.3)
+- Messages de clarification conversationnels multilingues
+- Génération de questions plutôt que de simples messages d'erreur
+- FUSION avec OpenAI interpretation avant validation
+- FORMAT AMÉLIORÉ pour questions multiples (numérotation + phrase de fermeture)
+- Messages d'abandon génériques enrichis
+- ✅ CORRECTION 4.3.1: detected_entities TOUJOURS présent dans needs_fallback
 """
 
 import re
@@ -71,7 +72,7 @@ class PostgreSQLValidator:
         self, entities: Dict, query: str, language: str = "fr"
     ) -> Dict:
         """
-        🆕 Valide le contexte avec fusion OpenAI AVANT validation
+        Valide le contexte avec fusion OpenAI AVANT validation
 
         Args:
             entities: Entités extraites (peut contenir _openai_interpretation)
@@ -81,7 +82,7 @@ class PostgreSQLValidator:
         Returns:
             Dict avec status et missing_fields après fusion
         """
-        # ✅ FUSION: Récupérer les entités OpenAI si disponibles
+        # Récupérer les entités OpenAI si disponibles
         openai_interp = entities.get("_openai_interpretation", {})
 
         # Enrichir avec OpenAI AVANT validation
@@ -108,7 +109,7 @@ class PostgreSQLValidator:
         missing_fields = []
         if not entities.get("breed"):
             missing_fields.append("breed")
-        if not entities.get("age_days"):  # Ne sera plus None car fusionné!
+        if not entities.get("age_days"):
             missing_fields.append("age")
         if not entities.get("metric") and not entities.get("metric_type"):
             missing_fields.append("metric")
@@ -117,6 +118,7 @@ class PostgreSQLValidator:
             "status": "complete" if not missing_fields else "needs_fallback",
             "missing_fields": missing_fields,
             "enhanced_entities": entities,
+            "detected_entities": entities,  # ✅ AJOUT pour cohérence
         }
 
     def flexible_query_validation(
@@ -125,9 +127,11 @@ class PostgreSQLValidator:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        🆕 VERSION 4.3: Fusion avec OpenAI interpretation AVANT validation
-        + Format amélioré pour questions multiples
-        + Messages d'abandon génériques
+        VERSION 4.3.1: CORRECTION CRITIQUE - detected_entities dans tous les retours
+        - Fusion avec OpenAI interpretation AVANT validation
+        - Format amélioré pour questions multiples
+        - Messages d'abandon génériques
+        - ✅ NOUVEAU: detected_entities TOUJOURS présent dans needs_fallback
 
         CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
         puis enrichit SEULEMENT les champs manquants avec auto-détection.
@@ -146,7 +150,7 @@ class PostgreSQLValidator:
         missing = []
         suggestions = []
 
-        # 🔥 LOG CRITIQUE #1 : Ce qui ARRIVE au validator
+        # LOG CRITIQUE #1 : Ce qui ARRIVE au validator
         logger.debug(f"🔍 VALIDATOR INPUT entities: {entities}")
         logger.debug(
             f"🔍 VALIDATOR INPUT - 'sex' present: {'sex' in entities}, value: {entities.get('sex')}"
@@ -164,11 +168,11 @@ class PostgreSQLValidator:
             f"🔍 VALIDATOR INPUT - 'metric_type' present: {'metric_type' in entities}, value: {entities.get('metric_type')}"
         )
 
-        # 🟢 CORRECTION CRITIQUE: Copier TOUTES les entités originales en priorité
+        # CORRECTION CRITIQUE: Copier TOUTES les entités originales en priorité
         # Cela préserve automatiquement 'sex', 'explicit_sex_request', etc.
         enhanced_entities = dict(entities) if entities else {}
 
-        # 🆕 FUSION OpenAI: Récupérer les entités OpenAI si disponibles
+        # FUSION OpenAI: Récupérer les entités OpenAI si disponibles
         openai_interp = enhanced_entities.get("_openai_interpretation", {})
 
         if openai_interp:
@@ -196,7 +200,7 @@ class PostgreSQLValidator:
                     f"✅ Metric récupéré depuis OpenAI: {openai_interp['metric_type']}"
                 )
 
-        # 🔥 LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
+        # LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
         logger.debug(
             f"🔍 enhanced_entities AFTER dict(entities) + OpenAI fusion: {enhanced_entities}"
         )
@@ -210,8 +214,7 @@ class PostgreSQLValidator:
             f"🔍 AFTER COPY - 'metric_type' present: {'metric_type' in enhanced_entities}, value: {enhanced_entities.get('metric_type')}"
         )
 
-        # 🟡 NOUVEAU : Invalider metric_type si c'est 'as_hatched' ou autre valeur invalide
-        # ✅ CORRECTION: Vérifier les DEUX champs
+        # Invalider metric_type si c'est 'as_hatched' ou autre valeur invalide
         metric = enhanced_entities.get("metric_type") or enhanced_entities.get("metric")
         if metric:
             metric_lower = str(metric).lower().strip()
@@ -229,9 +232,9 @@ class PostgreSQLValidator:
                     f"⚠️ metric invalide '{metric}' → None, auto-détection activée"
                 )
                 enhanced_entities["metric_type"] = None
-                enhanced_entities["metric"] = None  # ✅ Effacer les deux
+                enhanced_entities["metric"] = None
 
-        # 🟢 Auto-détection breed SEULEMENT si absent dans les entités originales ET OpenAI
+        # Auto-détection breed SEULEMENT si absent dans les entités originales ET OpenAI
         if not enhanced_entities.get("breed"):
             logger.debug("🔍 Breed ABSENT, auto-detecting from query...")
             detected_breed = self._detect_breed_from_query(query)
@@ -241,14 +244,13 @@ class PostgreSQLValidator:
             else:
                 logger.debug("❌ No breed detected in query")
                 missing.append("breed")
-                # 🆕 Suggestion conversationnelle selon la langue
                 suggestions.append(self._get_breed_suggestion(language))
         else:
             logger.debug(
                 f"🔍 Breed PRESENT: '{enhanced_entities.get('breed')}', skipping auto-detection"
             )
 
-        # 🟢 Auto-détection age SEULEMENT si absent dans les entités originales ET OpenAI
+        # Auto-détection age SEULEMENT si absent dans les entités originales ET OpenAI
         if not enhanced_entities.get("age_days"):
             logger.debug("🔍 Age ABSENT, auto-detecting from query...")
             detected_age = self._detect_age_from_query(query)
@@ -272,17 +274,16 @@ class PostgreSQLValidator:
                     ]
                 ):
                     logger.debug("🔍 General query, age not critical")
-                    pass  # Requête générale - pas besoin d'âge spécifique
+                    pass
                 else:
                     missing.append("age")
-                    # 🆕 Suggestion conversationnelle selon la langue
                     suggestions.append(self._get_age_suggestion(language))
         else:
             logger.debug(
                 f"🔍 Age PRESENT: '{enhanced_entities.get('age_days')}', skipping auto-detection"
             )
 
-        # 🟡 AMÉLIORÉ : Auto-détection metric avec vérification de 'metric' OU 'metric_type'
+        # Auto-détection metric avec vérification de 'metric' OU 'metric_type'
         if not enhanced_entities.get("metric_type") and not enhanced_entities.get(
             "metric"
         ):
@@ -296,7 +297,6 @@ class PostgreSQLValidator:
                 missing.append("metric")
                 suggestions.append(self._get_metric_suggestion(language))
         else:
-            # Métrique présente (soit metric, soit metric_type)
             metric_value = enhanced_entities.get("metric") or enhanced_entities.get(
                 "metric_type"
             )
@@ -304,7 +304,7 @@ class PostgreSQLValidator:
                 f"🔍 Metric PRESENT: '{metric_value}', skipping auto-detection"
             )
 
-        # 🔥 LOG CRITIQUE #3 : Avant de retourner
+        # LOG CRITIQUE #3 : Avant de retourner
         logger.debug(f"🔍 enhanced_entities FINAL before return: {enhanced_entities}")
         logger.debug(
             f"🔍 FINAL - 'sex' present: {'sex' in enhanced_entities}, value: {enhanced_entities.get('sex')}"
@@ -316,7 +316,7 @@ class PostgreSQLValidator:
             f"🔍 FINAL - 'metric_type' present: {'metric_type' in enhanced_entities}, value: {enhanced_entities.get('metric_type')}"
         )
 
-        # 🔥 VÉRIFICATION CRITIQUE : Comparaison INPUT vs OUTPUT
+        # VÉRIFICATION CRITIQUE : Comparaison INPUT vs OUTPUT
         input_keys = set(entities.keys())
         output_keys = set(enhanced_entities.keys())
         lost_keys = input_keys - output_keys
@@ -326,7 +326,7 @@ class PostgreSQLValidator:
             logger.error(f"❌ INPUT had: {input_keys}")
             logger.error(f"❌ OUTPUT has: {output_keys}")
 
-            # 🟢 CORRECTION : RESTAURER les champs perdus
+            # CORRECTION : RESTAURER les champs perdus
             for key in lost_keys:
                 enhanced_entities[key] = entities[key]
                 logger.warning(f"⚠️ RESTORED lost key '{key}': {entities[key]}")
@@ -335,7 +335,7 @@ class PostgreSQLValidator:
         else:
             logger.debug("✅ No keys lost, all fields preserved")
 
-        # 🟢 Log de debug pour vérifier que tous les champs sont préservés
+        # Log de debug pour vérifier que tous les champs sont préservés
         if entities:
             preserved_fields = [k for k in entities.keys() if k in enhanced_entities]
             if preserved_fields:
@@ -347,7 +347,7 @@ class PostgreSQLValidator:
             return {"status": "complete", "enhanced_entities": enhanced_entities}
 
         elif len(missing) <= 1 and ("breed" not in missing):
-            # 🆕 CORRECTION CRITIQUE : Vérifier si l'âge manquant est critique
+            # CORRECTION CRITIQUE : Vérifier si l'âge manquant est critique
             if "age" in missing:
                 # Pour des métriques qui varient fortement avec l'âge, c'est critique
                 critical_metrics = [
@@ -380,6 +380,7 @@ class PostgreSQLValidator:
                         "missing": missing,
                         "suggestions": suggestions,
                         "helpful_message": helpful_message,
+                        "detected_entities": enhanced_entities,  # ✅ CORRECTION CRITIQUE
                     }
 
             # Si ce n'est pas critique (ex: mortalité générale), on peut traiter
@@ -392,7 +393,7 @@ class PostgreSQLValidator:
             }
 
         else:
-            # Trop d'informations manquantes - 🆕 Message conversationnel
+            # Trop d'informations manquantes - Message conversationnel
             logger.debug(f"❌ Validation needs fallback, missing: {missing}")
             helpful_message = self._generate_conversational_question(
                 query, missing, suggestions, language
@@ -402,6 +403,7 @@ class PostgreSQLValidator:
                 "missing": missing,
                 "suggestions": suggestions,
                 "helpful_message": helpful_message,
+                "detected_entities": enhanced_entities,  # ✅ CORRECTION CRITIQUE
             }
 
     def _get_breed_suggestion(self, language: str) -> str:
@@ -439,7 +441,7 @@ class PostgreSQLValidator:
         language: str = "fr",
     ) -> str:
         """
-        🆕 VERSION 4.3: Génère une question de clarification conversationnelle
+        VERSION 4.3: Génère une question de clarification conversationnelle
         avec format amélioré pour questions multiples (numérotation + fermeture)
 
         Args:
@@ -461,7 +463,7 @@ class PostgreSQLValidator:
 
         intro = intros.get(language, intros["fr"])
 
-        # 🔧 CORRECTION : Générer les bonnes suggestions basées sur les champs MISSING
+        # Générer les bonnes suggestions basées sur les champs MISSING
         contextual_suggestions = []
         for field in missing:
             if "breed" in field.lower() or "race" in field.lower():
@@ -474,7 +476,7 @@ class PostgreSQLValidator:
         # Construction de la question
         parts = [intro]
 
-        # 🆕 NOUVEAU CODE - Format plus conversationnel avec numérotation
+        # Format plus conversationnel avec numérotation
         if len(contextual_suggestions) > 1:
             numbered_intro = {
                 "fr": "Pourriez-vous me préciser ces informations :",
@@ -508,7 +510,7 @@ class PostgreSQLValidator:
         self, query: str, partial_entities: Dict, language: str = "fr"
     ) -> str:
         """
-        🆕 VERSION 4.3: Génère une réponse générique lorsque clarification abandonnée
+        VERSION 4.3: Génère une réponse générique lorsque clarification abandonnée
 
         Utilise le contexte partiel disponible pour fournir des informations
         générales utiles selon le type d'oiseau détecté.
@@ -603,7 +605,7 @@ class PostgreSQLValidator:
         message_parts.append(":\n\n")
 
         # Déterminer type d'oiseau pour données appropriées
-        bird_type = "broiler"  # Défaut
+        bird_type = "broiler"
         if breed:
             try:
                 species = self.breeds_registry.get_species(breed)
@@ -627,7 +629,7 @@ class PostgreSQLValidator:
     ) -> str:
         """
         Génère un message d'aide pour validation
-        🆕 DÉPRÉCIÉE: Utiliser _generate_conversational_question à la place
+        DÉPRÉCIÉE: Utiliser _generate_conversational_question à la place
         """
         return (
             f"Informations manquantes pour traiter votre requête : {', '.join(missing)}. "
@@ -638,13 +640,15 @@ class PostgreSQLValidator:
         """
         Valider et enrichir les entités
         Méthode alternative avec invalidation explicite des métriques invalides
+
+        ✅ VERSION 4.3.1: Ajoute detected_entities dans tous les retours
         """
 
         enhanced = dict(entities) if entities else {}
         missing = []
         message = ""
 
-        # 🟡 NOUVEAU : Invalider metric_type si c'est 'as_hatched' ou valeur invalide
+        # Invalider metric_type si c'est 'as_hatched' ou valeur invalide
         metric = enhanced.get("metric_type")
         if metric:
             metric_lower = str(metric).lower().strip()
@@ -707,6 +711,7 @@ class PostgreSQLValidator:
         return {
             "status": status,
             "enhanced_entities": enhanced,
+            "detected_entities": enhanced,  # ✅ CORRECTION CRITIQUE
             "missing": missing,
             "message": message,
         }
@@ -790,7 +795,7 @@ class PostgreSQLValidator:
 
         query_lower = query.lower()
 
-        # 🟡 Patterns étendus (cohérents avec query_preprocessor)
+        # Patterns étendus (cohérents avec query_preprocessor)
         metric_patterns = {
             # Poids
             "poids": "body_weight",
@@ -821,7 +826,7 @@ class PostgreSQLValidator:
             "mortality": "mortality",
         }
 
-        # 🟡 Chercher par ordre de spécificité (plus long d'abord)
+        # Chercher par ordre de spécificité (plus long d'abord)
         for pattern in sorted(metric_patterns.keys(), key=len, reverse=True):
             if pattern in query_lower:
                 detected = metric_patterns[pattern]
@@ -865,7 +870,7 @@ class PostgreSQLValidator:
 
         age_ranges = {
             "broiler": (0, 56),
-            "layer": (0, 600),  # Layers ont une durée de vie plus longue
+            "layer": (0, 600),
             "breeder": (0, 60),
         }
 
@@ -896,7 +901,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.3 FORMAT AMÉLIORÉ")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.3.1 CORRECTION detected_entities")
     print("=" * 70)
 
     validator = PostgreSQLValidator()
@@ -941,8 +946,10 @@ if __name__ == "__main__":
         print(f"  → Status: {result['status']}")
         if "enhanced_entities" in result:
             print(f"  → Enhanced: {result['enhanced_entities']}")
+        if "detected_entities" in result:
+            print(f"  → Detected: {result['detected_entities']}")
 
-    # 🆕 Test 3: Messages de clarification multilingues avec FORMAT AMÉLIORÉ
+    # Test 3: Messages de clarification multilingues avec FORMAT AMÉLIORÉ
     print("\n🆕 Test 3: Messages de clarification conversationnels (FORMAT AMÉLIORÉ)")
     test_clarifications = [
         {
@@ -973,8 +980,11 @@ if __name__ == "__main__":
         print(f"  → Status: {result['status']}")
         if result["status"] == "needs_fallback":
             print(f"  → Question:\n{result['helpful_message']}")
+            print(f"  → detected_entities présent: {'detected_entities' in result}")
+            if "detected_entities" in result:
+                print(f"  → detected_entities: {result['detected_entities']}")
 
-    # 🆕 Test 4: Fusion avec OpenAI interpretation
+    # Test 4: Fusion avec OpenAI interpretation
     print("\n🆕 Test 4: Fusion avec OpenAI interpretation")
     test_openai_fusion = [
         {
@@ -1010,8 +1020,10 @@ if __name__ == "__main__":
         if "enhanced_entities" in result:
             print(f"  → Enhanced: {result['enhanced_entities']}")
             print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
+        if "detected_entities" in result:
+            print(f"  → Detected: {result['detected_entities']}")
 
-    # 🆕 Test 5: validate_context avec fusion
+    # Test 5: validate_context avec fusion
     print("\n🆕 Test 5: validate_context avec fusion OpenAI")
     test_validate_context = {
         "query": "Compare weight",
@@ -1038,59 +1050,61 @@ if __name__ == "__main__":
     print(f"  → Status: {result['status']}")
     print(f"  → Missing fields: {result.get('missing_fields', [])}")
     print(f"  → Enhanced entities: {result['enhanced_entities']}")
+    print(f"  → detected_entities présent: {'detected_entities' in result}")
     print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
 
-    # 🆕 Test 6: Format amélioré pour questions multiples
-    print("\n🆕 Test 6: Format amélioré - Questions multiples avec numérotation")
-    test_multiple = {
+    # Test 6: NOUVEAU - Vérifier detected_entities dans needs_fallback
+    print("\n✅ Test 6: CRITIQUE - Vérifier detected_entities dans needs_fallback")
+    test_needs_fallback = {
         "query": "Quel est le poids?",
-        "entities": {},
+        "entities": {"sex": "male"},  # Manque breed, age, metric
         "language": "fr",
     }
 
-    print(f"\n  Query: {test_multiple['query']}")
-    print(f"  Language: {test_multiple['language']}")
+    print(f"\n  Query: {test_needs_fallback['query']}")
+    print(f"  Input entities: {test_needs_fallback['entities']}")
 
     result = validator.flexible_query_validation(
-        test_multiple["query"], test_multiple["entities"], test_multiple["language"]
+        test_needs_fallback["query"],
+        test_needs_fallback["entities"],
+        test_needs_fallback["language"],
     )
 
     print(f"  → Status: {result['status']}")
-    if result["status"] == "needs_fallback":
-        print(f"  → Question formatée:\n{result['helpful_message']}")
-        print("\n  ✅ Vérifier: numérotation (1), 2), 3)) et phrase de fermeture")
+    print(f"  → detected_entities présent: {'detected_entities' in result}")
 
-    # 🆕 Test 7: Messages d'abandon génériques
-    print("\n🆕 Test 7: Messages d'abandon génériques")
-    test_fallback_messages = [
-        {
-            "query": "Quel est le poids?",
-            "partial_entities": {"breed": "Ross 308"},
-            "language": "fr",
-        },
-        {
-            "query": "What is the weight?",
-            "partial_entities": {"age_days": 28},
-            "language": "en",
-        },
-        {
-            "query": "Datos generales",
-            "partial_entities": {},
-            "language": "es",
-        },
-    ]
-
-    for test in test_fallback_messages:
-        print(f"\n  Query: {test['query']}")
-        print(f"  Partial entities: {test['partial_entities']}")
-        print(f"  Language: {test['language']}")
-
-        fallback_message = validator._generate_generic_fallback_message(
-            test["query"], test["partial_entities"], test["language"]
+    if "detected_entities" in result:
+        print(f"  ✅ SUCCESS: detected_entities trouvé: {result['detected_entities']}")
+        print(
+            f"  → Sex preserved in detected_entities: {result['detected_entities'].get('sex')}"
         )
+    else:
+        print("  ❌ FAILURE: detected_entities MANQUANT dans needs_fallback!")
 
-        print(f"  → Fallback message:\n{fallback_message}")
+    # Test 7: validate_and_enhance avec needs_fallback
+    print("\n✅ Test 7: validate_and_enhance - vérifier detected_entities")
+    test_validate_enhance = {
+        "query": "Compare broilers",
+        "entities": {"sex": "female"},  # Manque plusieurs champs
+    }
+
+    print(f"\n  Query: {test_validate_enhance['query']}")
+    print(f"  Input entities: {test_validate_enhance['entities']}")
+
+    result = validator.validate_and_enhance(
+        test_validate_enhance["entities"],
+        test_validate_enhance["query"],
+    )
+
+    print(f"  → Status: {result['status']}")
+    print(f"  → detected_entities présent: {'detected_entities' in result}")
+
+    if "detected_entities" in result:
+        print(f"  ✅ SUCCESS: detected_entities trouvé: {result['detected_entities']}")
+    else:
+        print("  ❌ FAILURE: detected_entities MANQUANT!")
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.3")
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.3.1")
+    print("🎯 CORRECTION APPLIQUÉE: detected_entities présent partout")
     print("=" * 70)
