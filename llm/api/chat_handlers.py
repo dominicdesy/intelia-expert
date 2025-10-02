@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 api/chat_handlers.py - Logique de traitement des requêtes de chat
-Version 4.2.3 - DÉTECTION AMÉLIORÉE + GESTION AMBIGUÏTÉ + ABANDON
+Version 4.3.0 - FUSION D'ENTITÉS POUR MÉMOIRE CONVERSATIONNELLE
 """
 
 import time
@@ -292,6 +292,10 @@ class ChatHandlers:
         """
         Vérifie le statut de validation et retourne un résultat de clarification si nécessaire
         Retourne None si validation OK
+
+        ✅ VERSION 4.3.0 - CORRECTION CRITIQUE:
+        - Stocke les entités extraites lors du premier appel à mark_pending()
+        - Permet la fusion d'entités dans les échanges suivants
         """
         if not hasattr(rag_result, "metadata"):
             return None
@@ -313,15 +317,25 @@ class ChatHandlers:
         missing_fields = metadata.get("missing_fields", [])
         suggestions = metadata.get("suggestions", {})
 
-        # Si pas encore en attente, marquer maintenant
+        # ✅ CORRECTION CRITIQUE: Extraire les entités détectées depuis metadata
+        detected_entities = metadata.get("detected_entities", {})
+
+        logger.info(f"🔍 Entités détectées par le validator: {detected_entities}")
+
+        # Si pas encore en attente, marquer maintenant AVEC les entités
         pending_context = self.context_manager.get_pending(tenant_id)
         if not pending_context:
+            # ✅ PASSER LES ENTITÉS DÉTECTÉES lors de la création du contexte
             self.context_manager.mark_pending(
                 tenant_id=tenant_id,
                 original_query=message,
                 missing_fields=missing_fields,
                 suggestions=suggestions,
                 language=language,
+                partial_entities=detected_entities,  # ✅ AJOUT CRITIQUE
+            )
+            logger.info(
+                f"✅ Contexte créé avec entités partielles: {detected_entities}"
             )
         else:
             # Mettre à jour les champs manquants
@@ -331,6 +345,23 @@ class ChatHandlers:
             self.context_manager.pending_clarifications[tenant_id][
                 "suggestions"
             ] = suggestions
+
+            # ✅ METTRE À JOUR les entités partielles si de nouvelles sont détectées
+            existing_entities = self.context_manager.pending_clarifications[
+                tenant_id
+            ].get("partial_entities", {})
+            # Fusionner : nouvelles entités complètent les existantes
+            for key, value in detected_entities.items():
+                if value is not None and (
+                    not existing_entities.get(key) or existing_entities.get(key) is None
+                ):
+                    existing_entities[key] = value
+
+            self.context_manager.pending_clarifications[tenant_id][
+                "partial_entities"
+            ] = existing_entities
+
+            logger.info(f"✅ Entités partielles mises à jour: {existing_entities}")
 
         # Utiliser le message déjà généré par le validator
         clarification_msg = rag_result.answer
@@ -425,7 +456,7 @@ class ChatHandlers:
                 "confidence": float(confidence),
                 "processing_time": float(processing_time),
                 "fallback_used": safe_dict_get(metadata, "fallback_used", False),
-                "architecture": "modular-endpoints-json-improved",
+                "architecture": "modular-endpoints-entity-fusion",
                 "serialization_version": "optimized_cached",
                 "preprocessing_enabled": True,
                 "needs_clarification": metadata.get("needs_clarification", False),
@@ -489,7 +520,7 @@ class ChatHandlers:
                 "confidence": float(confidence),
                 "documents_used": documents_used,
                 "source": source,
-                "architecture": "modular-endpoints-json-improved",
+                "architecture": "modular-endpoints-entity-fusion",
                 "preprocessing_enabled": True,
                 "needs_clarification": metadata.get("needs_clarification", False),
                 "clarification_pending": metadata.get("clarification_pending", False),
@@ -516,7 +547,7 @@ class ChatHandlers:
                 "genetic_lines_detected": metadata.get("json_system", {}).get(
                     "genetic_lines_detected", []
                 ),
-                "detection_version": "4.2.3_improved",
+                "detection_version": "4.3.0_entity_fusion",
             }
 
             yield sse_event(safe_serialize_for_json(end_data))
