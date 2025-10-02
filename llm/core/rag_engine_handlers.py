@@ -490,7 +490,7 @@ class StandardQueryHandler(BaseQueryHandler):
                             "routing_hint": "postgresql",
                             "missing_fields": validation_result.get("missing", []),
                             "detected_entities": validation_result.get(
-                                "enhanced_entities", {}
+                                "detected_entities", {}  # ✅ CORRECTION: bon nom de clé
                             ),
                             "validation_status": "needs_fallback",
                             "processing_time": time.time() - start_time,
