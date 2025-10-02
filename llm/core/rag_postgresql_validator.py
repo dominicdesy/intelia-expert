@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 4.1: Fusion OpenAI + Contextualisation intelligente
+VERSION 4.2: Fusion OpenAI + Contextualisation intelligente + Format amélioré
 - Préserve tous les champs originaux
 - Logs diagnostiques
 - Invalidation des métriques invalides
@@ -9,6 +9,7 @@ VERSION 4.1: Fusion OpenAI + Contextualisation intelligente
 - 🆕 Messages de clarification conversationnels multilingues
 - 🆕 Génération de questions plutôt que de simples messages d'erreur
 - 🆕 FUSION avec OpenAI interpretation avant validation
+- 🆕 FORMAT AMÉLIORÉ pour questions multiples (numérotation + phrase de fermeture)
 """
 
 import re
@@ -123,7 +124,8 @@ class PostgreSQLValidator:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        🆕 VERSION 4.1: Fusion avec OpenAI interpretation AVANT validation
+        🆕 VERSION 4.2: Fusion avec OpenAI interpretation AVANT validation
+        + Format amélioré pour questions multiples
 
         CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
         puis enrichit SEULEMENT les champs manquants avec auto-détection.
@@ -435,7 +437,8 @@ class PostgreSQLValidator:
         language: str = "fr",
     ) -> str:
         """
-        🆕 NOUVEAU: Génère une question de clarification conversationnelle
+        🆕 VERSION 4.2: Génère une question de clarification conversationnelle
+        avec format amélioré pour questions multiples (numérotation + fermeture)
 
         Args:
             query: Requête originale
@@ -454,13 +457,6 @@ class PostgreSQLValidator:
             "es": "Para darle una respuesta precisa, necesito información adicional.",
         }
 
-        # Templates pour plusieurs champs manquants
-        multiple_intros = {
-            "fr": "Pourriez-vous préciser :",
-            "en": "Could you please specify:",
-            "es": "¿Podría especificar:",
-        }
-
         intro = intros.get(language, intros["fr"])
 
         # 🔧 CORRECTION : Générer les bonnes suggestions basées sur les champs MISSING
@@ -476,11 +472,27 @@ class PostgreSQLValidator:
         # Construction de la question
         parts = [intro]
 
+        # 🆕 NOUVEAU CODE - Format plus conversationnel avec numérotation
         if len(contextual_suggestions) > 1:
-            # Plusieurs champs manquants
-            parts.append(f"\n\n{multiple_intros.get(language, multiple_intros['fr'])}")
-            for suggestion in contextual_suggestions:
-                parts.append(f"\n• {suggestion}")
+            numbered_intro = {
+                "fr": "Pourriez-vous me préciser ces informations :",
+                "en": "Could you please provide these details:",
+                "es": "¿Podría proporcionar estos detalles:",
+            }
+
+            parts.append(f"\n\n{numbered_intro.get(language, numbered_intro['fr'])}")
+
+            for idx, suggestion in enumerate(contextual_suggestions, 1):
+                parts.append(f"\n{idx}) {suggestion}")
+
+            # Ajouter phrase de fermeture
+            closing = {
+                "fr": "\n\nCela me permettra de vous donner une réponse précise et adaptée.",
+                "en": "\n\nThis will allow me to give you an accurate and tailored answer.",
+                "es": "\n\nEsto me permitirá darle una respuesta precisa y adaptada.",
+            }
+            parts.append(closing.get(language, closing["fr"]))
+
         elif len(contextual_suggestions) == 1:
             # Un seul champ manquant
             parts.append(f"\n\n{contextual_suggestions[0]}")
@@ -764,7 +776,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION FUSION OPENAI")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.2 FORMAT AMÉLIORÉ")
     print("=" * 70)
 
     validator = PostgreSQLValidator()
@@ -810,8 +822,8 @@ if __name__ == "__main__":
         if "enhanced_entities" in result:
             print(f"  → Enhanced: {result['enhanced_entities']}")
 
-    # 🆕 Test 3: Messages de clarification multilingues
-    print("\n🆕 Test 3: Messages de clarification conversationnels")
+    # 🆕 Test 3: Messages de clarification multilingues avec FORMAT AMÉLIORÉ
+    print("\n🆕 Test 3: Messages de clarification conversationnels (FORMAT AMÉLIORÉ)")
     test_clarifications = [
         {
             "query": "Quel est le poids d'un poulet de 12 jours ?",
@@ -840,7 +852,7 @@ if __name__ == "__main__":
 
         print(f"  → Status: {result['status']}")
         if result["status"] == "needs_fallback":
-            print(f"  → Question: {result['helpful_message']}")
+            print(f"  → Question:\n{result['helpful_message']}")
 
     # 🆕 Test 4: Fusion avec OpenAI interpretation
     print("\n🆕 Test 4: Fusion avec OpenAI interpretation")
@@ -908,6 +920,26 @@ if __name__ == "__main__":
     print(f"  → Enhanced entities: {result['enhanced_entities']}")
     print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
 
+    # 🆕 Test 6: Format amélioré pour questions multiples
+    print("\n🆕 Test 6: Format amélioré - Questions multiples avec numérotation")
+    test_multiple = {
+        "query": "Quel est le poids?",
+        "entities": {},
+        "language": "fr",
+    }
+
+    print(f"\n  Query: {test_multiple['query']}")
+    print(f"  Language: {test_multiple['language']}")
+
+    result = validator.flexible_query_validation(
+        test_multiple["query"], test_multiple["entities"], test_multiple["language"]
+    )
+
+    print(f"  → Status: {result['status']}")
+    if result["status"] == "needs_fallback":
+        print(f"  → Question formatée:\n{result['helpful_message']}")
+        print("\n  ✅ Vérifier: numérotation (1), 2), 3)) et phrase de fermeture")
+
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator avec Fusion OpenAI")
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.2")
     print("=" * 70)

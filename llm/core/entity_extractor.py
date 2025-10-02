@@ -2,7 +2,7 @@
 """
 entity_extractor.py - Extracteur d'entités centralisé
 Remplace la logique éparpillée dans comparative_detector, query_preprocessor, etc.
-Version 2.0 - Migration vers breeds_registry dynamique
+Version 2.1 - Migration vers breeds_registry dynamique + CONVERSION SEMAINES → JOURS
 """
 
 import re
@@ -91,8 +91,9 @@ class EntityExtractor:
     - Détection de confiance par entité
     - Support multi-patterns pour robustesse
     - Normalisation automatique des valeurs
+    - 🆕 Conversion automatique semaines → jours
 
-    Version 2.0: Utilise breeds_registry au lieu de patterns hardcodés
+    Version 2.1: Utilise breeds_registry + conversion semaines
     """
 
     # Patterns centralisés - Sex (statiques, pas de races)
@@ -116,7 +117,15 @@ class EntityExtractor:
         ],
     }
 
-    # Patterns centralisés - Age (statiques)
+    # 🆕 NOUVEAUX PATTERNS - Semaines (pour conversion automatique)
+    WEEK_PATTERNS = [
+        r"(\d+)\s*semaines?",
+        r"(\d+)\s*weeks?",
+        r"(\d+)\s*sem\b",
+        r"(\d+)\s*w\b",
+    ]
+
+    # Patterns centralisés - Age en jours (statiques)
     AGE_PATTERNS = [
         r"(\d+)\s*(?:jours?|days?|j)\b",
         r"à\s+(\d+)\s*(?:jours?|j)\b",
@@ -187,7 +196,7 @@ class EntityExtractor:
 
         logger.info(
             f"EntityExtractor initialisé avec breeds_registry "
-            f"({len(self.breeds_registry.get_all_breeds())} races)"
+            f"({len(self.breeds_registry.get_all_breeds())} races) + conversion semaines"
         )
 
     def _compile_patterns(self):
@@ -204,12 +213,17 @@ class EntityExtractor:
                 re.compile(p, re.IGNORECASE) for p in patterns
             ]
 
+        # 🆕 Compilation semaines (PRIORITÉ sur jours)
+        self.compiled_weeks = [re.compile(p, re.IGNORECASE) for p in self.WEEK_PATTERNS]
+
         # Compilation age (statique)
         self.compiled_age = [re.compile(p, re.IGNORECASE) for p in self.AGE_PATTERNS]
 
         logger.debug(
             f"Patterns compilés: {len(self.compiled_breed)} breeds, "
-            f"{len(self.compiled_sex)} sexes, {len(self.compiled_age)} age patterns"
+            f"{len(self.compiled_sex)} sexes, "
+            f"{len(self.compiled_weeks)} week patterns, "
+            f"{len(self.compiled_age)} age patterns"
         )
 
     def _build_breed_patterns_from_registry(self):
@@ -299,9 +313,9 @@ class EntityExtractor:
             if breed_result["value"]:
                 entities.raw_matches["breed"] = breed_result["match_text"]
 
-        # Extraction age (si pas déjà défini)
+        # 🆕 Extraction age avec conversion semaines (si pas déjà défini)
         if not entities.age_days:
-            age_result = self._extract_age(query_lower)
+            age_result = self._extract_age_with_unit_conversion(query_lower)
             entities.age_days = age_result["value"]
             entities.confidence_breakdown["age"] = age_result["confidence"]
             entities.has_explicit_age = age_result["explicit"]
@@ -371,13 +385,52 @@ class EntityExtractor:
             "match_text": None,
         }
 
-    def _extract_age(self, query: str) -> Dict[str, Any]:
+    def _extract_age_with_unit_conversion(self, query: str) -> Dict[str, Any]:
         """
-        Extrait l'âge en jours avec confiance
+        🆕 NOUVELLE MÉTHODE: Extrait l'âge avec conversion automatique semaines → jours
+
+        Priorité de détection:
+        1. SEMAINES d'abord (3 semaines → 21 jours)
+        2. JOURS ensuite (si pas de semaines détectées)
+
+        Exemples:
+        - "3 semaines" → 21 jours
+        - "5 weeks" → 35 jours
+        - "2 sem" → 14 jours
+        - "21 jours" → 21 jours (pas de conversion)
 
         Returns:
             Dict avec 'value', 'confidence', 'explicit', 'match_text'
         """
+
+        # 1️⃣ PRIORITÉ 1: Chercher SEMAINES d'abord
+        for idx, pattern in enumerate(self.compiled_weeks):
+            match = pattern.search(query)
+            if match:
+                try:
+                    weeks = int(match.group(1))
+
+                    # Validation plausibilité (0-20 semaines = 0-140 jours)
+                    if 0 <= weeks <= 20:
+                        days = weeks * 7
+                        logger.info(
+                            f"✅ Conversion automatique: {weeks} semaine(s) → {days} jours"
+                        )
+
+                        return {
+                            "value": days,
+                            "confidence": 0.95,  # Haute confiance
+                            "explicit": True,
+                            "match_text": f"{match.group(0)} (converti: {days}j)",
+                        }
+                    else:
+                        logger.warning(f"Nombre de semaines hors plage: {weeks}")
+
+                except (ValueError, IndexError) as e:
+                    logger.debug(f"Erreur parsing semaines: {e}")
+                    continue
+
+        # 2️⃣ PRIORITÉ 2: Chercher JOURS si pas de semaines trouvées
         for idx, pattern in enumerate(self.compiled_age):
             match = pattern.search(query)
             if match:
@@ -400,12 +453,25 @@ class EntityExtractor:
                     logger.debug(f"Erreur parsing age: {e}")
                     continue
 
+        # 3️⃣ Aucun âge trouvé
         return {
             "value": None,
             "confidence": 0.0,
             "explicit": False,
             "match_text": None,
         }
+
+    def _extract_age(self, query: str) -> Dict[str, Any]:
+        """
+        ⚠️ DÉPRÉCIÉ: Utiliser _extract_age_with_unit_conversion() à la place
+
+        Méthode conservée pour compatibilité ascendante.
+        Redirige vers la nouvelle méthode avec conversion.
+        """
+        logger.warning(
+            "⚠️ _extract_age() est déprécié, utiliser _extract_age_with_unit_conversion()"
+        )
+        return self._extract_age_with_unit_conversion(query)
 
     def _extract_sex(self, query: str) -> Dict[str, Any]:
         """
@@ -557,7 +623,20 @@ class EntityExtractor:
                         break
 
         elif entity_type == EntityType.AGE:
-            # Extraction de multiples âges
+            # 🆕 Extraction de multiples âges avec conversion semaines
+            # 1. Chercher semaines
+            for pattern in self.compiled_weeks:
+                for match in pattern.finditer(query_lower):
+                    try:
+                        weeks = int(match.group(1))
+                        if 0 <= weeks <= 20:
+                            days = weeks * 7
+                            if days not in values:
+                                values.append(days)
+                    except (ValueError, IndexError):
+                        continue
+
+            # 2. Chercher jours
             for pattern in self.compiled_age:
                 for match in pattern.finditer(query_lower):
                     try:
@@ -639,10 +718,15 @@ if __name__ == "__main__":
         "Croissance d'un poulet de 0 à 42 jours",
         "Comparer ross308 et cobb500",
         "ISA Brown pondeuse",
+        # 🆕 NOUVEAUX TESTS - Conversion semaines
+        "Poids à 3 semaines pour Ross 308",
+        "FCR à 5 weeks",
+        "Comparaison 2 sem vs 4 sem",
+        "Performance de 1 à 8 semaines",
     ]
 
     print("=" * 70)
-    print("🧪 TESTS ENTITY EXTRACTOR - VERSION BREEDS_REGISTRY")
+    print("🧪 TESTS ENTITY EXTRACTOR - VERSION 2.1 avec CONVERSION SEMAINES")
     print("=" * 70)
 
     # Test 1: Résumé breeds_registry
@@ -659,10 +743,17 @@ if __name__ == "__main__":
     print("=" * 70)
 
     for query in test_queries:
-        print(f"\n Query: {query}")
+        print(f"\nQuery: {query}")
         entities = extractor.extract(query)
         print(f"  Breed: {entities.breed}")
         print(f"  Age: {entities.age_days}")
+
+        # 🆕 Afficher info conversion si applicable
+        if entities.raw_matches.get("age") and "converti" in str(
+            entities.raw_matches.get("age")
+        ):
+            print(f"  Age (raw): {entities.raw_matches['age']}")
+
         print(f"  Sex: {entities.sex}")
         print(f"  Metric: {entities.metric_type}")
         print(f"  Genetic Line: {entities.genetic_line}")
@@ -676,8 +767,20 @@ if __name__ == "__main__":
         if validation["errors"]:
             print(f"  ❌ Errors: {validation['errors']}")
         if validation["warnings"]:
-            print(f"  ⚠️  Warnings: {validation['warnings']}")
+            print(f"  ⚠️ Warnings: {validation['warnings']}")
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - Entity Extractor avec Breeds Registry")
+    print("🆕 TEST EXTRACTION MULTIPLES ÂGES AVEC CONVERSION")
+    print("=" * 70)
+
+    multi_age_query = "Comparer le poids entre 2 semaines et 35 jours"
+    print(f"\nQuery: {multi_age_query}")
+
+    ages = extractor.extract_multiple_values(multi_age_query, EntityType.AGE)
+    print(f"Âges extraits: {ages}")
+    print(f"  → 2 semaines converti en: {14 if 14 in ages else 'non trouvé'} jours")
+    print(f"  → 35 jours: {'trouvé' if 35 in ages else 'non trouvé'}")
+
+    print("\n" + "=" * 70)
+    print("✅ TESTS TERMINÉS - Entity Extractor v2.1 avec Conversion Semaines")
     print("=" * 70)
