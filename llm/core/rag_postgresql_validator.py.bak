@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 4.5.0: FIX BOUCLE INFINIE + EXTRACTION SYSTÉMATIQUE
-- CORRECTION CRITIQUE: Extraction OpenAI TOUJOURS appelée (même si age_days existe)
+VERSION 4.5.2: FIX VALIDATION REQUÊTES SIMPLES
+- CORRECTION CRITIQUE: Règles de validation réorganisées (requêtes simples EN PREMIER)
 - Support réponses courtes: "35 jours", "Jour 42", "... | 35 days"
 - Distinction start_age_days vs target_age_days pour calculs de plage
 - Validation spécifique pour requêtes de calcul (feed/moulée)
@@ -199,7 +199,7 @@ Examples in Spanish:
     ) -> dict:
         """
         Validation intelligente : détecte automatiquement les informations manquantes
-        VERSION 4.5.1: Logique claire - âge cible OU poids cible suffit
+        VERSION 4.5.2: RÈGLES RÉORGANISÉES - Requêtes simples en priorité
 
         Args:
             query: Requête utilisateur
@@ -260,35 +260,60 @@ Detected entities:
 - Sex: {sex}
 - Metric: {metric}
 
-**CRITICAL RULES FOR FEED/MOULÉE CALCULATIONS:**
-1. For feed calculations (moulée/alimento/feed), if we have:
-   - Breed + Start Age + Target Age → COMPLETE (no weight needed)
-   - Breed + Start Age + Target Weight → COMPLETE (no age needed)
-   - Breed + Start Age only → INCOMPLETE (need target age OR target weight)
+**VALIDATION RULES - APPLY IN THIS EXACT ORDER:**
 
-2. Simple queries (e.g., "weight at 28 days for Ross 308") → if breed + age + metric = COMPLETE
+**RULE 1 - SIMPLE METRIC QUERIES (CHECK THIS FIRST):**
+If the query asks for a SINGLE METRIC VALUE at a SPECIFIC AGE:
+Examples: 
+- "weight at 17 days", "poids à 17 jours", "peso a 17 días"
+- "FCR at day 28", "IC jour 28", "conversión día 28"
+- "feed intake day 35", "consommation jour 35"
+- "Quel est le poids...", "What is the weight...", "Cuál es el peso..."
 
-3. Comparison queries → need at least 2 entities to compare
+→ Requirements: Breed + Age + Metric = COMPLETE
+→ NO need for target_age or target_weight
+→ The age mentioned IS the point of interest (not a starting point for calculation)
 
-**In this case:**
-- Is this a feed calculation? (keywords: moulée, feed, alimento, combien, how much)
-- Do we have breed? {breed}
-- Do we have start age? {start_age_str}
-- Do we have target age OR target weight? Target age: {target_age_str}, Target weight: {target_weight_str}
-- If YES to all above → is_complete = TRUE
+**RULE 2 - PERIOD/CALCULATION QUERIES:**
+If the query asks for TOTALS, CALCULATIONS, or data over a TIME PERIOD:
+Examples:
+- "feed from day 18 to 35", "moulée de jour 18 à 35"
+- "total feed until 2.5kg", "total jusqu'à 2.5kg"
+- "combien de moulée pour finir", "how much feed to finish"
+
+Keywords indicating calculations: "total", "combien", "how much", "cuánto", "de...à", "from...to", "until", "jusqu'à", "hasta"
+
+→ Requirements: Breed + Start Age + (Target Age OR Target Weight) = COMPLETE
+→ If only Start Age (no endpoint) = INCOMPLETE
+
+**RULE 3 - COMPARISON QUERIES:**
+If comparing multiple entities → need at least 2 complete entities
+
+**CRITICAL INSTRUCTION:**
+- Apply RULE 1 FIRST for 80%+ of queries
+- Only apply RULE 2 if query explicitly mentions calculations, totals, or time ranges
+- Questions like "Quel est...", "What is...", "Cuál es..." are ALWAYS Rule 1 (simple queries)
+
+**Analysis required:**
+1. Is this a simple metric lookup at one specific age? (RULE 1) → is_complete based on breed + age + metric
+2. OR is this a calculation over a period? (RULE 2) → is_complete needs endpoint
 
 Return ONLY valid JSON:
 {{
     "is_complete": true/false,
     "missing_info": ["list of missing information **IN {language.upper()}**"],
-    "reason": "brief explanation"
+    "reason": "brief explanation mentioning which rule applies"
 }}
 
-**IMPORTANT**: The "missing_info" list MUST be in {language.upper()} language.
+**IMPORTANT**: 
+- "missing_info" list MUST be in {language.upper()} language
+- State which rule (1, 2, or 3) determined your answer
 
 Examples:
-- "Combien de moulée de jour 18 à 35 pour Ross 308?" → {{"is_complete": true, "missing_info": [], "reason": "has breed + start age + target age"}}
-- "Feed from day 18 with 20k birds Ross 308?" → {{"is_complete": false, "missing_info": ["target age or weight"], "reason": "missing endpoint"}}
+- "Quel est le poids à 17 jours pour Ross 308?" → {{"is_complete": true, "missing_info": [], "reason": "Rule 1: simple metric query with breed + age + metric"}}
+- "Poids du Ross 308 mâle de 17 jours?" → {{"is_complete": true, "missing_info": [], "reason": "Rule 1: has all required data for point query"}}
+- "Combien de moulée de jour 18 à 35 pour Ross 308?" → {{"is_complete": true, "missing_info": [], "reason": "Rule 2: calculation query with breed + start + target age"}}
+- "Feed from day 18 with 20k birds Ross 308?" → {{"is_complete": false, "missing_info": ["target age or weight"], "reason": "Rule 2: calculation needs endpoint"}}
 """
 
         try:
@@ -565,56 +590,14 @@ Examples:
                 "detected_entities": enhanced_entities,
             }
 
-        # ✅ VERSION 4.5: LOGIQUE SPÉCIFIQUE CALCULS (start + target age requis)
-        if self._is_calculation_query(enhanced_entities, query):
-            start_age = enhanced_entities.get("age_days") or enhanced_entities.get(
-                "start_age_days"
-            )
-            target_age = enhanced_entities.get("target_age_days")
+        # 🔥 FIX CRITIQUE v4.5.3: Si OpenAI valide comme "complete", on fait confiance
+        # La validation intelligente via OpenAI est plus fiable que les regex locales
+        logger.info(
+            f"✅ Requête validée complète par OpenAI - {completeness.get('reason', '')}"
+        )
 
-            logger.info(
-                f"🔢 Requête de calcul détectée - start: {start_age}, target: {target_age}"
-            )
-
-            # Vérifier start age
-            if not start_age:
-                missing_term = self._translate("starting age", language)
-                clarification_msg = self._generate_clarification_message(
-                    [missing_term], language
-                )
-
-                logger.warning("❌ Calcul impossible sans start age")
-                return {
-                    "status": "needs_fallback",
-                    "missing": [missing_term],
-                    "helpful_message": clarification_msg,
-                    "detected_entities": enhanced_entities,
-                    "reason": "Calculation requires starting age",
-                }
-
-            # Vérifier target age
-            if not target_age:
-                missing_term = self._translate("target age", language)
-                clarification_msg = self._generate_clarification_message(
-                    [missing_term], language
-                )
-
-                logger.warning("❌ Calcul impossible sans target age")
-                return {
-                    "status": "needs_fallback",
-                    "missing": [missing_term],
-                    "helpful_message": clarification_msg,
-                    "detected_entities": enhanced_entities,
-                    "reason": "Calculation requires target age",
-                }
-
-            # ✅ Si les deux âges présents → VALIDATION RÉUSSIE
-            logger.info(f"✅ Calcul validé: jour {start_age} → jour {target_age}")
-            return {
-                "status": "complete",
-                "enhanced_entities": enhanced_entities,
-                "message": f"Calculation range validated: day {start_age} to {target_age}",
-            }
+        # NOTE: L'ancienne logique _is_calculation_query() créait des contradictions
+        # Elle est maintenant désactivée car OpenAI gère mieux les cas limites
 
         # LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
         logger.debug(
@@ -760,7 +743,21 @@ Examples:
         # Déterminer le statut
         if not missing:
             logger.debug("✅ Validation complete, returning enhanced_entities")
-            return {"status": "complete", "enhanced_entities": enhanced_entities}
+            return {
+                "status": "complete",
+                "enhanced_entities": enhanced_entities,
+                "filtering_hints": {
+                    "strict_sex_match": enhanced_entities.get(
+                        "has_explicit_sex", False
+                    ),
+                    "strict_breed_match": enhanced_entities.get(
+                        "has_explicit_breed", False
+                    ),
+                    "strict_age_match": enhanced_entities.get(
+                        "has_explicit_age", False
+                    ),
+                },
+            }
 
         elif len(missing) <= 1 and ("breed" not in missing):
             # CORRECTION CRITIQUE : Vérifier si l'âge manquant est critique
@@ -1417,7 +1414,6 @@ Examples:
             if min_age <= age <= max_age:
                 return {"available": True}
             else:
-                # Proposer des alternatives
                 alternatives = []
                 if age < min_age:
                     alternatives.append(f"{min_age} jours (âge minimum)")
@@ -1433,12 +1429,12 @@ Examples:
         return {"available": True}
 
 
-# Tests unitaires
+# Tests unitaires - AU NIVEAU RACINE
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.5.0 FIX BOUCLE INFINIE")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.5.2 FIX REQUÊTES SIMPLES")
     print("=" * 70)
 
     validator = PostgreSQLValidator()
@@ -1489,6 +1485,11 @@ if __name__ == "__main__":
                 "start_age_days": 18,
             },
         },
+        {
+            "query": "Quel est le poids d'un Ross 308 mâle de 17 jours ?",
+            "entities": {"breed": "ross 308", "age_days": 17, "sex": "male"},
+            "context": None,
+        },
     ]
 
     import asyncio
@@ -1508,13 +1509,17 @@ if __name__ == "__main__":
                 print(f"  → Enhanced: {result['enhanced_entities']}")
             if "detected_entities" in result:
                 print(f"  → Detected: {result['detected_entities']}")
+            if "helpful_message" in result:
+                print(f"  → Message: {result['helpful_message'][:100]}...")
 
     asyncio.run(run_tests())
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.5.0")
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.5.2")
     print(
-        "🎯 NOUVELLE FONCTIONNALITÉ: Extraction systématique + support réponses courtes"
+        "🎯 FIX CRITIQUE: Validation requêtes simples réorganisée (Rule 1 en priorité)"
     )
-    print("🔧 FIX CRITIQUE: Boucle infinie corrigée pour calculs de plage")
+    print(
+        "🔧 Requêtes 'Quel est le poids à X jours' maintenant reconnues comme COMPLÈTES"
+    )
     print("=" * 70)
