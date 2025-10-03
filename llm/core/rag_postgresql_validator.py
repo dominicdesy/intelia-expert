@@ -199,6 +199,7 @@ Examples in Spanish:
     ) -> dict:
         """
         Validation intelligente : détecte automatiquement les informations manquantes
+        VERSION 4.5.1: Logique claire - âge cible OU poids cible suffit
 
         Args:
             query: Requête utilisateur
@@ -222,15 +223,17 @@ Examples in Spanish:
                 "reason": "validation_disabled",
             }
 
-        # Construire le contexte des entités détectées
-        entities_context = f"""
-Detected entities:
-- Breed: {entities.get('breed') or 'NOT SPECIFIED'}
-- Start Age: {entities.get('age_days') or 'NOT SPECIFIED'} days
-- Target Age: {entities.get('target_age_days') or 'NOT SPECIFIED'} days
-- Sex: {entities.get('sex') or 'NOT SPECIFIED'}
-- Metric: {entities.get('metric_type') or 'NOT SPECIFIED'}
-"""
+        breed = entities.get("breed", "NOT SPECIFIED")
+        start_age = entities.get("start_age_days", entities.get("age_days"))
+        target_age = entities.get("target_age_days")
+        target_weight = entities.get("target_weight")
+        sex = entities.get("sex", "NOT SPECIFIED")
+        metric = entities.get("metric_type", "NOT SPECIFIED")
+
+        # Formater les entités pour le prompt
+        start_age_str = f"{start_age} days" if start_age else "NOT SPECIFIED"
+        target_age_str = f"{target_age} days" if target_age else "NOT SPECIFIED"
+        target_weight_str = f"{target_weight} kg" if target_weight else "NOT SPECIFIED"
 
         # Ajouter le contexte conversationnel si disponible
         context_info = ""
@@ -248,33 +251,44 @@ User query: "{query}"
 Language: {language}
 
 {context_info}
-{entities_context}
 
-Your task: Determine if the query can be answered with ALL available information (current + previous context), or if critical information is still missing.
+Detected entities:
+- Breed: {breed}
+- Start Age: {start_age_str}
+- Target Age: {target_age_str}
+- Target Weight: {target_weight_str}
+- Sex: {sex}
+- Metric: {metric}
 
-Consider:
-1. Simple queries (e.g., "weight at 28 days for Ross 308") → if breed + age + metric detected = COMPLETE
-2. Calculation queries (e.g., "how much feed needed from day 18 to finish") → need START age + END age/target weight
+**CRITICAL RULES FOR FEED/MOULÉE CALCULATIONS:**
+1. For feed calculations (moulée/alimento/feed), if we have:
+   - Breed + Start Age + Target Age → COMPLETE (no weight needed)
+   - Breed + Start Age + Target Weight → COMPLETE (no age needed)
+   - Breed + Start Age only → INCOMPLETE (need target age OR target weight)
+
+2. Simple queries (e.g., "weight at 28 days for Ross 308") → if breed + age + metric = COMPLETE
+
 3. Comparison queries → need at least 2 entities to compare
-4. Range queries → need start and end points
-5. If previous context exists, check if missing info could be inferred from it
+
+**In this case:**
+- Is this a feed calculation? (keywords: moulée, feed, alimento, combien, how much)
+- Do we have breed? {breed}
+- Do we have start age? {start_age_str}
+- Do we have target age OR target weight? Target age: {target_age_str}, Target weight: {target_weight_str}
+- If YES to all above → is_complete = TRUE
 
 Return ONLY valid JSON:
 {{
     "is_complete": true/false,
-    "missing_info": ["list of missing information descriptions **IN {language.upper()}**"],  
-    "reason": "brief explanation why incomplete"
+    "missing_info": ["list of missing information **IN {language.upper()}**"],
+    "reason": "brief explanation"
 }}
 
-Examples:
-- "Weight at 28 days?" → {{"is_complete": false, "missing_info": ["breed/strain"], "reason": "breed not specified"}}
-- "Weight at 28 days Ross 308?" → {{"is_complete": true, "missing_info": [], "reason": "all info present"}}
-- "Feed needed from day 18 with 20k birds?" → {{"is_complete": false, "missing_info": ["target age or weight", "breed"], "reason": "calculation needs endpoint and breed"}}
+**IMPORTANT**: The "missing_info" list MUST be in {language.upper()} language.
 
-**IMPORTANT**: The "missing_info" list MUST be in {language.upper()} language:
-- If language is "fr": use French (e.g., "âge cible ou poids", "race/souche")
-- If language is "en": use English (e.g., "target age or weight", "breed/strain")
-- If language is "es": use Spanish (e.g., "edad objetivo o peso", "raza/cepa")
+Examples:
+- "Combien de moulée de jour 18 à 35 pour Ross 308?" → {{"is_complete": true, "missing_info": [], "reason": "has breed + start age + target age"}}
+- "Feed from day 18 with 20k birds Ross 308?" → {{"is_complete": false, "missing_info": ["target age or weight"], "reason": "missing endpoint"}}
 """
 
         try:
@@ -301,11 +315,11 @@ Examples:
 
         except Exception as e:
             logger.error(f"❌ Validation completeness failed: {e}")
-            # En cas d'erreur, on suppose que c'est complet pour ne pas bloquer
+            # En cas d'erreur, retourner incomplet pour éviter de bloquer
             return {
-                "is_complete": True,
-                "missing_info": [],
-                "reason": "validation_error",
+                "is_complete": False,
+                "missing_info": ["validation error"],
+                "reason": str(e),
             }
 
     def _generate_smart_clarification(
