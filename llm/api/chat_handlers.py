@@ -197,7 +197,7 @@ class ChatHandlers:
         """
         Gère le contexte de clarification et retourne un résultat si nécessaire
         Retourne None si le flux normal doit continuer
-        
+
         ✅ VERSION 4.3.1 - CORRECTION MAJEURE:
         - Fusion des entités AVANT de retourner pour traitement
         - Flag continue_processing pour reprendre le flux RAG
@@ -265,7 +265,7 @@ class ChatHandlers:
         """
         Génère une réponse via le RAG Engine
         Retourne le résultat ou None si erreur
-        
+
         ✅ VERSION 4.3.1: Support des entités fusionnées via performance_context
         """
         rag_engine = self.get_rag_engine()
