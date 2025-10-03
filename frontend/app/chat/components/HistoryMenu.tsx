@@ -57,12 +57,11 @@ export const HistoryMenu = React.memo(() => {
     const newIsOpen = !isOpen;
     setIsOpen(newIsOpen);
 
-    if (
-      newIsOpen &&
-      user &&
-      !isLoadingHistory &&
-      conversationGroups.length === 0
-    ) {
+	if (
+	  newIsOpen &&
+	  user &&
+	  !isLoadingHistory
+	) {
       console.log(
         "🔄 [HistoryMenu] Chargement MANUEL uniquement lors de l'ouverture",
       );
