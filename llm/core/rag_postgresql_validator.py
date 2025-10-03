@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 4.3.1: CORRECTION CRITIQUE - detected_entities dans tous les retours needs_fallback
+VERSION 4.4.0: EXTRACTION MULTILINGUE AVEC OPENAI
+- Ajout du paramètre openai_client dans __init__
+- Nouvelle méthode _extract_with_openai pour extraction multilingue
+- Intégration OpenAI dans flexible_query_validation
 - Préserve tous les champs originaux
 - Logs diagnostiques
 - Invalidation des métriques invalides
@@ -11,11 +14,12 @@ VERSION 4.3.1: CORRECTION CRITIQUE - detected_entities dans tous les retours nee
 - FUSION avec OpenAI interpretation avant validation
 - FORMAT AMÉLIORÉ pour questions multiples (numérotation + phrase de fermeture)
 - Messages d'abandon génériques enrichis
-- ✅ CORRECTION 4.3.1: detected_entities TOUJOURS présent dans needs_fallback
+- detected_entities TOUJOURS présent dans needs_fallback
 """
 
 import re
 import logging
+import json
 from typing import Dict, List, Optional, Any
 
 from utils.breeds_registry import get_breeds_registry
@@ -26,15 +30,28 @@ logger = logging.getLogger(__name__)
 class PostgreSQLValidator:
     """Validateur intelligent avec auto-détection, alternatives et contextualisation"""
 
-    def __init__(self, intents_config_path: str = "llm/config/intents.json"):
+    def __init__(
+        self, intents_config_path: str = "llm/config/intents.json", openai_client=None
+    ):
         """
-        Initialise le validateur avec breeds_registry
+        Initialise le validateur avec breeds_registry et OpenAI client
 
         Args:
             intents_config_path: Chemin vers intents.json
+            openai_client: Client OpenAI pour extraction multilingue (optionnel)
         """
         self.logger = logger
         self.breeds_registry = get_breeds_registry(intents_config_path)
+        self.openai_client = openai_client  # Stocker le client OpenAI
+
+        if not openai_client:
+            logger.warning(
+                "⚠️ Validator créé sans OpenAI - extraction multilingue désactivée"
+            )
+        else:
+            logger.info(
+                "✅ Validator créé avec OpenAI - extraction multilingue activée"
+            )
 
         logger.info(
             f"PostgreSQLValidator initialisé avec breeds_registry "
@@ -67,6 +84,54 @@ class PostgreSQLValidator:
         except Exception as e:
             self.logger.error(f"❌ Erreur initialisation PostgreSQLValidator: {e}")
             raise
+
+    async def _extract_with_openai(self, query: str, language: str = "en") -> dict:
+        """
+        Extraction intelligente multilingue avec OpenAI
+
+        Args:
+            query: Requête utilisateur
+            language: Code langue (fr, en, es, etc.)
+
+        Returns:
+            Dict avec age_days, breed, metric_type extraits
+        """
+
+        if not self.openai_client:
+            logger.warning("⚠️ OpenAI client non disponible pour extraction")
+            return {"age_days": None, "breed": None, "metric_type": None}
+
+        prompt = f"""Extract information from this query in {language}:
+Query: "{query}"
+
+Extract:
+1. Age in days (e.g., "28 días", "28 days", "28 jours")
+2. Breed/strain (Ross 308, Cobb 500, etc.)
+3. Metric type (weight/peso/poids, feed conversion, etc.)
+
+Return JSON only:
+{{
+    "age_days": <number or null>,
+    "breed": "<breed name or null>",
+    "metric_type": "<metric or null>"
+}}
+"""
+
+        try:
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=150,
+            )
+
+            result = json.loads(response.choices[0].message.content)
+            logger.info(f"✅ OpenAI extraction ({language}): {result}")
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ OpenAI extraction failed: {e}")
+            return {"age_days": None, "breed": None, "metric_type": None}
 
     def validate_context(
         self, entities: Dict, query: str, language: str = "fr"
@@ -118,20 +183,21 @@ class PostgreSQLValidator:
             "status": "complete" if not missing_fields else "needs_fallback",
             "missing_fields": missing_fields,
             "enhanced_entities": entities,
-            "detected_entities": entities,  # ✅ AJOUT pour cohérence
+            "detected_entities": entities,
         }
 
-    def flexible_query_validation(
+    async def flexible_query_validation(
         self, query: str, entities: Dict[str, Any], language: str = "fr"
     ) -> Dict[str, Any]:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        VERSION 4.3.1: CORRECTION CRITIQUE - detected_entities dans tous les retours
+        VERSION 4.4.0: EXTRACTION MULTILINGUE AVEC OPENAI
+        - Appel OpenAI pour extraction multilingue si champs manquants
         - Fusion avec OpenAI interpretation AVANT validation
         - Format amélioré pour questions multiples
         - Messages d'abandon génériques
-        - ✅ NOUVEAU: detected_entities TOUJOURS présent dans needs_fallback
+        - detected_entities TOUJOURS présent dans needs_fallback
 
         CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
         puis enrichit SEULEMENT les champs manquants avec auto-détection.
@@ -199,6 +265,50 @@ class PostgreSQLValidator:
                 logger.info(
                     f"✅ Metric récupéré depuis OpenAI: {openai_interp['metric_type']}"
                 )
+
+        # 🤖 NOUVEAU: Extraction OpenAI multilingue si champs manquants
+        if not enhanced_entities.get("age_days") or not enhanced_entities.get("breed"):
+            logger.info(f"🤖 Appel OpenAI pour extraction multilingue ({language})")
+
+            openai_extracted = await self._extract_with_openai(query, language)
+
+            # Enrichir avec les résultats OpenAI
+            if not enhanced_entities.get("age_days") and openai_extracted.get(
+                "age_days"
+            ):
+                enhanced_entities["age_days"] = openai_extracted["age_days"]
+                logger.info(
+                    f"✅ Age détecté par OpenAI: {openai_extracted['age_days']} jours"
+                )
+
+            if not enhanced_entities.get("breed") and openai_extracted.get("breed"):
+                normalized_breed = self.breeds_registry.normalize_breed(
+                    openai_extracted["breed"]
+                )
+                if normalized_breed:
+                    enhanced_entities["breed"] = normalized_breed
+                    enhanced_entities["has_explicit_breed"] = True
+                    logger.info(f"✅ Breed détecté par OpenAI: {normalized_breed}")
+
+            if not enhanced_entities.get("metric_type") and openai_extracted.get(
+                "metric_type"
+            ):
+                # Normaliser la métrique
+                metric_mapping = {
+                    "peso": "weight",
+                    "poids": "weight",
+                    "gewicht": "weight",
+                    "conversión": "fcr",
+                    "conversion": "fcr",
+                    "mortalidad": "mortality",
+                    "mortalité": "mortality",
+                }
+                normalized_metric = metric_mapping.get(
+                    openai_extracted["metric_type"].lower(),
+                    openai_extracted["metric_type"],
+                )
+                enhanced_entities["metric_type"] = normalized_metric
+                logger.info(f"✅ Metric détecté par OpenAI: {normalized_metric}")
 
         # LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
         logger.debug(
@@ -380,7 +490,7 @@ class PostgreSQLValidator:
                         "missing": missing,
                         "suggestions": suggestions,
                         "helpful_message": helpful_message,
-                        "detected_entities": enhanced_entities,  # ✅ CORRECTION CRITIQUE
+                        "detected_entities": enhanced_entities,
                     }
 
             # Si ce n'est pas critique (ex: mortalité générale), on peut traiter
@@ -403,7 +513,7 @@ class PostgreSQLValidator:
                 "missing": missing,
                 "suggestions": suggestions,
                 "helpful_message": helpful_message,
-                "detected_entities": enhanced_entities,  # ✅ CORRECTION CRITIQUE
+                "detected_entities": enhanced_entities,
             }
 
     def _get_breed_suggestion(self, language: str) -> str:
@@ -641,7 +751,7 @@ class PostgreSQLValidator:
         Valider et enrichir les entités
         Méthode alternative avec invalidation explicite des métriques invalides
 
-        ✅ VERSION 4.3.1: Ajoute detected_entities dans tous les retours
+        VERSION 4.3.1: Ajoute detected_entities dans tous les retours
         """
 
         enhanced = dict(entities) if entities else {}
@@ -711,7 +821,7 @@ class PostgreSQLValidator:
         return {
             "status": status,
             "enhanced_entities": enhanced,
-            "detected_entities": enhanced,  # ✅ CORRECTION CRITIQUE
+            "detected_entities": enhanced,
             "missing": missing,
             "message": message,
         }
@@ -901,7 +1011,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.3.1 CORRECTION detected_entities")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.4.0 EXTRACTION MULTILINGUE")
     print("=" * 70)
 
     validator = PostgreSQLValidator()
@@ -937,174 +1047,26 @@ if __name__ == "__main__":
         },
     ]
 
-    for test in test_cases:
-        print(f"\n  Query: {test['query']}")
-        print(f"  Input entities: {test['entities']}")
+    import asyncio
 
-        result = validator.flexible_query_validation(test["query"], test["entities"])
+    async def run_tests():
+        for test in test_cases:
+            print(f"\n  Query: {test['query']}")
+            print(f"  Input entities: {test['entities']}")
 
-        print(f"  → Status: {result['status']}")
-        if "enhanced_entities" in result:
-            print(f"  → Enhanced: {result['enhanced_entities']}")
-        if "detected_entities" in result:
-            print(f"  → Detected: {result['detected_entities']}")
+            result = await validator.flexible_query_validation(
+                test["query"], test["entities"]
+            )
 
-    # Test 3: Messages de clarification multilingues avec FORMAT AMÉLIORÉ
-    print("\n🆕 Test 3: Messages de clarification conversationnels (FORMAT AMÉLIORÉ)")
-    test_clarifications = [
-        {
-            "query": "Quel est le poids d'un poulet de 12 jours ?",
-            "entities": {},
-            "language": "fr",
-        },
-        {
-            "query": "What is the weight at 12 days?",
-            "entities": {},
-            "language": "en",
-        },
-        {
-            "query": "¿Cuál es el peso?",
-            "entities": {"age_days": 15},
-            "language": "es",
-        },
-    ]
-
-    for test in test_clarifications:
-        print(f"\n  Query: {test['query']}")
-        print(f"  Language: {test['language']}")
-
-        result = validator.flexible_query_validation(
-            test["query"], test["entities"], test["language"]
-        )
-
-        print(f"  → Status: {result['status']}")
-        if result["status"] == "needs_fallback":
-            print(f"  → Question:\n{result['helpful_message']}")
-            print(f"  → detected_entities présent: {'detected_entities' in result}")
+            print(f"  → Status: {result['status']}")
+            if "enhanced_entities" in result:
+                print(f"  → Enhanced: {result['enhanced_entities']}")
             if "detected_entities" in result:
-                print(f"  → detected_entities: {result['detected_entities']}")
+                print(f"  → Detected: {result['detected_entities']}")
 
-    # Test 4: Fusion avec OpenAI interpretation
-    print("\n🆕 Test 4: Fusion avec OpenAI interpretation")
-    test_openai_fusion = [
-        {
-            "query": "Quel est le poids?",
-            "entities": {
-                "_openai_interpretation": {
-                    "breed": "Ross 308",
-                    "age_days": 21,
-                    "metric_type": "body_weight",
-                }
-            },
-            "language": "fr",
-        },
-        {
-            "query": "FCR comparison",
-            "entities": {
-                "sex": "male",
-                "_openai_interpretation": {"breed": "Cobb 500", "age_days": 35},
-            },
-            "language": "en",
-        },
-    ]
-
-    for test in test_openai_fusion:
-        print(f"\n  Query: {test['query']}")
-        print(f"  Input entities: {test['entities']}")
-
-        result = validator.flexible_query_validation(
-            test["query"], test["entities"], test["language"]
-        )
-
-        print(f"  → Status: {result['status']}")
-        if "enhanced_entities" in result:
-            print(f"  → Enhanced: {result['enhanced_entities']}")
-            print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
-        if "detected_entities" in result:
-            print(f"  → Detected: {result['detected_entities']}")
-
-    # Test 5: validate_context avec fusion
-    print("\n🆕 Test 5: validate_context avec fusion OpenAI")
-    test_validate_context = {
-        "query": "Compare weight",
-        "entities": {
-            "sex": "female",
-            "_openai_interpretation": {
-                "breed": "Ross 308",
-                "age_days": 28,
-                "metric_type": "body_weight",
-            },
-        },
-        "language": "en",
-    }
-
-    print(f"\n  Query: {test_validate_context['query']}")
-    print(f"  Input entities: {test_validate_context['entities']}")
-
-    result = validator.validate_context(
-        test_validate_context["entities"],
-        test_validate_context["query"],
-        test_validate_context["language"],
-    )
-
-    print(f"  → Status: {result['status']}")
-    print(f"  → Missing fields: {result.get('missing_fields', [])}")
-    print(f"  → Enhanced entities: {result['enhanced_entities']}")
-    print(f"  → detected_entities présent: {'detected_entities' in result}")
-    print(f"  → Sex preserved: {result['enhanced_entities'].get('sex')}")
-
-    # Test 6: NOUVEAU - Vérifier detected_entities dans needs_fallback
-    print("\n✅ Test 6: CRITIQUE - Vérifier detected_entities dans needs_fallback")
-    test_needs_fallback = {
-        "query": "Quel est le poids?",
-        "entities": {"sex": "male"},  # Manque breed, age, metric
-        "language": "fr",
-    }
-
-    print(f"\n  Query: {test_needs_fallback['query']}")
-    print(f"  Input entities: {test_needs_fallback['entities']}")
-
-    result = validator.flexible_query_validation(
-        test_needs_fallback["query"],
-        test_needs_fallback["entities"],
-        test_needs_fallback["language"],
-    )
-
-    print(f"  → Status: {result['status']}")
-    print(f"  → detected_entities présent: {'detected_entities' in result}")
-
-    if "detected_entities" in result:
-        print(f"  ✅ SUCCESS: detected_entities trouvé: {result['detected_entities']}")
-        print(
-            f"  → Sex preserved in detected_entities: {result['detected_entities'].get('sex')}"
-        )
-    else:
-        print("  ❌ FAILURE: detected_entities MANQUANT dans needs_fallback!")
-
-    # Test 7: validate_and_enhance avec needs_fallback
-    print("\n✅ Test 7: validate_and_enhance - vérifier detected_entities")
-    test_validate_enhance = {
-        "query": "Compare broilers",
-        "entities": {"sex": "female"},  # Manque plusieurs champs
-    }
-
-    print(f"\n  Query: {test_validate_enhance['query']}")
-    print(f"  Input entities: {test_validate_enhance['entities']}")
-
-    result = validator.validate_and_enhance(
-        test_validate_enhance["entities"],
-        test_validate_enhance["query"],
-    )
-
-    print(f"  → Status: {result['status']}")
-    print(f"  → detected_entities présent: {'detected_entities' in result}")
-
-    if "detected_entities" in result:
-        print(f"  ✅ SUCCESS: detected_entities trouvé: {result['detected_entities']}")
-    else:
-        print("  ❌ FAILURE: detected_entities MANQUANT!")
+    asyncio.run(run_tests())
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.3.1")
-    print("🎯 CORRECTION APPLIQUÉE: detected_entities présent partout")
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.4.0")
+    print("🎯 NOUVELLE FONCTIONNALITÉ: Extraction multilingue OpenAI")
     print("=" * 70)

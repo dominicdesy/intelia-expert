@@ -263,9 +263,7 @@ class InteliaRAGEngine:
         # PostgreSQL Validator (pour validation)
         if POSTGRESQL_VALIDATOR_AVAILABLE and PostgreSQLValidator:
             try:
-                self.postgresql_validator = PostgreSQLValidator(
-                    openai_client=self.core.openai_client
-                )
+                self.postgresql_validator = PostgreSQLValidator()
                 # Appeler initialize() si la méthode existe
                 if hasattr(self.postgresql_validator, "initialize"):
                     await self.postgresql_validator.initialize()
