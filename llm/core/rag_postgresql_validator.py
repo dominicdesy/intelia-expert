@@ -592,8 +592,10 @@ Examples:
 
         # 🔥 FIX CRITIQUE v4.5.3: Si OpenAI valide comme "complete", on fait confiance
         # La validation intelligente via OpenAI est plus fiable que les regex locales
-        logger.info(f"✅ Requête validée complète par OpenAI - {completeness.get('reason', '')}")
-        
+        logger.info(
+            f"✅ Requête validée complète par OpenAI - {completeness.get('reason', '')}"
+        )
+
         # NOTE: L'ancienne logique _is_calculation_query() créait des contradictions
         # Elle est maintenant désactivée car OpenAI gère mieux les cas limites
 
@@ -741,7 +743,21 @@ Examples:
         # Déterminer le statut
         if not missing:
             logger.debug("✅ Validation complete, returning enhanced_entities")
-            return {"status": "complete", "enhanced_entities": enhanced_entities}
+            return {
+                "status": "complete",
+                "enhanced_entities": enhanced_entities,
+                "filtering_hints": {
+                    "strict_sex_match": enhanced_entities.get(
+                        "has_explicit_sex", False
+                    ),
+                    "strict_breed_match": enhanced_entities.get(
+                        "has_explicit_breed", False
+                    ),
+                    "strict_age_match": enhanced_entities.get(
+                        "has_explicit_age", False
+                    ),
+                },
+            }
 
         elif len(missing) <= 1 and ("breed" not in missing):
             # CORRECTION CRITIQUE : Vérifier si l'âge manquant est critique
@@ -1500,6 +1516,10 @@ if __name__ == "__main__":
 
     print("\n" + "=" * 70)
     print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.5.2")
-    print("🎯 FIX CRITIQUE: Validation requêtes simples réorganisée (Rule 1 en priorité)")
-    print("🔧 Requêtes 'Quel est le poids à X jours' maintenant reconnues comme COMPLÈTES")
+    print(
+        "🎯 FIX CRITIQUE: Validation requêtes simples réorganisée (Rule 1 en priorité)"
+    )
+    print(
+        "🔧 Requêtes 'Quel est le poids à X jours' maintenant reconnues comme COMPLÈTES"
+    )
     print("=" * 70)

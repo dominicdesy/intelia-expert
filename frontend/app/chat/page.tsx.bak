@@ -774,24 +774,23 @@ function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation]);
 
-
-// Chargement initial unique
+  // Chargement initial unique
   useEffect(() => {
     if (
       isAuthenticated &&
-      user?.id &&
+      user?.email &&
       !hasLoadedConversationsRef.current &&
       isMountedRef.current
     ) {
-      console.log("[Chat] Chargement initial UNIQUE pour:", user.id);
+      console.log("[Chat] Chargement initial UNIQUE pour:", user.email);
       hasLoadedConversationsRef.current = true;
 
-      const userId = user.id;
+      const userEmail = user.email;
 
       const performInitialLoad = async () => {
         try {
           const { loadConversations: loadFn } = useChatStore.getState();
-          await loadFn(userId);
+          await loadFn(userEmail);
           console.log("[Chat] Chargement initial terminé avec succès");
         } catch (error) {
           console.error("[Chat] Erreur chargement initial:", error);
@@ -810,8 +809,7 @@ function ChatInterface() {
 
       setTimeout(performInitialLoad, 100);
     }
-  }, [isAuthenticated, user?.id]);
-
+  }, [isAuthenticated, user?.email]);
 
   // FONCTION CORRIGÉE POUR STREAMING - Élimine le scintillement
   const handleSendMessage = useCallback(async () => {

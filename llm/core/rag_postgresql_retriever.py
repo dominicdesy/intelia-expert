@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_retriever.py - Récupérateur de données PostgreSQL
-Version 3.2: Support des calculs de moulée sur plage d'âges
+Version 3.3: Support du flag has_explicit_sex pour mode strict/souple
 - Mapping breed → nom PostgreSQL via breeds_registry
 - Retourne RAGResult avec documents formatés correctement
-- ✅ NOUVEAU: Détection et calcul automatique de consommation sur plage (start_age → target_age)
-- ✅ NOUVEAU: Extraction du nombre de poulets depuis la requête
+- ✅ Support des calculs de moulée sur plage d'âges
+- ✅ Extraction du nombre de poulets depuis la requête
+- ✅ NOUVEAU: Mode strict/souple basé sur has_explicit_sex
 - Format documents avec 'content' + metadata
 """
 
@@ -166,13 +167,13 @@ class PostgreSQLRetriever:
         """
         Recherche de métriques avec support des calculs de plage d'âges
 
-        VERSION 3.2: Détection automatique des calculs de moulée sur plage
+        VERSION 3.3: Support du flag has_explicit_sex pour mode strict/souple
 
         Args:
             query: Requête de recherche
-            entities: Entités extraites (breed, age_days, start_age_days, target_age_days, sex, metric_type, etc.)
+            entities: Entités extraites (breed, age_days, start_age_days, target_age_days, sex, metric_type, has_explicit_sex, etc.)
             top_k: Nombre maximum de résultats
-            strict_sex_match: Si True, correspondance exacte du sexe uniquement (pour comparaisons)
+            strict_sex_match: DEPRECATED - utilisez has_explicit_sex dans entities à la place
 
         Returns:
             RAGResult contenant les documents formatés et métadonnées
@@ -210,7 +211,7 @@ class PostgreSQLRetriever:
 
             if is_feed_calc:
                 logger.info(
-                    f"🔢 Calcul de moulée détecté: jour {start_age} → {target_age}"
+                    f"📢 Calcul de moulée détecté: jour {start_age} → {target_age}"
                 )
                 return await self._calculate_feed_range(
                     breed, start_age, target_age, sex, query, entities
@@ -320,6 +321,7 @@ class PostgreSQLRetriever:
                         "query": query,
                         "entities": normalized_entities,
                         "strict_sex_match": strict_sex_match,
+                        "has_explicit_sex": entities.get("has_explicit_sex", False),
                     },
                 )
             else:
@@ -374,13 +376,26 @@ class PostgreSQLRetriever:
             # Fallback si pas de mapping
             breed_db = breed
 
-        # ✅ CORRECTION: Le metric_name est "feed_intake for X"
-        sql = """
+        # ✅ Support du mode strict/souple pour les calculs de feed
+        has_explicit_sex = entities.get("has_explicit_sex", False)
+
+        if has_explicit_sex and sex not in ["as_hatched", "mixed"]:
+            # Mode strict: UNIQUEMENT le sexe demandé
+            sex_condition = "AND LOWER(COALESCE(d.sex, 'as_hatched')) = $4"
+            logger.info(f"🎯 Feed calculation: STRICT sex mode for '{sex}'")
+        else:
+            # Mode souple: sexe demandé OU fallback mixed/as_hatched
+            sex_condition = """AND (LOWER(COALESCE(d.sex, 'as_hatched')) = $4 
+                   OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed'))"""
+            logger.info(f"🔄 Feed calculation: FLEXIBLE sex mode for '{sex}'")
+
+        sql = f"""
             SELECT 
                 m.age_min as age_days,
                 m.value_numeric as feed_intake,
                 m.metric_name,
-                s.strain_name
+                s.strain_name,
+                d.sex
             FROM companies c
             JOIN breeds b ON c.id = b.company_id
             JOIN strains s ON b.id = s.breed_id  
@@ -390,8 +405,7 @@ class PostgreSQLRetriever:
               AND m.age_min BETWEEN $2 AND $3
               AND m.metric_name LIKE 'feed_intake for %'
               AND m.value_numeric IS NOT NULL
-              AND (LOWER(COALESCE(d.sex, 'as_hatched')) = $4 
-                   OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed'))
+              {sex_condition}
             ORDER BY m.age_min ASC
         """
 
@@ -405,7 +419,7 @@ class PostgreSQLRetriever:
 
             if not rows:
                 logger.warning(
-                    f"❌ Aucune donnée feed_intake trouvée pour {breed_db if breed_db else breed} entre {start_age}-{target_age} jours"
+                    f"❌ Aucune donnée feed_intake trouvée pour {breed_db if breed_db else breed} entre {start_age}-{target_age} jours (sex: {sex}, strict: {has_explicit_sex})"
                 )
                 return RAGResult(
                     context_docs=[],
@@ -415,12 +429,15 @@ class PostgreSQLRetriever:
                         "reason": "no_feed_data_for_range",
                         "start_age": start_age,
                         "target_age": target_age,
+                        "sex": sex,
+                        "has_explicit_sex": has_explicit_sex,
                     },
                 )
 
             # ✅ Grouper par jour (un seul feed_intake par jour)
             daily_feed = {}
             strain_name = rows[0].get("strain_name", breed)
+            actual_sex = rows[0].get("sex", sex)
 
             for row in rows:
                 age = row["age_days"]
@@ -430,7 +447,9 @@ class PostgreSQLRetriever:
                     if age not in daily_feed or feed > daily_feed[age]:
                         daily_feed[age] = feed
 
-            logger.info(f"✅ {len(daily_feed)} jours de données feed_intake trouvés")
+            logger.info(
+                f"✅ {len(daily_feed)} jours de données feed_intake trouvés (sex: {actual_sex})"
+            )
 
             # ✅ SOMME (pas moyenne) pour le total par poulet
             total_feed_grams = sum(daily_feed.values())
@@ -449,7 +468,7 @@ class PostgreSQLRetriever:
             total_feed_kg_per_bird = total_feed_grams / 1000
 
             # ✅ FORMATAGE RÉSULTAT
-            context_text = f"""Feed calculation for {strain_name} ({sex}) from day {start_age} to day {target_age}:
+            context_text = f"""Feed calculation for {strain_name} ({actual_sex}) from day {start_age} to day {target_age}:
 
 **Daily feed intake:**
 {chr(10).join(daily_details[:10])}"""
@@ -479,7 +498,8 @@ class PostgreSQLRetriever:
                     "breed": strain_name,
                     "start_age": start_age,
                     "target_age": target_age,
-                    "sex": sex,
+                    "sex": actual_sex,
+                    "has_explicit_sex": has_explicit_sex,
                     "num_birds": num_birds,
                     "total_feed_kg_per_bird": total_feed_kg_per_bird,
                     "total_feed_tonnes": total_feed_tonnes if num_birds else None,
@@ -495,6 +515,8 @@ class PostgreSQLRetriever:
                     "query_type": "feed_calculation",
                     "start_age": start_age,
                     "target_age": target_age,
+                    "sex": actual_sex,
+                    "has_explicit_sex": has_explicit_sex,
                     "num_birds": num_birds,
                     "total_feed_tonnes": total_feed_tonnes if num_birds else None,
                     "days_with_data": num_days,
@@ -520,7 +542,7 @@ class PostgreSQLRetriever:
         top_k: int,
         strict_sex_match: bool,
     ) -> Tuple[str, List]:
-        """Construit une requête SQL avec filtres"""
+        """Construit une requête SQL avec filtres adaptatifs selon has_explicit_sex"""
         conditions = []
         params = []
         param_count = 0
@@ -587,21 +609,53 @@ class PostgreSQLRetriever:
             else:
                 logger.warning(f"⚠️ Unknown metric type from OpenAI: {metric_name}")
 
-        # Filtres pour sexe
-        if entities.get("sex") and entities["sex"] != "as_hatched":
-            if strict_sex_match:
+        # ✅ FILTRES POUR SEXE - LOGIQUE ADAPTATIVE
+        sex = entities.get("sex", "as_hatched")
+        has_explicit_sex = original_entities.get("has_explicit_sex", False)
+
+        # Pour backward compatibility avec strict_sex_match (deprecated)
+        if strict_sex_match:
+            has_explicit_sex = True
+            logger.warning(
+                "strict_sex_match is deprecated, using has_explicit_sex instead"
+            )
+
+        sex_condition = None
+        order_sex_clause = None
+
+        if sex and sex != "as_hatched":
+            if has_explicit_sex:
+                # 🎯 MODE STRICT: UNIQUEMENT le sexe demandé
                 param_count += 1
-                conditions.append(f"LOWER(d.sex) = ${param_count}")
-                params.append(entities["sex"].lower())
+                sex_condition = f"LOWER(d.sex) = ${param_count}"
+                params.append(sex.lower())
+                order_sex_clause = ""  # Pas de priorisation nécessaire
+                logger.info(f"🎯 Using STRICT sex filter: only '{sex}' results")
             else:
+                # 🔄 MODE SOUPLE: sexe demandé OU fallback mixed/as_hatched
                 param_count += 1
-                conditions.append(
-                    f"""
+                sex_condition = f"""
                     (LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_count} 
                      OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed'))
                 """
+                params.append(sex.lower())
+                # Priorisation: exact match > fallback
+                order_sex_clause = """CASE 
+                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed') THEN 1
+                    ELSE 2
+                END,"""
+                logger.info(
+                    f"🔄 Using FLEXIBLE sex filter: '{sex}' + fallback to mixed/as_hatched"
                 )
-                params.append(entities["sex"].lower())
+        else:
+            # Pas de filtre sexe spécifique
+            order_sex_clause = """CASE 
+                WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed') THEN 1
+                ELSE 2
+            END,"""
+
+        if sex_condition:
+            conditions.append(sex_condition)
 
         where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -619,10 +673,7 @@ class PostgreSQLRetriever:
             JOIN data_categories dc ON m.category_id = dc.id
             {where_clause}
             ORDER BY 
-                CASE 
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed') THEN 1
-                    ELSE 2
-                END,
+                {order_sex_clause or ''}
                 m.value_numeric DESC NULLS LAST
             LIMIT {top_k}
         """
@@ -734,7 +785,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL RETRIEVER - VERSION 3.2")
+    print("🧪 TESTS POSTGRESQL RETRIEVER - VERSION 3.3")
     print("=" * 70)
 
     async def test_retriever():
@@ -746,6 +797,7 @@ if __name__ == "__main__":
             "age_days": 21,
             "sex": "male",
             "metric": "body_weight",
+            "has_explicit_sex": False,  # Mode souple
         }
 
         print(f"\nEntités de test: {test_entities}")
@@ -769,12 +821,24 @@ if __name__ == "__main__":
             }
         )
 
-        print("\n✅ Test 2: Calcul de moulée sur plage d'âges")
+        print("\n✅ Test 2: Mode strict avec has_explicit_sex=True")
+        strict_entities = {
+            "breed": "ross 308",
+            "age_days": 21,
+            "sex": "male",
+            "metric": "body_weight",
+            "has_explicit_sex": True,  # Mode strict - UNIQUEMENT male
+        }
+        print(f"\nEntités strict: {strict_entities}")
+        print("→ SQL WHERE: LOWER(d.sex) = 'male' (pas de fallback)")
+
+        print("\n✅ Test 3: Calcul de moulée sur plage d'âges")
         feed_entities = {
             "breed": "ross 308",
             "start_age_days": 1,
             "target_age_days": 35,
             "sex": "as_hatched",
+            "has_explicit_sex": False,
         }
 
         print(f"\nEntités de test feed: {feed_entities}")
@@ -788,6 +852,7 @@ if __name__ == "__main__":
                     "breed": "308/308 FF",
                     "start_age": 1,
                     "target_age": 35,
+                    "has_explicit_sex": False,
                     "total_feed_kg_per_bird": 3.5,
                     "days_calculated": 35,
                 },
@@ -801,14 +866,17 @@ if __name__ == "__main__":
         print("- Chaque document a un champ 'score' (float)")
         print("- Support des calculs de moulée sur plage d'âges")
         print("- Extraction automatique du nombre de poulets")
+        print("- 🆕 Support du flag has_explicit_sex pour mode strict/souple")
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Retriever VERSION 3.2")
+    print("✅ TESTS TERMINÉS - PostgreSQL Retriever VERSION 3.3")
     print("🎯 NOUVELLES FONCTIONNALITÉS:")
     print("   - Détection automatique des calculs de moulée")
     print("   - Support des plages d'âges (start_age → target_age)")
     print("   - Extraction du nombre de poulets depuis la requête")
     print("   - Calcul automatique de consommation totale")
+    print("   - 🆕 Mode strict/souple avec has_explicit_sex")
+    print("   - 🆕 Logique SQL adaptative selon le contexte")
     print("=" * 70)
 
     # Exécuter le test
