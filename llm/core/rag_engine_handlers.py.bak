@@ -467,10 +467,8 @@ class StandardQueryHandler(BaseQueryHandler):
             if self.postgresql_validator:
                 logger.info("🔍 Validation des entités avant appel PostgreSQL...")
 
-                validation_result = (
-                    await self.postgresql_validator.flexible_query_validation(
-                        query=query, entities=entities, language=language
-                    )
+                validation_result = self.postgresql_validator.flexible_query_validation(
+                    query=query, entities=entities, language=language
                 )
 
                 logger.info(f"📋 Résultat validation: {validation_result['status']}")
