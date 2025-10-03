@@ -220,9 +220,10 @@ class ConversationContextManager:
         """
         Accumule les informations de clarification de manière intelligente
 
-        ✅ Version 3.0 - FUSION D'ENTITÉS:
+        ✅ Version 3.1 - FUSION D'ENTITÉS + TARGET_AGE:
         - Fusion sémantique de la requête (existant)
         - ✅ NOUVEAU: Fusion des entités extraites
+        - ✅ NOUVEAU: Distinction age_days (départ) vs target_age (cible)
         - Préservation de TOUS les champs (age_days, metric_type, breed, sex)
         - Maintien de la lisibilité de la requête
         """
@@ -241,11 +242,35 @@ class ConversationContextManager:
 
             # ✅ NOUVELLE SECTION: FUSION DES ENTITÉS
             partial_entities = context.get("partial_entities", {})
+            missing_fields = context.get("missing_fields", [])
 
             logger.info(f"🔄 Fusion entités - Avant: {partial_entities}")
             logger.info(
                 f"🔄 Nouvelles entités extraites: {response_entities.to_dict()}"
             )
+
+            # ✅ NOUVEAU: Si on attend un âge cible et qu'un âge est détecté
+            if any("âge" in f or "age" in f or "poids" in f for f in missing_fields):
+                if response_entities.age_days is not None:
+                    # C'est l'âge CIBLE, pas l'âge de départ
+                    partial_entities["target_age"] = response_entities.age_days
+                    logger.info(f"✅ Target age ajouté: {response_entities.age_days}")
+                    # Ne pas écraser age_days si déjà présent
+                    if "age_days" not in partial_entities:
+                        partial_entities["age_days"] = response_entities.age_days
+                        partial_entities["has_explicit_age"] = (
+                            response_entities.has_explicit_age
+                        )
+                        logger.info(
+                            f"✅ Age_days (départ) ajouté: {response_entities.age_days}"
+                        )
+            elif response_entities.age_days is not None:
+                # Si ce n'est pas une clarification d'âge, c'est l'âge de départ
+                partial_entities["age_days"] = response_entities.age_days
+                partial_entities["has_explicit_age"] = (
+                    response_entities.has_explicit_age
+                )
+                logger.info(f"✅ Age_days ajouté: {response_entities.age_days}")
 
             # Fusionner : nouvelles entités ÉCRASENT les anciennes pour les champs présents
             if response_entities.breed:
@@ -254,13 +279,6 @@ class ConversationContextManager:
                     response_entities.has_explicit_breed
                 )
                 logger.info(f"✅ Breed ajouté: {response_entities.breed}")
-
-            if response_entities.age_days is not None:
-                partial_entities["age_days"] = response_entities.age_days
-                partial_entities["has_explicit_age"] = (
-                    response_entities.has_explicit_age
-                )
-                logger.info(f"✅ Age ajouté: {response_entities.age_days}")
 
             if response_entities.sex:
                 partial_entities["sex"] = response_entities.sex
