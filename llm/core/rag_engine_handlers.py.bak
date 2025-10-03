@@ -467,19 +467,9 @@ class StandardQueryHandler(BaseQueryHandler):
             if self.postgresql_validator:
                 logger.info("🔍 Validation des entités avant appel PostgreSQL...")
 
-                # ✅ Récupérer le contexte conversationnel si disponible
-                conversation_context = (
-                    preprocessed_data.get("conversation_context")
-                    if preprocessed_data
-                    else None
-                )
-
                 validation_result = (
                     await self.postgresql_validator.flexible_query_validation(
-                        query=query,
-                        entities=entities,
-                        language=language,
-                        conversation_context=conversation_context,
+                        query=query, entities=entities, language=language
                     )
                 )
 

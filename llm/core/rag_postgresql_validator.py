@@ -315,9 +315,8 @@ Examples:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        VERSION 4.4.0: EXTRACTION MULTILINGUE AVEC OPENAI + VALIDATION INTELLIGENTE
+        VERSION 4.4.0: EXTRACTION MULTILINGUE AVEC OPENAI
         - Appel OpenAI pour extraction multilingue si champs manquants
-        - Validation intelligente de complétude avec OpenAI
         - Fusion avec OpenAI interpretation AVANT validation
         - Format amélioré pour questions multiples
         - Messages d'abandon génériques
@@ -390,7 +389,7 @@ Examples:
                     f"✅ Metric récupéré depuis OpenAI: {openai_interp['metric_type']}"
                 )
 
-        # 🤖 1. EXTRACTION OpenAI multilingue si champs manquants
+        # 🤖 NOUVEAU: Extraction OpenAI multilingue si champs manquants
         if not enhanced_entities.get("age_days") or not enhanced_entities.get("breed"):
             logger.info(f"🤖 Appel OpenAI pour extraction multilingue ({language})")
 
@@ -433,29 +432,6 @@ Examples:
                 )
                 enhanced_entities["metric_type"] = normalized_metric
                 logger.info(f"✅ Metric détecté par OpenAI: {normalized_metric}")
-
-        # 🧠 2. VALIDATION INTELLIGENTE de complétude
-        logger.info("🧠 Validation intelligente de la complétude de la requête...")
-        completeness = await self._validate_query_completeness(
-            query, enhanced_entities, language
-        )
-
-        if not completeness.get("is_complete"):
-            missing_descriptions = completeness.get("missing_info", [])
-            logger.info(f"⚠️ Requête incomplète détectée: {missing_descriptions}")
-
-            # Générer message de clarification intelligent
-            clarification_msg = self._generate_smart_clarification(
-                missing_descriptions, language, completeness.get("reason", "")
-            )
-
-            return {
-                "status": "needs_fallback",
-                "enhanced_entities": enhanced_entities,
-                "missing": missing_descriptions,
-                "helpful_message": clarification_msg,
-                "detected_entities": enhanced_entities,
-            }
 
         # LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
         logger.debug(

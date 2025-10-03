@@ -11,7 +11,6 @@ VERSION 4.7.0 - CORRECTION CRITIQUE: GÉNÉRATION LLM POUR POSTGRESQL:
 - ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
 - ✅ Transmission correcte du paramètre language à tous les handlers
 - ✅ Support des entités pré-extraites pour fusion conversationnelle
-- ✅ Support du paramètre conversation_context dans generate_response()
 """
 
 import asyncio
@@ -120,7 +119,6 @@ class InteliaRAGEngine:
     - Intègre EntityExtractor pour extraction centralisée
     - Utilise ValidationCore pour validation unifiée
     - ComparisonHandler est maintenant un wrapper vers ComparisonEngine
-    - ✅ Support du paramètre conversation_context dans generate_response()
     """
 
     def __init__(self, openai_client: AsyncOpenAI = None):
@@ -336,16 +334,7 @@ class InteliaRAGEngine:
         enable_preprocessing: bool = True,
         **kwargs,
     ) -> RAGResult:
-        """Point d'entrée principal avec routage intelligent
-
-        Args:
-            query: Requête utilisateur
-            tenant_id: Identifiant du tenant
-            conversation_context: Historique de conversation (format liste)
-            language: Langue de la requête
-            enable_preprocessing: Activer le preprocessing
-            **kwargs: Paramètres additionnels (peut contenir conversation_context au format dict)
-        """
+        """Point d'entrée principal avec routage intelligent"""
 
         if not self.is_initialized:
             logger.warning("⚠️ RAG Engine non initialisé, tentative d'initialisation")
@@ -365,7 +354,7 @@ class InteliaRAGEngine:
             )
 
         effective_language = language or "fr"
-        logger.info(f"🌍 generate_response reçoit langue: {effective_language}")
+        logger.info(f"🌐 generate_response reçoit langue: {effective_language}")
 
         # Fallback si système indisponible
         if self.degraded_mode and not self.postgresql_retriever:
@@ -375,16 +364,9 @@ class InteliaRAGEngine:
                 metadata={"reason": "système_indisponible"},
             )
 
-        # ✅ Extraire conversation_context au format dict depuis kwargs si présent
-        context_dict = kwargs.get("conversation_context")
-
         try:
             return await self._process_query(
-                query,
-                effective_language,
-                enable_preprocessing,
-                start_time,
-                conversation_context=context_dict,
+                query, effective_language, enable_preprocessing, start_time
             )
         except Exception as e:
             logger.error(f"❌ Erreur generate_response: {e}")
@@ -440,7 +422,7 @@ class InteliaRAGEngine:
 
         effective_language = language or "fr"
         logger.info(
-            f"🌍 generate_response_with_entities reçoit langue: {effective_language}"
+            f"🌐 generate_response_with_entities reçoit langue: {effective_language}"
         )
         logger.info(f"🔄 Entités pré-extraites fournies: {entities}")
 
@@ -452,16 +434,9 @@ class InteliaRAGEngine:
                 metadata={"reason": "système_indisponible"},
             )
 
-        # ✅ Extraire conversation_context depuis kwargs si présent
-        context_dict = kwargs.get("conversation_context")
-
         try:
             return await self._process_query_with_entities(
-                query,
-                entities,
-                effective_language,
-                start_time,
-                conversation_context=context_dict,
+                query, entities, effective_language, start_time
             )
         except Exception as e:
             logger.error(f"❌ Erreur generate_response_with_entities: {e}")
@@ -477,19 +452,10 @@ class InteliaRAGEngine:
         language: str,
         enable_preprocessing: bool,
         start_time: float,
-        conversation_context: Dict = None,
     ) -> RAGResult:
-        """Pipeline de traitement modulaire
+        """Pipeline de traitement modulaire"""
 
-        Args:
-            query: Requête utilisateur
-            language: Langue de la requête
-            enable_preprocessing: Activer le preprocessing
-            start_time: Timestamp de début
-            conversation_context: Contexte conversationnel (format dict)
-        """
-
-        logger.info(f"🌍 _process_query traite avec langue: {language}")
+        logger.info(f"🌐 _process_query traite avec langue: {language}")
 
         # 1. Preprocessing
         preprocessed_data = await self._apply_preprocessing(
@@ -498,14 +464,7 @@ class InteliaRAGEngine:
 
         if "language" not in preprocessed_data:
             preprocessed_data["language"] = language
-            logger.info(f"🌍 Langue ajoutée à preprocessed_data: {language}")
-
-        # ✅ AJOUTER le contexte conversationnel
-        if conversation_context:
-            preprocessed_data["conversation_context"] = conversation_context
-            logger.info(
-                f"📝 Contexte conversationnel ajouté: {list(conversation_context.keys())}"
-            )
+            logger.info(f"🌐 Langue ajoutée à preprocessed_data: {language}")
 
         # 2. Classification
         classification = self.query_classifier.classify(
@@ -557,23 +516,15 @@ class InteliaRAGEngine:
         entities: Dict[str, Any],
         language: str,
         start_time: float,
-        conversation_context: Dict = None,
     ) -> RAGResult:
         """
         Pipeline de traitement avec entités pré-extraites
 
         Similaire à _process_query mais utilise les entités fournies
         au lieu de les extraire via le preprocessing
-
-        Args:
-            query: Requête utilisateur
-            entities: Entités pré-extraites
-            language: Langue de la requête
-            start_time: Timestamp de début
-            conversation_context: Contexte conversationnel (format dict)
         """
 
-        logger.info(f"🌍 _process_query_with_entities traite avec langue: {language}")
+        logger.info(f"🌐 _process_query_with_entities traite avec langue: {language}")
         logger.info(f"🔄 Utilisation des entités pré-extraites: {entities}")
 
         # 1. Créer preprocessed_data avec les entités fournies
@@ -593,13 +544,6 @@ class InteliaRAGEngine:
                 "language_detected": language,
             },
         }
-
-        # ✅ AJOUTER le contexte conversationnel
-        if conversation_context:
-            preprocessed_data["conversation_context"] = conversation_context
-            logger.info(
-                f"📝 Contexte conversationnel ajouté: {list(conversation_context.keys())}"
-            )
 
         # 2. Classification
         classification = self.query_classifier.classify(query)
@@ -681,7 +625,7 @@ class InteliaRAGEngine:
                 return result
 
             logger.info(
-                f"🔍 Génération réponse LLM pour {len(result.context_docs)} documents PostgreSQL"
+                f"📝 Génération réponse LLM pour {len(result.context_docs)} documents PostgreSQL"
             )
 
             try:
@@ -715,7 +659,7 @@ class InteliaRAGEngine:
     ) -> Dict[str, Any]:
         """Applique le preprocessing"""
 
-        logger.debug(f"🌍 _apply_preprocessing avec langue: {language}")
+        logger.debug(f"🌐 _apply_preprocessing avec langue: {language}")
 
         if not enable_preprocessing or not self.query_preprocessor:
             logger.debug("📋 Preprocessing minimal")
@@ -800,7 +744,7 @@ class InteliaRAGEngine:
     ) -> RAGResult:
         """Route vers le handler approprié"""
 
-        logger.info(f"🌍 _route_to_handler avec langue: {language}")
+        logger.info(f"🌐 _route_to_handler avec langue: {language}")
 
         if query_type == "temporal_range":
             logger.debug("→ Routage vers TemporalQueryHandler")
