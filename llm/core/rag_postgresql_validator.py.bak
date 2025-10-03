@@ -148,114 +148,6 @@ Return ONLY valid JSON, nothing else:
             logger.error(f"❌ OpenAI extraction failed: {e}")
             return {"age_days": None, "breed": None, "metric_type": None}
 
-    async def _validate_query_completeness(
-        self, query: str, entities: dict, language: str = "en"
-    ) -> dict:
-        """
-        Validation intelligente : détecte automatiquement les informations manquantes
-
-        Returns:
-            {
-                "is_complete": bool,
-                "missing_info": ["description de ce qui manque"],
-                "reason": "explication"
-            }
-        """
-
-        if not self.openai_client:
-            logger.warning("⚠️ OpenAI non disponible pour validation")
-            return {
-                "is_complete": True,
-                "missing_info": [],
-                "reason": "validation_disabled",
-            }
-
-        # Construire le contexte des entités détectées
-        entities_context = f"""
-Detected entities:
-- Breed: {entities.get('breed') or 'NOT SPECIFIED'}
-- Age: {entities.get('age_days') or 'NOT SPECIFIED'} days
-- Sex: {entities.get('sex') or 'NOT SPECIFIED'}
-- Metric: {entities.get('metric_type') or 'NOT SPECIFIED'}
-"""
-
-        prompt = f"""You are validating if a poultry production query has all necessary information to be answered.
-
-User query: "{query}"
-Language: {language}
-
-{entities_context}
-
-Your task: Determine if the query can be answered with the detected information, or if critical information is missing.
-
-Consider:
-1. Simple queries (e.g., "weight at 28 days for Ross 308") → if breed + age + metric detected = COMPLETE
-2. Calculation queries (e.g., "how much feed needed from day 18 to finish") → need START age + END age/target weight
-3. Comparison queries → need at least 2 entities to compare
-4. Range queries → need start and end points
-
-Return ONLY valid JSON:
-{{
-    "is_complete": true/false,
-    "missing_info": ["list of missing information descriptions in {language}"],
-    "reason": "brief explanation why incomplete"
-}}
-
-Examples:
-- "Weight at 28 days?" → {{"is_complete": false, "missing_info": ["breed/strain"], "reason": "breed not specified"}}
-- "Weight at 28 days Ross 308?" → {{"is_complete": true, "missing_info": [], "reason": "all info present"}}
-- "Feed needed from day 18 with 20k birds?" → {{"is_complete": false, "missing_info": ["target age or weight", "breed"], "reason": "calculation needs endpoint and breed"}}
-"""
-
-        try:
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0,
-                max_tokens=200,
-                response_format={"type": "json_object"},
-            )
-
-            content = response.choices[0].message.content.strip()
-
-            # Nettoyage backticks
-            if content.startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
-                content = content.strip()
-
-            result = json.loads(content)
-            logger.info(f"✅ Validation completeness ({language}): {result}")
-            return result
-
-        except Exception as e:
-            logger.error(f"❌ Validation completeness failed: {e}")
-            # En cas d'erreur, on suppose que c'est complet pour ne pas bloquer
-            return {
-                "is_complete": True,
-                "missing_info": [],
-                "reason": "validation_error",
-            }
-
-    def _generate_smart_clarification(
-        self, missing_info: list, language: str, reason: str
-    ) -> str:
-        """Génère un message de clarification basé sur les informations manquantes détectées par l'IA"""
-
-        templates = {
-            "en": "To provide an accurate answer, I need additional information:\n\n{missing_list}\n\nThis will help me give you a precise response.",
-            "fr": "Pour vous fournir une réponse précise, j'ai besoin d'informations supplémentaires :\n\n{missing_list}\n\nCela me permettra de vous donner une réponse adaptée.",
-            "es": "Para darle una respuesta precisa, necesito información adicional:\n\n{missing_list}\n\nEsto me ayudará a darle una respuesta exacta.",
-        }
-
-        template = templates.get(language, templates["en"])
-
-        # Formater la liste des informations manquantes
-        missing_formatted = "\n".join([f"• {info}" for info in missing_info])
-
-        return template.format(missing_list=missing_formatted)
-
     def validate_context(
         self, entities: Dict, query: str, language: str = "fr"
     ) -> Dict:
@@ -315,9 +207,8 @@ Examples:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        VERSION 4.4.0: EXTRACTION MULTILINGUE AVEC OPENAI + VALIDATION INTELLIGENTE
+        VERSION 4.4.0: EXTRACTION MULTILINGUE AVEC OPENAI
         - Appel OpenAI pour extraction multilingue si champs manquants
-        - Validation intelligente de complétude avec OpenAI
         - Fusion avec OpenAI interpretation AVANT validation
         - Format amélioré pour questions multiples
         - Messages d'abandon génériques
@@ -390,7 +281,7 @@ Examples:
                     f"✅ Metric récupéré depuis OpenAI: {openai_interp['metric_type']}"
                 )
 
-        # 🤖 1. EXTRACTION OpenAI multilingue si champs manquants
+        # 🤖 NOUVEAU: Extraction OpenAI multilingue si champs manquants
         if not enhanced_entities.get("age_days") or not enhanced_entities.get("breed"):
             logger.info(f"🤖 Appel OpenAI pour extraction multilingue ({language})")
 
@@ -433,29 +324,6 @@ Examples:
                 )
                 enhanced_entities["metric_type"] = normalized_metric
                 logger.info(f"✅ Metric détecté par OpenAI: {normalized_metric}")
-
-        # 🧠 2. VALIDATION INTELLIGENTE de complétude
-        logger.info("🧠 Validation intelligente de la complétude de la requête...")
-        completeness = await self._validate_query_completeness(
-            query, enhanced_entities, language
-        )
-
-        if not completeness.get("is_complete"):
-            missing_descriptions = completeness.get("missing_info", [])
-            logger.info(f"⚠️ Requête incomplète détectée: {missing_descriptions}")
-
-            # Générer message de clarification intelligent
-            clarification_msg = self._generate_smart_clarification(
-                missing_descriptions, language, completeness.get("reason", "")
-            )
-
-            return {
-                "status": "needs_fallback",
-                "enhanced_entities": enhanced_entities,
-                "missing": missing_descriptions,
-                "helpful_message": clarification_msg,
-                "detected_entities": enhanced_entities,
-            }
 
         # LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
         logger.debug(
