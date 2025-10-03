@@ -1,20 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 4.4.0: EXTRACTION MULTILINGUE AVEC OPENAI
-- Ajout du paramètre openai_client dans __init__
-- Nouvelle méthode _extract_with_openai pour extraction multilingue
-- Intégration OpenAI dans flexible_query_validation
-- Préserve tous les champs originaux
-- Logs diagnostiques
-- Invalidation des métriques invalides
-- Auto-détection enrichie dynamique
-- Messages de clarification conversationnels multilingues
-- Génération de questions plutôt que de simples messages d'erreur
-- FUSION avec OpenAI interpretation avant validation
-- FORMAT AMÉLIORÉ pour questions multiples (numérotation + phrase de fermeture)
-- Messages d'abandon génériques enrichis
-- detected_entities TOUJOURS présent dans needs_fallback
+VERSION 4.4.1: AJOUT CONVERSATION_CONTEXT
+- Ajout du paramètre conversation_context dans flexible_query_validation
+- Intégration de _validate_query_completeness avec contexte conversationnel
+- Transmission du contexte à la validation intelligente
+- Toutes les autres fonctionnalités préservées
 """
 
 import re
@@ -149,10 +140,20 @@ Return ONLY valid JSON, nothing else:
             return {"age_days": None, "breed": None, "metric_type": None}
 
     async def _validate_query_completeness(
-        self, query: str, entities: dict, language: str = "en"
+        self,
+        query: str,
+        entities: dict,
+        language: str = "en",
+        previous_context: Dict = None,
     ) -> dict:
         """
         Validation intelligente : détecte automatiquement les informations manquantes
+
+        Args:
+            query: Requête utilisateur
+            entities: Entités détectées
+            language: Langue de la requête
+            previous_context: Contexte conversationnel précédent (optionnel)
 
         Returns:
             {
@@ -179,12 +180,24 @@ Detected entities:
 - Metric: {entities.get('metric_type') or 'NOT SPECIFIED'}
 """
 
+        # Ajouter le contexte conversationnel si disponible
+        context_section = ""
+        if previous_context:
+            context_section = f"""
+Previous conversation context:
+{json.dumps(previous_context, indent=2)}
+
+Note: Use this context to understand if missing information might be implied from previous exchanges.
+"""
+
         prompt = f"""You are validating if a poultry production query has all necessary information to be answered.
 
 User query: "{query}"
 Language: {language}
 
 {entities_context}
+
+{context_section}
 
 Your task: Determine if the query can be answered with the detected information, or if critical information is missing.
 
@@ -193,6 +206,7 @@ Consider:
 2. Calculation queries (e.g., "how much feed needed from day 18 to finish") → need START age + END age/target weight
 3. Comparison queries → need at least 2 entities to compare
 4. Range queries → need start and end points
+5. If previous context exists, check if missing info could be inferred from it
 
 Return ONLY valid JSON:
 {{
@@ -310,26 +324,25 @@ Examples:
         }
 
     async def flexible_query_validation(
-        self, query: str, entities: Dict[str, Any], language: str = "fr"
+        self,
+        query: str,
+        entities: Dict[str, Any],
+        language: str = "fr",
+        conversation_context: Dict = None,  # ✅ NOUVEAU PARAMÈTRE
     ) -> Dict[str, Any]:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        VERSION 4.4.0: EXTRACTION MULTILINGUE AVEC OPENAI
-        - Appel OpenAI pour extraction multilingue si champs manquants
-        - Fusion avec OpenAI interpretation AVANT validation
-        - Format amélioré pour questions multiples
-        - Messages d'abandon génériques
-        - detected_entities TOUJOURS présent dans needs_fallback
-
-        CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
-        puis enrichit SEULEMENT les champs manquants avec auto-détection.
-        Cela garantit que 'sex' et autres champs du comparison_handler sont préservés.
+        VERSION 4.4.1: AJOUT CONVERSATION_CONTEXT
+        - Nouveau paramètre conversation_context pour contexte conversationnel
+        - Intégration validation intelligente avec contexte
+        - Toutes les autres fonctionnalités préservées
 
         Args:
             query: Requête utilisateur
             entities: Entités extraites (peut contenir _openai_interpretation)
             language: Langue détectée (fr, en, es, etc.)
+            conversation_context: Contexte conversationnel précédent (optionnel)
 
         Returns:
             Dict avec status: "complete" | "incomplete_but_processable" | "needs_fallback"
@@ -355,6 +368,9 @@ Examples:
         )
         logger.debug(
             f"🔍 VALIDATOR INPUT - 'metric_type' present: {'metric_type' in entities}, value: {entities.get('metric_type')}"
+        )
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - conversation_context present: {bool(conversation_context)}"
         )
 
         # CORRECTION CRITIQUE: Copier TOUTES les entités originales en priorité
@@ -432,6 +448,30 @@ Examples:
                 )
                 enhanced_entities["metric_type"] = normalized_metric
                 logger.info(f"✅ Metric détecté par OpenAI: {normalized_metric}")
+
+        # ✅ NOUVEAU: Validation intelligente de complétude avec contexte
+        logger.info(
+            f"🧠 Validation intelligente (contexte: {bool(conversation_context)})..."
+        )
+        completeness = await self._validate_query_completeness(
+            query, enhanced_entities, language, previous_context=conversation_context
+        )
+
+        if not completeness.get("is_complete"):
+            missing_descriptions = completeness.get("missing_info", [])
+            logger.info(f"⚠️ Requête incomplète détectée: {missing_descriptions}")
+
+            clarification_msg = self._generate_smart_clarification(
+                missing_descriptions, language, completeness.get("reason", "")
+            )
+
+            return {
+                "status": "needs_fallback",
+                "enhanced_entities": enhanced_entities,
+                "missing": missing_descriptions,
+                "helpful_message": clarification_msg,
+                "detected_entities": enhanced_entities,
+            }
 
         # LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
         logger.debug(
@@ -1134,7 +1174,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.4.0 EXTRACTION MULTILINGUE")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.4.1 CONVERSATION CONTEXT")
     print("=" * 70)
 
     validator = PostgreSQLValidator()
@@ -1153,20 +1193,23 @@ if __name__ == "__main__":
         print(f"  Query: {query}")
         print(f"  → Breed: {detected}")
 
-    # Test 2: Validation avec enrichissement
-    print("\n✅ Test 2: Validation et enrichissement")
+    # Test 2: Validation avec enrichissement et contexte
+    print("\n✅ Test 2: Validation et enrichissement avec contexte")
     test_cases = [
         {
             "query": "Poids à 21 jours pour Cobb 500",
             "entities": {"breed": "cobb 500"},
+            "context": None,
         },
         {
             "query": "FCR du Ross 308",
             "entities": {},
+            "context": {"breed": "Ross 308", "previous_age": 28},
         },
         {
             "query": "Mortalité",
             "entities": {"age_days": 35},
+            "context": {"breed": "Cobb 500", "metric_type": "mortality"},
         },
     ]
 
@@ -1176,9 +1219,10 @@ if __name__ == "__main__":
         for test in test_cases:
             print(f"\n  Query: {test['query']}")
             print(f"  Input entities: {test['entities']}")
+            print(f"  Context: {test['context']}")
 
             result = await validator.flexible_query_validation(
-                test["query"], test["entities"]
+                test["query"], test["entities"], conversation_context=test["context"]
             )
 
             print(f"  → Status: {result['status']}")
@@ -1190,6 +1234,6 @@ if __name__ == "__main__":
     asyncio.run(run_tests())
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.4.0")
-    print("🎯 NOUVELLE FONCTIONNALITÉ: Extraction multilingue OpenAI")
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.4.1")
+    print("🎯 NOUVELLE FONCTIONNALITÉ: Contexte conversationnel intégré")
     print("=" * 70)
