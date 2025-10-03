@@ -181,9 +181,9 @@ Detected entities:
 """
 
         # Ajouter le contexte conversationnel si disponible
-        context_section = ""
+        context_info = ""
         if previous_context:
-            context_section = f"""
+            context_info = f"""
 Previous conversation context:
 {json.dumps(previous_context, indent=2)}
 
@@ -195,11 +195,10 @@ Note: Use this context to understand if missing information might be implied fro
 User query: "{query}"
 Language: {language}
 
+{context_info}
 {entities_context}
 
-{context_section}
-
-Your task: Determine if the query can be answered with the detected information, or if critical information is missing.
+Your task: Determine if the query can be answered with ALL available information (current + previous context), or if critical information is still missing.
 
 Consider:
 1. Simple queries (e.g., "weight at 28 days for Ross 308") → if breed + age + metric detected = COMPLETE
@@ -211,7 +210,7 @@ Consider:
 Return ONLY valid JSON:
 {{
     "is_complete": true/false,
-    "missing_info": ["list of missing information descriptions in {language}"],
+    "missing_info": ["list of missing information descriptions **IN {language.upper()}**"],  
     "reason": "brief explanation why incomplete"
 }}
 
@@ -219,6 +218,11 @@ Examples:
 - "Weight at 28 days?" → {{"is_complete": false, "missing_info": ["breed/strain"], "reason": "breed not specified"}}
 - "Weight at 28 days Ross 308?" → {{"is_complete": true, "missing_info": [], "reason": "all info present"}}
 - "Feed needed from day 18 with 20k birds?" → {{"is_complete": false, "missing_info": ["target age or weight", "breed"], "reason": "calculation needs endpoint and breed"}}
+
+**IMPORTANT**: The "missing_info" list MUST be in {language.upper()} language:
+- If language is "fr": use French (e.g., "âge cible ou poids", "race/souche")
+- If language is "en": use English (e.g., "target age or weight", "breed/strain")
+- If language is "es": use Spanish (e.g., "edad objetivo o peso", "raza/cepa")
 """
 
         try:
