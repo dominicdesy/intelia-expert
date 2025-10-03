@@ -374,40 +374,30 @@ class PostgreSQLRetriever:
             # Fallback si pas de mapping
             breed_db = breed
 
-        # ✅ SQL MODIFIÉ : Récupérer TOUS les jours de la plage
+        # ✅ SQL MODIFIÉ : Plus strict sur le nom de métrique
         sql = """
             SELECT 
                 m.age_min as age_days,
-                m.metric_name,
-                m.value_numeric,
-                m.unit,
-                d.sex,
+                m.value_numeric as feed_intake,
                 s.strain_name
             FROM companies c
             JOIN breeds b ON c.id = b.company_id
             JOIN strains s ON b.id = s.breed_id  
             JOIN documents d ON s.id = d.strain_id
             JOIN metrics m ON d.id = m.document_id
-            WHERE m.age_min BETWEEN $1 AND $2
-              AND m.metric_name ILIKE '%feed%intake%'
+            WHERE s.strain_name = $1
+              AND m.age_min BETWEEN $2 AND $3
+              AND (
+                  m.metric_name = 'Daily Feed Intake'
+                  OR m.metric_name ILIKE 'daily feed intake'
+                  OR m.metric_name ILIKE 'feed intake/bird/day'
+              )
+              AND (LOWER(COALESCE(d.sex, 'as_hatched')) = $4 
+                   OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed'))
+            ORDER BY m.age_min ASC
         """
 
-        params = [start_age, target_age]
-        param_count = 2
-
-        # Ajouter filtre breed si disponible
-        if breed_db:
-            param_count += 1
-            sql += f" AND s.strain_name = ${param_count}"
-            params.append(breed_db)
-
-        # Ajouter filtre sexe
-        if sex and sex.lower() != "as_hatched":
-            param_count += 1
-            sql += f" AND (LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_count} OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed'))"
-            params.append(sex.lower())
-
-        sql += " ORDER BY m.age_min ASC"
+        params = [breed_db if breed_db else breed, start_age, target_age, sex.lower()]
 
         try:
             async with self.pool.acquire() as conn:
@@ -425,28 +415,33 @@ class PostgreSQLRetriever:
                     },
                 )
 
-            # ✅ CALCUL DE LA CONSOMMATION TOTALE
-            total_feed_grams = 0
-            daily_details = []
+            # ✅ CHANGEMENT: Grouper par jour (un seul feed_intake par jour)
+            daily_feed = {}
             strain_name = rows[0].get("strain_name", breed)
 
             for row in rows:
                 age = row["age_days"]
-                feed_intake = row["value_numeric"]  # grammes/jour/poulet
+                feed = row["feed_intake"]
+                if feed and feed > 0:
+                    # Prendre la valeur max si plusieurs entrées pour le même jour
+                    if age not in daily_feed or feed > daily_feed[age]:
+                        daily_feed[age] = feed
 
-                if feed_intake:
-                    total_feed_grams += feed_intake
-                    daily_details.append(f"Day {age}: {feed_intake}g")
-
-            # Nombre de jours dans la plage demandée
-            num_days = target_age - start_age + 1
+            # ✅ CALCUL CORRECT
+            total_feed_grams = sum(daily_feed.values())
+            num_days = len(daily_feed)
+            avg_daily_grams = total_feed_grams / num_days if num_days > 0 else 0
 
             # Nombre de poulets (extraire de la requête)
             num_birds = self._extract_bird_count(query)
 
+            # Formatage détails quotidiens
+            daily_details = [
+                f"Day {age}: {feed:.1f}g" for age, feed in sorted(daily_feed.items())
+            ]
+
             # Consommation totale
             total_feed_kg_per_bird = total_feed_grams / 1000
-            avg_daily_grams = total_feed_grams / num_days if num_days > 0 else 0
 
             # ✅ FORMATAGE RÉSULTAT
             context_text = f"""Feed calculation for {strain_name} ({sex}) from day {start_age} to day {target_age}:
