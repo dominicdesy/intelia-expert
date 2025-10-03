@@ -374,11 +374,12 @@ class PostgreSQLRetriever:
             # Fallback si pas de mapping
             breed_db = breed
 
-        # ✅ SQL MODIFIÉ : Plus strict sur le nom de métrique
+        # ✅ CORRECTION: Le metric_name est "feed_intake for X"
         sql = """
             SELECT 
                 m.age_min as age_days,
                 m.value_numeric as feed_intake,
+                m.metric_name,
                 s.strain_name
             FROM companies c
             JOIN breeds b ON c.id = b.company_id
@@ -387,11 +388,8 @@ class PostgreSQLRetriever:
             JOIN metrics m ON d.id = m.document_id
             WHERE s.strain_name = $1
               AND m.age_min BETWEEN $2 AND $3
-              AND (
-                  m.metric_name = 'Daily Feed Intake'
-                  OR m.metric_name ILIKE 'daily feed intake'
-                  OR m.metric_name ILIKE 'feed intake/bird/day'
-              )
+              AND m.metric_name LIKE 'feed_intake for %'
+              AND m.value_numeric IS NOT NULL
               AND (LOWER(COALESCE(d.sex, 'as_hatched')) = $4 
                    OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed'))
             ORDER BY m.age_min ASC
@@ -403,7 +401,12 @@ class PostgreSQLRetriever:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(sql, *params)
 
+            logger.debug(f"📊 SQL returned {len(rows)} rows")
+
             if not rows:
+                logger.warning(
+                    f"❌ Aucune donnée feed_intake trouvée pour {breed_db if breed_db else breed} entre {start_age}-{target_age} jours"
+                )
                 return RAGResult(
                     context_docs=[],
                     source=RAGSource.NO_RESULTS,
@@ -415,7 +418,7 @@ class PostgreSQLRetriever:
                     },
                 )
 
-            # ✅ CHANGEMENT: Grouper par jour (un seul feed_intake par jour)
+            # ✅ Grouper par jour (un seul feed_intake par jour)
             daily_feed = {}
             strain_name = rows[0].get("strain_name", breed)
 
@@ -427,7 +430,9 @@ class PostgreSQLRetriever:
                     if age not in daily_feed or feed > daily_feed[age]:
                         daily_feed[age] = feed
 
-            # ✅ CALCUL CORRECT
+            logger.info(f"✅ {len(daily_feed)} jours de données feed_intake trouvés")
+
+            # ✅ SOMME (pas moyenne) pour le total par poulet
             total_feed_grams = sum(daily_feed.values())
             num_days = len(daily_feed)
             avg_daily_grams = total_feed_grams / num_days if num_days > 0 else 0
@@ -435,31 +440,31 @@ class PostgreSQLRetriever:
             # Nombre de poulets (extraire de la requête)
             num_birds = self._extract_bird_count(query)
 
-            # Formatage détails quotidiens
+            # Formatage détails quotidiens (limiter affichage)
             daily_details = [
                 f"Day {age}: {feed:.1f}g" for age, feed in sorted(daily_feed.items())
             ]
 
-            # Consommation totale
+            # Calculs finaux
             total_feed_kg_per_bird = total_feed_grams / 1000
 
             # ✅ FORMATAGE RÉSULTAT
             context_text = f"""Feed calculation for {strain_name} ({sex}) from day {start_age} to day {target_age}:
 
-**Daily feed intake detected:**
+**Daily feed intake:**
 {chr(10).join(daily_details[:10])}"""
 
             if len(daily_details) > 10:
-                context_text += f"\n... ({len(daily_details)} days of data)"
+                context_text += "\n... (see all details in the data)"
 
             context_text += f"""
 
 **Totals:**
-- Total feed per bird: {total_feed_kg_per_bird:.2f} kg ({len(daily_details)} days of data)
-- Average per day: {avg_daily_grams:.1f} g/day/bird"""
+- Total feed per bird: {total_feed_kg_per_bird:.2f} kg over {num_days} days
+- Average daily consumption: {avg_daily_grams:.1f} g/day/bird"""
 
             if num_birds:
-                total_feed_kg = total_feed_grams * num_birds / 1000
+                total_feed_kg = total_feed_kg_per_bird * num_birds
                 total_feed_tonnes = total_feed_kg / 1000
                 context_text += f"""
 - Number of birds: {num_birds:,}
@@ -492,7 +497,7 @@ class PostgreSQLRetriever:
                     "target_age": target_age,
                     "num_birds": num_birds,
                     "total_feed_tonnes": total_feed_tonnes if num_birds else None,
-                    "days_calculated": len(daily_details),
+                    "days_with_data": num_days,
                 },
             )
 
