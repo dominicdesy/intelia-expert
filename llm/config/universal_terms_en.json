@@ -3,11 +3,198 @@
     "language": "en",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 19,
+    "total_domains": 23,
     "description": "Universal terminology for poultry production expert system - English version"
   },
 
   "domains": {
+    "contextual_references": {
+      "same": {
+        "canonical": "same",
+        "confidence": 0.90,
+        "variants": ["same", "the same", "at the same", "for the same"]
+      },
+      "same_age": {
+        "canonical": "same_age",
+        "confidence": 0.90,
+        "variants": ["at the same age", "same age", "at age", "at the same stage"]
+      },
+      "and_for": {
+        "canonical": "and_for",
+        "confidence": 0.90,
+        "variants": ["and for", "and for the", "as well as for", "likewise for"]
+      },
+      "what_about": {
+        "canonical": "what_about",
+        "confidence": 0.90,
+        "variants": ["what about", "how about", "and regarding", "and concerning", "and what about"]
+      },
+      "females": {
+        "canonical": "females",
+        "confidence": 0.95,
+        "variants": ["females", "the females", "female", "the female", "hens", "the hens"]
+      },
+      "males": {
+        "canonical": "males",
+        "confidence": 0.95,
+        "variants": ["males", "the males", "male", "the male", "roosters", "the roosters", "cocks"]
+      },
+      "and_the": {
+        "canonical": "and_the",
+        "confidence": 0.90,
+        "variants": ["and the", "as well as the", "along with the"]
+      },
+      "also_for": {
+        "canonical": "also_for",
+        "confidence": 0.90,
+        "variants": ["also for", "likewise for", "similarly for", "same for"]
+      }
+    },
+
+    "metrics": {
+      "weight": {
+        "canonical": "weight",
+        "confidence": 0.95,
+        "variants": ["weight", "mass", "body weight", "kg", "grams", "g", "lbs"]
+      },
+      "fcr": {
+        "canonical": "fcr",
+        "confidence": 0.95,
+        "variants": ["fcr", "feed conversion", "conversion ratio", "feed efficiency"]
+      },
+      "gain": {
+        "canonical": "gain",
+        "confidence": 0.95,
+        "variants": ["gain", "weight gain", "increase", "growth", "adg"]
+      },
+      "conversion": {
+        "canonical": "conversion",
+        "confidence": 0.95,
+        "variants": ["conversion", "conversion rate", "feed efficiency", "efficiency"]
+      },
+      "consumption": {
+        "canonical": "consumption",
+        "confidence": 0.95,
+        "variants": ["consumption", "intake", "consumed", "eaten", "feed intake"]
+      },
+      "production": {
+        "canonical": "production",
+        "confidence": 0.95,
+        "variants": ["production", "output", "yield", "productivity", "performance"]
+      },
+      "growth": {
+        "canonical": "growth",
+        "confidence": 0.95,
+        "variants": ["growth", "development", "growing", "growth rate"]
+      },
+      "performance": {
+        "canonical": "performance",
+        "confidence": 0.95,
+        "variants": ["performance", "results", "efficiency", "output"]
+      },
+      "index": {
+        "canonical": "index",
+        "confidence": 0.95,
+        "variants": ["index", "ratio", "coefficient", "rate", "factor"]
+      }
+    },
+
+    "health": {
+      "disease": {
+        "canonical": "disease",
+        "confidence": 0.95,
+        "variants": ["disease", "pathology", "infection", "illness", "infectious disease"]
+      },
+      "symptoms": {
+        "canonical": "symptoms",
+        "confidence": 0.95,
+        "variants": ["symptoms", "signs", "manifestations", "clinical signs", "indications"]
+      },
+      "treatment": {
+        "canonical": "treatment",
+        "confidence": 0.95,
+        "variants": ["treatment", "therapy", "medication", "cure", "care"]
+      },
+      "coccidiosis": {
+        "canonical": "coccidiosis",
+        "confidence": 0.95,
+        "variants": ["coccidiosis", "coccidia", "eimeria", "coccidiostat"]
+      },
+      "vaccination": {
+        "canonical": "vaccination",
+        "confidence": 0.95,
+        "variants": ["vaccination", "vaccine", "immunization", "prophylaxis", "vaccinate"]
+      },
+      "gumboro": {
+        "canonical": "gumboro",
+        "confidence": 0.95,
+        "variants": ["gumboro", "gumboro disease", "infectious bursal disease", "ibdv", "ibd"]
+      },
+      "enteritis": {
+        "canonical": "enteritis",
+        "confidence": 0.95,
+        "variants": ["enteritis", "necrotic enteritis", "intestinal inflammation"]
+      },
+      "mortality": {
+        "canonical": "mortality",
+        "confidence": 0.95,
+        "variants": ["mortality", "death", "deaths", "losses", "mortality rate", "death rate"]
+      },
+      "diagnosis": {
+        "canonical": "diagnosis",
+        "confidence": 0.95,
+        "variants": ["diagnosis", "diagnostic", "analysis", "identification", "detection"]
+      }
+    },
+
+    "environment": {
+      "temperature": {
+        "canonical": "temperature",
+        "confidence": 0.95,
+        "variants": ["temperature", "temp", "t°", "degrees", "celsius", "heat"]
+      },
+      "humidity": {
+        "canonical": "humidity",
+        "confidence": 0.95,
+        "variants": ["humidity", "rh", "relative humidity", "moisture", "humidity level"]
+      },
+      "ventilation": {
+        "canonical": "ventilation",
+        "confidence": 0.95,
+        "variants": ["ventilation", "airflow", "air exchange", "air circulation"]
+      },
+      "lighting": {
+        "canonical": "lighting",
+        "confidence": 0.95,
+        "variants": ["lighting", "light", "illumination", "brightness"]
+      },
+      "density": {
+        "canonical": "density",
+        "confidence": 0.95,
+        "variants": ["density", "stocking density", "stocking rate", "kg/m2", "birds/m2"]
+      },
+      "space": {
+        "canonical": "space",
+        "confidence": 0.95,
+        "variants": ["space", "area", "room", "cm/bird", "available space"]
+      },
+      "feeder": {
+        "canonical": "feeder",
+        "confidence": 0.95,
+        "variants": ["feeder", "feeders", "feeding system", "feed pan", "trough"]
+      },
+      "drinker": {
+        "canonical": "drinker",
+        "confidence": 0.95,
+        "variants": ["drinker", "drinkers", "waterer", "watering system", "water point"]
+      },
+      "light": {
+        "canonical": "light",
+        "confidence": 0.95,
+        "variants": ["light", "lighting", "lux", "light intensity", "photoperiod"]
+      }
+    },
+
     "general_terms": {
       "poultry": {
         "canonical": "poultry",

@@ -2,15 +2,16 @@
 """
 rag_engine.py - RAG Engine Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION 4.8.0 - INTÉGRATION QUERY ROUTER:
-- ✅ NOUVEAU: Utilisation de QueryRouter pour le routage unifié
-- ✅ Suppression de QueryPreprocessor (remplacé par QueryRouter)
-- ✅ Suppression de PostgreSQLValidator (validation intégrée dans QueryRouter)
-- ✅ Suppression de UnifiedQueryClassifier (logique dans QueryRouter)
-- ✅ Suppression de ValidationCore (validation centralisée dans QueryRouter)
-- ✅ Support natif de NEEDS_CLARIFICATION via QueryRouter
-- ✅ Génération automatique de réponse LLM après récupération documents
+VERSION 4.7.0 - CORRECTION CRITIQUE: GÉNÉRATION LLM POUR POSTGRESQL:
+- ✅ NOUVEAU: Génération automatique de réponse LLM après récupération documents
+- ✅ Appel generator.generate_response() si context_docs présents mais answer vide
+- ✅ Import automatique de POSTGRESQL_CONFIG dans _initialize_external_modules()
+- ✅ Instanciation PostgreSQLRetriever avec config centralisée
+- ✅ Plus besoin de passer config depuis monitoring.py
+- ✅ Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
+- ✅ Transmission correcte du paramètre language à tous les handlers
 - ✅ Support des entités pré-extraites pour fusion conversationnelle
+- ✅ Support du paramètre conversation_context dans generate_response()
 """
 
 import asyncio
@@ -40,22 +41,27 @@ from .rag_engine_handlers import (
     StandardQueryHandler,
 )
 
-# NOUVEAUX IMPORTS - QueryRouter remplace plusieurs modules
-from .query_router import QueryRouter
+# NOUVEAUX IMPORTS - Modules centralisés
+from .query_classifier import UnifiedQueryClassifier, QueryType
 from .entity_extractor import EntityExtractor
+from .validation_core import ValidationCore
 
 logger = logging.getLogger(__name__)
 
 # Imports conditionnels des modules externes
 POSTGRESQL_RETRIEVER_AVAILABLE = False
+POSTGRESQL_VALIDATOR_AVAILABLE = False
+QUERY_PREPROCESSOR_AVAILABLE = False
 COMPARISON_HANDLER_AVAILABLE = False
 WEAVIATE_CORE_AVAILABLE = False
 
 PostgreSQLRetriever = None
+PostgreSQLValidator = None
+QueryPreprocessor = None
 ComparisonHandler = None
 WeaviateCore = None
 
-# Import séparé du Retriever
+# Import séparé du Retriever et Validator
 try:
     from .rag_postgresql_retriever import PostgreSQLRetriever
 
@@ -63,6 +69,22 @@ try:
     logger.info("✅ PostgreSQL Retriever importé")
 except ImportError as e:
     logger.warning(f"⚠️ PostgreSQL Retriever non disponible: {e}")
+
+try:
+    from .rag_postgresql_validator import PostgreSQLValidator
+
+    POSTGRESQL_VALIDATOR_AVAILABLE = True
+    logger.info("✅ PostgreSQL Validator importé")
+except ImportError as e:
+    logger.warning(f"⚠️ PostgreSQL Validator non disponible: {e}")
+
+try:
+    from .query_preprocessor import QueryPreprocessor
+
+    QUERY_PREPROCESSOR_AVAILABLE = True
+    logger.info("✅ Query Preprocessor importé")
+except ImportError as e:
+    logger.warning(f"⚠️ Query Preprocessor non disponible: {e}")
 
 try:
     from .comparison_handler import ComparisonHandler
@@ -85,33 +107,41 @@ class InteliaRAGEngine:
     """
     RAG Engine principal avec architecture modulaire refactorisée
 
-    VERSION 4.8.0 - INTÉGRATION QUERY ROUTER:
-    - QueryRouter unifie classification, validation et routage
-    - Support natif de NEEDS_CLARIFICATION
+    VERSION 4.7.0 - GÉNÉRATION LLM AUTOMATIQUE:
     - Configuration PostgreSQL chargée automatiquement depuis rag_postgresql_config.py
     - Instanciation PostgreSQLRetriever avec config centralisée
+    - Initialisation complète du PostgreSQLValidator
+    - Transmission du validator au StandardHandler
+    - Séparation PostgreSQLRetriever (search_metrics) et PostgreSQLValidator (validation)
     - Transmission correcte du paramètre language à tous les handlers
     - ✅ CORRECTION CRITIQUE: Génération LLM automatique après récupération documents
     - ✅ NOUVEAU: Méthode generate_response_with_entities() pour fusion conversationnelle
+    - Utilise UnifiedQueryClassifier au lieu de QueryClassifier legacy
+    - Intègre EntityExtractor pour extraction centralisée
+    - Utilise ValidationCore pour validation unifiée
+    - ComparisonHandler est maintenant un wrapper vers ComparisonEngine
     - ✅ Support du paramètre conversation_context dans generate_response()
     """
 
     def __init__(self, openai_client: AsyncOpenAI = None):
-        """Initialisation avec QueryRouter centralisé"""
+        """Initialisation avec nouveaux modules centralisés"""
         # Core engine
         self.core = RAGEngineCore(openai_client)
 
-        # NOUVEAU MODULE CENTRALISÉ - QueryRouter
-        self.query_router = QueryRouter(config_dir="/app/config")
+        # NOUVEAUX MODULES CENTRALISÉS
+        self.query_classifier = UnifiedQueryClassifier()
         self.entity_extractor = EntityExtractor()
+        self.validator = ValidationCore()
 
         # Handlers spécialisés
         self.temporal_handler = TemporalQueryHandler()
         self.comparative_handler = ComparativeQueryHandler()
         self.standard_handler = StandardQueryHandler()
 
-        # Modules externes (Retriever uniquement, plus de Validator)
+        # Modules externes avec Retriever ET Validator séparés
         self.postgresql_retriever = None
+        self.postgresql_validator = None
+        self.query_preprocessor = None
         self.comparison_handler = None
         self.weaviate_core = None
 
@@ -123,9 +153,8 @@ class InteliaRAGEngine:
         # Stats
         self.optimization_stats = {
             "requests_total": 0,
-            "routing_success": 0,
-            "routing_failures": 0,
-            "clarification_needed": 0,
+            "preprocessing_success": 0,
+            "preprocessing_failures": 0,
             "comparative_queries": 0,
             "comparative_success": 0,
             "comparative_failures": 0,
@@ -142,11 +171,11 @@ class InteliaRAGEngine:
         }
 
     async def initialize(self):
-        """Initialisation modulaire avec QueryRouter"""
+        """Initialisation modulaire avec nouveaux composants"""
         if self.is_initialized:
             return
 
-        logger.info("🚀 Initialisation RAG Engine v4.8.0 (QueryRouter)")
+        logger.info("🚀 Initialisation RAG Engine v4.7.0 (Génération LLM Automatique)")
         self.initialization_errors = []
 
         try:
@@ -164,11 +193,14 @@ class InteliaRAGEngine:
             active_modules = [
                 name
                 for name, module in [
-                    ("QueryRouter", self.query_router),
+                    ("Preprocessor", self.query_preprocessor),
                     ("PostgreSQLRetriever", self.postgresql_retriever),
+                    ("PostgreSQLValidator", self.postgresql_validator),
                     ("WeaviateCore", self.weaviate_core),
                     ("ComparisonHandler", self.comparison_handler),
+                    ("QueryClassifier", self.query_classifier),
                     ("EntityExtractor", self.entity_extractor),
+                    ("ValidationCore", self.validator),
                     ("LLMGenerator", self.core.generator),
                 ]
                 if module is not None
@@ -190,7 +222,17 @@ class InteliaRAGEngine:
             self.initialization_errors.append(str(e))
 
     async def _initialize_external_modules(self):
-        """Initialise Retriever avec config centralisée"""
+        """Initialise Retriever et Validator avec config centralisée"""
+
+        # Query Preprocessor
+        if QUERY_PREPROCESSOR_AVAILABLE and QueryPreprocessor:
+            try:
+                self.query_preprocessor = QueryPreprocessor()
+                await self.query_preprocessor.initialize()
+                logger.info("✅ Query Preprocessor initialisé")
+            except Exception as e:
+                logger.warning(f"⚠️ Query Preprocessor échoué: {e}")
+                self.initialization_errors.append(f"Preprocessor: {e}")
 
         # PostgreSQL Retriever (pour search_metrics)
         if POSTGRESQL_RETRIEVER_AVAILABLE and PostgreSQLRetriever:
@@ -220,6 +262,20 @@ class InteliaRAGEngine:
                 logger.warning(f"⚠️ PostgreSQL Retriever échoué: {e}")
                 self.initialization_errors.append(f"PostgreSQLRetriever: {e}")
 
+        # PostgreSQL Validator (pour validation)
+        if POSTGRESQL_VALIDATOR_AVAILABLE and PostgreSQLValidator:
+            try:
+                self.postgresql_validator = PostgreSQLValidator(
+                    openai_client=self.core.openai_client
+                )
+                # Appeler initialize() si la méthode existe
+                if hasattr(self.postgresql_validator, "initialize"):
+                    await self.postgresql_validator.initialize()
+                logger.info("✅ PostgreSQL Validator initialisé")
+            except Exception as e:
+                logger.warning(f"⚠️ PostgreSQL Validator échoué: {e}")
+                self.initialization_errors.append(f"PostgreSQLValidator: {e}")
+
         # Weaviate Core
         if WEAVIATE_CORE_AVAILABLE and WeaviateCore and self.core.openai_client:
             try:
@@ -245,7 +301,7 @@ class InteliaRAGEngine:
                 self.initialization_errors.append(f"ComparisonHandler: {e}")
 
     async def _configure_handlers(self):
-        """Configure handlers avec Retriever"""
+        """Configure handlers avec Retriever ET Validator"""
 
         # Configuration temporal handler (utilise le Retriever)
         self.temporal_handler.configure(postgresql_system=self.postgresql_retriever)
@@ -257,11 +313,11 @@ class InteliaRAGEngine:
             postgresql_system=self.postgresql_retriever,
         )
 
-        # Configuration standard handler (utilise RETRIEVER, plus de VALIDATOR)
+        # Configuration standard handler (utilise RETRIEVER + VALIDATOR)
         self.standard_handler.configure(
             postgresql_system=self.postgresql_retriever,
             weaviate_core=self.weaviate_core,
-            postgresql_validator=None,  # Plus de validator séparé
+            postgresql_validator=self.postgresql_validator,
         )
 
         logger.debug(
@@ -280,14 +336,14 @@ class InteliaRAGEngine:
         enable_preprocessing: bool = True,
         **kwargs,
     ) -> RAGResult:
-        """Point d'entrée principal avec routage intelligent via QueryRouter
+        """Point d'entrée principal avec routage intelligent
 
         Args:
             query: Requête utilisateur
             tenant_id: Identifiant du tenant
             conversation_context: Historique de conversation (format liste)
             language: Langue de la requête
-            enable_preprocessing: Activer le preprocessing (ignoré, toujours via QueryRouter)
+            enable_preprocessing: Activer le preprocessing
             **kwargs: Paramètres additionnels (peut contenir conversation_context au format dict)
         """
 
@@ -326,7 +382,7 @@ class InteliaRAGEngine:
             return await self._process_query(
                 query,
                 effective_language,
-                tenant_id,
+                enable_preprocessing,
                 start_time,
                 conversation_context=context_dict,
             )
@@ -351,7 +407,7 @@ class InteliaRAGEngine:
 
         UTILISÉ POUR LA MÉMOIRE CONVERSATIONNELLE:
         - Permet de passer directement les entités fusionnées depuis la session
-        - Bypass l'extraction normale du QueryRouter
+        - Bypass l'extraction normale du preprocessing
         - Garantit que les entités accumulées sont utilisées
 
         Args:
@@ -386,7 +442,7 @@ class InteliaRAGEngine:
         logger.info(
             f"🌍 generate_response_with_entities reçoit langue: {effective_language}"
         )
-        logger.info(f"📄 Entités pré-extraites fournies: {entities}")
+        logger.info(f"🔄 Entités pré-extraites fournies: {entities}")
 
         # Fallback si système indisponible
         if self.degraded_mode and not self.postgresql_retriever:
@@ -404,7 +460,6 @@ class InteliaRAGEngine:
                 query,
                 entities,
                 effective_language,
-                tenant_id,
                 start_time,
                 conversation_context=context_dict,
             )
@@ -420,70 +475,30 @@ class InteliaRAGEngine:
         self,
         query: str,
         language: str,
-        tenant_id: str,
+        enable_preprocessing: bool,
         start_time: float,
         conversation_context: Dict = None,
     ) -> RAGResult:
-        """Pipeline de traitement avec QueryRouter
+        """Pipeline de traitement modulaire
 
         Args:
             query: Requête utilisateur
             language: Langue de la requête
-            tenant_id: Identifiant du tenant
+            enable_preprocessing: Activer le preprocessing
             start_time: Timestamp de début
             conversation_context: Contexte conversationnel (format dict)
         """
 
         logger.info(f"🌍 _process_query traite avec langue: {language}")
 
-        # 1. ROUTAGE VIA QUERY ROUTER
-        route = self.query_router.route(
-            query=query, user_id=tenant_id, language=language
+        # 1. Preprocessing
+        preprocessed_data = await self._apply_preprocessing(
+            query, language, enable_preprocessing
         )
 
-        logger.info(
-            f"🎯 QueryRouter → destination: {route.destination}, confiance: {route.confidence:.2%}"
-        )
-
-        # 2. VÉRIFIER CLARIFICATION NÉCESSAIRE
-        if route.destination == "needs_clarification":
-            self.optimization_stats["clarification_needed"] += 1
-            logger.info(
-                f"⚠️ Clarification nécessaire - champs manquants: {route.missing_fields}"
-            )
-
-            return RAGResult(
-                source=RAGSource.NEEDS_CLARIFICATION,
-                metadata={
-                    "missing_fields": route.missing_fields,
-                    "entities": route.entities,
-                    "validation_details": route.validation_details,
-                    "query_type": route.query_type,
-                    "language": language,
-                },
-            )
-
-        # 3. CRÉER PREPROCESSED_DATA DEPUIS ROUTE
-        preprocessed_data = {
-            "normalized_query": query,
-            "original_query": query,
-            "entities": route.entities,
-            "language": language,
-            "routing_hint": route.destination,
-            "is_comparative": route.query_type == "comparative",
-            "comparison_entities": [],
-            "query_type": route.query_type,
-            "metadata": {
-                "original_query": query,
-                "normalized_query": query,
-                "routing_hint": route.destination,
-                "is_comparative": route.query_type == "comparative",
-                "routing_applied": True,
-                "confidence": route.confidence,
-                "language_detected": language,
-                "validation_details": route.validation_details,
-            },
-        }
+        if "language" not in preprocessed_data:
+            preprocessed_data["language"] = language
+            logger.info(f"🌍 Langue ajoutée à preprocessed_data: {language}")
 
         # ✅ AJOUTER le contexte conversationnel
         if conversation_context:
@@ -492,22 +507,35 @@ class InteliaRAGEngine:
                 f"📝 Contexte conversationnel ajouté: {list(conversation_context.keys())}"
             )
 
-        # 4. MISE À JOUR DES STATS
-        query_type = route.query_type
-        if query_type == "comparative":
+        # 2. Classification
+        classification = self.query_classifier.classify(
+            preprocessed_data["normalized_query"]
+        )
+
+        query_type = classification.query_type.value
+        logger.info(
+            f"🎯 Type de requête détecté: {query_type} (confiance: {classification.confidence:.2%})"
+        )
+
+        # Mise à jour des stats
+        if classification.query_type == QueryType.COMPARATIVE:
             self.optimization_stats["comparative_queries"] += 1
-        elif query_type == "temporal_range":
+        elif classification.query_type == QueryType.TEMPORAL_RANGE:
             self.optimization_stats["temporal_queries"] += 1
-        elif query_type == "optimization":
+        elif classification.query_type == QueryType.OPTIMIZATION:
             self.optimization_stats["optimization_queries"] += 1
-        elif query_type == "calculation":
+        elif classification.query_type == QueryType.CALCULATION:
             self.optimization_stats["calculation_queries"] += 1
-        elif query_type == "economic":
+        elif classification.query_type == QueryType.ECONOMIC:
             self.optimization_stats["economic_queries"] += 1
-        elif query_type == "diagnostic":
+        elif classification.query_type == QueryType.DIAGNOSTIC:
             self.optimization_stats["diagnostic_queries"] += 1
 
-        # 5. ROUTAGE VERS HANDLER
+        # 3. Enrichir preprocessed_data
+        preprocessed_data["query_type"] = query_type
+        preprocessed_data["classification"] = classification.to_dict()
+
+        # 4. Routage vers handler
         result = await self._route_to_handler(
             query_type, preprocessed_data, start_time, language
         )
@@ -517,12 +545,9 @@ class InteliaRAGEngine:
             result, preprocessed_data, query, language
         )
 
-        # 6. ENRICHIR MÉTADONNÉES
+        # 5. Enrichir métadonnées
         result.metadata.update(preprocessed_data["metadata"])
-        result.metadata["route_confidence"] = route.confidence
-        result.metadata["route_destination"] = route.destination
-
-        self.optimization_stats["routing_success"] += 1
+        result.metadata["classification"] = classification.to_dict()
 
         return result
 
@@ -531,7 +556,6 @@ class InteliaRAGEngine:
         query: str,
         entities: Dict[str, Any],
         language: str,
-        tenant_id: str,
         start_time: float,
         conversation_context: Dict = None,
     ) -> RAGResult:
@@ -539,71 +563,34 @@ class InteliaRAGEngine:
         Pipeline de traitement avec entités pré-extraites
 
         Similaire à _process_query mais utilise les entités fournies
-        au lieu de les extraire via le QueryRouter
+        au lieu de les extraire via le preprocessing
 
         Args:
             query: Requête utilisateur
             entities: Entités pré-extraites
             language: Langue de la requête
-            tenant_id: Identifiant du tenant
             start_time: Timestamp de début
             conversation_context: Contexte conversationnel (format dict)
         """
 
         logger.info(f"🌍 _process_query_with_entities traite avec langue: {language}")
-        logger.info(f"📄 Utilisation des entités pré-extraites: {entities}")
+        logger.info(f"🔄 Utilisation des entités pré-extraites: {entities}")
 
-        # 1. ROUTAGE VIA QUERY ROUTER (qui utilisera les entités si fournies)
-        route = self.query_router.route(
-            query=query,
-            user_id=tenant_id,
-            language=language,
-            preextracted_entities=entities,  # Passer les entités pré-extraites
-        )
-
-        logger.info(
-            f"🎯 QueryRouter → destination: {route.destination}, confiance: {route.confidence:.2%}"
-        )
-
-        # 2. VÉRIFIER CLARIFICATION (même avec entités pré-extraites)
-        if route.destination == "needs_clarification":
-            self.optimization_stats["clarification_needed"] += 1
-            logger.info(
-                f"⚠️ Clarification nécessaire malgré entités - champs: {route.missing_fields}"
-            )
-
-            return RAGResult(
-                source=RAGSource.NEEDS_CLARIFICATION,
-                metadata={
-                    "missing_fields": route.missing_fields,
-                    "entities": route.entities,
-                    "validation_details": route.validation_details,
-                    "query_type": route.query_type,
-                    "language": language,
-                    "entities_preextracted": True,
-                },
-            )
-
-        # 3. CRÉER PREPROCESSED_DATA
+        # 1. Créer preprocessed_data avec les entités fournies
         preprocessed_data = {
             "normalized_query": query,
             "original_query": query,
-            "entities": route.entities,  # Utiliser les entités validées par le router
+            "entities": entities,
             "language": language,
-            "routing_hint": route.destination,
-            "is_comparative": route.query_type == "comparative",
+            "routing_hint": "postgresql",  # Force PostgreSQL car entités disponibles
+            "is_comparative": False,
             "comparison_entities": [],
-            "query_type": route.query_type,
             "metadata": {
-                "original_query": query,
-                "normalized_query": query,
-                "routing_hint": route.destination,
-                "is_comparative": route.query_type == "comparative",
-                "routing_applied": True,
+                "preprocessing_applied": True,
                 "entities_preextracted": True,
-                "confidence": route.confidence,
+                "extraction_confidence": entities.get("confidence", 1.0),
+                "entities_found": len([k for k in entities.keys() if entities.get(k)]),
                 "language_detected": language,
-                "validation_details": route.validation_details,
             },
         }
 
@@ -614,22 +601,33 @@ class InteliaRAGEngine:
                 f"📝 Contexte conversationnel ajouté: {list(conversation_context.keys())}"
             )
 
-        # 4. MISE À JOUR DES STATS
-        query_type = route.query_type
-        if query_type == "comparative":
+        # 2. Classification
+        classification = self.query_classifier.classify(query)
+        query_type = classification.query_type.value
+
+        logger.info(
+            f"🎯 Type de requête détecté: {query_type} (confiance: {classification.confidence:.2%})"
+        )
+
+        # Mise à jour des stats
+        if classification.query_type == QueryType.COMPARATIVE:
             self.optimization_stats["comparative_queries"] += 1
-        elif query_type == "temporal_range":
+        elif classification.query_type == QueryType.TEMPORAL_RANGE:
             self.optimization_stats["temporal_queries"] += 1
-        elif query_type == "optimization":
+        elif classification.query_type == QueryType.OPTIMIZATION:
             self.optimization_stats["optimization_queries"] += 1
-        elif query_type == "calculation":
+        elif classification.query_type == QueryType.CALCULATION:
             self.optimization_stats["calculation_queries"] += 1
-        elif query_type == "economic":
+        elif classification.query_type == QueryType.ECONOMIC:
             self.optimization_stats["economic_queries"] += 1
-        elif query_type == "diagnostic":
+        elif classification.query_type == QueryType.DIAGNOSTIC:
             self.optimization_stats["diagnostic_queries"] += 1
 
-        # 5. ROUTAGE VERS HANDLER (force standard pour PostgreSQL)
+        # 3. Enrichir preprocessed_data
+        preprocessed_data["query_type"] = query_type
+        preprocessed_data["classification"] = classification.to_dict()
+
+        # 4. Routage vers handler (force standard pour PostgreSQL)
         result = await self.standard_handler.handle(
             preprocessed_data, start_time, language=language
         )
@@ -639,13 +637,10 @@ class InteliaRAGEngine:
             result, preprocessed_data, query, language
         )
 
-        # 6. ENRICHIR MÉTADONNÉES
+        # 5. Enrichir métadonnées
         result.metadata.update(preprocessed_data["metadata"])
-        result.metadata["route_confidence"] = route.confidence
-        result.metadata["route_destination"] = route.destination
+        result.metadata["classification"] = classification.to_dict()
         result.metadata["entities_source"] = "preextracted_from_session"
-
-        self.optimization_stats["routing_success"] += 1
 
         return result
 
@@ -686,7 +681,7 @@ class InteliaRAGEngine:
                 return result
 
             logger.info(
-                f"🔧 Génération réponse LLM pour {len(result.context_docs)} documents PostgreSQL"
+                f"🔍 Génération réponse LLM pour {len(result.context_docs)} documents PostgreSQL"
             )
 
             try:
@@ -714,6 +709,87 @@ class InteliaRAGEngine:
                 result.metadata["llm_generation_error"] = str(e)
 
         return result
+
+    async def _apply_preprocessing(
+        self, query: str, language: str, enable_preprocessing: bool
+    ) -> Dict[str, Any]:
+        """Applique le preprocessing"""
+
+        logger.debug(f"🌍 _apply_preprocessing avec langue: {language}")
+
+        if not enable_preprocessing or not self.query_preprocessor:
+            logger.debug("📋 Preprocessing minimal")
+
+            extracted = self.entity_extractor.extract(query)
+            entities_dict = extracted.to_dict()
+
+            return {
+                "normalized_query": query,
+                "original_query": query,
+                "entities": entities_dict,
+                "language": language,
+                "routing_hint": None,
+                "is_comparative": False,
+                "comparison_entities": [],
+                "metadata": {
+                    "preprocessing_applied": False,
+                    "extraction_confidence": extracted.confidence,
+                    "entities_found": extracted.get_entity_count(),
+                    "language_detected": language,
+                },
+            }
+
+        try:
+            logger.debug("🔧 Application du preprocessing complet")
+            preprocessed = await self.query_preprocessor.preprocess_query(
+                query=query, language=language
+            )
+
+            self.optimization_stats["preprocessing_success"] += 1
+
+            return {
+                "normalized_query": preprocessed.get("normalized_query", query),
+                "original_query": query,
+                "entities": preprocessed.get("entities", {}),
+                "language": language,
+                "routing_hint": preprocessed.get("routing"),
+                "is_comparative": preprocessed.get("is_comparative", False),
+                "comparison_entities": preprocessed.get("comparison_entities", []),
+                "temporal_range": preprocessed.get("temporal_range"),
+                "metadata": {
+                    "original_query": query,
+                    "normalized_query": preprocessed.get("normalized_query", query),
+                    "routing_hint": preprocessed.get("routing"),
+                    "is_comparative": preprocessed.get("is_comparative", False),
+                    "preprocessing_applied": True,
+                    "confidence": preprocessed.get("confidence", 1.0),
+                    "language_detected": language,
+                },
+            }
+
+        except Exception as e:
+            logger.warning(f"⚠️ Preprocessing échoué: {e}, fallback basique")
+            self.optimization_stats["preprocessing_failures"] += 1
+
+            extracted = self.entity_extractor.extract(query)
+            entities_dict = extracted.to_dict()
+
+            return {
+                "normalized_query": query,
+                "original_query": query,
+                "entities": entities_dict,
+                "language": language,
+                "routing_hint": None,
+                "is_comparative": False,
+                "comparison_entities": [],
+                "metadata": {
+                    "preprocessing_applied": False,
+                    "preprocessing_error": str(e),
+                    "fallback_extraction": True,
+                    "extraction_confidence": extracted.confidence,
+                    "language_detected": language,
+                },
+            }
 
     async def _route_to_handler(
         self,
@@ -769,17 +845,20 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v4.8.0_query_router",
-            "architecture": "modular_query_router",
+            "version": "v4.7.0_llm_generation_fix",
+            "architecture": "modular_centralized",
             "modules": {
                 "core": True,
                 "rag_engine": True,
-                "query_router": bool(self.query_router),
+                "query_classifier": bool(self.query_classifier),
                 "entity_extractor": bool(self.entity_extractor),
+                "validation_core": bool(self.validator),
                 "temporal_handler": True,
                 "comparative_handler": True,
                 "standard_handler": True,
+                "query_preprocessor": bool(self.query_preprocessor),
                 "postgresql_retriever": bool(self.postgresql_retriever),
+                "postgresql_validator": bool(self.postgresql_validator),
                 "weaviate_core": bool(self.weaviate_core),
                 "comparison_handler": bool(self.comparison_handler),
                 "llm_generator": bool(self.core.generator),
@@ -793,10 +872,24 @@ class InteliaRAGEngine:
         logger.info("🔒 Fermeture RAG Engine...")
 
         try:
+            if self.query_preprocessor:
+                await self.query_preprocessor.close()
+        except Exception as e:
+            logger.error(f"❌ Erreur fermeture Preprocessor: {e}")
+
+        try:
             if self.postgresql_retriever:
                 await self.postgresql_retriever.close()
         except Exception as e:
             logger.error(f"❌ Erreur fermeture PostgreSQL Retriever: {e}")
+
+        try:
+            if self.postgresql_validator and hasattr(
+                self.postgresql_validator, "close"
+            ):
+                await self.postgresql_validator.close()
+        except Exception as e:
+            logger.error(f"❌ Erreur fermeture PostgreSQL Validator: {e}")
 
         try:
             if self.weaviate_core:

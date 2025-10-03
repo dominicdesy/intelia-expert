@@ -3,11 +3,198 @@
     "language": "de",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 19,
+    "total_domains": 23,
     "description": "Universelle Terminologie für Expertensystem in der Geflügelproduktion - Deutsche Version"
   },
 
   "domains": {
+    "contextual_references": {
+      "same": {
+        "canonical": "gleich",
+        "confidence": 0.90,
+        "variants": ["gleich", "gleiches", "gleiche", "dasselbe", "derselbe", "dieselbe", "beim gleichen"]
+      },
+      "same_age": {
+        "canonical": "gleiches_alter",
+        "confidence": 0.90,
+        "variants": ["im gleichen alter", "beim gleichen alter", "gleiches alter", "im alter von", "zur gleichen zeit"]
+      },
+      "and_for": {
+        "canonical": "und_fuer",
+        "confidence": 0.90,
+        "variants": ["und für", "und fuer", "sowie für", "sowie fuer", "ebenso für", "ebenso fuer"]
+      },
+      "what_about": {
+        "canonical": "wie_steht_es",
+        "confidence": 0.90,
+        "variants": ["wie steht es mit", "wie sieht es aus mit", "und was ist mit", "und bezüglich", "und bezueglich"]
+      },
+      "females": {
+        "canonical": "weibchen",
+        "confidence": 0.95,
+        "variants": ["weibchen", "die weibchen", "weibliche", "die weiblichen", "hennen", "die hennen"]
+      },
+      "males": {
+        "canonical": "maennchen",
+        "confidence": 0.95,
+        "variants": ["männchen", "maennchen", "die männchen", "die maennchen", "männliche", "maennliche", "hähne", "haehne", "die hähne", "die haehne"]
+      },
+      "and_the": {
+        "canonical": "und_die",
+        "confidence": 0.90,
+        "variants": ["und die", "und der", "und das", "sowie die"]
+      },
+      "also_for": {
+        "canonical": "auch_fuer",
+        "confidence": 0.90,
+        "variants": ["auch für", "auch fuer", "ebenfalls für", "ebenfalls fuer", "genauso für", "genauso fuer"]
+      }
+    },
+
+    "metrics": {
+      "weight": {
+        "canonical": "gewicht",
+        "confidence": 0.95,
+        "variants": ["gewicht", "masse", "lebendgewicht", "kg", "gramm", "g"]
+      },
+      "fcr": {
+        "canonical": "fcr",
+        "confidence": 0.95,
+        "variants": ["fcr", "fvw", "futterverwertung", "futterkonversion", "konversionsrate"]
+      },
+      "gain": {
+        "canonical": "zunahme",
+        "confidence": 0.95,
+        "variants": ["zunahme", "gewichtszunahme", "zuwachs", "wachstum", "tgz"]
+      },
+      "conversion": {
+        "canonical": "konversion",
+        "confidence": 0.95,
+        "variants": ["konversion", "konversionsrate", "futtereffizienz", "verwertung"]
+      },
+      "consumption": {
+        "canonical": "verbrauch",
+        "confidence": 0.95,
+        "variants": ["verbrauch", "aufnahme", "verzehr", "konsum", "futteraufnahme"]
+      },
+      "production": {
+        "canonical": "produktion",
+        "confidence": 0.95,
+        "variants": ["produktion", "ertrag", "leistung", "produktivität", "produktivitaet"]
+      },
+      "growth": {
+        "canonical": "wachstum",
+        "confidence": 0.95,
+        "variants": ["wachstum", "entwicklung", "zunahme", "wachstumsrate"]
+      },
+      "performance": {
+        "canonical": "leistung",
+        "confidence": 0.95,
+        "variants": ["leistung", "performance", "ergebnis", "effizienz"]
+      },
+      "index": {
+        "canonical": "index",
+        "confidence": 0.95,
+        "variants": ["index", "indice", "kennzahl", "rate", "koeffizient"]
+      }
+    },
+
+    "health": {
+      "disease": {
+        "canonical": "krankheit",
+        "confidence": 0.95,
+        "variants": ["krankheit", "pathologie", "infektion", "erkrankung", "infektionskrankheit"]
+      },
+      "symptoms": {
+        "canonical": "symptome",
+        "confidence": 0.95,
+        "variants": ["symptome", "anzeichen", "zeichen", "erscheinungen", "klinische zeichen"]
+      },
+      "treatment": {
+        "canonical": "behandlung",
+        "confidence": 0.95,
+        "variants": ["behandlung", "therapie", "medikation", "heilung", "pflege"]
+      },
+      "coccidiosis": {
+        "canonical": "kokzidiose",
+        "confidence": 0.95,
+        "variants": ["kokzidiose", "kokzidien", "eimeria", "kokzidiostatikum"]
+      },
+      "vaccination": {
+        "canonical": "impfung",
+        "confidence": 0.95,
+        "variants": ["impfung", "impfstoff", "immunisierung", "prophylaxe", "vakzination"]
+      },
+      "gumboro": {
+        "canonical": "gumboro",
+        "confidence": 0.95,
+        "variants": ["gumboro", "gumboro-krankheit", "infektiöse bursitis", "infektioese bursitis", "ibdv", "ibd"]
+      },
+      "enteritis": {
+        "canonical": "enteritis",
+        "confidence": 0.95,
+        "variants": ["enteritis", "nekrotische enteritis", "darmentzündung", "darmentzuendung"]
+      },
+      "mortality": {
+        "canonical": "mortalitaet",
+        "confidence": 0.95,
+        "variants": ["mortalität", "mortalitaet", "sterblichkeit", "tod", "verluste", "sterberate"]
+      },
+      "diagnosis": {
+        "canonical": "diagnose",
+        "confidence": 0.95,
+        "variants": ["diagnose", "diagnostik", "analyse", "identifikation", "erkennung"]
+      }
+    },
+
+    "environment": {
+      "temperature": {
+        "canonical": "temperatur",
+        "confidence": 0.95,
+        "variants": ["temperatur", "temp", "t°", "grad", "celsius", "wärme", "waerme"]
+      },
+      "humidity": {
+        "canonical": "feuchtigkeit",
+        "confidence": 0.95,
+        "variants": ["feuchtigkeit", "luftfeuchtigkeit", "rf", "feuchte", "luftfeuchte"]
+      },
+      "ventilation": {
+        "canonical": "lueftung",
+        "confidence": 0.95,
+        "variants": ["lüftung", "lueftung", "belüftung", "belueftung", "luftwechsel", "ventilation"]
+      },
+      "lighting": {
+        "canonical": "beleuchtung",
+        "confidence": 0.95,
+        "variants": ["beleuchtung", "licht", "belichtung", "helligkeit", "illumination"]
+      },
+      "density": {
+        "canonical": "dichte",
+        "confidence": 0.95,
+        "variants": ["dichte", "besatzdichte", "belastung", "kg/m2", "tiere/m2"]
+      },
+      "space": {
+        "canonical": "platz",
+        "confidence": 0.95,
+        "variants": ["platz", "raum", "fläche", "flaeche", "cm/tier", "verfügbarer raum", "verfuegbarer raum"]
+      },
+      "feeder": {
+        "canonical": "futtertrog",
+        "confidence": 0.95,
+        "variants": ["futtertrog", "trog", "futterstelle", "teller", "fütterungssystem", "fuetterungssystem"]
+      },
+      "drinker": {
+        "canonical": "traenke",
+        "confidence": 0.95,
+        "variants": ["tränke", "traenke", "nippel", "tränkesystem", "traenkesystem", "wasserstelle"]
+      },
+      "light": {
+        "canonical": "licht",
+        "confidence": 0.95,
+        "variants": ["licht", "beleuchtung", "lux", "lichtintensität", "lichtintensitaet", "photoperiode"]
+      }
+    },
+
     "general_terms": {
       "poultry": {
         "canonical": "gefluegel",
@@ -273,7 +460,7 @@
       "broiler": {
         "canonical": "masthaehnchen",
         "confidence": 0.95,
-        "variants": ["masthähnchen", "masthahnchen", "masthähnchen", "masthuhn", "mastgeflügel", "mastgefluegel", "broiler"]
+        "variants": ["masthähnchen", "masthahnchen", "masthuhn", "mastgeflügel", "mastgefluegel", "broiler"]
       },
       "layer": {
         "canonical": "legehenne",
@@ -595,7 +782,7 @@
         "variants": ["einstreu", "streu", "bodenbelag", "substrat"]
       },
       "wood_shavings": {
-        "canonical": "hobelspäne",
+        "canonical": "hobelspaene",
         "confidence": 0.95,
         "variants": ["hobelspäne", "hobelspaene", "späne", "spaene", "holzspäne", "holzspaene", "sägespäne", "saegespaene"]
       },

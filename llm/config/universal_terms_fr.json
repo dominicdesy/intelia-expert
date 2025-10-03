@@ -3,11 +3,198 @@
     "language": "fr",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 19,
+    "total_domains": 23,
     "description": "Terminologie universelle pour système expert en production avicole - Version française"
   },
 
   "domains": {
+    "contextual_references": {
+      "same": {
+        "canonical": "meme",
+        "confidence": 0.90,
+        "variants": ["même", "meme", "au même", "au meme", "la même", "le même"]
+      },
+      "same_age": {
+        "canonical": "meme_age",
+        "confidence": 0.90,
+        "variants": ["au même âge", "au meme age", "même âge", "meme age", "à l'âge de", "au même stade"]
+      },
+      "and_for": {
+        "canonical": "et_pour",
+        "confidence": 0.90,
+        "variants": ["et pour", "et pour les", "ainsi que pour", "de même pour"]
+      },
+      "what_about": {
+        "canonical": "qu_en_est_il",
+        "confidence": 0.90,
+        "variants": ["qu'en est-il", "qu'en est il", "quid de", "et concernant", "et pour ce qui est de"]
+      },
+      "females": {
+        "canonical": "femelles",
+        "confidence": 0.95,
+        "variants": ["femelles", "les femelles", "femelle", "la femelle", "poules", "les poules"]
+      },
+      "males": {
+        "canonical": "males",
+        "confidence": 0.95,
+        "variants": ["mâles", "males", "les mâles", "les males", "mâle", "male", "coqs", "les coqs"]
+      },
+      "and_the": {
+        "canonical": "et_les",
+        "confidence": 0.90,
+        "variants": ["et les", "et le", "et la", "ainsi que les"]
+      },
+      "also_for": {
+        "canonical": "aussi_pour",
+        "confidence": 0.90,
+        "variants": ["aussi pour", "également pour", "egalement pour", "pareillement pour", "idem pour"]
+      }
+    },
+
+    "metrics": {
+      "weight": {
+        "canonical": "poids",
+        "confidence": 0.95,
+        "variants": ["poids", "poid", "masse", "poids vif", "kg", "grammes", "g"]
+      },
+      "fcr": {
+        "canonical": "fcr",
+        "confidence": 0.95,
+        "variants": ["fcr", "ic", "indice de conversion", "conversion", "ratio de conversion"]
+      },
+      "gain": {
+        "canonical": "gain",
+        "confidence": 0.95,
+        "variants": ["gain", "prise de poids", "augmentation", "croissance", "gmq"]
+      },
+      "conversion": {
+        "canonical": "conversion",
+        "confidence": 0.95,
+        "variants": ["conversion", "taux de conversion", "efficacité alimentaire", "efficacite alimentaire"]
+      },
+      "consumption": {
+        "canonical": "consommation",
+        "confidence": 0.95,
+        "variants": ["consommation", "consomation", "ingestion", "ingéré", "ingere", "apport"]
+      },
+      "production": {
+        "canonical": "production",
+        "confidence": 0.95,
+        "variants": ["production", "rendement", "productivité", "productivite", "performance"]
+      },
+      "growth": {
+        "canonical": "croissance",
+        "confidence": 0.95,
+        "variants": ["croissance", "développement", "developpement", "évolution", "evolution"]
+      },
+      "performance": {
+        "canonical": "performance",
+        "confidence": 0.95,
+        "variants": ["performance", "performances", "résultats", "resultats", "efficacité", "efficacite"]
+      },
+      "index": {
+        "canonical": "indice",
+        "confidence": 0.95,
+        "variants": ["indice", "index", "ratio", "coefficient", "taux"]
+      }
+    },
+
+    "health": {
+      "disease": {
+        "canonical": "maladie",
+        "confidence": 0.95,
+        "variants": ["maladie", "pathologie", "infection", "affection", "maladie infectieuse"]
+      },
+      "symptoms": {
+        "canonical": "symptomes",
+        "confidence": 0.95,
+        "variants": ["symptômes", "symptomes", "signes", "manifestations", "signes cliniques"]
+      },
+      "treatment": {
+        "canonical": "traitement",
+        "confidence": 0.95,
+        "variants": ["traitement", "thérapie", "therapie", "médication", "medication", "soins"]
+      },
+      "coccidiosis": {
+        "canonical": "coccidiose",
+        "confidence": 0.95,
+        "variants": ["coccidiose", "coccidies", "eimeria", "coccidiostatique"]
+      },
+      "vaccination": {
+        "canonical": "vaccination",
+        "confidence": 0.95,
+        "variants": ["vaccination", "vaccin", "immunisation", "prophylaxie", "vaccinal"]
+      },
+      "gumboro": {
+        "canonical": "gumboro",
+        "confidence": 0.95,
+        "variants": ["gumboro", "maladie de gumboro", "bursite infectieuse", "ibdv", "ibd"]
+      },
+      "enteritis": {
+        "canonical": "enterite",
+        "confidence": 0.95,
+        "variants": ["entérite", "enterite", "entérite nécrotique", "enterite necrotique", "inflammation intestinale"]
+      },
+      "mortality": {
+        "canonical": "mortalite",
+        "confidence": 0.95,
+        "variants": ["mortalité", "mortalite", "mort", "décès", "deces", "pertes", "taux de mortalité", "taux de mortalite"]
+      },
+      "diagnosis": {
+        "canonical": "diagnostic",
+        "confidence": 0.95,
+        "variants": ["diagnostic", "diagnostique", "analyse", "identification", "détection", "detection"]
+      }
+    },
+
+    "environment": {
+      "temperature": {
+        "canonical": "temperature",
+        "confidence": 0.95,
+        "variants": ["température", "temperature", "temp", "t°", "degrés", "degres", "chaleur"]
+      },
+      "humidity": {
+        "canonical": "humidite",
+        "confidence": 0.95,
+        "variants": ["humidité", "humidite", "hr", "hygrométrie", "hygrometrie", "taux d'humidité", "taux d'humidite"]
+      },
+      "ventilation": {
+        "canonical": "ventilation",
+        "confidence": 0.95,
+        "variants": ["ventilation", "aération", "aeration", "renouvellement d'air", "flux d'air"]
+      },
+      "lighting": {
+        "canonical": "eclairage",
+        "confidence": 0.95,
+        "variants": ["éclairage", "eclairage", "lumière", "lumiere", "illumination", "luminosité", "luminosite"]
+      },
+      "density": {
+        "canonical": "densite",
+        "confidence": 0.95,
+        "variants": ["densité", "densite", "charge", "kg/m2", "sujets/m2", "occupation"]
+      },
+      "space": {
+        "canonical": "espace",
+        "confidence": 0.95,
+        "variants": ["espace", "surface", "place", "cm/sujet", "cm par oiseau", "surface disponible"]
+      },
+      "feeder": {
+        "canonical": "mangeoire",
+        "confidence": 0.95,
+        "variants": ["mangeoire", "mangeoires", "assiette", "distributeur", "système d'alimentation", "systeme d'alimentation"]
+      },
+      "drinker": {
+        "canonical": "abreuvoir",
+        "confidence": 0.95,
+        "variants": ["abreuvoir", "abreuvoirs", "pipette", "système d'abreuvement", "systeme d'abreuvement", "point d'eau"]
+      },
+      "light": {
+        "canonical": "lumiere",
+        "confidence": 0.95,
+        "variants": ["lumière", "lumiere", "éclairage", "eclairage", "lux", "intensité lumineuse", "intensite lumineuse", "photopériode", "photoperiode"]
+      }
+    },
+
     "general_terms": {
       "poultry": {
         "canonical": "aviculture",
@@ -186,7 +373,7 @@
       "mortality": {
         "canonical": "mortalite",
         "confidence": 0.95,
-        "variants": ["mortalité", "taux de mortalité", "mort", "taux de mortalité", "perte", "pourcentage mortalité", "mortalité cumulée", "mortalité quotidienne", "oiseaux morts", "pertes", "taux de survie"]
+        "variants": ["mortalité", "taux de mortalité", "mort", "perte", "pourcentage mortalité", "mortalité cumulée", "mortalité quotidienne", "oiseaux morts", "pertes", "taux de survie"]
       },
       "egg_production": {
         "canonical": "production_oeufs",
@@ -196,7 +383,7 @@
       "uniformity": {
         "canonical": "uniformite",
         "confidence": 0.95,
-        "variants": ["uniformité", "coefficient de variation", "cv", "homogénéité", "régularité", "uniformité du lot", "uniformité de poids", "uniformité de taille", "coefficient de variation", "consistance"]
+        "variants": ["uniformité", "coefficient de variation", "cv", "homogénéité", "régularité", "uniformité du lot", "uniformité de poids", "uniformité de taille", "consistance"]
       },
       "epef": {
         "canonical": "epef",
