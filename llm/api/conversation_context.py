@@ -220,10 +220,11 @@ class ConversationContextManager:
         """
         Accumule les informations de clarification de manière intelligente
 
-        ✅ Version 3.1 - FUSION D'ENTITÉS + TARGET_AGE:
-        - Fusion sémantique de la requête (existant)
-        - ✅ NOUVEAU: Fusion des entités extraites
-        - ✅ NOUVEAU: Distinction age_days (départ) vs target_age (cible)
+        ✅ Version 4.4 - Support target_age_days:
+        - Fusion sémantique de la requête
+        - Fusion des entités extraites
+        - ✅ NOUVEAU: Détection explicite "Jour X" → target_age_days
+        - Distinction age_days (départ) vs target_age_days (cible)
         - Préservation de TOUS les champs (age_days, metric_type, breed, sex)
         - Maintien de la lisibilité de la requête
         """
@@ -242,65 +243,37 @@ class ConversationContextManager:
 
             # ✅ NOUVELLE SECTION: FUSION DES ENTITÉS
             partial_entities = context.get("partial_entities", {})
-            missing_fields = context.get("missing_fields", [])
 
             logger.info(f"🔄 Fusion entités - Avant: {partial_entities}")
             logger.info(
                 f"🔄 Nouvelles entités extraites: {response_entities.to_dict()}"
             )
 
-            # ✅ NOUVEAU: Si on attend un âge cible et qu'un âge est détecté
-            if any("âge" in f or "age" in f or "poids" in f for f in missing_fields):
-                if response_entities.age_days is not None:
-                    # C'est l'âge CIBLE, pas l'âge de départ
-                    partial_entities["target_age"] = response_entities.age_days
-                    logger.info(f"✅ Target age ajouté: {response_entities.age_days}")
-                    # Ne pas écraser age_days si déjà présent
-                    if "age_days" not in partial_entities:
-                        partial_entities["age_days"] = response_entities.age_days
-                        partial_entities["has_explicit_age"] = (
-                            response_entities.has_explicit_age
-                        )
-                        logger.info(
-                            f"✅ Age_days (départ) ajouté: {response_entities.age_days}"
-                        )
-            elif response_entities.age_days is not None:
-                # Si ce n'est pas une clarification d'âge, c'est l'âge de départ
-                partial_entities["age_days"] = response_entities.age_days
-                partial_entities["has_explicit_age"] = (
-                    response_entities.has_explicit_age
+            # ✅ NOUVEAU: Détecter explicitement les réponses de type "Jour X"
+            target_age_match = re.search(
+                r"jour\s+(\d+)|day\s+(\d+)|día\s+(\d+)", new_info.lower()
+            )
+            if target_age_match:
+                target_age = int(
+                    target_age_match.group(1)
+                    or target_age_match.group(2)
+                    or target_age_match.group(3)
                 )
-                logger.info(f"✅ Age_days ajouté: {response_entities.age_days}")
+                partial_entities["target_age_days"] = target_age
+                logger.info(f"✅ Âge cible détecté: {target_age} jours")
 
-            # Fusionner : nouvelles entités ÉCRASENT les anciennes pour les champs présents
-            if response_entities.breed:
-                partial_entities["breed"] = response_entities.breed
-                partial_entities["has_explicit_breed"] = (
-                    response_entities.has_explicit_breed
-                )
-                logger.info(f"✅ Breed ajouté: {response_entities.breed}")
-
-            if response_entities.sex:
-                partial_entities["sex"] = response_entities.sex
-                partial_entities["has_explicit_sex"] = (
-                    response_entities.has_explicit_sex
-                )
-                logger.info(f"✅ Sex ajouté: {response_entities.sex}")
-
-            if response_entities.metric_type:
-                partial_entities["metric_type"] = response_entities.metric_type
-                logger.info(f"✅ Metric_type ajouté: {response_entities.metric_type}")
-
-            if response_entities.genetic_line:
-                partial_entities["genetic_line"] = response_entities.genetic_line
-                logger.info(f"✅ Genetic_line ajouté: {response_entities.genetic_line}")
-
-            # Copier également la confiance globale si elle existe
-            if hasattr(response_entities, "confidence"):
-                # Ne pas écraser une confiance existante plus élevée
-                existing_confidence = partial_entities.get("confidence", 0)
-                if response_entities.confidence > existing_confidence:
-                    partial_entities["confidence"] = response_entities.confidence
+            # Fusion des autres entités
+            for key, value in response_entities.to_dict().items():
+                if value is not None:
+                    # Ne pas écraser si déjà présent, sauf pour les champs explicites
+                    if key not in partial_entities or key in [
+                        "breed",
+                        "sex",
+                        "metric_type",
+                        "genetic_line",
+                    ]:
+                        partial_entities[key] = value
+                        logger.info(f"✅ {key} ajouté/mis à jour: {value}")
 
             # Sauvegarder les entités fusionnées
             context["partial_entities"] = partial_entities
@@ -308,10 +281,15 @@ class ConversationContextManager:
             logger.info(f"✅ Entités fusionnées - Après: {partial_entities}")
             # FIN NOUVELLE SECTION
 
-            # Construire requête enrichie intelligemment (EXISTANT - CONSERVÉ)
+            # Construire requête enrichie intelligemment
             merged = original
 
-            if response_entities.breed and response_entities.has_explicit_breed:
+            if target_age_match:
+                # "quel est le poids" + "Jour 33" → "quel est le poids | Jour 33"
+                merged = f"{original} | Jour {target_age}"
+                logger.info(f"✅ Requête enrichie avec âge cible: {merged}")
+
+            elif response_entities.breed and response_entities.has_explicit_breed:
                 # "quel est le poids" + "Cobb 500" → "quel est le poids pour Cobb 500"
                 merged = f"{original} pour {response_entities.breed}"
                 logger.info(f"✅ Requête enrichie avec race: {merged}")
@@ -331,7 +309,7 @@ class ConversationContextManager:
 
             else:
                 # Fallback: ajout simple
-                merged = f"{original} {new_info}"
+                merged = f"{original} | {new_info}"
                 logger.debug(f"Fusion simple: {merged}")
 
             context["original_query"] = merged

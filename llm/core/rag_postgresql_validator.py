@@ -79,33 +79,58 @@ class PostgreSQLValidator:
     async def _extract_with_openai(self, query: str, language: str = "en") -> dict:
         """
         Extraction intelligente multilingue avec OpenAI
+        VERSION 4.4.2: Support start_age vs target_age pour calculs de plage
 
         Args:
             query: Requête utilisateur
             language: Code langue (fr, en, es, etc.)
 
         Returns:
-            Dict avec age_days, breed, metric_type extraits
+            Dict avec start_age_days, target_age_days, breed, metric_type extraits
         """
 
         if not self.openai_client:
             logger.warning("⚠️ OpenAI client non disponible pour extraction")
-            return {"age_days": None, "breed": None, "metric_type": None}
+            return {
+                "start_age_days": None,
+                "target_age_days": None,
+                "breed": None,
+                "metric_type": None,
+            }
 
         prompt = f"""Extract information from this query in {language}:
 Query: "{query}"
 
+**IMPORTANT**: Distinguish between:
+- **start_age_days**: The CURRENT/STARTING age (e.g., "I'm at day 18", "currently day 10", "je suis au jour 18")
+- **target_age_days**: The TARGET/ENDING age (e.g., "until day 35", "finish at day 42", "Jour 35", "jusqu'à jour 42")
+
 Extract:
-1. Age in days (e.g., "28 días", "28 days", "28 jours")
-2. Breed/strain (Ross 308, Cobb 500, etc.)
-3. Metric type (weight/peso/poids, feed conversion, etc.)
+1. start_age_days: Starting age in days (where farmer currently is)
+2. target_age_days: Target/ending age in days (where farmer wants to finish)
+3. breed: Breed/strain name (Ross 308, Cobb 500, etc.)
+4. metric_type: Metric requested (weight/poids/peso, feed/moulée/alimento, FCR, etc.)
 
 Return ONLY valid JSON, nothing else:
 {{
-    "age_days": <number or null>,
+    "start_age_days": <number or null>,
+    "target_age_days": <number or null>,
     "breed": "<breed name or null>",
     "metric_type": "<metric or null>"
 }}
+
+Examples in French:
+- "Je suis au jour 18... Jour 35" → {{"start_age_days": 18, "target_age_days": 35}}
+- "Jour 20 jusqu'à 42 jours" → {{"start_age_days": 20, "target_age_days": 42}}
+- "Combien de moulée de jour 15 à 28?" → {{"start_age_days": 15, "target_age_days": 28}}
+
+Examples in English:
+- "I'm at day 18... Day 35" → {{"start_age_days": 18, "target_age_days": 35}}
+- "From day 20 to 42 days" → {{"start_age_days": 20, "target_age_days": 42}}
+
+Examples in Spanish:
+- "Estoy en día 18... Día 35" → {{"start_age_days": 18, "target_age_days": 35}}
+- "Desde día 20 hasta 42 días" → {{"start_age_days": 20, "target_age_days": 42}}
 """
 
         try:
@@ -129,15 +154,30 @@ Return ONLY valid JSON, nothing else:
 
             result = json.loads(content)
             logger.info(f"✅ OpenAI extraction ({language}): {result}")
+
+            # Rétrocompatibilité: si pas de start/target mais age_days présent
+            if "age_days" in result and "start_age_days" not in result:
+                result["start_age_days"] = result["age_days"]
+
             return result
 
         except json.JSONDecodeError as e:
             logger.error(f"❌ JSON parsing failed: {e}")
             logger.error(f"Raw content: {response.choices[0].message.content[:200]}")
-            return {"age_days": None, "breed": None, "metric_type": None}
+            return {
+                "start_age_days": None,
+                "target_age_days": None,
+                "breed": None,
+                "metric_type": None,
+            }
         except Exception as e:
             logger.error(f"❌ OpenAI extraction failed: {e}")
-            return {"age_days": None, "breed": None, "metric_type": None}
+            return {
+                "start_age_days": None,
+                "target_age_days": None,
+                "breed": None,
+                "metric_type": None,
+            }
 
     async def _validate_query_completeness(
         self,
@@ -175,7 +215,8 @@ Return ONLY valid JSON, nothing else:
         entities_context = f"""
 Detected entities:
 - Breed: {entities.get('breed') or 'NOT SPECIFIED'}
-- Age: {entities.get('age_days') or 'NOT SPECIFIED'} days
+- Start Age: {entities.get('age_days') or 'NOT SPECIFIED'} days
+- Target Age: {entities.get('target_age_days') or 'NOT SPECIFIED'} days
 - Sex: {entities.get('sex') or 'NOT SPECIFIED'}
 - Metric: {entities.get('metric_type') or 'NOT SPECIFIED'}
 """
@@ -415,14 +456,17 @@ Examples:
 
             openai_extracted = await self._extract_with_openai(query, language)
 
-            # Enrichir avec les résultats OpenAI
-            if not enhanced_entities.get("age_days") and openai_extracted.get(
-                "age_days"
-            ):
-                enhanced_entities["age_days"] = openai_extracted["age_days"]
-                logger.info(
-                    f"✅ Age détecté par OpenAI: {openai_extracted['age_days']} jours"
-                )
+            # Enrichir avec les résultats OpenAI (support start/target age)
+            start_age = openai_extracted.get("start_age_days")
+            target_age = openai_extracted.get("target_age_days")
+
+            if not enhanced_entities.get("age_days") and start_age:
+                enhanced_entities["age_days"] = start_age
+                logger.info(f"✅ Age de départ détecté par OpenAI: {start_age} jours")
+
+            if target_age:
+                enhanced_entities["target_age_days"] = target_age
+                logger.info(f"✅ Age cible détecté par OpenAI: {target_age} jours")
 
             if not enhanced_entities.get("breed") and openai_extracted.get("breed"):
                 normalized_breed = self.breeds_registry.normalize_breed(
@@ -445,6 +489,9 @@ Examples:
                     "conversion": "fcr",
                     "mortalidad": "mortality",
                     "mortalité": "mortality",
+                    "moulée": "feed",
+                    "alimento": "feed",
+                    "feed": "feed",
                 }
                 normalized_metric = metric_mapping.get(
                     openai_extracted["metric_type"].lower(),
@@ -476,6 +523,45 @@ Examples:
                 "helpful_message": clarification_msg,
                 "detected_entities": enhanced_entities,
             }
+
+        # ✅ NOUVEAU: Validation spéciale pour requêtes de calcul (start + target age)
+        if self._is_calculation_query(enhanced_entities, query):
+            start_age = enhanced_entities.get("age_days")
+            target_age = enhanced_entities.get("target_age_days")
+
+            logger.info(
+                f"🧮 Requête de calcul détectée - start: {start_age}, target: {target_age}"
+            )
+
+            if not start_age or not target_age:
+                missing = []
+                if not start_age:
+                    missing_text = {
+                        "fr": "âge de départ",
+                        "en": "starting age",
+                        "es": "edad de inicio",
+                    }
+                    missing.append(missing_text.get(language, "starting age"))
+
+                if not target_age:
+                    missing_text = {
+                        "fr": "âge cible ou final",
+                        "en": "target or final age",
+                        "es": "edad objetivo o final",
+                    }
+                    missing.append(missing_text.get(language, "target age"))
+
+                clarification_msg = self._generate_smart_clarification(
+                    missing, language, "Calculation requires both start and target age"
+                )
+
+                logger.warning("❌ Calcul impossible sans start ET target age")
+                return {
+                    "status": "needs_fallback",
+                    "missing": missing,
+                    "helpful_message": clarification_msg,
+                    "detected_entities": enhanced_entities,
+                }
 
         # LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
         logger.debug(
@@ -682,6 +768,52 @@ Examples:
                 "helpful_message": helpful_message,
                 "detected_entities": enhanced_entities,
             }
+
+    def _is_calculation_query(self, entities: Dict, query: str = "") -> bool:
+        """
+        Détecte si c'est une requête de calcul nécessitant une plage (start + target age)
+
+        Args:
+            entities: Entités extraites
+            query: Requête utilisateur (optionnel, pour contexte supplémentaire)
+
+        Returns:
+            True si c'est une requête de calcul nécessitant start et target age
+        """
+        metric = entities.get("metric_type", "").lower()
+
+        # Mots-clés indiquant un calcul
+        calculation_keywords = [
+            "combien",
+            "total",
+            "how much",
+            "cuanto",
+            "cuánto",
+            "calculer",
+            "calculate",
+            "calcular",
+            "de",
+            "from",
+            "desde",
+            "jusqu'à",
+            "until",
+            "hasta",
+            "à",
+            "to",
+            "a",
+        ]
+
+        # Si métrique de type "feed/moulée/alimento"
+        feed_metrics = ["moulée", "feed", "alimento", "aliment"]
+        is_feed_query = any(feed_kw in metric for feed_kw in feed_metrics)
+
+        # Si mots-clés de calcul dans la requête
+        has_calc_keywords = any(kw in query.lower() for kw in calculation_keywords)
+
+        # Si target_age_days est présent, c'est probablement un calcul
+        has_target_age = entities.get("target_age_days") is not None
+
+        return is_feed_query or has_calc_keywords or has_target_age
 
     def _get_breed_suggestion(self, language: str) -> str:
         """Retourne une suggestion pour la race selon la langue"""
@@ -1214,6 +1346,11 @@ if __name__ == "__main__":
             "query": "Mortalité",
             "entities": {"age_days": 35},
             "context": {"breed": "Cobb 500", "metric_type": "mortality"},
+        },
+        {
+            "query": "Combien de moulée de jour 18 à 35 pour Ross 308?",
+            "entities": {},
+            "context": None,
         },
     ]
 
