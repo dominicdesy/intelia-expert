@@ -24,7 +24,6 @@ export const HistoryMenu = React.memo(() => {
   } = useConversationActions();
   const { currentConversation, loadConversation } = useCurrentConversation();
 
-  // Fonction pour traduire les titres de groupes avec type assertion
   const getGroupTitle = useCallback(
     (title: string): string => {
       switch (title) {
@@ -45,7 +44,6 @@ export const HistoryMenu = React.memo(() => {
     [t],
   );
 
-  // CORRECTION: handleToggle avec user.id en priorité
   const handleToggle = useCallback(async () => {
     console.log(
       t("history.toggleClicked"),
@@ -57,68 +55,52 @@ export const HistoryMenu = React.memo(() => {
     const newIsOpen = !isOpen;
     setIsOpen(newIsOpen);
 
-	if (
-	  newIsOpen &&
-	  user &&
-	  !isLoadingHistory
-	) {
+    if (newIsOpen && user && !isLoadingHistory) {
       console.log(
-        "🔄 [HistoryMenu] Chargement MANUEL uniquement lors de l'ouverture",
+        "🔄 [HistoryMenu] Chargement à l'ouverture du menu",
       );
       try {
-        // ✅ CORRECTION: Utiliser user.id (UUID) au lieu de user.email
         await loadConversations(user.id || user.email);
-        console.log("✅ [HistoryMenu] Conversations chargées manuellement");
+        console.log("✅ [HistoryMenu] Conversations chargées");
       } catch (error) {
-        console.error("❌ [HistoryMenu] Erreur chargement manuel:", error);
+        console.error("❌ [HistoryMenu] Erreur chargement:", error);
       }
-    } else {
-      console.log(
-        "ℹ️ [HistoryMenu] Pas de chargement - données déjà présentes ou menu fermé",
-      );
     }
   }, [
     isOpen,
     user,
     isLoadingHistory,
     loadConversations,
-    conversationGroups.length,
     t,
   ]);
 
-  // ✅ CORRECTION: handleRefresh avec user.id en priorité
   const handleRefresh = useCallback(
     async (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       if (!user) return;
-      console.log("🔄 [HistoryMenu] Refresh MANUEL demandé par l'utilisateur");
-      // ✅ CORRECTION: Utiliser user.id (UUID) au lieu de user.email
+      console.log("🔄 [HistoryMenu] Refresh demandé");
       await refreshConversations(user.id || user.email);
     },
     [user, refreshConversations],
   );
 
-  // ✅ CORRECTION: handleClearAll avec user.id en priorité
   const handleClearAll = useCallback(
     async (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       if (!user) return;
       if (!confirm(t("history.confirmClearAll"))) return;
-      // ✅ CORRECTION: Utiliser user.id (UUID) au lieu de user.email
       await clearAllConversations(user.id || user.email);
     },
     [user, clearAllConversations, t],
   );
 
-  // ✅ CORRECTION: handleDeleteSingle avec user.id en priorité
   const handleDeleteSingle = useCallback(
     async (conversationId: string, e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       await deleteConversation(conversationId);
-      // ✅ CORRECTION: Utiliser user.id (UUID) au lieu de user.email
       if (user) await refreshConversations(user.id || user.email);
     },
     [deleteConversation, user, refreshConversations],
