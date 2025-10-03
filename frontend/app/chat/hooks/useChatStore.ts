@@ -328,7 +328,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       console.log("📡 [ChatStore] Appel API loadUserConversations...");
 
       // ✅ CORRECTION: Ajout du paramètre limit=100
-      const conversationsData = await loadUserConversations(userId, 100);
+      const conversationsData = await loadUserConversations(userId, 999);
 
       if (!conversationsData || !conversationsData.conversations) {
         console.log("📭 [ChatStore] Aucune conversation trouvée");
