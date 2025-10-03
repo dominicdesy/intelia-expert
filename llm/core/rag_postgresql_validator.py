@@ -279,28 +279,32 @@ If the query asks for a SINGLE METRIC VALUE at a SPECIFIC AGE:
 Examples: 
 - "weight at 17 days", "poids à 17 jours", "peso a 17 días"
 - "What should their weight be at 28 days?", "Quel devrait être leur poids à 28 jours?"
+- "What's the target weight at 35 days?", "Quel est le poids cible à 35 jours?"
 - "FCR at day 28", "IC jour 28", "conversión día 28"
 - "feed intake day 35", "consommation jour 35"
 - "Quel est le poids...", "What is the weight...", "Cuál es el peso..."
 - "I'm raising broilers and they're currently 28 days old. What should their average weight be?"
 
 → Requirements: Breed + Age + Metric = COMPLETE
-→ NO need for target_age or target_weight
+→ NO need for target_age or target_weight as INPUT
 → The age mentioned IS the point of interest (not a starting point for calculation)
 
-**CRITICAL FOR RULE 1:**
-- If query asks "What should the weight be at X days?" → ONLY breed is missing (if not specified)
-- If query asks "What is the weight at X days?" → ONLY breed is missing (if not specified)
-- NEVER EVER ask for target_weight in Rule 1 queries
-- target_weight is ONLY for Rule 2 (calculation queries like "feed until reaching 2.5kg")
-- Questions using "should", "average", "typical", "normal" at a specific age are Rule 1
+**CRITICAL FOR RULE 1 - DON'T CONFUSE "ASKING FOR" vs "PROVIDING":**
+- "What's the target weight at X days?" = USER IS ASKING FOR the weight → COMPLETE (if breed + age present)
+- "What is the weight at X days?" = USER IS ASKING FOR the weight → COMPLETE (if breed + age present)
+- "What should the weight be at X days?" = USER IS ASKING FOR the weight → COMPLETE (if breed + age present)
+- NEVER ask for target_weight when the user is REQUESTING that information
+- target_weight as MISSING INFO is ONLY for Rule 2 (calculation queries like "feed until reaching 2.5kg")
+- Questions using "should", "average", "typical", "normal", "target", "expected" at a specific age are Rule 1
+- The word "target" in the question does NOT mean target_weight is missing - it means the user WANTS to know it!
 
 **RULE 2 - PERIOD/CALCULATION QUERIES:**
 If the query asks for TOTALS, CALCULATIONS, or data over a TIME PERIOD:
 Examples:
 - "feed from day 18 to 35", "moulée de jour 18 à 35"
-- "total feed until 2.5kg", "total jusqu'à 2.5kg"
+- "total feed until 2.5kg", "total jusqu'à 2.5kg" ← HERE target weight IS required as input
 - "combien de moulée pour finir", "how much feed to finish"
+- "how much feed to reach 2.5kg" ← HERE target weight IS required as input
 
 Keywords indicating calculations: "total", "combien", "how much", "cuánto", "de...à", "from...to", "until", "jusqu'à", "hasta"
 
@@ -313,7 +317,8 @@ If comparing multiple entities → need at least 2 complete entities
 **CRITICAL INSTRUCTION:**
 - Apply RULE 1 FIRST for 80%+ of queries
 - Only apply RULE 2 if query explicitly mentions calculations, totals, or time ranges
-- Questions like "Quel est...", "What is...", "Cuál es..." are ALWAYS Rule 1 (simple queries)
+- Questions like "Quel est...", "What is...", "What's the...", "Cuál es..." are ALWAYS Rule 1 (simple queries)
+- Don't be confused by the word "target" - if asking "what's the target weight", that's Rule 1 COMPLETE
 
 **Analysis required:**
 1. Is this a simple metric lookup at one specific age? (RULE 1) → is_complete based on breed + age + metric
@@ -333,7 +338,10 @@ Return ONLY valid JSON:
 Examples:
 - "Quel est le poids à 17 jours pour Ross 308?" → {{"is_complete": true, "missing_info": [], "reason": "Rule 1: simple metric query with breed + age + metric"}}
 - "Poids du Ross 308 mâle de 17 jours?" → {{"is_complete": true, "missing_info": [], "reason": "Rule 1: has all required data for point query"}}
+- "What's the target weight for Ross 308 at 35 days?" → {{"is_complete": true, "missing_info": [], "reason": "Rule 1: user is ASKING FOR target weight, not providing it - complete query"}}
+- "What should the weight be at 28 days?" → {{"is_complete": false, "missing_info": ["breed"], "reason": "Rule 1: only breed is missing"}}
 - "Combien de moulée de jour 18 à 35 pour Ross 308?" → {{"is_complete": true, "missing_info": [], "reason": "Rule 2: calculation query with breed + start + target age"}}
+- "Feed until 2.5kg for Ross 308?" → {{"is_complete": false, "missing_info": ["starting age"], "reason": "Rule 2: calculation needs start age"}}
 - "Feed from day 18 with 20k birds Ross 308?" → {{"is_complete": false, "missing_info": ["target age or weight"], "reason": "Rule 2: calculation needs endpoint"}}
 """
 
