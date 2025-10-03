@@ -261,7 +261,7 @@ const syncConversationGroups = (
     }
 
     // 🛡️ PROTECTION: Limiter le nombre de conversations en mémoire
-    const MAX_CONVERSATIONS = 100;
+    const MAX_CONVERSATIONS = 999;
     if (updatedAllConversations.length > MAX_CONVERSATIONS) {
       updatedAllConversations = updatedAllConversations.slice(
         0,
@@ -327,7 +327,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     try {
       console.log("📡 [ChatStore] Appel API loadUserConversations...");
 
-      const conversationsData = await loadUserConversations(userId);
+      // ✅ CORRECTION: Ajout du paramètre limit=100
+      const conversationsData = await loadUserConversations(userId, 999);
 
       if (!conversationsData || !conversationsData.conversations) {
         console.log("📭 [ChatStore] Aucune conversation trouvée");

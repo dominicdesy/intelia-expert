@@ -193,27 +193,39 @@ const shouldSyncWithGroups = (
   conversation: ConversationWithMessages,
   state: ChatStoreState,
 ): boolean => {
-  // Ne synchroniser que si :
+  // Synchroniser si :
   // 1. Le message a un conversation_id valide
   // 2. Ce n'est pas une conversation temporaire
-  // 3. C'est un message d'IA (pour éviter les doublons)
+  // 3. C'est soit un message d'IA SOIT le premier message de l'utilisateur (nouvelle conversation)
   // 4. La protection anti-spam est OK
 
+  // BLOQUAGE 1: Pas de conversation_id valide
   if (
     !message.conversation_id ||
-    message.conversation_id.startsWith("temp-") ||
-    message.isUser
+    message.conversation_id.startsWith("temp-")
   ) {
     return false;
   }
 
-  // Vérifier la protection contre la synchronisation excessive
+  // BLOQUAGE 2: Message utilisateur qui n'est PAS le premier d'une nouvelle conversation
+  // ✅ CORRECTION: Permettre la sync pour le premier message utilisateur
+  if (message.isUser && conversation.message_count > 1) {
+    // Si c'est un message utilisateur et qu'il y a déjà plus d'un message,
+    // on ne synchronise pas (la sync se fera avec la réponse de l'IA)
+    return false;
+  }
+
+  // BLOQUAGE 3: Protection contre la synchronisation excessive
   if (!syncProtection.canSync(conversation.id)) {
     return false;
   }
 
+  // ✅ Autoriser la synchronisation pour :
+  // - Tous les messages de l'assistant
+  // - Le premier message de l'utilisateur (nouvelle conversation)
   return true;
 };
+
 
 // 🛡️ Fonction de synchronisation sécurisée
 const syncConversationGroups = (
