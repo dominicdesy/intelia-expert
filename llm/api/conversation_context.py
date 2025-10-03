@@ -235,7 +235,19 @@ class ConversationContextManager:
             logger.info(f"📖 Récupération contexte conversationnel pour {tenant_id}")
             logger.debug(f"   Previous query: {context.get('query')}")
             logger.debug(f"   Previous entities: {context.get('entities')}")
-            return context
+
+            # ✅ IMPORTANT: Retourner un dict compatible avec le validateur
+            # Le validateur attend {breed, age_days, sex, metric_type, etc.}
+            entities = context.get("entities", {})
+            return {
+                "breed": entities.get("breed"),
+                "age_days": entities.get("age_days"),
+                "sex": entities.get("sex"),
+                "metric_type": entities.get("metric_type"),
+                "genetic_line": entities.get("genetic_line"),
+                "previous_query": context.get("query"),
+                "language": context.get("language"),
+            }
 
         return None
 
