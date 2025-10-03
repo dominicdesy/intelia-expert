@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 api/chat_handlers.py - Logique de traitement des requêtes de chat
-Version 4.3.1 - FUSION D'ENTITÉS CORRIGÉE POUR MÉMOIRE CONVERSATIONNELLE
+Version 4.4.0 - MÉMOIRE CONVERSATIONNELLE POUR RÉSOLUTION CONTEXTUELLE
 """
 
 import time
@@ -266,7 +266,9 @@ class ChatHandlers:
         Génère une réponse via le RAG Engine
         Retourne le résultat ou None si erreur
 
-        ✅ VERSION 4.3.1: Support des entités fusionnées via performance_context
+        ✅ VERSION 4.4.0: Support mémoire conversationnelle
+        - Récupération du contexte de la dernière requête réussie
+        - Transmission au RAG Engine pour résolution contextuelle
         """
         rag_engine = self.get_rag_engine()
 
@@ -279,6 +281,20 @@ class ChatHandlers:
             if not hasattr(rag_engine, "generate_response"):
                 return None
 
+            # ✅ NOUVEAU v4.4: Récupérer le contexte conversationnel
+            conversation_context = self.context_manager.get_last_context(tenant_id)
+
+            if conversation_context:
+                logger.info(f"📖 Utilisation contexte conversationnel pour {tenant_id}")
+                logger.debug(
+                    f"   Previous: {conversation_context.get('previous_query', 'N/A')[:50]}..."
+                )
+                logger.debug(
+                    f"   Entities: breed={conversation_context.get('breed')}, "
+                    f"age={conversation_context.get('age_days')}, "
+                    f"sex={conversation_context.get('sex')}"
+                )
+
             logger.info(f"🎯 Appel RAG avec performance_context: {performance_context}")
 
             rag_result = await rag_engine.generate_response(
@@ -288,6 +304,7 @@ class ChatHandlers:
                 use_json_search=use_json_search,
                 genetic_line_filter=genetic_line_filter,
                 performance_context=performance_context,
+                conversation_context=conversation_context,  # ✅ NOUVEAU v4.4
                 enable_preprocessing=True,
             )
 
@@ -309,6 +326,10 @@ class ChatHandlers:
         Vérifie le statut de validation et retourne un résultat de clarification si nécessaire
         Retourne None si validation OK
 
+        ✅ VERSION 4.4.0 - MÉMOIRE CONVERSATIONNELLE:
+        - Stocke le contexte après validation réussie
+        - Permet la résolution de références contextuelles ("at the same age", "for females")
+
         ✅ VERSION 4.3.1 - CORRECTION CRITIQUE:
         - Stocke les entités extraites lors du premier appel à mark_pending()
         - Permet la fusion d'entités dans les échanges suivants
@@ -325,6 +346,26 @@ class ChatHandlers:
             if pending_context:
                 logger.info(f"Requête complète validée pour {tenant_id}")
                 self.context_manager.clear_pending(tenant_id)
+
+            # ✅ NOUVEAU v4.4: Stocker le contexte conversationnel après succès
+            enhanced_entities = metadata.get("enhanced_entities", {})
+
+            # Ne stocker que si on a les informations essentielles
+            if enhanced_entities and enhanced_entities.get("breed"):
+                self.context_manager.store_last_successful_query(
+                    tenant_id=tenant_id,
+                    query=message,
+                    entities=enhanced_entities,
+                    language=language,
+                )
+                logger.info(f"💾 Contexte conversationnel stocké pour {tenant_id}")
+                logger.debug(
+                    f"   Stored: breed={enhanced_entities.get('breed')}, "
+                    f"age={enhanced_entities.get('age_days')}, "
+                    f"sex={enhanced_entities.get('sex')}, "
+                    f"metric={enhanced_entities.get('metric_type')}"
+                )
+
             return None
 
         # Contexte insuffisant détecté
@@ -472,7 +513,7 @@ class ChatHandlers:
                 "confidence": float(confidence),
                 "processing_time": float(processing_time),
                 "fallback_used": safe_dict_get(metadata, "fallback_used", False),
-                "architecture": "modular-endpoints-entity-fusion",
+                "architecture": "modular-endpoints-conversational-memory",
                 "serialization_version": "optimized_cached",
                 "preprocessing_enabled": True,
                 "needs_clarification": metadata.get("needs_clarification", False),
@@ -536,7 +577,7 @@ class ChatHandlers:
                 "confidence": float(confidence),
                 "documents_used": documents_used,
                 "source": source,
-                "architecture": "modular-endpoints-entity-fusion",
+                "architecture": "modular-endpoints-conversational-memory",
                 "preprocessing_enabled": True,
                 "needs_clarification": metadata.get("needs_clarification", False),
                 "clarification_pending": metadata.get("clarification_pending", False),
@@ -563,7 +604,7 @@ class ChatHandlers:
                 "genetic_lines_detected": metadata.get("json_system", {}).get(
                     "genetic_lines_detected", []
                 ),
-                "detection_version": "4.3.1_entity_fusion_fixed",
+                "detection_version": "4.4.0_conversational_memory",
             }
 
             yield sse_event(safe_serialize_for_json(end_data))

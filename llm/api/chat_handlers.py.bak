@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 api/chat_handlers.py - Logique de traitement des requêtes de chat
-Version 4.3.0 - FUSION D'ENTITÉS POUR MÉMOIRE CONVERSATIONNELLE
+Version 4.3.1 - FUSION D'ENTITÉS CORRIGÉE POUR MÉMOIRE CONVERSATIONNELLE
 """
 
 import time
@@ -197,6 +197,11 @@ class ChatHandlers:
         """
         Gère le contexte de clarification et retourne un résultat si nécessaire
         Retourne None si le flux normal doit continuer
+
+        ✅ VERSION 4.3.1 - CORRECTION MAJEURE:
+        - Fusion des entités AVANT de retourner pour traitement
+        - Flag continue_processing pour reprendre le flux RAG
+        - Passage des entités fusionnées au RAG Engine
         """
         pending_context = self.context_manager.get_pending(tenant_id)
 
@@ -219,24 +224,31 @@ class ChatHandlers:
                     message, tenant_id, pending_context, language, total_start_time
                 )
 
-            # ÉTAPE 4: Accumulation normale (fusion intelligente)
+            # ✅ ÉTAPE 4: FUSIONNER LES ENTITÉS (correction majeure)
             self.context_manager.update_accumulated_query(tenant_id, message)
 
-            # Récupérer la requête mise à jour
-            pending_context = self.context_manager.get_pending(tenant_id)
+            # Récupérer le contexte mis à jour avec les entités fusionnées
+            updated_context = self.context_manager.get_pending(tenant_id)
+            accumulated_query = updated_context["original_query"]
+            partial_entities = updated_context.get("partial_entities", {})
+
+            logger.info(f"🔄 Reprise avec entités fusionnées: {partial_entities}")
+            logger.info(f"📝 Requête accumulée: {accumulated_query}")
 
             # Préserver la langue originale
-            original_language = pending_context.get("original_language")
+            original_language = updated_context.get("original_language")
             if original_language:
                 language = original_language
                 logger.info(f"Langue restaurée depuis contexte: {original_language}")
 
-            # Retourner la requête accumulée pour traitement
+            # ✅ RETOURNER UN FLAG POUR CONTINUER LE TRAITEMENT
+            # Au lieu de retourner directement la requête, on indique qu'il faut
+            # continuer le traitement avec les entités fusionnées
             return {
-                "accumulated_query": pending_context["original_query"],
-                "language": language,
                 "continue_processing": True,
-                "merged_entities": pending_context.get("partial_entities", {}),
+                "accumulated_query": accumulated_query,
+                "merged_entities": partial_entities,
+                "language": language,
             }
 
         return None
@@ -253,6 +265,8 @@ class ChatHandlers:
         """
         Génère une réponse via le RAG Engine
         Retourne le résultat ou None si erreur
+
+        ✅ VERSION 4.3.1: Support des entités fusionnées via performance_context
         """
         rag_engine = self.get_rag_engine()
 
@@ -264,6 +278,8 @@ class ChatHandlers:
         try:
             if not hasattr(rag_engine, "generate_response"):
                 return None
+
+            logger.info(f"🎯 Appel RAG avec performance_context: {performance_context}")
 
             rag_result = await rag_engine.generate_response(
                 query=query,
@@ -293,7 +309,7 @@ class ChatHandlers:
         Vérifie le statut de validation et retourne un résultat de clarification si nécessaire
         Retourne None si validation OK
 
-        ✅ VERSION 4.3.0 - CORRECTION CRITIQUE:
+        ✅ VERSION 4.3.1 - CORRECTION CRITIQUE:
         - Stocke les entités extraites lors du premier appel à mark_pending()
         - Permet la fusion d'entités dans les échanges suivants
         """
@@ -547,7 +563,7 @@ class ChatHandlers:
                 "genetic_lines_detected": metadata.get("json_system", {}).get(
                     "genetic_lines_detected", []
                 ),
-                "detection_version": "4.3.0_entity_fusion",
+                "detection_version": "4.3.1_entity_fusion_fixed",
             }
 
             yield sse_event(safe_serialize_for_json(end_data))
