@@ -314,12 +314,12 @@ html:not(.language-ready) body::after {
     background-color: rgb(29 78 216) !important;
   }
   
-  /* Badge de notification */
   .notification-badge {
-    @apply absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium;
+    @apply absolute -top-1 -right-1 bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center font-medium;
     z-index: 10;
+    font-size: 9px; /* Remplace text-xs (12px) */
   }
-  
+
   /* Container pour éviter les lignes parasites */
   .header-icon-container {
     @apply relative;
