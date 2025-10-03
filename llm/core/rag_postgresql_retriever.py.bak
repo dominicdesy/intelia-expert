@@ -1,16 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_retriever.py - Récupérateur de données PostgreSQL
-Version 3.2: Support des calculs de moulée sur plage d'âges
+Version 3.1: CORRECTION CRITIQUE - Format documents avec 'content' + metadata
 - Mapping breed → nom PostgreSQL via breeds_registry
 - Retourne RAGResult avec documents formatés correctement
-- ✅ NOUVEAU: Détection et calcul automatique de consommation sur plage (start_age → target_age)
-- ✅ NOUVEAU: Extraction du nombre de poulets depuis la requête
-- Format documents avec 'content' + metadata
+- ✅ NOUVEAU: Conversion MetricResult → dict avec 'content' et 'metadata'
 """
 
 import logging
-import re
 from typing import Dict, List, Any, Tuple, Optional
 
 from .rag_postgresql_config import ASYNCPG_AVAILABLE
@@ -128,34 +125,6 @@ class PostgreSQLRetriever:
 
         return normalized
 
-    def _extract_bird_count(self, query: str) -> Optional[int]:
-        """
-        Extrait le nombre de poulets de la requête
-
-        Args:
-            query: Requête utilisateur (ex: "moulée pour 20,000 poulets")
-
-        Returns:
-            Nombre de poulets ou None si non trouvé
-        """
-        # Patterns: "20,000 poulets", "20000 birds", "20 000 pollos"
-        patterns = [
-            r"(\d+[,\s]?\d+)\s*(?:poulets|birds|pollos|chickens|aves)",
-            r"(\d+[,\s]?\d+)\s*(?:en production|in production)",
-        ]
-
-        for pattern in patterns:
-            match = re.search(pattern, query.lower())
-            if match:
-                # Nettoyer et convertir
-                num_str = match.group(1).replace(",", "").replace(" ", "")
-                try:
-                    return int(num_str)
-                except ValueError:
-                    continue
-
-        return None
-
     async def search_metrics(
         self,
         query: str,
@@ -164,13 +133,13 @@ class PostgreSQLRetriever:
         strict_sex_match: bool = False,
     ) -> RAGResult:
         """
-        Recherche de métriques avec support des calculs de plage d'âges
+        Recherche de métriques avec correspondance de sexe optionnelle stricte
 
-        VERSION 3.2: Détection automatique des calculs de moulée sur plage
+        VERSION 3.1: CORRECTION CRITIQUE - Retourne documents formatés avec 'content'
 
         Args:
             query: Requête de recherche
-            entities: Entités extraites (breed, age_days, start_age_days, target_age_days, sex, metric_type, etc.)
+            entities: Entités extraites (breed, age_days, sex, metric_type, etc.)
             top_k: Nombre maximum de résultats
             strict_sex_match: Si True, correspondance exacte du sexe uniquement (pour comparaisons)
 
@@ -192,31 +161,6 @@ class PostgreSQLRetriever:
 
         try:
             normalized_entities = self._normalize_entities(entities)
-
-            # ✅ DÉTECTION CALCUL DE MOULÉE
-            start_age = entities.get("start_age_days") or entities.get("age_days")
-            target_age = entities.get("target_age_days")
-            breed = entities.get("breed")
-            sex = entities.get("sex", "as_hatched")
-
-            is_feed_calc = (
-                start_age
-                and target_age
-                and any(
-                    kw in query.lower()
-                    for kw in ["moulée", "feed", "alimento", "combien", "cuánto"]
-                )
-            )
-
-            if is_feed_calc:
-                logger.info(
-                    f"🔢 Calcul de moulée détecté: jour {start_age} → {target_age}"
-                )
-                return await self._calculate_feed_range(
-                    breed, start_age, target_age, sex, query, entities
-                )
-
-            # Sinon, requête standard
             logger.debug(f"Entities: {entities}")
             logger.debug(f"Normalized: {normalized_entities}")
 
@@ -262,7 +206,7 @@ class PostgreSQLRetriever:
                 f"PostgreSQL: {len(results)} metrics found from {len(rows)} rows"
             )
 
-            # Conversion: Transformer MetricResult en dict avec 'content'
+            # ✅ CONVERSION CRITIQUE: Transformer MetricResult en dict avec 'content'
             formatted_docs = []
             for metric in results:
                 # Extraire le type de métrique de manière propre
@@ -313,7 +257,7 @@ class PostgreSQLRetriever:
             # Retourner un RAGResult structuré avec documents formatés
             if len(formatted_docs) > 0:
                 return RAGResult(
-                    context_docs=formatted_docs,
+                    context_docs=formatted_docs,  # ✅ Utiliser formatted_docs au lieu de results
                     source=RAGSource.RAG_SUCCESS,
                     metadata={
                         "count": len(formatted_docs),
@@ -343,174 +287,6 @@ class PostgreSQLRetriever:
                 metadata={"error": str(e), "query": query, "entities": entities},
             )
 
-    async def _calculate_feed_range(
-        self,
-        breed: str,
-        start_age: int,
-        target_age: int,
-        sex: str,
-        query: str,
-        entities: Dict,
-    ) -> RAGResult:
-        """
-        Calcul de consommation de moulée sur une plage d'âges
-
-        Args:
-            breed: Race (ex: "ross 308")
-            start_age: Âge de départ (jours)
-            target_age: Âge cible (jours)
-            sex: Sexe (male, female, as_hatched)
-            query: Requête originale
-            entities: Entités complètes
-
-        Returns:
-            RAGResult avec calcul détaillé
-        """
-
-        # Normaliser breed pour DB
-        breed_db = self._get_db_breed_name(breed) if breed else None
-
-        if not breed_db and breed:
-            # Fallback si pas de mapping
-            breed_db = breed
-
-        # ✅ SQL MODIFIÉ : Récupérer TOUS les jours de la plage
-        sql = """
-            SELECT 
-                m.age_min as age_days,
-                m.metric_name,
-                m.value_numeric,
-                m.unit,
-                d.sex,
-                s.strain_name
-            FROM companies c
-            JOIN breeds b ON c.id = b.company_id
-            JOIN strains s ON b.id = s.breed_id  
-            JOIN documents d ON s.id = d.strain_id
-            JOIN metrics m ON d.id = m.document_id
-            WHERE m.age_min BETWEEN $1 AND $2
-              AND m.metric_name ILIKE '%feed%intake%'
-        """
-
-        params = [start_age, target_age]
-        param_count = 2
-
-        # Ajouter filtre breed si disponible
-        if breed_db:
-            param_count += 1
-            sql += f" AND s.strain_name = ${param_count}"
-            params.append(breed_db)
-
-        # Ajouter filtre sexe
-        if sex and sex.lower() != "as_hatched":
-            param_count += 1
-            sql += f" AND (LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_count} OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed'))"
-            params.append(sex.lower())
-
-        sql += " ORDER BY m.age_min ASC"
-
-        try:
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(sql, *params)
-
-            if not rows:
-                return RAGResult(
-                    context_docs=[],
-                    source=RAGSource.NO_RESULTS,
-                    metadata={
-                        "query_type": "feed_calculation",
-                        "reason": "no_feed_data_for_range",
-                        "start_age": start_age,
-                        "target_age": target_age,
-                    },
-                )
-
-            # ✅ CALCUL DE LA CONSOMMATION TOTALE
-            total_feed_grams = 0
-            daily_details = []
-            strain_name = rows[0].get("strain_name", breed)
-
-            for row in rows:
-                age = row["age_days"]
-                feed_intake = row["value_numeric"]  # grammes/jour/poulet
-
-                if feed_intake:
-                    total_feed_grams += feed_intake
-                    daily_details.append(f"Day {age}: {feed_intake}g")
-
-            # Nombre de poulets (extraire de la requête)
-            num_birds = self._extract_bird_count(query)
-
-            # Consommation totale
-            total_feed_kg_per_bird = total_feed_grams / 1000
-            avg_daily_grams = (
-                total_feed_grams / len(daily_details) if daily_details else 0
-            )
-
-            # ✅ FORMATAGE RÉSULTAT
-            context_text = f"""Feed calculation for {strain_name} ({sex}) from day {start_age} to day {target_age}:
-
-**Daily feed intake detected:**
-{chr(10).join(daily_details[:10])}"""
-
-            if len(daily_details) > 10:
-                context_text += f"\n... ({len(daily_details)} days of data)"
-
-            context_text += f"""
-
-**Totals:**
-- Total feed per bird: {total_feed_kg_per_bird:.2f} kg ({len(daily_details)} days of data)
-- Average per day: {avg_daily_grams:.1f} g/day/bird"""
-
-            if num_birds:
-                total_feed_kg = total_feed_grams * num_birds / 1000
-                total_feed_tonnes = total_feed_kg / 1000
-                context_text += f"""
-- Number of birds: {num_birds:,}
-- **TOTAL FEED REQUIRED: {total_feed_tonnes:.2f} tonnes** ({total_feed_kg:,.0f} kg)"""
-
-            # Créer document formaté
-            formatted_doc = {
-                "content": context_text,
-                "metadata": {
-                    "calculation": True,
-                    "query_type": "feed_calculation",
-                    "breed": strain_name,
-                    "start_age": start_age,
-                    "target_age": target_age,
-                    "sex": sex,
-                    "num_birds": num_birds,
-                    "total_feed_kg_per_bird": total_feed_kg_per_bird,
-                    "total_feed_tonnes": total_feed_tonnes if num_birds else None,
-                    "days_calculated": len(daily_details),
-                },
-                "score": 1.0,
-            }
-
-            return RAGResult(
-                context_docs=[formatted_doc],
-                source=RAGSource.RAG_SUCCESS,
-                metadata={
-                    "query_type": "feed_calculation",
-                    "start_age": start_age,
-                    "target_age": target_age,
-                    "num_birds": num_birds,
-                    "total_feed_tonnes": total_feed_tonnes if num_birds else None,
-                    "days_calculated": len(daily_details),
-                },
-            )
-
-        except Exception as e:
-            logger.error(f"❌ Erreur calcul feed range: {e}")
-            return RAGResult(
-                context_docs=[],
-                source=RAGSource.INTERNAL_ERROR,
-                metadata={
-                    "error": str(e),
-                    "query_type": "feed_calculation_error",
-                },
-            )
-
     def _build_query(
         self,
         query: str,
@@ -524,7 +300,7 @@ class PostgreSQLRetriever:
         params = []
         param_count = 0
 
-        # Filtres de base avec mapping vers noms PostgreSQL
+        # CORRECTION: Filtres de base avec mapping vers noms PostgreSQL
         if entities.get("breed"):
             canonical_breed = entities["breed"]
             db_breed_name = self._get_db_breed_name(canonical_breed)
@@ -559,7 +335,7 @@ class PostgreSQLRetriever:
             except (ValueError, TypeError):
                 logger.warning(f"Invalid age_days: {entities.get('age_days')}")
 
-        # Filtre métrique basé sur interprétation OpenAI
+        # NOUVEAU: Filtre métrique basé sur interprétation OpenAI
         if (
             original_entities
             and "metric" in original_entities
@@ -733,13 +509,16 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL RETRIEVER - VERSION 3.2")
+    print("🧪 TESTS POSTGRESQL RETRIEVER - VERSION 3.1")
     print("=" * 70)
 
     async def test_retriever():
         """Test de base pour vérifier le format de sortie"""
 
-        print("\n✅ Test 1: Vérification du format de sortie standard")
+        print("\n✅ Test 1: Vérification du format de sortie")
+        print("Note: Ce test nécessite une connexion PostgreSQL active")
+
+        # Test de la structure sans connexion réelle
         test_entities = {
             "breed": "ross 308",
             "age_days": 21,
@@ -751,7 +530,7 @@ if __name__ == "__main__":
         print("\nFormat attendu des documents retournés:")
         print(
             {
-                "content": "At 21 days old, 308/308 FF male chickens have an average body weight of 850.0 grams.",
+                "content": "body_weight for male: 850.0 g (Age: 21-21 days, Sex: male)",
                 "metadata": {
                     "company": "Aviagen",
                     "breed": "Ross",
@@ -768,46 +547,14 @@ if __name__ == "__main__":
             }
         )
 
-        print("\n✅ Test 2: Calcul de moulée sur plage d'âges")
-        feed_entities = {
-            "breed": "ross 308",
-            "start_age_days": 1,
-            "target_age_days": 35,
-            "sex": "as_hatched",
-        }
-
-        print(f"\nEntités de test feed: {feed_entities}")
-        print("\nFormat attendu pour calcul de moulée:")
-        print(
-            {
-                "content": "Feed calculation for 308/308 FF (as_hatched) from day 1 to day 35...",
-                "metadata": {
-                    "calculation": True,
-                    "query_type": "feed_calculation",
-                    "breed": "308/308 FF",
-                    "start_age": 1,
-                    "target_age": 35,
-                    "total_feed_kg_per_bird": 3.5,
-                    "days_calculated": 35,
-                },
-                "score": 1.0,
-            }
-        )
-
         print("\n✅ Structure validée:")
         print("- Chaque document a un champ 'content' (str)")
         print("- Chaque document a un champ 'metadata' (dict)")
         print("- Chaque document a un champ 'score' (float)")
-        print("- Support des calculs de moulée sur plage d'âges")
-        print("- Extraction automatique du nombre de poulets")
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Retriever VERSION 3.2")
-    print("🎯 NOUVELLES FONCTIONNALITÉS:")
-    print("   - Détection automatique des calculs de moulée")
-    print("   - Support des plages d'âges (start_age → target_age)")
-    print("   - Extraction du nombre de poulets depuis la requête")
-    print("   - Calcul automatique de consommation totale")
+    print("✅ TESTS TERMINÉS - PostgreSQL Retriever VERSION 3.1")
+    print("🎯 CORRECTION APPLIQUÉE: Documents formatés avec 'content' + metadata")
     print("=" * 70)
 
     # Exécuter le test
