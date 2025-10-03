@@ -438,14 +438,15 @@ class PostgreSQLRetriever:
                     total_feed_grams += feed_intake
                     daily_details.append(f"Day {age}: {feed_intake}g")
 
+            # Nombre de jours dans la plage demandée
+            num_days = target_age - start_age + 1
+
             # Nombre de poulets (extraire de la requête)
             num_birds = self._extract_bird_count(query)
 
             # Consommation totale
             total_feed_kg_per_bird = total_feed_grams / 1000
-            avg_daily_grams = (
-                total_feed_grams / len(daily_details) if daily_details else 0
-            )
+            avg_daily_grams = total_feed_grams / num_days if num_days > 0 else 0
 
             # ✅ FORMATAGE RÉSULTAT
             context_text = f"""Feed calculation for {strain_name} ({sex}) from day {start_age} to day {target_age}:
