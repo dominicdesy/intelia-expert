@@ -826,9 +826,13 @@ export const generateAIResponsePublic = async (
 // ===== FONCTIONS MÉTIER MODIFIÉES POUR NOUVELLE ARCHITECTURE =====
 
 /**
- * MODIFIÉ: Chargement des conversations utilisateur (nouvelle architecture)
+ * ✅ MODIFIÉ: Chargement des conversations utilisateur (nouvelle architecture)
+ * CORRECTION: Ajout du paramètre limit pour charger 100 conversations au lieu de 20
  */
-export const loadUserConversations = async (userId: string): Promise<any> => {
+export const loadUserConversations = async (
+  userId: string,
+  limit: number = 100, // ← LIGNE AJOUTÉE: Paramètre limit avec valeur par défaut 100
+): Promise<any> => {
   if (!userId) {
     throw new Error("User ID requis");
   }
@@ -836,11 +840,13 @@ export const loadUserConversations = async (userId: string): Promise<any> => {
   console.log(
     "[apiService] Chargement conversations (nouvelle architecture):",
     userId,
+    "limit:", limit, // ← LIGNE MODIFIÉE: Ajout du log pour limit
   );
 
   try {
     const headers = await getAuthHeaders();
-    const url = `${API_BASE_URL}/conversations/user/${userId}`;
+    // ✅ LIGNE MODIFIÉE: Ajout de ?limit=${limit} dans l'URL
+    const url = `${API_BASE_URL}/conversations/user/${userId}?limit=${limit}`;
 
     const response = await fetch(url, {
       method: "GET",

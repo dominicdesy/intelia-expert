@@ -590,56 +590,12 @@ Examples:
                 "detected_entities": enhanced_entities,
             }
 
-        # ✅ VERSION 4.5: LOGIQUE SPÉCIFIQUE CALCULS (start + target age requis)
-        if self._is_calculation_query(enhanced_entities, query):
-            start_age = enhanced_entities.get("age_days") or enhanced_entities.get(
-                "start_age_days"
-            )
-            target_age = enhanced_entities.get("target_age_days")
-
-            logger.info(
-                f"🔢 Requête de calcul détectée - start: {start_age}, target: {target_age}"
-            )
-
-            # Vérifier start age
-            if not start_age:
-                missing_term = self._translate("starting age", language)
-                clarification_msg = self._generate_clarification_message(
-                    [missing_term], language
-                )
-
-                logger.warning("❌ Calcul impossible sans start age")
-                return {
-                    "status": "needs_fallback",
-                    "missing": [missing_term],
-                    "helpful_message": clarification_msg,
-                    "detected_entities": enhanced_entities,
-                    "reason": "Calculation requires starting age",
-                }
-
-            # Vérifier target age
-            if not target_age:
-                missing_term = self._translate("target age", language)
-                clarification_msg = self._generate_clarification_message(
-                    [missing_term], language
-                )
-
-                logger.warning("❌ Calcul impossible sans target age")
-                return {
-                    "status": "needs_fallback",
-                    "missing": [missing_term],
-                    "helpful_message": clarification_msg,
-                    "detected_entities": enhanced_entities,
-                    "reason": "Calculation requires target age",
-                }
-
-            # ✅ Si les deux âges présents → VALIDATION RÉUSSIE
-            logger.info(f"✅ Calcul validé: jour {start_age} → jour {target_age}")
-            return {
-                "status": "complete",
-                "enhanced_entities": enhanced_entities,
-                "message": f"Calculation range validated: day {start_age} to {target_age}",
-            }
+        # 🔥 FIX CRITIQUE v4.5.3: Si OpenAI valide comme "complete", on fait confiance
+        # La validation intelligente via OpenAI est plus fiable que les regex locales
+        logger.info(f"✅ Requête validée complète par OpenAI - {completeness.get('reason', '')}")
+        
+        # NOTE: L'ancienne logique _is_calculation_query() créait des contradictions
+        # Elle est maintenant désactivée car OpenAI gère mieux les cas limites
 
         # LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
         logger.debug(
@@ -1544,10 +1500,6 @@ if __name__ == "__main__":
 
     print("\n" + "=" * 70)
     print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.5.2")
-    print(
-        "🎯 FIX CRITIQUE: Validation requêtes simples réorganisée (Rule 1 en priorité)"
-    )
-    print(
-        "🔧 Requêtes 'Quel est le poids à X jours' maintenant reconnues comme COMPLÈTES"
-    )
+    print("🎯 FIX CRITIQUE: Validation requêtes simples réorganisée (Rule 1 en priorité)")
+    print("🔧 Requêtes 'Quel est le poids à X jours' maintenant reconnues comme COMPLÈTES")
     print("=" * 70)
