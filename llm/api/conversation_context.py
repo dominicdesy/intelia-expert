@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 api/conversation_context.py - Gestionnaire de contexte conversationnel
-Version 4.3.1 - AMÉLIORATION DÉTECTION ÂGE CIBLE
+Version 4.4.0 - MÉMOIRE CONVERSATIONNELLE POUR RÉSOLUTION CONTEXTUELLE
 """
 
 import time
@@ -17,14 +17,19 @@ logger = logging.getLogger(__name__)
 class ConversationContextManager:
     """
     Gestionnaire de contexte conversationnel pour clarifications
-    VERSION 4.3.1 - AMÉLIORATION DÉTECTION ÂGE + FUSION D'ENTITÉS + MÉMOIRE CONVERSATIONNELLE
+    VERSION 4.4.0 - MÉMOIRE CONVERSATIONNELLE + AMÉLIORATION DÉTECTION ÂGE + FUSION D'ENTITÉS
 
-    ✅ CORRECTIONS APPLIQUÉES:
+    ✅ NOUVELLES FONCTIONNALITÉS v4.4:
+    - Stockage de la dernière requête réussie (store_last_successful_query)
+    - Récupération du contexte conversationnel (get_last_context)
+    - Résolution des références contextuelles ("at the same age", "for females too")
+
+    ✅ CORRECTIONS PRÉCÉDENTES (v4.3.1):
     - Stockage des entités partielles dans pending_clarifications
     - Fusion intelligente des entités lors de update_accumulated_query
     - Retour des entités fusionnées via get_pending()
     - Préservation de tous les champs (age_days, metric_type, breed, sex, etc.)
-    - ✅ NOUVEAU: Meilleure détection des réponses d'âge (patterns étendus)
+    - Meilleure détection des réponses d'âge (patterns étendus)
     """
 
     # NOUVEAUX PATTERNS D'AMBIGUÏTÉ
@@ -63,6 +68,8 @@ class ConversationContextManager:
         self.clarification_patterns = self._load_clarification_patterns(
             intents_config_path
         )
+        # ✅ NOUVEAU v4.4: Stockage de la dernière requête réussie
+        self.last_successful_context = {}  # {tenant_id: {entities, query, timestamp}}
 
     def _load_clarification_patterns(self, config_path: str = None) -> Dict:
         """Charge les patterns de clarification depuis intents.json"""
@@ -175,6 +182,72 @@ class ConversationContextManager:
                 ],
             },
         }
+
+    # ✅ ================================================================
+    # NOUVELLES MÉTHODES v4.4: MÉMOIRE CONVERSATIONNELLE
+    # ================================================================
+
+    def store_last_successful_query(
+        self, tenant_id: str, query: str, entities: Dict[str, Any], language: str = "en"
+    ):
+        """
+        Stocke le contexte de la dernière requête réussie
+
+        Args:
+            tenant_id: Identifiant du tenant
+            query: Requête utilisateur complète
+            entities: Entités extraites (breed, age_days, sex, metric_type, etc.)
+            language: Langue de la requête
+        """
+        self.last_successful_context[tenant_id] = {
+            "query": query,
+            "entities": entities,
+            "language": language,
+            "timestamp": time.time(),
+        }
+
+        logger.info(f"💾 Contexte conversationnel stocké pour {tenant_id}")
+        logger.debug(f"   Query: {query}")
+        logger.debug(f"   Entities: {entities}")
+
+    def get_last_context(self, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Récupère le contexte de la dernière requête réussie
+
+        Args:
+            tenant_id: Identifiant du tenant
+
+        Returns:
+            Dict avec query, entities, language, timestamp ou None si pas de contexte
+        """
+        context = self.last_successful_context.get(tenant_id)
+
+        if context:
+            # Vérifier que le contexte n'est pas trop ancien (max 5 minutes)
+            age = time.time() - context.get("timestamp", 0)
+            if age > 300:  # 5 minutes
+                logger.info(
+                    f"⏰ Contexte trop ancien pour {tenant_id} ({age:.0f}s), ignoré"
+                )
+                del self.last_successful_context[tenant_id]
+                return None
+
+            logger.info(f"📖 Récupération contexte conversationnel pour {tenant_id}")
+            logger.debug(f"   Previous query: {context.get('query')}")
+            logger.debug(f"   Previous entities: {context.get('entities')}")
+            return context
+
+        return None
+
+    def clear_last_context(self, tenant_id: str):
+        """Efface le contexte de la dernière requête"""
+        if tenant_id in self.last_successful_context:
+            del self.last_successful_context[tenant_id]
+            logger.info(f"🗑️ Contexte conversationnel effacé pour {tenant_id}")
+
+    # ================================================================
+    # FIN NOUVELLES MÉTHODES v4.4
+    # ================================================================
 
     def mark_pending(
         self,

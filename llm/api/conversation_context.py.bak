@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 api/conversation_context.py - Gestionnaire de contexte conversationnel
-Version 4.3.0 - FUSION D'ENTITÉS POUR MÉMOIRE CONVERSATIONNELLE
+Version 4.3.1 - AMÉLIORATION DÉTECTION ÂGE CIBLE
 """
 
 import time
@@ -17,13 +17,14 @@ logger = logging.getLogger(__name__)
 class ConversationContextManager:
     """
     Gestionnaire de contexte conversationnel pour clarifications
-    VERSION 4.3.0 - FUSION D'ENTITÉS + MÉMOIRE CONVERSATIONNELLE
+    VERSION 4.3.1 - AMÉLIORATION DÉTECTION ÂGE + FUSION D'ENTITÉS + MÉMOIRE CONVERSATIONNELLE
 
     ✅ CORRECTIONS APPLIQUÉES:
     - Stockage des entités partielles dans pending_clarifications
     - Fusion intelligente des entités lors de update_accumulated_query
     - Retour des entités fusionnées via get_pending()
     - Préservation de tous les champs (age_days, metric_type, breed, sex, etc.)
+    - ✅ NOUVEAU: Meilleure détection des réponses d'âge (patterns étendus)
     """
 
     # NOUVEAUX PATTERNS D'AMBIGUÏTÉ
@@ -219,9 +220,11 @@ class ConversationContextManager:
         """
         Accumule les informations de clarification de manière intelligente
 
-        ✅ Version 3.0 - FUSION D'ENTITÉS:
-        - Fusion sémantique de la requête (existant)
-        - ✅ NOUVEAU: Fusion des entités extraites
+        ✅ Version 4.4 - Support target_age_days:
+        - Fusion sémantique de la requête
+        - Fusion des entités extraites
+        - ✅ NOUVEAU: Détection explicite "Jour X" → target_age_days
+        - Distinction age_days (départ) vs target_age_days (cible)
         - Préservation de TOUS les champs (age_days, metric_type, breed, sex)
         - Maintien de la lisibilité de la requête
         """
@@ -246,42 +249,31 @@ class ConversationContextManager:
                 f"🔄 Nouvelles entités extraites: {response_entities.to_dict()}"
             )
 
-            # Fusionner : nouvelles entités ÉCRASENT les anciennes pour les champs présents
-            if response_entities.breed:
-                partial_entities["breed"] = response_entities.breed
-                partial_entities["has_explicit_breed"] = (
-                    response_entities.has_explicit_breed
+            # ✅ NOUVEAU: Détecter explicitement les réponses de type "Jour X"
+            target_age_match = re.search(
+                r"jour\s+(\d+)|day\s+(\d+)|día\s+(\d+)", new_info.lower()
+            )
+            if target_age_match:
+                target_age = int(
+                    target_age_match.group(1)
+                    or target_age_match.group(2)
+                    or target_age_match.group(3)
                 )
-                logger.info(f"✅ Breed ajouté: {response_entities.breed}")
+                partial_entities["target_age_days"] = target_age
+                logger.info(f"✅ Âge cible détecté: {target_age} jours")
 
-            if response_entities.age_days is not None:
-                partial_entities["age_days"] = response_entities.age_days
-                partial_entities["has_explicit_age"] = (
-                    response_entities.has_explicit_age
-                )
-                logger.info(f"✅ Age ajouté: {response_entities.age_days}")
-
-            if response_entities.sex:
-                partial_entities["sex"] = response_entities.sex
-                partial_entities["has_explicit_sex"] = (
-                    response_entities.has_explicit_sex
-                )
-                logger.info(f"✅ Sex ajouté: {response_entities.sex}")
-
-            if response_entities.metric_type:
-                partial_entities["metric_type"] = response_entities.metric_type
-                logger.info(f"✅ Metric_type ajouté: {response_entities.metric_type}")
-
-            if response_entities.genetic_line:
-                partial_entities["genetic_line"] = response_entities.genetic_line
-                logger.info(f"✅ Genetic_line ajouté: {response_entities.genetic_line}")
-
-            # Copier également la confiance globale si elle existe
-            if hasattr(response_entities, "confidence"):
-                # Ne pas écraser une confiance existante plus élevée
-                existing_confidence = partial_entities.get("confidence", 0)
-                if response_entities.confidence > existing_confidence:
-                    partial_entities["confidence"] = response_entities.confidence
+            # Fusion des autres entités
+            for key, value in response_entities.to_dict().items():
+                if value is not None:
+                    # Ne pas écraser si déjà présent, sauf pour les champs explicites
+                    if key not in partial_entities or key in [
+                        "breed",
+                        "sex",
+                        "metric_type",
+                        "genetic_line",
+                    ]:
+                        partial_entities[key] = value
+                        logger.info(f"✅ {key} ajouté/mis à jour: {value}")
 
             # Sauvegarder les entités fusionnées
             context["partial_entities"] = partial_entities
@@ -289,10 +281,15 @@ class ConversationContextManager:
             logger.info(f"✅ Entités fusionnées - Après: {partial_entities}")
             # FIN NOUVELLE SECTION
 
-            # Construire requête enrichie intelligemment (EXISTANT - CONSERVÉ)
+            # Construire requête enrichie intelligemment
             merged = original
 
-            if response_entities.breed and response_entities.has_explicit_breed:
+            if target_age_match:
+                # "quel est le poids" + "Jour 33" → "quel est le poids | Jour 33"
+                merged = f"{original} | Jour {target_age}"
+                logger.info(f"✅ Requête enrichie avec âge cible: {merged}")
+
+            elif response_entities.breed and response_entities.has_explicit_breed:
                 # "quel est le poids" + "Cobb 500" → "quel est le poids pour Cobb 500"
                 merged = f"{original} pour {response_entities.breed}"
                 logger.info(f"✅ Requête enrichie avec race: {merged}")
@@ -312,7 +309,7 @@ class ConversationContextManager:
 
             else:
                 # Fallback: ajout simple
-                merged = f"{original} {new_info}"
+                merged = f"{original} | {new_info}"
                 logger.debug(f"Fusion simple: {merged}")
 
             context["original_query"] = merged
@@ -346,10 +343,11 @@ class ConversationContextManager:
         """
         Détecte si le message est une réponse à une demande de clarification
 
-        ✅ Version 2.0:
+        ✅ Version 2.1 - AMÉLIORATION DÉTECTION ÂGE:
         - Utilise entity_extractor pour robustesse (Test 11)
         - Supporte TOUTES les races via breeds_registry (51 races)
         - Gère phrases complètes, pas seulement mots courts
+        - ✅ NOUVEAU: Patterns étendus pour âge cible ("35", "jour 35", etc.)
         - Fallback sur patterns intents.json si extraction échoue
         """
         if not pending_context:
@@ -357,6 +355,25 @@ class ConversationContextManager:
 
         missing = pending_context.get("missing_fields", [])
         msg = message.lower().strip()
+
+        # ========================================
+        # ✅ NOUVEAU: Pattern spécifique pour âge cible
+        # ========================================
+        if any("âge" in f or "age" in f or "poids" in f for f in missing):
+            age_patterns = [
+                r"^\s*(\d+)\s*$",  # "35"
+                r"^\s*(\d+)\s*(?:jours?|days?|j|d)\s*$",  # "35 jours"
+                r"^\s*jour\s*(\d+)\s*$",  # "jour 35"
+                r"^\s*day\s*(\d+)\s*$",  # "day 35"
+                r"^\s*à\s*(\d+)\s*(?:jours?|j)?\s*$",  # "à 35 jours"
+                r"^\s*(\d+)\s*semaines?\s*$",  # "3 semaines"
+                r"^\s*(\d+)\s*weeks?\s*$",  # "3 weeks"
+            ]
+
+            for pattern in age_patterns:
+                if re.search(pattern, msg, re.IGNORECASE):
+                    logger.info(f"✅ Âge cible détecté: {message}")
+                    return True
 
         # ========================================
         # APPROCHE 1: Utiliser entity_extractor (PRIORITAIRE)
@@ -396,24 +413,7 @@ class ConversationContextManager:
             )
 
         # ========================================
-        # APPROCHE 2: Patterns simples pour âge (FALLBACK)
-        # ========================================
-        if any("age" in field.lower() for field in missing):
-            age_patterns = [
-                r"^\s*(\d+)\s*$",  # "35"
-                r"^\s*(\d+)\s*(?:jours?|days?|j|d)\s*$",  # "35 jours"
-                r"^\s*à\s*(\d+)\s*(?:jours?|j)?\s*$",  # "à 35 jours"
-                r"^\s*(\d+)\s*semaines?\s*$",  # "3 semaines"
-                r"^\s*(\d+)\s*weeks?\s*$",  # "3 weeks"
-            ]
-
-            for pattern in age_patterns:
-                if re.search(pattern, msg):
-                    logger.info(f"✅ Âge détecté via patterns: {message}")
-                    return True
-
-        # ========================================
-        # APPROCHE 3: Patterns depuis intents.json (FALLBACK)
+        # APPROCHE 2: Patterns depuis intents.json (FALLBACK)
         # ========================================
         for field in missing:
             normalized = field.replace("_days", "").replace("_type", "")
