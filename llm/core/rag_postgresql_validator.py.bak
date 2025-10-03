@@ -1,20 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 4.4.0: EXTRACTION MULTILINGUE AVEC OPENAI
-- Ajout du paramètre openai_client dans __init__
-- Nouvelle méthode _extract_with_openai pour extraction multilingue
-- Intégration OpenAI dans flexible_query_validation
-- Préserve tous les champs originaux
-- Logs diagnostiques
-- Invalidation des métriques invalides
-- Auto-détection enrichie dynamique
-- Messages de clarification conversationnels multilingues
-- Génération de questions plutôt que de simples messages d'erreur
-- FUSION avec OpenAI interpretation avant validation
-- FORMAT AMÉLIORÉ pour questions multiples (numérotation + phrase de fermeture)
-- Messages d'abandon génériques enrichis
-- detected_entities TOUJOURS présent dans needs_fallback
+VERSION 4.5.0: FIX BOUCLE INFINIE + EXTRACTION SYSTÉMATIQUE
+- CORRECTION CRITIQUE: Extraction OpenAI TOUJOURS appelée (même si age_days existe)
+- Support réponses courtes: "35 jours", "Jour 42", "... | 35 days"
+- Distinction start_age_days vs target_age_days pour calculs de plage
+- Validation spécifique pour requêtes de calcul (feed/moulée)
+- Nouvelles méthodes: _translate(), _generate_clarification_message()
+- Détection améliorée: _is_calculation_query() avec plus de mots-clés
+- Messages de clarification contextualisés et naturels
+- Toutes les fonctionnalités précédentes préservées
 """
 
 import re
@@ -88,33 +83,65 @@ class PostgreSQLValidator:
     async def _extract_with_openai(self, query: str, language: str = "en") -> dict:
         """
         Extraction intelligente multilingue avec OpenAI
+        VERSION 4.5: Support réponses courtes comme "35 jours"
 
         Args:
             query: Requête utilisateur
             language: Code langue (fr, en, es, etc.)
 
         Returns:
-            Dict avec age_days, breed, metric_type extraits
+            Dict avec start_age_days, target_age_days, breed, metric_type extraits
         """
 
         if not self.openai_client:
             logger.warning("⚠️ OpenAI client non disponible pour extraction")
-            return {"age_days": None, "breed": None, "metric_type": None}
+            return {
+                "start_age_days": None,
+                "target_age_days": None,
+                "breed": None,
+                "metric_type": None,
+            }
 
         prompt = f"""Extract information from this query in {language}:
 Query: "{query}"
 
+**IMPORTANT**: Distinguish between:
+- **start_age_days**: The CURRENT/STARTING age (e.g., "I'm at day 18", "je suis au jour 18")
+- **target_age_days**: The TARGET/ENDING age (e.g., "until day 35", "Jour 35", "35 jours")
+
 Extract:
-1. Age in days (e.g., "28 días", "28 days", "28 jours")
-2. Breed/strain (Ross 308, Cobb 500, etc.)
-3. Metric type (weight/peso/poids, feed conversion, etc.)
+1. start_age_days: Starting age in days (where farmer currently is)
+2. target_age_days: Target/ending age in days (where farmer wants to finish)
+3. breed: Breed/strain name (Ross 308, Cobb 500, etc.)
+4. metric_type: Metric requested (weight/poids/peso, feed/moulée/alimento, FCR, etc.)
 
 Return ONLY valid JSON, nothing else:
 {{
-    "age_days": <number or null>,
+    "start_age_days": <number or null>,
+    "target_age_days": <number or null>,
     "breed": "<breed name or null>",
     "metric_type": "<metric or null>"
 }}
+
+Examples in French:
+- "Je suis au jour 18... Jour 35" → {{"start_age_days": 18, "target_age_days": 35}}
+- "... | 35 jours" → {{"start_age_days": null, "target_age_days": 35}}
+- "35 jours" → {{"start_age_days": null, "target_age_days": 35}}
+- "Jour 42" → {{"start_age_days": null, "target_age_days": 42}}
+- "De jour 15 à 28" → {{"start_age_days": 15, "target_age_days": 28}}
+- "Combien de moulée de jour 15 à 28?" → {{"start_age_days": 15, "target_age_days": 28}}
+
+Examples in English:
+- "I'm at day 18... Day 35" → {{"start_age_days": 18, "target_age_days": 35}}
+- "... | 35 days" → {{"start_age_days": null, "target_age_days": 35}}
+- "35 days" → {{"start_age_days": null, "target_age_days": 35}}
+- "From day 20 to 42 days" → {{"start_age_days": 20, "target_age_days": 42}}
+
+Examples in Spanish:
+- "Estoy en día 18... Día 35" → {{"start_age_days": 18, "target_age_days": 35}}
+- "... | 35 días" → {{"start_age_days": null, "target_age_days": 35}}
+- "35 días" → {{"start_age_days": null, "target_age_days": 35}}
+- "Desde día 20 hasta 42 días" → {{"start_age_days": 20, "target_age_days": 42}}
 """
 
         try:
@@ -138,15 +165,180 @@ Return ONLY valid JSON, nothing else:
 
             result = json.loads(content)
             logger.info(f"✅ OpenAI extraction ({language}): {result}")
+
+            # Rétrocompatibilité: si pas de start/target mais age_days présent
+            if "age_days" in result and "start_age_days" not in result:
+                result["start_age_days"] = result["age_days"]
+
             return result
 
         except json.JSONDecodeError as e:
             logger.error(f"❌ JSON parsing failed: {e}")
             logger.error(f"Raw content: {response.choices[0].message.content[:200]}")
-            return {"age_days": None, "breed": None, "metric_type": None}
+            return {
+                "start_age_days": None,
+                "target_age_days": None,
+                "breed": None,
+                "metric_type": None,
+            }
         except Exception as e:
             logger.error(f"❌ OpenAI extraction failed: {e}")
-            return {"age_days": None, "breed": None, "metric_type": None}
+            return {
+                "start_age_days": None,
+                "target_age_days": None,
+                "breed": None,
+                "metric_type": None,
+            }
+
+    async def _validate_query_completeness(
+        self,
+        query: str,
+        entities: dict,
+        language: str = "en",
+        previous_context: Dict = None,
+    ) -> dict:
+        """
+        Validation intelligente : détecte automatiquement les informations manquantes
+        VERSION 4.5.1: Logique claire - âge cible OU poids cible suffit
+
+        Args:
+            query: Requête utilisateur
+            entities: Entités détectées
+            language: Langue de la requête
+            previous_context: Contexte conversationnel précédent (optionnel)
+
+        Returns:
+            {
+                "is_complete": bool,
+                "missing_info": ["description de ce qui manque"],
+                "reason": "explication"
+            }
+        """
+
+        if not self.openai_client:
+            logger.warning("⚠️ OpenAI non disponible pour validation")
+            return {
+                "is_complete": True,
+                "missing_info": [],
+                "reason": "validation_disabled",
+            }
+
+        breed = entities.get("breed", "NOT SPECIFIED")
+        start_age = entities.get("start_age_days", entities.get("age_days"))
+        target_age = entities.get("target_age_days")
+        target_weight = entities.get("target_weight")
+        sex = entities.get("sex", "NOT SPECIFIED")
+        metric = entities.get("metric_type", "NOT SPECIFIED")
+
+        # Formater les entités pour le prompt
+        start_age_str = f"{start_age} days" if start_age else "NOT SPECIFIED"
+        target_age_str = f"{target_age} days" if target_age else "NOT SPECIFIED"
+        target_weight_str = f"{target_weight} kg" if target_weight else "NOT SPECIFIED"
+
+        # Ajouter le contexte conversationnel si disponible
+        context_info = ""
+        if previous_context:
+            context_info = f"""
+Previous conversation context:
+{json.dumps(previous_context, indent=2)}
+
+Note: Use this context to understand if missing information might be implied from previous exchanges.
+"""
+
+        prompt = f"""You are validating if a poultry production query has all necessary information to be answered.
+
+User query: "{query}"
+Language: {language}
+
+{context_info}
+
+Detected entities:
+- Breed: {breed}
+- Start Age: {start_age_str}
+- Target Age: {target_age_str}
+- Target Weight: {target_weight_str}
+- Sex: {sex}
+- Metric: {metric}
+
+**CRITICAL RULES FOR FEED/MOULÉE CALCULATIONS:**
+1. For feed calculations (moulée/alimento/feed), if we have:
+   - Breed + Start Age + Target Age → COMPLETE (no weight needed)
+   - Breed + Start Age + Target Weight → COMPLETE (no age needed)
+   - Breed + Start Age only → INCOMPLETE (need target age OR target weight)
+
+2. Simple queries (e.g., "weight at 28 days for Ross 308") → if breed + age + metric = COMPLETE
+
+3. Comparison queries → need at least 2 entities to compare
+
+**In this case:**
+- Is this a feed calculation? (keywords: moulée, feed, alimento, combien, how much)
+- Do we have breed? {breed}
+- Do we have start age? {start_age_str}
+- Do we have target age OR target weight? Target age: {target_age_str}, Target weight: {target_weight_str}
+- If YES to all above → is_complete = TRUE
+
+Return ONLY valid JSON:
+{{
+    "is_complete": true/false,
+    "missing_info": ["list of missing information **IN {language.upper()}**"],
+    "reason": "brief explanation"
+}}
+
+**IMPORTANT**: The "missing_info" list MUST be in {language.upper()} language.
+
+Examples:
+- "Combien de moulée de jour 18 à 35 pour Ross 308?" → {{"is_complete": true, "missing_info": [], "reason": "has breed + start age + target age"}}
+- "Feed from day 18 with 20k birds Ross 308?" → {{"is_complete": false, "missing_info": ["target age or weight"], "reason": "missing endpoint"}}
+"""
+
+        try:
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=200,
+                response_format={"type": "json_object"},
+            )
+
+            content = response.choices[0].message.content.strip()
+
+            # Nettoyage backticks
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+                content = content.strip()
+
+            result = json.loads(content)
+            logger.info(f"✅ Validation completeness ({language}): {result}")
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ Validation completeness failed: {e}")
+            # En cas d'erreur, retourner incomplet pour éviter de bloquer
+            return {
+                "is_complete": False,
+                "missing_info": ["validation error"],
+                "reason": str(e),
+            }
+
+    def _generate_smart_clarification(
+        self, missing_info: list, language: str, reason: str
+    ) -> str:
+        """Génère un message de clarification basé sur les informations manquantes détectées par l'IA"""
+
+        templates = {
+            "en": "To provide an accurate answer, I need additional information:\n\n{missing_list}\n\nThis will help me give you a precise response.",
+            "fr": "Pour vous fournir une réponse précise, j'ai besoin d'informations supplémentaires :\n\n{missing_list}\n\nCela me permettra de vous donner une réponse adaptée.",
+            "es": "Para darle una respuesta precisa, necesito información adicional:\n\n{missing_list}\n\nEsto me ayudará a darle una respuesta exacta.",
+        }
+
+        template = templates.get(language, templates["en"])
+
+        # Formater la liste des informations manquantes
+        missing_formatted = "\n".join([f"• {info}" for info in missing_info])
+
+        return template.format(missing_list=missing_formatted)
 
     def validate_context(
         self, entities: Dict, query: str, language: str = "fr"
@@ -202,26 +394,25 @@ Return ONLY valid JSON, nothing else:
         }
 
     async def flexible_query_validation(
-        self, query: str, entities: Dict[str, Any], language: str = "fr"
+        self,
+        query: str,
+        entities: Dict[str, Any],
+        language: str = "fr",
+        conversation_context: Dict = None,  # ✅ NOUVEAU PARAMÈTRE
     ) -> Dict[str, Any]:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        VERSION 4.4.0: EXTRACTION MULTILINGUE AVEC OPENAI
-        - Appel OpenAI pour extraction multilingue si champs manquants
-        - Fusion avec OpenAI interpretation AVANT validation
-        - Format amélioré pour questions multiples
-        - Messages d'abandon génériques
-        - detected_entities TOUJOURS présent dans needs_fallback
-
-        CORRECTION FINALE: Commence toujours par les entités ORIGINALES,
-        puis enrichit SEULEMENT les champs manquants avec auto-détection.
-        Cela garantit que 'sex' et autres champs du comparison_handler sont préservés.
+        VERSION 4.4.1: AJOUT CONVERSATION_CONTEXT
+        - Nouveau paramètre conversation_context pour contexte conversationnel
+        - Intégration validation intelligente avec contexte
+        - Toutes les autres fonctionnalités préservées
 
         Args:
             query: Requête utilisateur
             entities: Entités extraites (peut contenir _openai_interpretation)
             language: Langue détectée (fr, en, es, etc.)
+            conversation_context: Contexte conversationnel précédent (optionnel)
 
         Returns:
             Dict avec status: "complete" | "incomplete_but_processable" | "needs_fallback"
@@ -247,6 +438,9 @@ Return ONLY valid JSON, nothing else:
         )
         logger.debug(
             f"🔍 VALIDATOR INPUT - 'metric_type' present: {'metric_type' in entities}, value: {entities.get('metric_type')}"
+        )
+        logger.debug(
+            f"🔍 VALIDATOR INPUT - conversation_context present: {bool(conversation_context)}"
         )
 
         # CORRECTION CRITIQUE: Copier TOUTES les entités originales en priorité
@@ -281,49 +475,146 @@ Return ONLY valid JSON, nothing else:
                     f"✅ Metric récupéré depuis OpenAI: {openai_interp['metric_type']}"
                 )
 
-        # 🤖 NOUVEAU: Extraction OpenAI multilingue si champs manquants
-        if not enhanced_entities.get("age_days") or not enhanced_entities.get("breed"):
-            logger.info(f"🤖 Appel OpenAI pour extraction multilingue ({language})")
+        # 🤖 CORRECTION CRITIQUE VERSION 4.5: Extraction OpenAI SYSTÉMATIQUE
+        # Même si age_days existe, on DOIT capturer target_age_days pour les calculs
+        logger.info(
+            f"🤖 Appel OpenAI SYSTÉMATIQUE pour extraction multilingue ({language})"
+        )
+        openai_extracted = await self._extract_with_openai(query, language)
 
-            openai_extracted = await self._extract_with_openai(query, language)
+        # Fusionner intelligemment les données (prioriser OpenAI pour start/target)
+        start_age = (
+            openai_extracted.get("start_age_days")
+            or enhanced_entities.get("age_days")
+            or enhanced_entities.get("start_age_days")
+        )
+        target_age = openai_extracted.get("target_age_days") or enhanced_entities.get(
+            "target_age_days"
+        )
 
-            # Enrichir avec les résultats OpenAI
-            if not enhanced_entities.get("age_days") and openai_extracted.get(
-                "age_days"
-            ):
-                enhanced_entities["age_days"] = openai_extracted["age_days"]
-                logger.info(
-                    f"✅ Age détecté par OpenAI: {openai_extracted['age_days']} jours"
+        # Logs détaillés
+        if start_age:
+            logger.info(f"✅ Âge de départ: {start_age} jours")
+        if target_age:
+            logger.info(f"✅ Âge cible: {target_age} jours")
+        else:
+            logger.warning(f"⚠️ Âge cible NON détecté dans: '{query}'")
+
+        # ✅ MISE À JOUR DES ENTITÉS avec les deux âges
+        if start_age:
+            enhanced_entities["age_days"] = start_age
+            enhanced_entities["start_age_days"] = start_age  # Alias pour clarté
+        if target_age:
+            enhanced_entities["target_age_days"] = target_age
+
+        # Enrichir breed si trouvé par OpenAI
+        if not enhanced_entities.get("breed") and openai_extracted.get("breed"):
+            normalized_breed = self.breeds_registry.normalize_breed(
+                openai_extracted["breed"]
+            )
+            if normalized_breed:
+                enhanced_entities["breed"] = normalized_breed
+                enhanced_entities["has_explicit_breed"] = True
+                logger.info(f"✅ Breed détecté par OpenAI: {normalized_breed}")
+
+        # Enrichir metric si trouvé par OpenAI
+        if not enhanced_entities.get("metric_type") and openai_extracted.get(
+            "metric_type"
+        ):
+            # Normaliser la métrique
+            metric_mapping = {
+                "peso": "weight",
+                "poids": "weight",
+                "gewicht": "weight",
+                "conversión": "fcr",
+                "conversion": "fcr",
+                "mortalidad": "mortality",
+                "mortalité": "mortality",
+                "moulée": "feed",
+                "alimento": "feed",
+                "feed": "feed",
+            }
+            normalized_metric = metric_mapping.get(
+                openai_extracted["metric_type"].lower(),
+                openai_extracted["metric_type"],
+            )
+            enhanced_entities["metric_type"] = normalized_metric
+            logger.info(f"✅ Metric détecté par OpenAI: {normalized_metric}")
+
+        # ✅ NOUVEAU: Validation intelligente de complétude avec contexte
+        logger.info(
+            f"🧠 Validation intelligente (contexte: {bool(conversation_context)})..."
+        )
+        completeness = await self._validate_query_completeness(
+            query, enhanced_entities, language, previous_context=conversation_context
+        )
+
+        if not completeness.get("is_complete"):
+            missing_descriptions = completeness.get("missing_info", [])
+            logger.info(f"⚠️ Requête incomplète détectée: {missing_descriptions}")
+
+            clarification_msg = self._generate_smart_clarification(
+                missing_descriptions, language, completeness.get("reason", "")
+            )
+
+            return {
+                "status": "needs_fallback",
+                "enhanced_entities": enhanced_entities,
+                "missing": missing_descriptions,
+                "helpful_message": clarification_msg,
+                "detected_entities": enhanced_entities,
+            }
+
+        # ✅ VERSION 4.5: LOGIQUE SPÉCIFIQUE CALCULS (start + target age requis)
+        if self._is_calculation_query(enhanced_entities, query):
+            start_age = enhanced_entities.get("age_days") or enhanced_entities.get(
+                "start_age_days"
+            )
+            target_age = enhanced_entities.get("target_age_days")
+
+            logger.info(
+                f"🔢 Requête de calcul détectée - start: {start_age}, target: {target_age}"
+            )
+
+            # Vérifier start age
+            if not start_age:
+                missing_term = self._translate("starting age", language)
+                clarification_msg = self._generate_clarification_message(
+                    [missing_term], language
                 )
 
-            if not enhanced_entities.get("breed") and openai_extracted.get("breed"):
-                normalized_breed = self.breeds_registry.normalize_breed(
-                    openai_extracted["breed"]
-                )
-                if normalized_breed:
-                    enhanced_entities["breed"] = normalized_breed
-                    enhanced_entities["has_explicit_breed"] = True
-                    logger.info(f"✅ Breed détecté par OpenAI: {normalized_breed}")
-
-            if not enhanced_entities.get("metric_type") and openai_extracted.get(
-                "metric_type"
-            ):
-                # Normaliser la métrique
-                metric_mapping = {
-                    "peso": "weight",
-                    "poids": "weight",
-                    "gewicht": "weight",
-                    "conversión": "fcr",
-                    "conversion": "fcr",
-                    "mortalidad": "mortality",
-                    "mortalité": "mortality",
+                logger.warning("❌ Calcul impossible sans start age")
+                return {
+                    "status": "needs_fallback",
+                    "missing": [missing_term],
+                    "helpful_message": clarification_msg,
+                    "detected_entities": enhanced_entities,
+                    "reason": "Calculation requires starting age",
                 }
-                normalized_metric = metric_mapping.get(
-                    openai_extracted["metric_type"].lower(),
-                    openai_extracted["metric_type"],
+
+            # Vérifier target age
+            if not target_age:
+                missing_term = self._translate("target age", language)
+                clarification_msg = self._generate_clarification_message(
+                    [missing_term], language
                 )
-                enhanced_entities["metric_type"] = normalized_metric
-                logger.info(f"✅ Metric détecté par OpenAI: {normalized_metric}")
+
+                logger.warning("❌ Calcul impossible sans target age")
+                return {
+                    "status": "needs_fallback",
+                    "missing": [missing_term],
+                    "helpful_message": clarification_msg,
+                    "detected_entities": enhanced_entities,
+                    "reason": "Calculation requires target age",
+                }
+
+            # ✅ Si les deux âges présents → VALIDATION RÉUSSIE
+            logger.info(f"✅ Calcul validé: jour {start_age} → jour {target_age}")
+            return {
+                "status": "complete",
+                "enhanced_entities": enhanced_entities,
+                "message": f"Calculation range validated: day {start_age} to {target_age}",
+            }
 
         # LOG CRITIQUE #2 : Juste après dict(entities) et fusion OpenAI
         logger.debug(
@@ -530,6 +821,127 @@ Return ONLY valid JSON, nothing else:
                 "helpful_message": helpful_message,
                 "detected_entities": enhanced_entities,
             }
+
+    def _is_calculation_query(self, entities: Dict, query: str = "") -> bool:
+        """
+        Détecte si c'est une requête de calcul nécessitant une plage (start + target age)
+        VERSION 4.5: Amélioration de la détection avec plus de mots-clés
+
+        Args:
+            entities: Entités extraites
+            query: Requête utilisateur (optionnel, pour contexte supplémentaire)
+
+        Returns:
+            True si c'est une requête de calcul nécessitant start et target age
+        """
+        query_lower = query.lower()
+
+        # Mots-clés de calcul (VERSION ÉTENDUE)
+        calc_keywords = [
+            "combien",
+            "how much",
+            "cuanto",
+            "cuánto",
+            "total",
+            "besoin",
+            "need",
+            "necesito",
+            "calculer",
+            "calculate",
+            "calcular",
+            "de jour",
+            "from day",
+            "desde día",
+            "jusqu'à",
+            "until",
+            "hasta",
+            "compléter",
+            "finish",
+            "terminar",
+            "à",
+            "to",
+            "a",
+        ]
+
+        # Métrique de type feed/moulée
+        metric = entities.get("metric_type", "").lower()
+        feed_keywords = ["moulée", "feed", "alimento", "alimentation"]
+
+        has_calc_keyword = any(kw in query_lower for kw in calc_keywords)
+        has_feed_metric = any(kw in metric for kw in feed_keywords)
+
+        # Si target_age_days est présent, c'est probablement un calcul
+        has_target_age = entities.get("target_age_days") is not None
+
+        is_calc = has_calc_keyword or has_feed_metric or has_target_age
+
+        if is_calc:
+            logger.debug(
+                f"🔢 Calcul détecté - calc_kw: {has_calc_keyword}, feed: {has_feed_metric}, target_age: {has_target_age}"
+            )
+
+        return is_calc
+
+    def _translate(self, term: str, language: str) -> str:
+        """
+        Traduction simple des termes de clarification
+
+        Args:
+            term: Terme anglais à traduire
+            language: Langue cible
+
+        Returns:
+            Terme traduit
+        """
+        translations = {
+            "starting age": {
+                "fr": "âge de départ",
+                "en": "starting age",
+                "es": "edad de inicio",
+            },
+            "target age": {
+                "fr": "âge cible",
+                "en": "target age",
+                "es": "edad objetivo",
+            },
+            "breed": {"fr": "race/souche", "en": "breed/strain", "es": "raza/cepa"},
+        }
+        return translations.get(term, {}).get(language, term)
+
+    def _generate_clarification_message(
+        self, missing_fields: list, language: str
+    ) -> str:
+        """
+        Génère un message de clarification naturel et contextualisé
+
+        Args:
+            missing_fields: Liste des champs manquants
+            language: Langue du message
+
+        Returns:
+            Message de clarification personnalisé
+        """
+        missing_str = str(missing_fields).lower()
+
+        # Messages spécifiques pour target age dans contexte de calcul
+        if language == "fr":
+            if "âge cible" in missing_str or "target age" in missing_str:
+                return "Pour calculer la quantité de moulée nécessaire, j'ai besoin de connaître l'âge cible (par exemple: 35 jours, 42 jours, etc.)"
+            elif "âge de départ" in missing_str or "starting age" in missing_str:
+                return "Pour calculer la quantité de moulée, j'ai besoin de connaître l'âge de départ (par exemple: 18 jours, 20 jours, etc.)"
+        elif language == "en":
+            if "target age" in missing_str or "âge cible" in missing_str:
+                return "To calculate the required feed quantity, I need to know the target age (e.g., 35 days, 42 days, etc.)"
+            elif "starting age" in missing_str or "âge de départ" in missing_str:
+                return "To calculate the feed quantity, I need to know the starting age (e.g., 18 days, 20 days, etc.)"
+        elif language == "es":
+            if "edad objetivo" in missing_str or "target age" in missing_str:
+                return "Para calcular la cantidad de alimento necesaria, necesito saber la edad objetivo (por ejemplo: 35 días, 42 días, etc.)"
+            elif "edad de inicio" in missing_str or "starting age" in missing_str:
+                return "Para calcular la cantidad de alimento, necesito saber la edad de inicio (por ejemplo: 18 días, 20 días, etc.)"
+
+        # Fallback générique
+        return f"Missing information: {', '.join(missing_fields)}"
 
     def _get_breed_suggestion(self, language: str) -> str:
         """Retourne une suggestion pour la race selon la langue"""
@@ -1026,7 +1438,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.4.0 EXTRACTION MULTILINGUE")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.5.0 FIX BOUCLE INFINIE")
     print("=" * 70)
 
     validator = PostgreSQLValidator()
@@ -1045,20 +1457,37 @@ if __name__ == "__main__":
         print(f"  Query: {query}")
         print(f"  → Breed: {detected}")
 
-    # Test 2: Validation avec enrichissement
-    print("\n✅ Test 2: Validation et enrichissement")
+    # Test 2: Validation avec enrichissement et contexte
+    print("\n✅ Test 2: Validation et enrichissement avec contexte")
     test_cases = [
         {
             "query": "Poids à 21 jours pour Cobb 500",
             "entities": {"breed": "cobb 500"},
+            "context": None,
         },
         {
             "query": "FCR du Ross 308",
             "entities": {},
+            "context": {"breed": "Ross 308", "previous_age": 28},
         },
         {
             "query": "Mortalité",
             "entities": {"age_days": 35},
+            "context": {"breed": "Cobb 500", "metric_type": "mortality"},
+        },
+        {
+            "query": "Combien de moulée de jour 18 à 35 pour Ross 308?",
+            "entities": {},
+            "context": None,
+        },
+        {
+            "query": "35 jours",
+            "entities": {},
+            "context": {
+                "breed": "Ross 308",
+                "metric_type": "feed",
+                "start_age_days": 18,
+            },
         },
     ]
 
@@ -1068,9 +1497,10 @@ if __name__ == "__main__":
         for test in test_cases:
             print(f"\n  Query: {test['query']}")
             print(f"  Input entities: {test['entities']}")
+            print(f"  Context: {test['context']}")
 
             result = await validator.flexible_query_validation(
-                test["query"], test["entities"]
+                test["query"], test["entities"], conversation_context=test["context"]
             )
 
             print(f"  → Status: {result['status']}")
@@ -1082,6 +1512,9 @@ if __name__ == "__main__":
     asyncio.run(run_tests())
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.4.0")
-    print("🎯 NOUVELLE FONCTIONNALITÉ: Extraction multilingue OpenAI")
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.5.0")
+    print(
+        "🎯 NOUVELLE FONCTIONNALITÉ: Extraction systématique + support réponses courtes"
+    )
+    print("🔧 FIX CRITIQUE: Boucle infinie corrigée pour calculs de plage")
     print("=" * 70)
