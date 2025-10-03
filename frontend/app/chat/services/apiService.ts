@@ -831,7 +831,7 @@ export const generateAIResponsePublic = async (
  */
 export const loadUserConversations = async (
   userId: string,
-  limit: number = 100, // ← LIGNE AJOUTÉE: Paramètre limit avec valeur par défaut 100
+  limit: number = 999, // ← LIGNE AJOUTÉE: Paramètre limit avec valeur par défaut 999
 ): Promise<any> => {
   if (!userId) {
     throw new Error("User ID requis");
