@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
-VERSION 4.5.2: FIX VALIDATION REQUÊTES SIMPLES
+VERSION 4.5.2: FIX VALIDATION REQUÊTES SIMPLES + SEX EXTRACTION
 - CORRECTION CRITIQUE: Règles de validation réorganisées (requêtes simples EN PREMIER)
 - Support réponses courtes: "35 jours", "Jour 42", "... | 35 days"
 - Distinction start_age_days vs target_age_days pour calculs de plage
@@ -9,6 +9,7 @@ VERSION 4.5.2: FIX VALIDATION REQUÊTES SIMPLES
 - Nouvelles méthodes: _translate(), _generate_clarification_message()
 - Détection améliorée: _is_calculation_query() avec plus de mots-clés
 - Messages de clarification contextualisés et naturels
+- NOUVEAU: Extraction du sexe via OpenAI
 - Toutes les fonctionnalités précédentes préservées
 """
 
@@ -83,14 +84,14 @@ class PostgreSQLValidator:
     async def _extract_with_openai(self, query: str, language: str = "en") -> dict:
         """
         Extraction intelligente multilingue avec OpenAI
-        VERSION 4.5: Support réponses courtes comme "35 jours"
+        VERSION 4.5.2: Support réponses courtes + extraction du sexe
 
         Args:
             query: Requête utilisateur
             language: Code langue (fr, en, es, etc.)
 
         Returns:
-            Dict avec start_age_days, target_age_days, breed, metric_type extraits
+            Dict avec start_age_days, target_age_days, breed, metric_type, sex extraits
         """
 
         if not self.openai_client:
@@ -100,6 +101,7 @@ class PostgreSQLValidator:
                 "target_age_days": None,
                 "breed": None,
                 "metric_type": None,
+                "sex": None,
             }
 
         prompt = f"""Extract information from this query in {language}:
@@ -114,34 +116,42 @@ Extract:
 2. target_age_days: Target/ending age in days (where farmer wants to finish)
 3. breed: Breed/strain name (Ross 308, Cobb 500, etc.)
 4. metric_type: Metric requested (weight/poids/peso, feed/moulée/alimento, FCR, etc.)
+5. sex: Sex if specified (male/mâle/macho, female/femelle/hembra, or null if not mentioned)
 
 Return ONLY valid JSON, nothing else:
 {{
     "start_age_days": <number or null>,
     "target_age_days": <number or null>,
     "breed": "<breed name or null>",
-    "metric_type": "<metric or null>"
+    "metric_type": "<metric or null>",
+    "sex": "<male/female or null>"
 }}
 
 Examples in French:
-- "Je suis au jour 18... Jour 35" → {{"start_age_days": 18, "target_age_days": 35}}
-- "... | 35 jours" → {{"start_age_days": null, "target_age_days": 35}}
-- "35 jours" → {{"start_age_days": null, "target_age_days": 35}}
-- "Jour 42" → {{"start_age_days": null, "target_age_days": 42}}
-- "De jour 15 à 28" → {{"start_age_days": 15, "target_age_days": 28}}
-- "Combien de moulée de jour 15 à 28?" → {{"start_age_days": 15, "target_age_days": 28}}
+- "Je suis au jour 18... Jour 35" → {{"start_age_days": 18, "target_age_days": 35, "sex": null}}
+- "... | 35 jours" → {{"start_age_days": null, "target_age_days": 35, "sex": null}}
+- "35 jours" → {{"start_age_days": null, "target_age_days": 35, "sex": null}}
+- "Jour 42" → {{"start_age_days": null, "target_age_days": 42, "sex": null}}
+- "De jour 15 à 28" → {{"start_age_days": 15, "target_age_days": 28, "sex": null}}
+- "Combien de moulée de jour 15 à 28?" → {{"start_age_days": 15, "target_age_days": 28, "sex": null}}
+- "Poids mâle 17 jours" → {{"start_age_days": null, "target_age_days": 17, "sex": "male"}}
+- "Femelle Ross 308 jour 28" → {{"start_age_days": null, "target_age_days": 28, "sex": "female"}}
 
 Examples in English:
-- "I'm at day 18... Day 35" → {{"start_age_days": 18, "target_age_days": 35}}
-- "... | 35 days" → {{"start_age_days": null, "target_age_days": 35}}
-- "35 days" → {{"start_age_days": null, "target_age_days": 35}}
-- "From day 20 to 42 days" → {{"start_age_days": 20, "target_age_days": 42}}
+- "I'm at day 18... Day 35" → {{"start_age_days": 18, "target_age_days": 35, "sex": null}}
+- "... | 35 days" → {{"start_age_days": null, "target_age_days": 35, "sex": null}}
+- "35 days" → {{"start_age_days": null, "target_age_days": 35, "sex": null}}
+- "From day 20 to 42 days" → {{"start_age_days": 20, "target_age_days": 42, "sex": null}}
+- "Male weight at day 28" → {{"start_age_days": null, "target_age_days": 28, "sex": "male"}}
+- "Female Ross 308" → {{"sex": "female"}}
 
 Examples in Spanish:
-- "Estoy en día 18... Día 35" → {{"start_age_days": 18, "target_age_days": 35}}
-- "... | 35 días" → {{"start_age_days": null, "target_age_days": 35}}
-- "35 días" → {{"start_age_days": null, "target_age_days": 35}}
-- "Desde día 20 hasta 42 días" → {{"start_age_days": 20, "target_age_days": 42}}
+- "Estoy en día 18... Día 35" → {{"start_age_days": 18, "target_age_days": 35, "sex": null}}
+- "... | 35 días" → {{"start_age_days": null, "target_age_days": 35, "sex": null}}
+- "35 días" → {{"start_age_days": null, "target_age_days": 35, "sex": null}}
+- "Desde día 20 hasta 42 días" → {{"start_age_days": 20, "target_age_days": 42, "sex": null}}
+- "Peso macho día 28" → {{"start_age_days": null, "target_age_days": 28, "sex": "male"}}
+- "Hembra Cobb 500" → {{"sex": "female"}}
 """
 
         try:
@@ -180,6 +190,7 @@ Examples in Spanish:
                 "target_age_days": None,
                 "breed": None,
                 "metric_type": None,
+                "sex": None,
             }
         except Exception as e:
             logger.error(f"❌ OpenAI extraction failed: {e}")
@@ -188,6 +199,7 @@ Examples in Spanish:
                 "target_age_days": None,
                 "breed": None,
                 "metric_type": None,
+                "sex": None,
             }
 
     async def _validate_query_completeness(
@@ -437,9 +449,10 @@ Examples:
         """
         Validation flexible qui essaie de compléter les requêtes incomplètes
 
-        VERSION 4.4.1: AJOUT CONVERSATION_CONTEXT
+        VERSION 4.5.2: AJOUT CONVERSATION_CONTEXT + SEX EXTRACTION
         - Nouveau paramètre conversation_context pour contexte conversationnel
         - Intégration validation intelligente avec contexte
+        - Extraction du sexe via OpenAI
         - Toutes les autres fonctionnalités préservées
 
         Args:
@@ -576,6 +589,12 @@ Examples:
             )
             enhanced_entities["metric_type"] = normalized_metric
             logger.info(f"✅ Metric détecté par OpenAI: {normalized_metric}")
+
+        # ✅ NOUVEAU: Enrichir sex si trouvé par OpenAI
+        if not enhanced_entities.get("sex") and openai_extracted.get("sex"):
+            enhanced_entities["sex"] = openai_extracted["sex"]
+            enhanced_entities["has_explicit_sex"] = True
+            logger.info(f"✅ Sex détecté par OpenAI: {openai_extracted['sex']}")
 
         # ✅ NOUVEAU: Validation intelligente de complétude avec contexte
         logger.info(
@@ -1445,7 +1464,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     print("=" * 70)
-    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.5.2 FIX REQUÊTES SIMPLES")
+    print("🧪 TESTS POSTGRESQL VALIDATOR - VERSION 4.5.2 FIX REQUÊTES SIMPLES + SEX")
     print("=" * 70)
 
     validator = PostgreSQLValidator()
@@ -1501,6 +1520,11 @@ if __name__ == "__main__":
             "entities": {"breed": "ross 308", "age_days": 17, "sex": "male"},
             "context": None,
         },
+        {
+            "query": "Poids femelle Cobb 500 jour 28",
+            "entities": {},
+            "context": None,
+        },
     ]
 
     import asyncio
@@ -1526,11 +1550,12 @@ if __name__ == "__main__":
     asyncio.run(run_tests())
 
     print("\n" + "=" * 70)
-    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.5.2")
+    print("✅ TESTS TERMINÉS - PostgreSQL Validator VERSION 4.5.2 + SEX")
     print(
         "🎯 FIX CRITIQUE: Validation requêtes simples réorganisée (Rule 1 en priorité)"
     )
     print(
         "🔧 Requêtes 'Quel est le poids à X jours' maintenant reconnues comme COMPLÈTES"
     )
+    print("🆕 NOUVEAU: Extraction du sexe via OpenAI (male/female)")
     print("=" * 70)
