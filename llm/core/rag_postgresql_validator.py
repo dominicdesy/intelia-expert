@@ -109,7 +109,7 @@ Extract:
 2. Breed/strain (Ross 308, Cobb 500, etc.)
 3. Metric type (weight/peso/poids, feed conversion, etc.)
 
-Return JSON only:
+Return ONLY valid JSON, nothing else:
 {{
     "age_days": <number or null>,
     "breed": "<breed name or null>",
@@ -123,12 +123,27 @@ Return JSON only:
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
                 max_tokens=150,
+                response_format={"type": "json_object"},  # ✅ FORCE JSON MODE
             )
 
-            result = json.loads(response.choices[0].message.content)
+            content = response.choices[0].message.content.strip()
+
+            # ✅ Nettoyage robuste du contenu
+            # Enlever les backticks markdown si présents
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+                content = content.strip()
+
+            result = json.loads(content)
             logger.info(f"✅ OpenAI extraction ({language}): {result}")
             return result
 
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ JSON parsing failed: {e}")
+            logger.error(f"Raw content: {response.choices[0].message.content[:200]}")
+            return {"age_days": None, "breed": None, "metric_type": None}
         except Exception as e:
             logger.error(f"❌ OpenAI extraction failed: {e}")
             return {"age_days": None, "breed": None, "metric_type": None}
