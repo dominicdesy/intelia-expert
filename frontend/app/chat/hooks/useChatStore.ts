@@ -261,7 +261,7 @@ const syncConversationGroups = (
     }
 
     // 🛡️ PROTECTION: Limiter le nombre de conversations en mémoire
-    const MAX_CONVERSATIONS = 100;
+    const MAX_CONVERSATIONS = 999;
     if (updatedAllConversations.length > MAX_CONVERSATIONS) {
       updatedAllConversations = updatedAllConversations.slice(
         0,

@@ -237,7 +237,7 @@ async def save_conversation(
 @router.get("/user/{user_id}")
 async def get_user_conversations(
     user_id: str,
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=999),
     offset: int = Query(default=0, ge=0),
     current_user: dict = Depends(get_current_user),
 ) -> Dict[str, Any]:
