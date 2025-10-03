@@ -266,13 +266,22 @@ Detected entities:
 If the query asks for a SINGLE METRIC VALUE at a SPECIFIC AGE:
 Examples: 
 - "weight at 17 days", "poids à 17 jours", "peso a 17 días"
+- "What should their weight be at 28 days?", "Quel devrait être leur poids à 28 jours?"
 - "FCR at day 28", "IC jour 28", "conversión día 28"
 - "feed intake day 35", "consommation jour 35"
 - "Quel est le poids...", "What is the weight...", "Cuál es el peso..."
+- "I'm raising broilers and they're currently 28 days old. What should their average weight be?"
 
 → Requirements: Breed + Age + Metric = COMPLETE
 → NO need for target_age or target_weight
 → The age mentioned IS the point of interest (not a starting point for calculation)
+
+**CRITICAL FOR RULE 1:**
+- If query asks "What should the weight be at X days?" → ONLY breed is missing (if not specified)
+- If query asks "What is the weight at X days?" → ONLY breed is missing (if not specified)
+- NEVER EVER ask for target_weight in Rule 1 queries
+- target_weight is ONLY for Rule 2 (calculation queries like "feed until reaching 2.5kg")
+- Questions using "should", "average", "typical", "normal" at a specific age are Rule 1
 
 **RULE 2 - PERIOD/CALCULATION QUERIES:**
 If the query asks for TOTALS, CALCULATIONS, or data over a TIME PERIOD:

@@ -534,9 +534,11 @@ Examples:
 
         # Enrichir breed si trouvé par OpenAI
         if not enhanced_entities.get("breed") and openai_extracted.get("breed"):
-            normalized_breed = self.breeds_registry.normalize_breed(
+
+            normalized_breed = self.breeds_registry.normalize_breed_name(
                 openai_extracted["breed"]
             )
+
             if normalized_breed:
                 enhanced_entities["breed"] = normalized_breed
                 enhanced_entities["has_explicit_breed"] = True
