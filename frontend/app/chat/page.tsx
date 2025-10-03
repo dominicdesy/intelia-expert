@@ -984,17 +984,19 @@ function ChatInterface() {
 		  );
 		  
 		  if (isNewConversation) {
-			console.log("🔄 [Chat] Nouvelle conversation créée, refresh dans 2s");
-			setTimeout(async () => {
+		    console.log("🔄 [Chat] Nouvelle conversation créée, refresh dans 2s");
+		    setTimeout(async () => {
 			  if (!isMountedRef.current) return;
 			  try {
-				await loadConversations(user.id);
-				console.log("✅ [Chat] Historique rafraîchi automatiquement");
+			    // ✅ Utiliser refreshConversations qui force le bypass de la protection
+			    const { refreshConversations } = useChatStore.getState();
+			    await refreshConversations(user.id);
+			    console.log("✅ [Chat] Historique rafraîchi automatiquement avec bypass");
 			  } catch (error) {
-				console.warn("⚠️ [Chat] Erreur refresh auto:", error);
+			    console.warn("⚠️ [Chat] Erreur refresh auto:", error);
 			  }
-			}, 2000);
-		  }
+		    }, 2000);
+		  }		  
 		}
 		// ✅ FIN DE L'AJOUT
 

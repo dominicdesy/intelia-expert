@@ -813,211 +813,230 @@ function ChatInterface() {
   }, [isAuthenticated, user?.id]);
 
 
-  // FONCTION CORRIGÉE POUR STREAMING - Élimine le scintillement
-  const handleSendMessage = useCallback(async () => {
-    const safeText = inputMessage;
 
-    if (!safeText.trim() || !isMountedRef.current) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: safeText.trim(),
-      isUser: true,
-      timestamp: new Date(),
-    };
 
-    let conversationIdToSend: string | undefined = undefined;
+	// FONCTION CORRIGÉE POUR STREAMING - Élimine le scintillement
+	const handleSendMessage = useCallback(async () => {
+	  const safeText = inputMessage;
 
-    if (
-      currentConversation &&
-      currentConversation.id !== "welcome" &&
-      !currentConversation.id.startsWith("temp-")
-    ) {
-      conversationIdToSend = currentConversation.id;
-    }
+	  if (!safeText.trim() || !isMountedRef.current) return;
 
-    // Ajouter le message utilisateur
-    addMessage(userMessage);
-    setInputMessage("");
-    setIsLoadingChat(true); // L'indicateur de typing gère l'affichage
-    setShouldAutoScroll(true);
-    setIsUserScrolling(false);
+	  const userMessage: Message = {
+		id: Date.now().toString(),
+		content: safeText.trim(),
+		isUser: true,
+		timestamp: new Date(),
+	  };
 
-    // Variables pour le streaming - PAS de message vide créé
-    let assistantId: string | null = null;
-    let messageCreated = false;
+	  let conversationIdToSend: string | undefined = undefined;
 
-    try {
-      let finalQuestionOrSafeText: string;
+	  if (
+		currentConversation &&
+		currentConversation.id !== "welcome" &&
+		!currentConversation.id.startsWith("temp-")
+	  ) {
+		conversationIdToSend = currentConversation.id;
+	  }
 
-      if (clarificationState) {
-        finalQuestionOrSafeText =
-          clarificationState.originalQuestion + " " + safeText.trim();
-        setClarificationState(null);
-      } else {
-        finalQuestionOrSafeText = safeText.trim();
-      }
+	  // Ajouter le message utilisateur
+	  addMessage(userMessage);
+	  setInputMessage("");
+	  setIsLoadingChat(true);
+	  setShouldAutoScroll(true);
+	  setIsUserScrolling(false);
 
-      const optimalLevel = undefined;
+	  // Variables pour le streaming
+	  let assistantId: string | null = null;
+	  let messageCreated = false;
 
-      // APPEL AVEC CALLBACKS DE STREAMING AMÉLIORÉS
-      const response = await generateAIResponse(
-        finalQuestionOrSafeText,
-        user,
-        currentLanguage,
-        conversationIdToSend,
-        optimalLevel,
-        clarificationState !== null,
-        clarificationState?.originalQuestion,
-        clarificationState ? { answer: safeText.trim() } : undefined,
-        {
-          onDelta: (chunk: string) => {
-            if (!messageCreated) {
-              // Créer le message au premier chunk reçu
-              assistantId = `ai-${Date.now()}`;
-              addMessage({
-                id: assistantId,
-                content: chunk,
-                isUser: false,
-                timestamp: new Date(),
-              });
-              messageCreated = true;
-              // Arrêter l'indicateur de typing dès qu'on reçoit le premier chunk
-              setIsLoadingChat(false);
-            } else if (assistantId) {
-              // Mettre à jour le message existant
-              const currentMessage = useChatStore
-                .getState()
-                .currentConversation?.messages.find(
-                  (m) => m.id === assistantId,
-                );
-              if (currentMessage) {
-                updateMessage(assistantId, {
-                  content: (currentMessage.content || "") + chunk,
-                });
-              }
-            }
-          },
-          onFinal: (fullText: string) => {
-            // Mise à jour finale avec le texte complet
-            if (assistantId) {
-              updateMessage(assistantId, {
-                content: fullText,
-              });
-            }
-          },
-          onFollowup: (followupMessage: string) => {
-            // Ajouter la relance comme un nouveau message assistant
-            addMessage({
-              id: `followup-${Date.now()}`,
-              content: followupMessage,
-              isUser: false,
-              timestamp: new Date(),
-            });
-          },
-        },
-      );
+	  try {
+		let finalQuestionOrSafeText: string;
 
-      if (!isMountedRef.current) return;
+		if (clarificationState) {
+		  finalQuestionOrSafeText =
+			clarificationState.originalQuestion + " " + safeText.trim();
+		  setClarificationState(null);
+		} else {
+		  finalQuestionOrSafeText = safeText.trim();
+		}
 
-      // Vérification des erreurs d'authentification
-      if (
-        response?.response?.includes?.("Session expirée") ||
-        response?.response?.includes?.("Token expired") ||
-        response?.response?.includes?.("authentication_failed") ||
-        response?.response?.includes?.("Unauthorized") ||
-        response?.response?.includes?.("401") ||
-        response?.note?.includes?.("Session expirée") ||
-        response?.note?.includes?.("Token expired")
-      ) {
-        handleAuthError({
-          status: 401,
-          message: "Token expired from API response",
-          detail: "Token expired",
-        });
-        return;
-      }
+		const optimalLevel = undefined;
 
-      const needsClarification =
-        response.clarification_result?.clarification_requested === true;
+		// APPEL AVEC CALLBACKS DE STREAMING
+		const response = await generateAIResponse(
+		  finalQuestionOrSafeText,
+		  user,
+		  currentLanguage,
+		  conversationIdToSend,
+		  optimalLevel,
+		  clarificationState !== null,
+		  clarificationState?.originalQuestion,
+		  clarificationState ? { answer: safeText.trim() } : undefined,
+		  {
+			onDelta: (chunk: string) => {
+			  if (!messageCreated) {
+				assistantId = `ai-${Date.now()}`;
+				addMessage({
+				  id: assistantId,
+				  content: chunk,
+				  isUser: false,
+				  timestamp: new Date(),
+				});
+				messageCreated = true;
+				setIsLoadingChat(false);
+			  } else if (assistantId) {
+				const currentMessage = useChatStore
+				  .getState()
+				  .currentConversation?.messages.find(
+					(m) => m.id === assistantId,
+				  );
+				if (currentMessage) {
+				  updateMessage(assistantId, {
+					content: (currentMessage.content || "") + chunk,
+				  });
+				}
+			  }
+			},
+			onFinal: (fullText: string) => {
+			  if (assistantId) {
+				updateMessage(assistantId, {
+				  content: fullText,
+				});
+			  }
+			},
+			onFollowup: (followupMessage: string) => {
+			  addMessage({
+				id: `followup-${Date.now()}`,
+				content: followupMessage,
+				isUser: false,
+				timestamp: new Date(),
+			  });
+			},
+		  },
+		);
 
-      if (needsClarification && assistantId) {
-        // Mise à jour pour clarification
-        const clarificationText =
-          (response.full_text || response.response) +
-          `\n\n${t("chat.clarificationInstruction")}`;
+		if (!isMountedRef.current) return;
 
-        updateMessage(assistantId, {
-          content: clarificationText,
-          conversation_id: response.conversation_id,
-        });
+		// Vérification des erreurs d'authentification
+		if (
+		  response?.response?.includes?.("Session expirée") ||
+		  response?.response?.includes?.("Token expired") ||
+		  response?.response?.includes?.("authentication_failed") ||
+		  response?.response?.includes?.("Unauthorized") ||
+		  response?.response?.includes?.("401") ||
+		  response?.note?.includes?.("Session expirée") ||
+		  response?.note?.includes?.("Token expired")
+		) {
+		  handleAuthError({
+			status: 401,
+			message: "Token expired from API response",
+			detail: "Token expired",
+		  });
+		  return;
+		}
 
-        setClarificationState({
-          messageId: assistantId,
-          originalQuestion: safeText.trim(),
-          clarificationQuestions: response.clarification_questions || [],
-        });
-      } else if (assistantId) {
-        // Mise à jour finale avec métadonnées
-        const safeResponseVersions = response.response_versions
-          ? {
-              ultra_concise:
-                response.response_versions.ultra_concise || response.response,
-              concise: response.response_versions.concise || response.response,
-              standard:
-                response.response_versions.standard || response.response,
-              detailed:
-                response.response_versions.detailed || response.response,
-            }
-          : undefined;
+		const needsClarification =
+		  response.clarification_result?.clarification_requested === true;
 
-        updateMessage(assistantId, {
-          conversation_id: response.conversation_id,
-          ...(safeResponseVersions && {
-            response_versions: safeResponseVersions,
-          }),
-          originalResponse: response.response,
-        });
-      }
-    } catch (error) {
-      console.error(t("chat.sendError"), error);
-      handleAuthError(error);
+		if (needsClarification && assistantId) {
+		  const clarificationText =
+			(response.full_text || response.response) +
+			`\n\n${t("chat.clarificationInstruction")}`;
 
-      if (isMountedRef.current) {
-        if (!messageCreated && assistantId) {
-          // Si le message n'a pas encore été créé, le créer avec l'erreur
-          addMessage({
-            id: `error-${Date.now()}`,
-            content:
-              error instanceof Error ? error.message : t("chat.errorMessage"),
-            isUser: false,
-            timestamp: new Date(),
-          });
-        } else if (assistantId) {
-          // Mise à jour du message d'erreur
-          const errorContent =
-            error instanceof Error ? error.message : t("chat.errorMessage");
-          updateMessage(assistantId, {
-            content: errorContent,
-          });
-        }
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsLoadingChat(false); // S'assurer que l'indicateur est arrêté
-      }
-    }
-  }, [
-    inputMessage,
-    currentConversation,
-    addMessage,
-    updateMessage,
-    clarificationState,
-    user,
-    currentLanguage,
-    handleAuthError,
-    t,
-  ]);
+		  updateMessage(assistantId, {
+			content: clarificationText,
+			conversation_id: response.conversation_id,
+		  });
+
+		  setClarificationState({
+			messageId: assistantId,
+			originalQuestion: safeText.trim(),
+			clarificationQuestions: response.clarification_questions || [],
+		  });
+		} else if (assistantId) {
+		  const safeResponseVersions = response.response_versions
+			? {
+				ultra_concise:
+				  response.response_versions.ultra_concise || response.response,
+				concise: response.response_versions.concise || response.response,
+				standard:
+				  response.response_versions.standard || response.response,
+				detailed:
+				  response.response_versions.detailed || response.response,
+			  }
+			: undefined;
+
+		  updateMessage(assistantId, {
+			conversation_id: response.conversation_id,
+			...(safeResponseVersions && {
+			  response_versions: safeResponseVersions,
+			}),
+			originalResponse: response.response,
+		  });
+		}
+
+		// ✅ AJOUT: Refresh automatique si nouvelle conversation créée
+		if (response?.conversation_id && user?.id && isMountedRef.current) {
+		  const { conversationGroups } = useChatStore.getState();
+		  const isNewConversation = !conversationGroups.some(g => 
+			g.conversations.some(c => c.id === response.conversation_id)
+		  );
+		  
+		  if (isNewConversation) {
+			console.log("🔄 [Chat] Nouvelle conversation créée, refresh dans 2s");
+			setTimeout(async () => {
+			  if (!isMountedRef.current) return;
+			  try {
+				await loadConversations(user.id);
+				console.log("✅ [Chat] Historique rafraîchi automatiquement");
+			  } catch (error) {
+				console.warn("⚠️ [Chat] Erreur refresh auto:", error);
+			  }
+			}, 2000);
+		  }
+		}
+		// ✅ FIN DE L'AJOUT
+
+	  } catch (error) {
+		console.error(t("chat.sendError"), error);
+		handleAuthError(error);
+
+		if (isMountedRef.current) {
+		  if (!messageCreated && assistantId) {
+			addMessage({
+			  id: `error-${Date.now()}`,
+			  content:
+				error instanceof Error ? error.message : t("chat.errorMessage"),
+			  isUser: false,
+			  timestamp: new Date(),
+			});
+		  } else if (assistantId) {
+			const errorContent =
+			  error instanceof Error ? error.message : t("chat.errorMessage");
+			updateMessage(assistantId, {
+			  content: errorContent,
+			});
+		  }
+		}
+	  } finally {
+		if (isMountedRef.current) {
+		  setIsLoadingChat(false);
+		}
+	  }
+	}, [
+	  inputMessage,
+	  currentConversation,
+	  addMessage,
+	  updateMessage,
+	  clarificationState,
+	  user,
+	  currentLanguage,
+	  handleAuthError,
+	  t,
+	  loadConversations, // ⚠️ IMPORTANT: Ajouter cette dépendance
+	]);
+
 
   // Fonctions de feedback
   const handleFeedbackClick = useCallback(
