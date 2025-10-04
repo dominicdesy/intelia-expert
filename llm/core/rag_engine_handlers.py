@@ -811,6 +811,46 @@ class StandardQueryHandler(BaseQueryHandler):
             logger.error(f"Full traceback:\n{traceback.format_exc()}")
             return None
 
+    def _filter_documents_by_species(
+        self, context_docs: List[Dict], target_species: str = "broilers"
+    ) -> List[Dict]:
+        """
+        ✅ NOUVELLE MÉTHODE: Filtre les documents pour ne garder que l'espèce cible
+
+        Args:
+            context_docs: Liste de documents
+            target_species: Espèce cible (défaut: "broilers" pour poulets de chair)
+
+        Returns:
+            Liste filtrée de documents
+        """
+        if not context_docs:
+            return []
+
+        filtered_docs = []
+        species_counts = {}
+
+        for doc in context_docs:
+            # Extraire l'espèce du document
+            if isinstance(doc, dict):
+                species = doc.get("metadata", {}).get("species", "")
+            else:
+                species = getattr(doc, "metadata", {}).get("species", "")
+
+            # Compter les espèces pour logging
+            species_counts[species] = species_counts.get(species, 0) + 1
+
+            # Filtrer par espèce cible
+            if species == target_species:
+                filtered_docs.append(doc)
+
+        logger.info(
+            f"📊 Filtrage espèce: {len(context_docs)} docs → {len(filtered_docs)} docs "
+            f"({target_species}). Distribution: {species_counts}"
+        )
+
+        return filtered_docs
+
     async def _search_weaviate_direct(
         self,
         query: str,
@@ -822,7 +862,7 @@ class StandardQueryHandler(BaseQueryHandler):
     ) -> RAGResult:
         """
         Recherche directe dans Weaviate (fallback ou routage suggéré)
-        Supporte le paramètre language
+        ✅ VERSION 4.6: Filtrage par espèce et correction comptage documents
         """
         try:
             weaviate_top_k = 5 if is_optimization else top_k
@@ -838,32 +878,76 @@ class StandardQueryHandler(BaseQueryHandler):
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
-                # Enrichissement métadonnées
-                if is_optimization:
-                    result.metadata["query_mode"] = "optimization"
-                    result.metadata["source"] = "weaviate_optimized"
+                # ✅ CORRECTION CRITIQUE: Vérifier context_docs correctement
+                doc_count = len(result.context_docs) if result.context_docs else 0
+
+                if doc_count > 0:
+                    logger.info(
+                        f"🔍 Weaviate brut: {doc_count} documents récupérés avant filtrage"
+                    )
+
+                    # ✅ NOUVEAU: Filtrer par espèce pour poulets de chair
+                    # Détecter si on cherche spécifiquement des broilers
+                    query_lower = query.lower()
+                    is_broiler_query = any(
+                        term in query_lower
+                        for term in [
+                            "poulet de chair",
+                            "broiler",
+                            "chair",
+                            "meat chicken",
+                            "pollo de engorde",
+                            "frango de corte",
+                            "masthuhn",
+                        ]
+                    )
+
+                    if is_broiler_query:
+                        original_count = doc_count
+                        result.context_docs = self._filter_documents_by_species(
+                            result.context_docs, "broilers"
+                        )
+                        doc_count = len(result.context_docs)
+
+                        if doc_count < original_count:
+                            logger.warning(
+                                f"⚠️ Filtrage broilers: {original_count} → {doc_count} documents "
+                                f"(supprimé {original_count - doc_count} docs layers/breeders)"
+                            )
+
+                    # Enrichissement métadonnées
+                    if is_optimization:
+                        result.metadata["query_mode"] = "optimization"
+                        result.metadata["source"] = "weaviate_optimized"
+                    else:
+                        result.metadata["source"] = "weaviate_fallback"
+
+                    result.metadata["top_k_used"] = weaviate_top_k
+                    result.metadata["processing_time"] = time.time() - start_time
+                    result.metadata["language_used"] = language
+                    result.metadata["documents_filtered"] = is_broiler_query
+                    result.metadata["documents_count_final"] = doc_count
+
+                    logger.info(
+                        f"✅ Weaviate ({language}): {doc_count} documents trouvés (après filtrage)"
+                    )
+                    return result
                 else:
-                    result.metadata["source"] = "weaviate_fallback"
+                    logger.warning(
+                        "⚠️ Weaviate: RAG_SUCCESS mais context_docs vide ou None"
+                    )
 
-                result.metadata["top_k_used"] = weaviate_top_k
-                result.metadata["processing_time"] = time.time() - start_time
-                result.metadata["language_used"] = language
-
-                logger.info(
-                    f"✅ Weaviate ({language}): {len(result.context_docs)} documents trouvés"
-                )
-                return result
-            else:
-                logger.info(f"⚠️ Weaviate ({language}): 0 documents")
-                return RAGResult(
-                    source=RAGSource.NO_RESULTS,
-                    answer="Aucune information trouvée dans Weaviate.",
-                    metadata={
-                        "source": "weaviate_fallback",
-                        "processing_time": time.time() - start_time,
-                        "language_attempted": language,
-                    },
-                )
+            # Aucun résultat ou context_docs vide
+            logger.info(f"⚠️ Weaviate ({language}): 0 documents")
+            return RAGResult(
+                source=RAGSource.NO_RESULTS,
+                answer="Aucune information trouvée dans Weaviate.",
+                metadata={
+                    "source": "weaviate_fallback",
+                    "processing_time": time.time() - start_time,
+                    "language_attempted": language,
+                },
+            )
 
         except Exception as e:
             logger.error(f"Erreur recherche Weaviate ({language}): {e}")

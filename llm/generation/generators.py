@@ -600,7 +600,7 @@ class EnhancedResponseGenerator:
         """
         Construit un prompt enrichi avec instructions de langue renforcées
 
-        VERSION 3.3: Support dict et Document + instructions multilingues dynamiques
+        VERSION 3.3: Support dict et Document + instructions multilingues dynamiques + détection espèce
         """
 
         # DEBUG CRITIQUE : Logger la langue reçue
@@ -608,6 +608,48 @@ class EnhancedResponseGenerator:
             f"🌐 _build_enhanced_prompt received language parameter: '{language}'"
         )
         logger.debug(f"Query: '{query[:50]}...'")
+
+        # ✅ NOUVEAU: Détecter l'espèce cible depuis la query
+        query_lower = query.lower()
+        target_species = None
+
+        # Détection multilingue de l'espèce
+        broiler_terms = [
+            "poulet de chair",
+            "broiler",
+            "chair",
+            "meat chicken",
+            "pollo de engorde",
+            "frango de corte",
+        ]
+        layer_terms = [
+            "pondeuse",
+            "layer",
+            "ponte",
+            "laying hen",
+            "gallina ponedora",
+            "poedeira",
+        ]
+        breeder_terms = [
+            "reproducteur",
+            "breeder",
+            "parent",
+            "parent stock",
+            "reproductor",
+        ]
+
+        if any(term in query_lower for term in broiler_terms):
+            target_species = "broilers"
+        elif any(term in query_lower for term in layer_terms):
+            target_species = "layers"
+        elif any(term in query_lower for term in breeder_terms):
+            target_species = "breeders"
+
+        # Log de détection d'espèce
+        if target_species:
+            logger.info(f"🐔 Target species detected: {target_species}")
+        else:
+            logger.debug("🐔 No specific species detected in query")
 
         # ✅ CORRECTION CRITIQUE: Utiliser les helpers pour extraire le contenu
         context_text_parts = []
