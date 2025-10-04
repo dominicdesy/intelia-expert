@@ -635,7 +635,7 @@ class StandardQueryHandler(BaseQueryHandler):
         # ✅ NOUVEAU: Extraire filters depuis entities
         filters = self._extract_filters_from_entities(entities)
 
-        # ✅ NOUVEAU: Extraire le contexte conversationnel depuis preprocessed_data
+        # ✅ EXTRACTION CONTEXTE: Pour logs et transmission
         contextual_history = (
             preprocessed_data.get("contextual_history", "") if preprocessed_data else ""
         )
