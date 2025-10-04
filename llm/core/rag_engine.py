@@ -759,14 +759,14 @@ class InteliaRAGEngine:
         language: str,
     ) -> RAGResult:
         """
-        ✅ NOUVELLE MÉTHODE CRITIQUE: Génère la réponse LLM si nécessaire
+        ✅ NOUVELLE MÉTHODE CRITIQUE: Génère la réponse LLM avec contexte conversationnel
 
         Vérifie si le RAGResult contient des documents mais pas de réponse,
         et dans ce cas appelle le générateur LLM pour créer la réponse.
 
         Args:
             result: RAGResult du handler
-            preprocessed_data: Données preprocessées
+            preprocessed_data: Données preprocessées (contient contextual_history)
             original_query: Requête originale
             language: Langue de la requête
 
@@ -791,12 +791,34 @@ class InteliaRAGEngine:
                 f"🔧 Génération réponse LLM pour {len(result.context_docs)} documents PostgreSQL"
             )
 
+            # ✅ CORRECTION : Récupérer le contexte conversationnel
+            contextual_history = preprocessed_data.get("contextual_history", "")
+
+            # Formater l'historique pour le générateur
+            conversation_context = ""
+            if contextual_history:
+                if isinstance(contextual_history, list):
+                    # Format liste de dicts
+                    conversation_context = "\n".join(
+                        [
+                            f"Q: {item.get('query', '')}\nR: {item.get('answer', '')}"
+                            for item in contextual_history
+                        ]
+                    )
+                else:
+                    # Format string déjà formaté
+                    conversation_context = str(contextual_history)
+
+                logger.info(
+                    f"📚 Contexte conversationnel ajouté au générateur: {len(conversation_context)} chars"
+                )
+
             try:
-                # Appel du générateur avec les documents récupérés
+                # Appel du générateur avec les documents récupérés ET le contexte conversationnel
                 generated_answer = await self.core.generator.generate_response(
                     query=preprocessed_data.get("original_query", original_query),
                     context_docs=result.context_docs,
-                    conversation_context="",
+                    conversation_context=conversation_context,  # ✅ CORRECTION
                     language=language,
                     intent_result=None,
                 )
@@ -804,6 +826,12 @@ class InteliaRAGEngine:
                 result.answer = generated_answer
                 result.metadata["llm_generation_applied"] = True
                 result.metadata["llm_input_docs_count"] = len(result.context_docs)
+                result.metadata["conversation_context_used"] = bool(
+                    conversation_context
+                )
+                result.metadata["conversation_context_length"] = len(
+                    conversation_context
+                )
                 self.optimization_stats["llm_generations"] += 1
 
                 logger.info(
