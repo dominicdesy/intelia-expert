@@ -247,7 +247,9 @@ class ConfigManager:
 
         # Charger depuis universal_terms si disponible
         for lang_code, lang_terms in self.universal_terms.items():
-            species_terms = lang_terms.get("species", {})
+            # ✅ CORRECTION: Accéder à domains.species
+            domains = lang_terms.get("domains", {})
+            species_terms = domains.get("species", {})
 
             if not species_terms:
                 continue
