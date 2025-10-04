@@ -27,9 +27,12 @@ try:
     from config.messages import get_message
 
     MESSAGES_AVAILABLE = True
+    logger = logging.getLogger(__name__)
+    logger.info("✅ config.messages disponible pour disclaimers vétérinaires")
 except ImportError:
+    logger = logging.getLogger(__name__)
     MESSAGES_AVAILABLE = False
-    logging.warning("config.messages non disponible pour disclaimers vétérinaires")
+    logger.warning("⚠️ config.messages non disponible pour disclaimers vétérinaires")
 
 # Import du gestionnaire de prompts centralisé
 try:
@@ -306,43 +309,58 @@ class EnhancedResponseGenerator:
     def _is_veterinary_query(self, query: str, context_docs: List) -> bool:
         """
         Détecte si la question concerne un sujet vétérinaire
-        Utilise les mots-clés pour détecter les questions vétérinaires
 
         Args:
             query: Question de l'utilisateur
-            context_docs: Documents de contexte (Document ou dict)
+            context_docs: Documents de contexte récupérés
 
         Returns:
-            True si question vétérinaire détectée
+            True si c'est une question vétérinaire nécessitant un disclaimer
         """
         query_lower = query.lower()
 
-        # Mots-clés vétérinaires multilingues
+        # Mots-clés vétérinaires cross-language (maladies, traitements, symptômes)
         veterinary_keywords = [
-            # Core veterinary terms (work across languages)
+            # Maladies communes
+            "ascites",
+            "ascite",
+            "coccidiosis",
+            "coccidiose",
             "disease",
             "maladie",
             "krankheit",
             "enfermedad",
             "malattia",
-            "treatment",
-            "traitement",
-            "behandlung",
-            "tratamiento",
-            "trattamento",
+            "infection",
+            "infektion",
+            "infección",
+            "infezione",
+            # Symptômes
             "symptom",
             "symptôme",
             "symptom",
             "síntoma",
             "sintomo",
-            "infection",
-            "infektion",
-            "infección",
-            "infezione",
-            "virus",
-            "bacteria",
-            "bactérie",
-            "bakterie",
+            "sick",
+            "malade",
+            "krank",
+            "enfermo",
+            "malato",
+            "mortality",
+            "mortalité",
+            "mortalidad",
+            "mortalità",
+            # Traitements
+            "treatment",
+            "traitement",
+            "behandlung",
+            "tratamiento",
+            "trattamento",
+            "cure",
+            "soigner",
+            "heal",
+            "guérir",
+            "genezing",
             "antibiotic",
             "antibiotique",
             "antibiotikum",
@@ -352,14 +370,34 @@ class EnhancedResponseGenerator:
             "impfstoff",
             "vacuna",
             "vaccino",
-            "mortality",
-            "mortalité",
-            "mortalidad",
-            "mortalità",
+            "medication",
+            "médicament",
+            "medikament",
+            "medicación",
+            # Agents pathogènes
+            "virus",
+            "bacteria",
+            "bactérie",
+            "bakterie",
+            "parasite",
+            "parasit",
+            # Diagnostic
             "diagnosis",
             "diagnostic",
             "diagnose",
             "diagnóstico",
+            # Questions typiques nécessitant conseil vétérinaire
+            "what should i do",
+            "que dois-je faire",
+            "was soll ich tun",
+            "how to treat",
+            "comment traiter",
+            "wie behandeln",
+            "i have",
+            "j'ai",
+            "ich habe",
+            "tengo",
+            "ho",
         ]
 
         # Vérifier dans la query
@@ -367,18 +405,31 @@ class EnhancedResponseGenerator:
             keyword in query_lower for keyword in veterinary_keywords
         )
 
-        # Vérifier dans les documents (premiers 3 docs, 500 chars chacun)
-        if context_docs and not has_vet_keywords:
-            doc_content = " ".join(
-                [self._get_doc_content(doc)[:500] for doc in context_docs[:3]]
-            ).lower()
-            has_vet_content = any(
-                keyword in doc_content for keyword in veterinary_keywords[:15]
-            )
+        # Si pas de mots-clés dans la query, vérifier dans les documents
+        if not has_vet_keywords and context_docs:
+            try:
+                # Examiner les 3 premiers documents (500 chars chacun)
+                doc_content = " ".join(
+                    [str(self._get_doc_content(doc))[:500] for doc in context_docs[:3]]
+                ).lower()
+
+                # Vérifier présence de termes vétérinaires dans les docs
+                has_vet_content = any(
+                    keyword in doc_content
+                    for keyword in veterinary_keywords[:20]  # Top 20 keywords
+                )
+            except Exception as e:
+                logger.debug(f"Erreur vérification contenu vétérinaire: {e}")
+                has_vet_content = False
         else:
             has_vet_content = False
 
-        return has_vet_keywords or has_vet_content
+        result = has_vet_keywords or has_vet_content
+
+        if result:
+            logger.info(f"🏥 Question vétérinaire détectée: '{query[:50]}...'")
+
+        return result
 
     def _get_veterinary_disclaimer(self, language: str = "fr") -> str:
         """
@@ -388,18 +439,22 @@ class EnhancedResponseGenerator:
             language: Code langue (fr, en, es, de, it, pt, nl, pl, hi, id, th, zh)
 
         Returns:
-            Texte de l'avertissement ou string vide si non disponible
+            Texte de l'avertissement avec saut de ligne, ou string vide si non disponible
         """
         if not MESSAGES_AVAILABLE:
-            logger.debug("Messages non disponibles, pas de disclaimer vétérinaire")
+            logger.warning("⚠️ Messages non disponibles, pas de disclaimer vétérinaire")
             return ""
 
         try:
             disclaimer = get_message("veterinary_disclaimer", language)
+            # Ajouter double saut de ligne avant le disclaimer
             return f"\n\n{disclaimer}"
         except Exception as e:
-            logger.warning(f"Erreur récupération veterinary_disclaimer: {e}")
-            return ""
+            logger.warning(
+                f"⚠️ Erreur récupération veterinary_disclaimer pour {language}: {e}"
+            )
+            # Fallback minimal en anglais
+            return "\n\n**Important**: This information is provided for educational purposes. For health concerns, consult a qualified veterinarian."
 
     def _get_doc_content(self, doc: Union[Document, dict]) -> str:
         """
@@ -1068,23 +1123,23 @@ Style professionnel et structuré avec recommandations actionnables.""",
         Post-traitement avec ajout automatique d'avertissement vétérinaire
 
         Args:
-            response: Réponse générée
+            response: Réponse générée par le LLM
             enrichment: Enrichissement du contexte
-            context_docs: Documents de contexte (format dict)
-            query: Question originale
+            context_docs: Documents de contexte utilisés
+            query: Question originale de l'utilisateur
             language: Langue de la réponse
 
         Returns:
-            Réponse post-traitée avec avertissement si nécessaire
+            Réponse post-traitée avec disclaimer vétérinaire si nécessaire
         """
         response = response.strip()
 
-        # Ajouter avertissement vétérinaire si nécessaire
+        # Ajouter avertissement vétérinaire si la question concerne la santé/maladie
         if query and self._is_veterinary_query(query, context_docs):
             disclaimer = self._get_veterinary_disclaimer(language)
             if disclaimer:  # Seulement si disclaimer non vide
                 response = response + disclaimer
-                logger.info(f"🏥 Avertissement vétérinaire ajouté (langue: {language})")
+                logger.info(f"🏥 Disclaimer vétérinaire ajouté (langue: {language})")
 
         return response
 
