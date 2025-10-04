@@ -635,6 +635,18 @@ class StandardQueryHandler(BaseQueryHandler):
         # ✅ NOUVEAU: Extraire filters depuis entities
         filters = self._extract_filters_from_entities(entities)
 
+        # ✅ NOUVEAU: Extraire le contexte conversationnel depuis preprocessed_data
+        contextual_history = (
+            preprocessed_data.get("contextual_history", "") if preprocessed_data else ""
+        )
+
+        logger.info(
+            f"🔍 HANDLER - contextual_history présent: {bool(contextual_history)}"
+        )
+        logger.info(
+            f"🔍 HANDLER - contextual_history length: {len(contextual_history) if contextual_history else 0}"
+        )
+
         logger.info(f"🌍 StandardQueryHandler traite requête en langue: {language}")
         logger.info(f"🎯 ROUTING_HINT REÇU: '{routing_hint}'")
         logger.info(f"📊 ENTITIES REÇUES: {entities}")
@@ -740,6 +752,21 @@ class StandardQueryHandler(BaseQueryHandler):
                         logger.info(
                             f"✅ PostgreSQL SUCCESS: {len(pg_result.context_docs or [])} documents"
                         )
+
+                        # ✅ NOUVEAU: Générer réponse avec contexte conversationnel si nécessaire
+                        if pg_result.context_docs and not pg_result.answer:
+                            logger.info(
+                                "📝 Génération réponse PostgreSQL avec contexte conversationnel"
+                            )
+                            pg_result.answer = (
+                                await self._generate_response_with_generator(
+                                    context_docs=pg_result.context_docs,
+                                    query=query,
+                                    language=language,
+                                    preprocessed_data=preprocessed_data or {},
+                                )
+                            )
+
                         pg_result.metadata.update(
                             {
                                 "source_type": "postgresql_routing_hint",
@@ -774,6 +801,7 @@ class StandardQueryHandler(BaseQueryHandler):
                     start_time,
                     language,
                     filters,  # ✅ NOUVEAU paramètre
+                    contextual_history,  # ✅ NOUVEAU paramètre
                 )
             else:
                 logger.info("⚠️ Suggestion Weaviate ignorée (présence âge/métrique)")
@@ -792,6 +820,7 @@ class StandardQueryHandler(BaseQueryHandler):
                     start_time,
                     language,
                     filters,  # ✅ NOUVEAU paramètre
+                    contextual_history,  # ✅ NOUVEAU paramètre
                 )
 
         # PostgreSQL standard (UN SEUL APPEL) - seulement si pas déjà tenté avec routing hint
@@ -816,6 +845,19 @@ class StandardQueryHandler(BaseQueryHandler):
                     logger.info(
                         f"✅ Résultats PostgreSQL PERTINENTS pour '{query[:50]}...' - retour direct"
                     )
+
+                    # ✅ NOUVEAU: Générer réponse avec contexte conversationnel si nécessaire
+                    if result.context_docs and not result.answer:
+                        logger.info(
+                            "📝 Génération réponse PostgreSQL standard avec contexte conversationnel"
+                        )
+                        result.answer = await self._generate_response_with_generator(
+                            context_docs=result.context_docs,
+                            query=query,
+                            language=language,
+                            preprocessed_data=preprocessed_data or {},
+                        )
+
                     return result
                 else:
                     logger.warning(
@@ -840,6 +882,7 @@ class StandardQueryHandler(BaseQueryHandler):
                 start_time,
                 language,
                 filters,  # ✅ NOUVEAU paramètre
+                contextual_history,  # ✅ NOUVEAU paramètre
             )
 
         return RAGResult(
@@ -953,6 +996,7 @@ class StandardQueryHandler(BaseQueryHandler):
         start_time: float,
         language: str = "fr",
         filters: Dict[str, Any] = None,  # ✅ NOUVEAU paramètre
+        contextual_history: str = "",  # ✅ NOUVEAU paramètre pour historique
     ) -> RAGResult:
         """
         Recherche directe dans Weaviate (fallback ou routage suggéré)
@@ -978,6 +1022,27 @@ class StandardQueryHandler(BaseQueryHandler):
             if result and result.source != RAGSource.NO_RESULTS:
                 # ✅ CORRECTION: Vérifier context_docs correctement
                 doc_count = len(result.context_docs) if result.context_docs else 0
+
+                # ✅ NOUVEAU: Générer réponse avec contexte conversationnel si nécessaire
+                if result.context_docs and not result.answer:
+                    logger.info(
+                        "📝 Génération réponse Weaviate avec contexte conversationnel"
+                    )
+
+                    # Construire preprocessed_data si nécessaire
+                    preprocessed_dict = {
+                        "contextual_history": contextual_history,
+                        "normalized_query": query,
+                        "entities": entities,
+                        "language": language,
+                    }
+
+                    result.answer = await self._generate_response_with_generator(
+                        context_docs=result.context_docs,
+                        query=query,
+                        language=language,
+                        preprocessed_data=preprocessed_dict,
+                    )
 
                 # Enrichissement métadonnées
                 if is_optimization:
