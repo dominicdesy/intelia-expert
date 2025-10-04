@@ -7,13 +7,16 @@ Importe et combine tous les endpoints depuis les modules séparés
 import time
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime
-from collections import deque
 from fastapi import APIRouter
 from config.config import BASE_PATH
 
-# Import de la fonction utilitaire depuis utils (corrige l'import circulaire)
-from .utils import safe_serialize_for_json
+# Import de TOUS les utilitaires depuis utils (corrige l'import circulaire)
+from .utils import (
+    safe_serialize_for_json,
+    conversation_memory,
+    metrics_collector,
+    add_to_conversation_memory,
+)
 
 # Imports des modules d'endpoints
 from .endpoints_health import create_health_endpoints
@@ -21,51 +24,6 @@ from .endpoints_diagnostic import create_diagnostic_endpoints
 from .endpoints_chat import create_chat_endpoints
 
 logger = logging.getLogger(__name__)
-
-# ============================================================================
-# UTILITAIRES INTÉGRÉS
-# ============================================================================
-
-# Mémoire de conversation
-conversation_memory: Dict[str, deque] = {}
-
-
-def add_to_conversation_memory(
-    session_id: str, message: Dict[str, Any], max_size: int = 50
-):
-    """Ajoute un message à la mémoire de conversation"""
-    if session_id not in conversation_memory:
-        conversation_memory[session_id] = deque(maxlen=max_size)
-
-    conversation_memory[session_id].append(
-        {**message, "timestamp": datetime.now().isoformat()}
-    )
-
-
-# Collecteur de métriques
-class MetricsCollector:
-    """Collecteur simple de métriques"""
-
-    def __init__(self):
-        self.metrics: Dict[str, Any] = {
-            "total_requests": 0,
-            "successful_requests": 0,
-            "failed_requests": 0,
-            "total_tokens": 0,
-            "start_time": datetime.now().isoformat(),
-        }
-
-    def increment(self, metric: str, value: int = 1):
-        """Incrémente une métrique"""
-        if metric in self.metrics:
-            self.metrics[metric] += value
-
-    def get_metrics(self) -> Dict[str, Any]:
-        """Retourne toutes les métriques"""
-        return self.metrics.copy()
-
-
-metrics_collector = MetricsCollector()
 
 
 # ============================================================================
@@ -92,12 +50,13 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
         """Endpoint de version pour vérifier les déploiements"""
         return {
             "message": "VERSION MODULAIRE - Endpoints séparés",
-            "version": "4.1.0-modular",
+            "version": "4.1.1-modular-fixed",
             "timestamp": time.time(),
             "architecture": "modular-endpoints",
             "modules": ["health", "diagnostic", "chat", "utils"],
             "services_count": len(_services),
             "services_list": list(_services.keys()),
+            "circular_import_fixed": True,
         }
 
     @router.get(f"{BASE_PATH}/deployment-test")
@@ -105,16 +64,17 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
         """Endpoint de test simple pour confirmer le déploiement"""
         return {
             "message": "ARCHITECTURE MODULAIRE - Endpoints séparés",
-            "version": "4.1.0-modular",
+            "version": "4.1.1-modular-fixed",
             "timestamp": time.time(),
             "architecture": "modular-endpoints",
             "files": [
                 "endpoints.py",
-                "endpoints_utils.py",
+                "utils.py",
                 "endpoints_health.py",
                 "endpoints_diagnostic.py",
                 "endpoints_chat.py",
             ],
+            "circular_import_fixed": True,
         }
 
     # ========================================================================

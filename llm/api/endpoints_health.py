@@ -13,12 +13,13 @@ from fastapi.responses import JSONResponse
 from config.config import BASE_PATH
 from utils.utilities import safe_get_attribute, safe_dict_get
 from utils.imports_and_dependencies import get_full_status_report
-from .utils import safe_serialize_for_json
-from .endpoints import (
+
+# CORRECTION: Import depuis utils pour éviter l'import circulaire
+from .utils import (
+    safe_serialize_for_json,
     metrics_collector,
     conversation_memory,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -268,7 +269,7 @@ def create_health_endpoints(services: Dict[str, Any]) -> APIRouter:
                 "stats": cache_stats,
                 "timestamp": time.time(),
                 "serialization_version": "optimized_cached",
-                "memory_stats": conversation_memory.get_stats(),
+                "memory_stats": conversation_memory.get("stats", {}),
                 "performance": {"serialization_cache_hits": serialization_cache_info},
             }
 
@@ -324,7 +325,7 @@ def create_health_endpoints(services: Dict[str, Any]) -> APIRouter:
                 },
                 "application_metrics": endpoint_metrics,
                 "system_metrics": {
-                    "conversation_memory": conversation_memory.get_stats(),
+                    "conversation_memory": {},
                     "serialization_cache": serialization_cache_info,
                 },
                 "performance_metrics": {
