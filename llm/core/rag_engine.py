@@ -115,13 +115,30 @@ class InteliaRAGEngine:
         self.entity_extractor = EntityExtractor()
 
         # ✅ NOUVEAU: ConversationMemory pour historique
+        # DEBUG CRITIQUE - INITIALISATION
+        logger.info(f"🔍 INIT - openai_client type: {type(openai_client)}")
+        logger.info(f"🔍 INIT - openai_client is None: {openai_client is None}")
+        logger.info(
+            f"🔍 INIT - CONVERSATION_MEMORY_AVAILABLE: {CONVERSATION_MEMORY_AVAILABLE}"
+        )
+
         self.conversation_memory = None
         if CONVERSATION_MEMORY_AVAILABLE and ConversationMemory:
+            logger.info("🔍 INIT - Tentative d'initialisation ConversationMemory...")
             try:
                 self.conversation_memory = ConversationMemory(client=openai_client)
-                logger.info("✅ ConversationMemory initialisée")
+                logger.info(
+                    f"✅ ConversationMemory initialisée - Type: {type(self.conversation_memory)}"
+                )
             except Exception as e:
-                logger.warning(f"⚠️ Échec initialisation ConversationMemory: {e}")
+                logger.error(
+                    f"❌ INIT - Échec initialisation ConversationMemory: {e}",
+                    exc_info=True,
+                )
+        else:
+            logger.warning(
+                f"⚠️ INIT - ConversationMemory NON disponible (AVAILABLE={CONVERSATION_MEMORY_AVAILABLE})"
+            )
 
         # Handlers spécialisés
         self.temporal_handler = TemporalQueryHandler()
@@ -345,21 +362,47 @@ class InteliaRAGEngine:
         context_dict = kwargs.get("conversation_context")
 
         # ✅ NOUVEAU: Récupérer l'historique conversationnel contextuel
+        # DEBUG CRITIQUE - AVANT RÉCUPÉRATION
+        logger.info(
+            f"🔍 GENERATE - self.conversation_memory: {self.conversation_memory}"
+        )
+        logger.info(
+            f"🔍 GENERATE - conversation_memory is None: {self.conversation_memory is None}"
+        )
+        logger.info(f"🔍 GENERATE - tenant_id: {tenant_id}")
+        logger.info(f"🔍 GENERATE - query: {query[:50]}...")
+
         contextual_history = None
         if self.conversation_memory:
+            logger.info("🔍 GENERATE - TENTATIVE de récupération historique...")
             try:
                 contextual_history = (
                     await self.conversation_memory.get_contextual_memory(
                         tenant_id, query
                     )
                 )
+                logger.info(
+                    f"🔍 GENERATE - RÉSULTAT brut: type={type(contextual_history)}, value={contextual_history}"
+                )
+
                 if contextual_history:
                     self.optimization_stats["contextual_memory_queries"] += 1
                     logger.info(
                         f"📚 Historique contextuel récupéré: {len(contextual_history)} éléments"
                     )
+                else:
+                    logger.warning(
+                        f"⚠️ GENERATE - Historique VIDE retourné (contextual_history={contextual_history})"
+                    )
             except Exception as e:
-                logger.warning(f"⚠️ Échec récupération historique: {e}")
+                logger.error(
+                    f"❌ GENERATE - Exception récupération historique: {e}",
+                    exc_info=True,
+                )
+        else:
+            logger.warning(
+                "⚠️ GENERATE - conversation_memory est None, impossible de récupérer l'historique"
+            )
 
         try:
             return await self._process_query(
@@ -792,7 +835,17 @@ class InteliaRAGEngine:
             )
 
             # ✅ CORRECTION : Récupérer le contexte conversationnel
+            # DEBUG CRITIQUE - TRANSMISSION AU GÉNÉRATEUR
             contextual_history = preprocessed_data.get("contextual_history", "")
+            logger.info(
+                f"🔍 ENSURE - contextual_history type: {type(contextual_history)}"
+            )
+            logger.info(
+                f"🔍 ENSURE - contextual_history length: {len(contextual_history) if contextual_history else 0}"
+            )
+            logger.info(
+                f"🔍 ENSURE - contextual_history value: {str(contextual_history)[:200]}"
+            )
 
             # Formater l'historique pour le générateur
             conversation_context = ""
@@ -810,8 +863,13 @@ class InteliaRAGEngine:
                     conversation_context = str(contextual_history)
 
                 logger.info(
+                    f"🔍 ENSURE - conversation_context formaté: {conversation_context[:200]}"
+                )
+                logger.info(
                     f"📚 Contexte conversationnel ajouté au générateur: {len(conversation_context)} chars"
                 )
+            else:
+                logger.warning("⚠️ ENSURE - Pas d'historique dans preprocessed_data!")
 
             try:
                 # Appel du générateur avec les documents récupérés ET le contexte conversationnel
