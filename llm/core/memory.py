@@ -9,10 +9,18 @@ import time
 import os
 from typing import Dict, List, Optional, Any
 
-# Import modulaire depuis config
-from config.config import MAX_CONVERSATION_CONTEXT
-
 logger = logging.getLogger(__name__)
+
+# 🔧 Limite augmentée pour permettre plus de contexte conversationnel
+# Import avec fallback si non défini dans config
+try:
+    from config.config import MAX_CONVERSATION_CONTEXT
+
+    # Si la valeur est trop basse, utiliser 2000
+    if MAX_CONVERSATION_CONTEXT < 2000:
+        MAX_CONVERSATION_CONTEXT = 2000  # Environ 500 tokens
+except (ImportError, AttributeError):
+    MAX_CONVERSATION_CONTEXT = 2000  # Environ 500 tokens par défaut
 
 
 class ConversationMemory:
@@ -69,14 +77,29 @@ class ConversationMemory:
                 )
 
                 exchange_text = f"Q: {exchange['question'][:150]}... R: {exchange['answer'][:200]}..."
-                if total_length + len(exchange_text) <= MAX_CONVERSATION_CONTEXT:
+                exchange_length = len(exchange_text)
+
+                # 🔍 DEBUG - Vérification avant limite
+                logger.info(
+                    f"🔍 MEMORY - Longueur échange {i}: {exchange_length} caractères"
+                )
+                logger.info(
+                    f"🔍 MEMORY - Longueur actuelle contexte: {total_length} caractères"
+                )
+                logger.info(
+                    f"🔍 MEMORY - Limite MAX_CONVERSATION_CONTEXT: {MAX_CONVERSATION_CONTEXT} caractères"
+                )
+
+                if total_length + exchange_length <= MAX_CONVERSATION_CONTEXT:
                     context_parts.insert(0, exchange_text)
-                    total_length += len(exchange_text)
+                    total_length += exchange_length
                     logger.info(
                         f"🔍 MEMORY - Échange {i} ajouté, total_length: {total_length}"
                     )
                 else:
-                    logger.info(f"🔍 MEMORY - Échange {i} ignoré (dépassement limite)")
+                    logger.info(
+                        f"🔍 MEMORY - Échange {i} ignoré (dépassement limite: {total_length + exchange_length} > {MAX_CONVERSATION_CONTEXT})"
+                    )
                     break
 
             formatted_context = " | ".join(context_parts)
