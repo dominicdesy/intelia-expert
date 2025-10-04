@@ -835,39 +835,25 @@ class InteliaRAGEngine:
             )
 
             # ✅ CORRECTION : Récupérer le contexte conversationnel
-            # DEBUG CRITIQUE - TRANSMISSION AU GÉNÉRATEUR
             contextual_history = preprocessed_data.get("contextual_history", "")
+
+            # DEBUG CRITIQUE
             logger.info(
                 f"🔍 ENSURE - contextual_history type: {type(contextual_history)}"
             )
             logger.info(
-                f"🔍 ENSURE - contextual_history length: {len(contextual_history) if contextual_history else 0}"
-            )
-            logger.info(
-                f"🔍 ENSURE - contextual_history value: {str(contextual_history)[:200]}"
+                f"🔍 ENSURE - contextual_history value: {contextual_history[:200] if contextual_history else 'VIDE'}"
             )
 
             # Formater l'historique pour le générateur
             conversation_context = ""
             if contextual_history:
-                if isinstance(contextual_history, list):
-                    # Format liste de dicts
-                    conversation_context = "\n".join(
-                        [
-                            f"Q: {item.get('query', '')}\nR: {item.get('answer', '')}"
-                            for item in contextual_history
-                        ]
-                    )
-                else:
-                    # Format string déjà formaté
-                    conversation_context = str(contextual_history)
-
+                # Le contexte est déjà formaté en string
+                conversation_context = str(contextual_history)
                 logger.info(
-                    f"🔍 ENSURE - conversation_context formaté: {conversation_context[:200]}"
+                    f"📚 Contexte conversationnel transmis au générateur: {len(conversation_context)} chars"
                 )
-                logger.info(
-                    f"📚 Contexte conversationnel ajouté au générateur: {len(conversation_context)} chars"
-                )
+                logger.info(f"📚 Preview contexte: {conversation_context[:200]}")
             else:
                 logger.warning("⚠️ ENSURE - Pas d'historique dans preprocessed_data!")
 
@@ -876,7 +862,7 @@ class InteliaRAGEngine:
                 generated_answer = await self.core.generator.generate_response(
                     query=preprocessed_data.get("original_query", original_query),
                     context_docs=result.context_docs,
-                    conversation_context=conversation_context,  # ✅ CORRECTION
+                    conversation_context=conversation_context,  # ✅ CORRECTION - DOIT CONTENIR LE CONTEXTE
                     language=language,
                     intent_result=None,
                 )
