@@ -1045,11 +1045,35 @@ class StandardQueryHandler(BaseQueryHandler):
                 f"Recherche Weaviate (top_k={weaviate_top_k}, langue={language}, filters={filters})"
             )
 
+            # ✅ NOUVEAU: Extraire et convertir contextual_history pour Weaviate
+            contextual_history = preprocessed_data.get("contextual_history", "")
+
+            # ✅ CONVERSION: String → List[Dict]
+            conversation_context_list = []
+            if contextual_history:
+                # Parser le string formaté "Q: ... R: ..."
+                lines = contextual_history.split("\n")
+                current_q = ""
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith("Q: "):
+                        current_q = line[3:].strip()
+                    elif line.startswith("R: ") and current_q:
+                        conversation_context_list.append(
+                            {"question": current_q, "answer": line[3:].strip()}
+                        )
+                        current_q = ""
+
+                logger.info(
+                    f"📝 Historique conversationnel parsé: {len(conversation_context_list)} échanges"
+                )
+
             result = await self.weaviate_core.search(
                 query=query,
                 top_k=weaviate_top_k,
                 language=language,
-                filters=filters,  # ✅ NOUVEAU paramètre
+                filters=filters,
+                conversation_context=conversation_context_list,  # ✅ List[Dict]
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
