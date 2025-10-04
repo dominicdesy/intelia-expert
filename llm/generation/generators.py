@@ -785,7 +785,7 @@ class EnhancedResponseGenerator:
 
         # DEBUG CRITIQUE : Logger la langue reçue
         logger.info(
-            f"🌐 _build_enhanced_prompt received language parameter: '{language}'"
+            f"🌍 _build_enhanced_prompt received language parameter: '{language}'"
         )
         logger.debug(f"Query: '{query[:50]}...'")
 
@@ -827,9 +827,9 @@ class EnhancedResponseGenerator:
 
         # Log de détection d'espèce
         if target_species:
-            logger.info(f"🐔 Target species detected: {target_species}")
+            logger.info(f"🔍 Target species detected: {target_species}")
         else:
-            logger.debug("🐔 No specific species detected in query")
+            logger.debug("🔍 No specific species detected in query")
 
         # ✅ CORRECTION CRITIQUE: Utiliser les helpers pour extraire le contenu
         context_text_parts = []
@@ -869,6 +869,13 @@ class EnhancedResponseGenerator:
             # ✅ Instructions de langue EN TÊTE (UNE SEULE FOIS)
             language_instruction = f"""You are an expert in poultry production.
 CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
+
+FORMATTING RULES:
+- Use section headers with **bold** for main topics
+- Use bullet points with dash (-) NEVER numbered lists (1., 2., 3.)
+- Structure: **Header:** then bullet points with -
+- Keep responses concise and structured
+- No redundant numbering or formatting artifacts
 """
             system_prompt_parts.append(language_instruction)
 
@@ -925,7 +932,7 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
         Génère les instructions à partir de SUPPORTED_LANGUAGES
         """
 
-        logger.info(f"🌐 _get_critical_language_instructions received: '{language}'")
+        logger.info(f"🌍 _get_critical_language_instructions received: '{language}'")
 
         # VALIDATION DÉFENSIVE
         if not language:
@@ -940,7 +947,7 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
         # Récupérer le nom d'affichage
         language_name = self.language_display_names.get(language, language.upper())
 
-        logger.info(f"🌐 Language mapped: '{language}' → '{language_name}'")
+        logger.info(f"🌍 Language mapped: '{language}' → '{language_name}'")
 
         # Générer la liste des exemples de langues DYNAMIQUEMENT
         language_examples = self._generate_language_examples()
@@ -1132,7 +1139,18 @@ Style professionnel et structuré avec recommandations actionnables.""",
         Returns:
             Réponse post-traitée avec disclaimer vétérinaire si nécessaire
         """
+        import re
+
         response = response.strip()
+
+        # Nettoyer les listes numérotées mal formatées
+        # Exemple: "1. \n**Titre:**" → "**Titre:**"
+        response = re.sub(r"^\d+\.\s*\n\*\*", "**", response, flags=re.MULTILINE)
+        response = re.sub(r"\n\d+\.\s*\n\*\*", "\n**", response)
+        # Supprimer numéros orphelins (ligne avec juste "1." ou "2.")
+        response = re.sub(r"^\d+\.\s*$", "", response, flags=re.MULTILINE)
+        # Nettoyer lignes vides multiples
+        response = re.sub(r"\n{3,}", "\n\n", response)
 
         # Ajouter avertissement vétérinaire si la question concerne la santé/maladie
         if query and self._is_veterinary_query(query, context_docs):
