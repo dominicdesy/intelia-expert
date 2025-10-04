@@ -726,15 +726,33 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
 INSTRUCTIONS CRITIQUES - STRUCTURE ET FORMAT:
 - NE commence JAMAIS par un titre (ex: "## Maladie", "**Maladie**") - commence directement par la phrase d'introduction
 - Examine les tableaux de données pour extraire les informations précises
-- Présente 2-3 éléments principaux, pas plus
+- RÉPONDS UNIQUEMENT À LA QUESTION POSÉE - ne donne RIEN d'autre
 - Utilise un ton affirmatif mais sobre, sans formatage excessif
 - NE conclus PAS avec des recommandations pratiques sauf si explicitement demandé
-- RÉPONDS UNIQUEMENT À CE QUI EST DEMANDÉ - n'ajoute pas de métriques ou sections non sollicitées
-- Si la question porte sur le poids, donne UNIQUEMENT le poids (pas FCR, feed intake, etc.)
-- Maximum 2-3 phrases sauf si plus de détails sont explicitement demandés
+
+RÈGLE ABSOLUE - RÉPONSE MINIMALISTE:
+- Question sur le poids → Donne UNIQUEMENT le poids (1-2 phrases maximum)
+- Question sur le FCR → Donne UNIQUEMENT le FCR (1-2 phrases maximum)
+- Question sur "what about X?" → Donne UNIQUEMENT X (1-2 phrases maximum)
+- N'ajoute JAMAIS de métriques supplémentaires non demandées
+- Une question = une métrique = une réponse courte
+- Si on demande seulement le poids, NE DONNE PAS feed intake, FCR, daily gain, etc.
+
+EXEMPLES DE RÉPONSES CORRECTES:
+Question: "What's the target weight for Ross 308 males at 35 days?"
+❌ MAUVAIS: "At 35 days, males weigh 2441g with FCR 1.52 and feed intake 3720g."
+✅ BON: "The target weight for Ross 308 males at 35 days is 2441 grams."
+
+Question: "And what about females at the same age?"
+❌ MAUVAIS: "At 35 days, females weigh 2150g. Feed intake is 3028g. Daily gain is 89g."
+✅ BON: "At 35 days old, Ross 308 females have an average body weight of 2150 grams."
+
+Question: "Quel est le poids cible à 35 jours?"
+❌ MAUVAIS: "Le poids cible est 2441g avec un FCR de 1.52 et une consommation de 3720g."
+✅ BON: "Le poids cible pour les mâles Ross 308 à 35 jours est de 2441 grammes."
 
 COMPORTEMENT CONVERSATIONNEL:
-- Pour questions techniques: réponse structurée mais CONCISE avec données chiffrées
+- Pour questions techniques: réponse ULTRA-CONCISE avec données chiffrées
 - Pour questions générales: ton professionnel mais accessible, réponses courtes
 - Évite de poser trop de questions - réponds d'abord à la requête
 - N'utilise PAS d'emojis sauf si l'utilisateur en utilise
@@ -763,10 +781,11 @@ LANGUE DE VOTRE RÉPONSE DOIT ÊTRE: {language_name}
 
 🎯 CRITICAL FORMAT CONSISTENCY:
 - Answer format MUST be IDENTICAL regardless of language
-- If question asks for weight → give ONLY weight (2-3 sentences max)
-- If question asks for multiple metrics → give ONLY those metrics
-- NO extra sections, NO extra bullet points beyond what was asked
-- Maintain EXACT SAME level of detail across ALL languages
+- ONE question = ONE metric = ONE short answer (1-2 sentences)
+- If question asks ONLY for weight → give ONLY weight
+- If question asks ONLY for FCR → give ONLY FCR
+- NO extra metrics, NO extra sections, NO extra information beyond what was asked
+- Maintain EXACT SAME concise format across ALL languages
 
 {"="*80}
 """
