@@ -870,12 +870,13 @@ class EnhancedResponseGenerator:
             language_instruction = f"""You are an expert in poultry production.
 CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 
-FORMATTING RULES:
-- Use section headers with **bold** for main topics
-- Use bullet points with dash (-) NEVER numbered lists (1., 2., 3.)
-- Structure: **Header:** then bullet points with -
-- Keep responses concise and structured
-- No redundant numbering or formatting artifacts
+FORMATTING RULES - CLEAN & MODERN:
+- NO bold headers with asterisks (**Header:**) 
+- Use simple paragraph structure with clear topic sentences
+- Separate ideas with line breaks, not headers
+- Use bullet points (- ) ONLY for lists, NEVER numbered lists (1., 2., 3.)
+- Keep responses clean, concise and professional
+- NO excessive formatting or visual artifacts
 """
             system_prompt_parts.append(language_instruction)
 
@@ -1143,14 +1144,31 @@ Style professionnel et structuré avec recommandations actionnables.""",
 
         response = response.strip()
 
-        # Nettoyer les listes numérotées mal formatées
-        # Exemple: "1. \n**Titre:**" → "**Titre:**"
-        response = re.sub(r"^\d+\.\s*\n\*\*", "**", response, flags=re.MULTILINE)
-        response = re.sub(r"\n\d+\.\s*\n\*\*", "\n**", response)
-        # Supprimer numéros orphelins (ligne avec juste "1." ou "2.")
-        response = re.sub(r"^\d+\.\s*$", "", response, flags=re.MULTILINE)
-        # Nettoyer lignes vides multiples
+        # ✅ NETTOYAGE AMÉLIORÉ DU FORMATAGE
+
+        # 1. Supprimer les numéros de liste (1., 2., etc.)
+        response = re.sub(r"^\d+\.\s+", "", response, flags=re.MULTILINE)
+
+        # 2. Nettoyer les astérisques orphelins (lignes avec juste ** ou **)
+        response = re.sub(r"^\*\*\s*$", "", response, flags=re.MULTILINE)
+
+        # 3. Corriger les headers mal formés (**+Titre: → **Titre:**)
+        response = re.sub(r"\*\*\+([^:]+):", r"**\1:**", response)
+
+        # 4. S'assurer que les headers se terminent par :**
+        response = re.sub(r"\*\*([^*]+)\*\*(?!:)", r"**\1:**", response)
+
+        # 5. Nettoyer les espaces autour des headers
+        response = re.sub(r"\n\s*\*\*", "\n**", response)
+
+        # 6. Nettoyer les lignes vides multiples (3+ → 2)
         response = re.sub(r"\n{3,}", "\n\n", response)
+
+        # 7. Supprimer les espaces en fin de ligne
+        response = re.sub(r" +$", "", response, flags=re.MULTILINE)
+
+        # 8. S'assurer qu'il y a un espace après les bullet points
+        response = re.sub(r"^-([^ ])", r"- \1", response, flags=re.MULTILINE)
 
         # Ajouter avertissement vétérinaire si la question concerne la santé/maladie
         if query and self._is_veterinary_query(query, context_docs):
