@@ -117,6 +117,49 @@ class MetricsCollector:
     def api_correction_applied(self, correction_type: str):
         self.api_corrections[correction_type] += 1
 
+    def record_query(
+        self, tenant_id: str, query: str, response_time: float, status: str, **kwargs
+    ):
+        """
+        Enregistre les métriques complètes d'une requête
+
+        Args:
+            tenant_id: Identifiant du tenant
+            query: Texte de la requête
+            response_time: Temps de réponse en secondes
+            status: Statut de la requête (success, error, etc.)
+            **kwargs: Métriques additionnelles (source, tokens, intent, etc.)
+        """
+        # Incrémenter les compteurs appropriés
+        self.inc(f"query_{status}")
+        self.inc("total_queries")
+
+        # Enregistrer la latence
+        self.observe_latency(response_time)
+
+        # Métriques additionnelles optionnelles
+        if "source" in kwargs:
+            self.search_stats[f"source_{kwargs['source']}"] += 1
+
+        if "tokens" in kwargs:
+            self.counters["total_tokens"] += kwargs["tokens"]
+
+        if "intent" in kwargs:
+            intent_type = kwargs["intent"]
+            confidence = kwargs.get("confidence", 0.0)
+            self.intent_detected(intent_type, confidence)
+
+        if "cache_hit" in kwargs and kwargs["cache_hit"]:
+            cache_type = kwargs.get("cache_type", "general")
+            self.cache_hit(cache_type)
+
+        # Log pour debugging
+        logger.debug(
+            f"Query recorded - tenant: {tenant_id}, "
+            f"status: {status}, time: {response_time:.3f}s, "
+            f"extras: {list(kwargs.keys())}"
+        )
+
     def snapshot(self):
         p50 = statistics.median(self.last_100_lat) if self.last_100_lat else 0.0
         p95 = (

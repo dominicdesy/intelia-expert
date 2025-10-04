@@ -14,9 +14,11 @@ from config.config import BASE_PATH
 from .utils import (
     safe_serialize_for_json,
     conversation_memory,
-    metrics_collector,
     add_to_conversation_memory,
 )
+
+# Import du MetricsCollector centralisé depuis utils
+from utils.metrics_collector import METRICS as metrics_collector
 
 # Imports des modules d'endpoints
 from .endpoints_health import create_health_endpoints
@@ -50,13 +52,14 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
         """Endpoint de version pour vérifier les déploiements"""
         return {
             "message": "VERSION MODULAIRE - Endpoints séparés",
-            "version": "4.1.1-modular-fixed",
+            "version": "4.1.2-metrics-centralized",
             "timestamp": time.time(),
             "architecture": "modular-endpoints",
             "modules": ["health", "diagnostic", "chat", "utils"],
             "services_count": len(_services),
             "services_list": list(_services.keys()),
             "circular_import_fixed": True,
+            "metrics_centralized": True,
         }
 
     @router.get(f"{BASE_PATH}/deployment-test")
@@ -64,7 +67,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
         """Endpoint de test simple pour confirmer le déploiement"""
         return {
             "message": "ARCHITECTURE MODULAIRE - Endpoints séparés",
-            "version": "4.1.1-modular-fixed",
+            "version": "4.1.2-metrics-centralized",
             "timestamp": time.time(),
             "architecture": "modular-endpoints",
             "files": [
@@ -75,6 +78,8 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
                 "endpoints_chat.py",
             ],
             "circular_import_fixed": True,
+            "metrics_centralized": True,
+            "metrics_source": "utils.metrics_collector.METRICS",
         }
 
     # ========================================================================

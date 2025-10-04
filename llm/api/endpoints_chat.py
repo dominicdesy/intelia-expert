@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_chat.py - Endpoints de chat et streaming avec Système RAG JSON
-Version 5.0.0 - SIMPLIFIÉ AVEC QUERY ROUTER
+Version 5.0.1 - CORRIGÉ: record_query() avec signature correcte
 Le contexte conversationnel est maintenant géré par QueryRouter dans RAGEngine
 """
 
@@ -86,7 +86,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 **result,
                 "processing_time": time.time() - start_time,
                 "timestamp": time.time(),
-                "version": "5.0.0_query_router",
+                "version": "5.0.1_metrics_fixed",
             }
 
             return JSONResponse(content=safe_serialize_for_json(response))
@@ -344,7 +344,8 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
         """
         Chat endpoint simplifié
 
-        VERSION 5.0.0:
+        VERSION 5.0.1:
+        - CORRIGÉ: Appel metrics_collector.record_query() avec signature correcte
         - Le QueryRouter dans RAGEngine gère TOUT:
           * Extraction d'entités
           * Contexte conversationnel
@@ -417,10 +418,23 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     genetic_line_filter=genetic_line_filter,
                 )
 
-            # Métriques
+            # CORRECTION CRITIQUE: Signature correcte de record_query()
             total_processing_time = time.time() - total_start_time
+
+            # Extraire les informations de rag_result
+            source = str(getattr(rag_result, "source", "unknown"))
+            confidence = float(getattr(rag_result, "confidence", 0.0))
+
+            # Appel avec la signature correcte
             metrics_collector.record_query(
-                rag_result, "rag_enhanced_json", total_processing_time
+                tenant_id=tenant_id,
+                query=message,
+                response_time=total_processing_time,
+                status="success",
+                source=source,
+                confidence=confidence,
+                language=detected_language,
+                use_json_search=use_json_search,
             )
 
             # Streaming de la réponse
@@ -439,9 +453,17 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             raise
         except Exception as e:
             logger.error(f"Erreur chat endpoint: {e}", exc_info=True)
+
+            # CORRECTION CRITIQUE: Signature correcte pour cas d'erreur
             metrics_collector.record_query(
-                {"source": "error"}, "error", time.time() - total_start_time
+                tenant_id=tenant_id if "tenant_id" in locals() else "unknown",
+                query=message if "message" in locals() else "error",
+                response_time=time.time() - total_start_time,
+                status="error",
+                error_type=type(e).__name__,
+                error_message=str(e),
             )
+
             return JSONResponse(
                 status_code=500, content={"error": f"Erreur traitement: {str(e)}"}
             )
@@ -490,7 +512,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                             safe_get_attribute(rag_result, "confidence", 0.5)
                         ),
                         "json_system": metadata.get("json_system", {}),
-                        "architecture": "query-router-v5",
+                        "architecture": "query-router-v5.0.1",
                     }
 
                     yield sse_event(safe_serialize_for_json(expert_metadata))
@@ -573,7 +595,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     {
                         "type": "start",
                         "reason": "out_of_domain",
-                        "architecture": "query-router-v5",
+                        "architecture": "query-router-v5.0.1",
                     }
                 )
 
@@ -586,7 +608,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     {
                         "type": "end",
                         "confidence": 1.0,
-                        "architecture": "query-router-v5",
+                        "architecture": "query-router-v5.0.1",
                     }
                 )
 
@@ -697,7 +719,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     if successful_tests == total_tests
                     else "DEGRADED" if successful_tests > 0 else "FAILED"
                 ),
-                "version": "5.0.0_query_router",
+                "version": "5.0.1_metrics_fixed",
             }
 
             return safe_serialize_for_json(analysis)
