@@ -113,54 +113,7 @@
       "treatment": {
         "canonical": "การรักษา",
         "confidence": 0.95,
-        "variants": ["การรักษา", "treatment", "การให้ยา", "medication", "การบำบัด", "therapy", "การรักษาโรค"]
-      },
-      "lab_diagnostics": {
-        "canonical": "การวินิจฉัยห้องปฏิบัติการ",
-        "confidence": 0.95,
-        "variants": ["การวินิจฉัย", "diagnostic", "การทดสอบ", "test", "การวิเคราะห์", "analyse", "ห้องปฏิบัติการ", "laboratory", "lab"]
-      }
-    },
-
-    "system_messages": {
-      "out_of_domain": {
-        "canonical": "นอกขอบเขต",
-        "confidence": 1.0,
-        "variants": ["นอกขอบเขต", "out of domain", "นอกขอบข่าย", "outside scope", "ไม่อยู่ในโดเมน"]
-      },
-      "error_generic": {
-        "canonical": "ข้อผิดพลาดทั่วไป",
-        "confidence": 1.0,
-        "variants": ["ข้อผิดพลาด", "error", "ข้อผิดพลาดทั่วไป", "generic error", "ข้อผิดพลาดการประมวลผล"]
-      },
-      "welcome": {
-        "canonical": "ยินดีต้อนรับ",
-        "confidence": 1.0,
-        "variants": ["ยินดีต้อนรับ", "welcome", "การทักทาย", "greeting", "สวัสดี", "hello"]
-      },
-      "clarification_needed": {
-        "canonical": "ต้องการคำชี้แจง",
-        "confidence": 1.0,
-        "variants": ["ต้องการคำชี้แจง", "clarification needed", "กรุณาชี้แจง", "please clarify", "ต้องการข้อมูลเพิ่มเติม"]
-      },
-      "no_results": {
-        "canonical": "ไม่มีผลลัพธ์",
-        "confidence": 1.0,
-        "variants": ["ไม่มีผลลัพธ์", "no results", "ไม่พบอะไร", "nothing found", "ไม่มีข้อมูล"]
-      },
-      "processing": {
-        "canonical": "กำลังประมวลผล",
-        "confidence": 1.0,
-        "variants": ["กำลังประมวลผล", "processing", "กรุณารอสักครู่", "please wait", "กำลังทำงาน"]
-      },
-      "farewell": {
-        "canonical": "ลาก่อน",
-        "confidence": 1.0,
-        "variants": ["ลาก่อน", "goodbye", "สวัสดี", "farewell", "บาย", "bye"]
-      }
-    }
-  }
-}", "treatment", "การบำบัด", "การให้ยา", "การดูแล"]
+        "variants": ["การรักษา", "treatment", "การบำบัด", "การให้ยา", "การดูแล"]
       },
       "coccidiosis": {
         "canonical": "โรคลำไส้อักเสบ",
@@ -908,4 +861,51 @@
       "treatment": {
         "canonical": "การรักษา",
         "confidence": 0.95,
-        "variants": ["การรักษา
+        "variants": ["การรักษา", "treatment", "การให้ยา", "medication", "การบำบัด", "therapy", "การรักษาโรค"]
+      },
+      "lab_diagnostics": {
+        "canonical": "การวินิจฉัยห้องปฏิบัติการ",
+        "confidence": 0.95,
+        "variants": ["การวินิจฉัย", "diagnostic", "การทดสอบ", "test", "การวิเคราะห์", "analyse", "ห้องปฏิบัติการ", "laboratory", "lab"]
+      }
+    },
+
+    "system_messages": {
+      "out_of_domain": {
+        "canonical": "นอกขอบเขต",
+        "confidence": 1.0,
+        "variants": ["นอกขอบเขต", "out of domain", "นอกขอบข่าย", "outside scope", "ไม่อยู่ในโดเมน"]
+      },
+      "error_generic": {
+        "canonical": "ข้อผิดพลาดทั่วไป",
+        "confidence": 1.0,
+        "variants": ["ข้อผิดพลาด", "error", "ข้อผิดพลาดทั่วไป", "generic error", "ข้อผิดพลาดการประมวลผล"]
+      },
+      "welcome": {
+        "canonical": "ยินดีต้อนรับ",
+        "confidence": 1.0,
+        "variants": ["ยินดีต้อนรับ", "welcome", "การทักทาย", "greeting", "สวัสดี", "hello"]
+      },
+      "clarification_needed": {
+        "canonical": "ต้องการคำชี้แจง",
+        "confidence": 1.0,
+        "variants": ["ต้องการคำชี้แจง", "clarification needed", "กรุณาชี้แจง", "please clarify", "ต้องการข้อมูลเพิ่มเติม"]
+      },
+      "no_results": {
+        "canonical": "ไม่มีผลลัพธ์",
+        "confidence": 1.0,
+        "variants": ["ไม่มีผลลัพธ์", "no results", "ไม่พบอะไร", "nothing found", "ไม่มีข้อมูล"]
+      },
+      "processing": {
+        "canonical": "กำลังประมวลผล",
+        "confidence": 1.0,
+        "variants": ["กำลังประมวลผล", "processing", "กรุณารอสักครู่", "please wait", "กำลังทำงาน"]
+      },
+      "farewell": {
+        "canonical": "ลาก่อน",
+        "confidence": 1.0,
+        "variants": ["ลาก่อน", "goodbye", "สวัสดี", "farewell", "บาย", "bye"]
+      }
+    }
+  }
+}
