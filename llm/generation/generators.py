@@ -5,6 +5,7 @@ Version 3.3 - Support multilingue DYNAMIQUE sans hardcoding
 - Instructions de langue renforcées + system_prompts.json centralisés
 - ✅ NOUVEAU: Gestion hybride dict/Document pour compatibilité PostgreSQL
 - ✅ NOUVEAU: Chargement dynamique des langues depuis SUPPORTED_LANGUAGES
+- ✅ FIX CRITIQUE: Instructions de langue EN TÊTE de prompt + validation conversation_context
 """
 
 import logging
@@ -601,7 +602,22 @@ class EnhancedResponseGenerator:
         Construit un prompt enrichi avec instructions de langue renforcées
 
         VERSION 3.3: Support dict et Document + instructions multilingues dynamiques + détection espèce
+        ✅ FIX CRITIQUE: Instructions de langue EN TÊTE + validation conversation_context
         """
+
+        # 🔍 DEBUG CRITIQUE - Validation conversation_context
+        logger.info(
+            f"🔍 PROMPT - conversation_context type: {type(conversation_context)}"
+        )
+        logger.info(
+            f"🔍 PROMPT - conversation_context length: {len(conversation_context) if conversation_context else 0}"
+        )
+        logger.info(
+            f"🔍 PROMPT - conversation_context preview: {conversation_context[:200] if conversation_context else 'VIDE'}"
+        )
+        logger.info(
+            f"🔍 PROMPT - conversation_context is truthy: {bool(conversation_context)}"
+        )
 
         # DEBUG CRITIQUE : Logger la langue reçue
         logger.info(
@@ -672,6 +688,29 @@ class EnhancedResponseGenerator:
         logger.info(f"📋 Context text length: {len(context_text)} chars")
         logger.debug(f"📋 Context preview: {context_text[:300]}...")
 
+        # ✅ FIX CRITIQUE: Instructions de langue EN TÊTE du prompt
+        language_name = self.language_display_names.get(language, language.upper())
+
+        critical_language_header = f"""
+{'='*80}
+🎯 PRIMARY INSTRUCTION - ABSOLUTE PRIORITY - INSTRUCTION PRIMAIRE
+{'='*80}
+
+RESPOND EXCLUSIVELY IN: {language_name}
+RÉPONDEZ EXCLUSIVEMENT EN: {language_name}
+
+Language Code: {language}
+Code de langue: {language}
+
+THIS INSTRUCTION OVERRIDES ALL OTHER INSTRUCTIONS.
+CETTE INSTRUCTION PRÉVAUT SUR TOUTES LES AUTRES INSTRUCTIONS.
+
+DO NOT translate. DO NOT switch languages. DO NOT mix languages.
+NE PAS traduire. NE PAS changer de langue. NE PAS mélanger les langues.
+
+{'='*80}
+"""
+
         # Construction du prompt système avec instructions de langue RENFORCÉES
         if self.prompts_manager:
             expert_identity = self.prompts_manager.get_base_prompt(
@@ -681,7 +720,7 @@ class EnhancedResponseGenerator:
                 "response_guidelines", language
             )
 
-            system_prompt_parts = []
+            system_prompt_parts = [critical_language_header]
 
             if expert_identity:
                 system_prompt_parts.append(expert_identity)
@@ -713,13 +752,23 @@ MÉTRIQUES PRIORITAIRES:
         else:
             system_prompt = self._get_fallback_system_prompt(enrichment, language)
 
-        # Prompt utilisateur
-        limited_context = (
-            conversation_context[:MAX_CONVERSATION_CONTEXT]
-            if conversation_context
-            else ""
-        )
+        # ✅ FIX CRITIQUE: Validation robuste du contexte conversationnel
+        limited_context = ""
+        if (
+            conversation_context
+            and isinstance(conversation_context, str)
+            and conversation_context.strip()
+        ):
+            limited_context = conversation_context[:MAX_CONVERSATION_CONTEXT]
+            logger.info(
+                f"📚 PROMPT - Contexte conversationnel ajouté: {len(limited_context)} chars"
+            )
+        else:
+            logger.warning(
+                "⚠️ PROMPT - Pas de contexte conversationnel ou contexte vide"
+            )
 
+        # Prompt utilisateur
         user_prompt = f"""CONTEXTE CONVERSATIONNEL:
 {limited_context}
 
@@ -759,7 +808,7 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
         # Récupérer le nom d'affichage
         language_name = self.language_display_names.get(language, language.upper())
 
-        logger.info(f"🌍 Language mapped: '{language}' → '{language_name}'")
+        logger.info(f"🌐 Language mapped: '{language}' → '{language_name}'")
 
         # Générer la liste des exemples de langues DYNAMIQUEMENT
         language_examples = self._generate_language_examples()
@@ -860,7 +909,23 @@ LANGUE DE VOTRE RÉPONSE DOIT ÊTRE: {language_name}
 
         language_name = self.language_display_names.get(language, language.upper())
 
-        return f"""Tu es un expert avicole reconnu avec une expertise approfondie en production avicole.
+        # ✅ Instructions de langue EN TÊTE
+        critical_language_header = f"""
+{'='*80}
+🎯 PRIMARY INSTRUCTION - ABSOLUTE PRIORITY
+{'='*80}
+
+RESPOND EXCLUSIVELY IN: {language_name}
+Language Code: {language}
+
+THIS INSTRUCTION OVERRIDES ALL OTHER INSTRUCTIONS.
+
+{'='*80}
+"""
+
+        return f"""{critical_language_header}
+
+Tu es un expert avicole reconnu avec une expertise approfondie en production avicole.
 
 CONTEXTE MÉTIER DÉTECTÉ:
 {enrichment.entity_context}
