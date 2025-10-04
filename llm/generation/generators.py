@@ -22,6 +22,15 @@ from config.config import (
 )
 from utils.utilities import METRICS
 
+# Import du gestionnaire de messages pour disclaimers vétérinaires
+try:
+    from config.messages import get_message
+
+    MESSAGES_AVAILABLE = True
+except ImportError:
+    MESSAGES_AVAILABLE = False
+    logging.warning("config.messages non disponible pour disclaimers vétérinaires")
+
 # Import du gestionnaire de prompts centralisé
 try:
     from config.system_prompts import get_prompts_manager
@@ -294,6 +303,104 @@ class EnhancedResponseGenerator:
         logger.info(f"✅ Fallback language names loaded: {len(result)} languages")
         return result
 
+    def _is_veterinary_query(self, query: str, context_docs: List) -> bool:
+        """
+        Détecte si la question concerne un sujet vétérinaire
+        Utilise les mots-clés pour détecter les questions vétérinaires
+
+        Args:
+            query: Question de l'utilisateur
+            context_docs: Documents de contexte (Document ou dict)
+
+        Returns:
+            True si question vétérinaire détectée
+        """
+        query_lower = query.lower()
+
+        # Mots-clés vétérinaires multilingues
+        veterinary_keywords = [
+            # Core veterinary terms (work across languages)
+            "disease",
+            "maladie",
+            "krankheit",
+            "enfermedad",
+            "malattia",
+            "treatment",
+            "traitement",
+            "behandlung",
+            "tratamiento",
+            "trattamento",
+            "symptom",
+            "symptôme",
+            "symptom",
+            "síntoma",
+            "sintomo",
+            "infection",
+            "infektion",
+            "infección",
+            "infezione",
+            "virus",
+            "bacteria",
+            "bactérie",
+            "bakterie",
+            "antibiotic",
+            "antibiotique",
+            "antibiotikum",
+            "antibiótico",
+            "vaccine",
+            "vaccin",
+            "impfstoff",
+            "vacuna",
+            "vaccino",
+            "mortality",
+            "mortalité",
+            "mortalidad",
+            "mortalità",
+            "diagnosis",
+            "diagnostic",
+            "diagnose",
+            "diagnóstico",
+        ]
+
+        # Vérifier dans la query
+        has_vet_keywords = any(
+            keyword in query_lower for keyword in veterinary_keywords
+        )
+
+        # Vérifier dans les documents (premiers 3 docs, 500 chars chacun)
+        if context_docs and not has_vet_keywords:
+            doc_content = " ".join(
+                [self._get_doc_content(doc)[:500] for doc in context_docs[:3]]
+            ).lower()
+            has_vet_content = any(
+                keyword in doc_content for keyword in veterinary_keywords[:15]
+            )
+        else:
+            has_vet_content = False
+
+        return has_vet_keywords or has_vet_content
+
+    def _get_veterinary_disclaimer(self, language: str = "fr") -> str:
+        """
+        Retourne l'avertissement vétérinaire depuis languages.json
+
+        Args:
+            language: Code langue (fr, en, es, de, it, pt, nl, pl, hi, id, th, zh)
+
+        Returns:
+            Texte de l'avertissement ou string vide si non disponible
+        """
+        if not MESSAGES_AVAILABLE:
+            logger.debug("Messages non disponibles, pas de disclaimer vétérinaire")
+            return ""
+
+        try:
+            disclaimer = get_message("veterinary_disclaimer", language)
+            return f"\n\n{disclaimer}"
+        except Exception as e:
+            logger.warning(f"Erreur récupération veterinary_disclaimer: {e}")
+            return ""
+
     def _get_doc_content(self, doc: Union[Document, dict]) -> str:
         """
         Extrait le contenu d'un document (dict ou objet Document)
@@ -421,11 +528,13 @@ class EnhancedResponseGenerator:
 
             generated_response = response.choices[0].message.content.strip()
 
-            # Post-traitement
+            # Post-traitement avec disclaimer vétérinaire
             enhanced_response = self._post_process_response(
                 generated_response,
                 enrichment,
                 [self._doc_to_dict(doc) for doc in context_docs],
+                query=query,
+                language=lang,
             )
 
             # Mettre en cache
@@ -948,10 +1057,36 @@ Style professionnel et structuré avec recommandations actionnables.""",
         return base_prompt
 
     def _post_process_response(
-        self, response: str, enrichment: ContextEnrichment, context_docs: List[Dict]
+        self,
+        response: str,
+        enrichment: ContextEnrichment,
+        context_docs: List[Dict],
+        query: str = "",
+        language: str = "fr",
     ) -> str:
-        """Post-traitement minimaliste"""
-        return response.strip()
+        """
+        Post-traitement avec ajout automatique d'avertissement vétérinaire
+
+        Args:
+            response: Réponse générée
+            enrichment: Enrichissement du contexte
+            context_docs: Documents de contexte (format dict)
+            query: Question originale
+            language: Langue de la réponse
+
+        Returns:
+            Réponse post-traitée avec avertissement si nécessaire
+        """
+        response = response.strip()
+
+        # Ajouter avertissement vétérinaire si nécessaire
+        if query and self._is_veterinary_query(query, context_docs):
+            disclaimer = self._get_veterinary_disclaimer(language)
+            if disclaimer:  # Seulement si disclaimer non vide
+                response = response + disclaimer
+                logger.info(f"🏥 Avertissement vétérinaire ajouté (langue: {language})")
+
+        return response
 
 
 # Factory function

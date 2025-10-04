@@ -30,7 +30,8 @@
       "farewell",
       "success_generic",
       "feedback_thanks",
-      "feedback_request"
+      "feedback_request",
+      "veterinary_disclaimer"
     ],
     "last_updated": "2025-01-15",
     "encoding": "utf-8"
@@ -50,7 +51,8 @@
       "farewell": "Au revoir ! N'hésitez pas à revenir si vous avez d'autres questions sur l'aviculture.",
       "success_generic": "Opération effectuée avec succès.",
       "feedback_thanks": "Merci pour votre retour ! Cela nous aide à améliorer Intelia Expert.",
-      "feedback_request": "Cette réponse vous a-t-elle été utile ? Votre avis nous aide à nous améliorer."
+      "feedback_request": "Cette réponse vous a-t-elle été utile ? Votre avis nous aide à nous améliorer.",
+      "veterinary_disclaimer": "**Important** : Ces informations sont fournies à titre éducatif. Pour toute question concernant la santé de vos animaux, consultez un vétérinaire qualifié qui pourra établir un diagnostic précis et prescrire un traitement adapté."
     },
 
     "en": {
@@ -66,7 +68,8 @@
       "farewell": "Goodbye! Feel free to come back if you have more questions about poultry.",
       "success_generic": "Operation completed successfully.",
       "feedback_thanks": "Thank you for your feedback! It helps us improve Intelia Expert.",
-      "feedback_request": "Was this answer helpful? Your feedback helps us improve."
+      "feedback_request": "Was this answer helpful? Your feedback helps us improve.",
+      "veterinary_disclaimer": "**Important**: This information is provided for educational purposes. For any questions regarding your animals' health, consult a qualified veterinarian who can provide an accurate diagnosis and appropriate treatment."
     },
 
     "es": {
@@ -82,7 +85,8 @@
       "farewell": "¡Hasta luego! No dude en volver si tiene más preguntas sobre avicultura.",
       "success_generic": "Operación completada con éxito.",
       "feedback_thanks": "¡Gracias por su comentario! Nos ayuda a mejorar Intelia Expert.",
-      "feedback_request": "¿Le resultó útil esta respuesta? Sus comentarios nos ayudan a mejorar."
+      "feedback_request": "¿Le resultó útil esta respuesta? Sus comentarios nos ayudan a mejorar.",
+      "veterinary_disclaimer": "**Importante**: Esta información se proporciona con fines educativos. Para cualquier pregunta sobre la salud de sus animales, consulte a un veterinario calificado."
     },
 
     "de": {
@@ -98,7 +102,8 @@
       "farewell": "Auf Wiedersehen! Zögern Sie nicht, zurückzukommen, wenn Sie weitere Fragen zur Geflügelzucht haben.",
       "success_generic": "Vorgang erfolgreich abgeschlossen.",
       "feedback_thanks": "Vielen Dank für Ihr Feedback! Es hilft uns, Intelia Expert zu verbessern.",
-      "feedback_request": "War diese Antwort hilfreich? Ihr Feedback hilft uns, uns zu verbessern."
+      "feedback_request": "War diese Antwort hilfreich? Ihr Feedback hilft uns, uns zu verbessern.",
+      "veterinary_disclaimer": "**Wichtig**: Diese Informationen dienen nur zu Bildungszwecken. Bei Fragen zur Gesundheit Ihrer Tiere konsultieren Sie bitte einen qualifizierten Tierarzt."
     },
 
     "it": {
@@ -114,7 +119,8 @@
       "farewell": "Arrivederci! Non esitare a tornare se hai altre domande sull'avicoltura.",
       "success_generic": "Operazione completata con successo.",
       "feedback_thanks": "Grazie per il tuo feedback! Ci aiuta a migliorare Intelia Expert.",
-      "feedback_request": "Questa risposta è stata utile? Il tuo feedback ci aiuta a migliorare."
+      "feedback_request": "Questa risposta è stata utile? Il tuo feedback ci aiuta a migliorare.",
+      "veterinary_disclaimer": "**Importante**: Queste informazioni sono fornite a scopo educativo. Per qualsiasi domanda sulla salute dei vostri animali, consultate un veterinario qualificato."
     },
 
     "pt": {
@@ -130,7 +136,8 @@
       "farewell": "Até logo! Não hesite em voltar se tiver mais perguntas sobre avicultura.",
       "success_generic": "Operação concluída com sucesso.",
       "feedback_thanks": "Obrigado pelo seu feedback! Isso nos ajuda a melhorar o Intelia Expert.",
-      "feedback_request": "Esta resposta foi útil? Seu feedback nos ajuda a melhorar."
+      "feedback_request": "Esta resposta foi útil? Seu feedback nos ajuda a melhorar.",
+      "veterinary_disclaimer": "**Importante**: Esta informação é fornecida para fins educacionais. Para qualquer questão relacionada à saúde dos seus animais, consulte um veterinário qualificado."
     },
 
     "nl": {
@@ -146,7 +153,8 @@
       "farewell": "Tot ziens! Aarzel niet om terug te komen als u meer vragen heeft over pluimveehouderij.",
       "success_generic": "Operatie succesvol voltooid.",
       "feedback_thanks": "Bedankt voor uw feedback! Het helpt ons Intelia Expert te verbeteren.",
-      "feedback_request": "Was dit antwoord nuttig? Uw feedback helpt ons te verbeteren."
+      "feedback_request": "Was dit antwoord nuttig? Uw feedback helpt ons te verbeteren.",
+      "veterinary_disclaimer": "**Belangrijk**: Deze informatie wordt verstrekt voor educatieve doeleinden. Voor vragen over de gezondheid van uw dieren, raadpleeg een gekwalificeerde dierenarts."
     },
 
     "pl": {
@@ -162,7 +170,8 @@
       "farewell": "Do widzenia! Nie wahaj się wrócić, jeśli masz więcej pytań o drobiarstwie.",
       "success_generic": "Operacja zakończona pomyślnie.",
       "feedback_thanks": "Dziękujemy za opinię! Pomaga nam ulepszyć Intelia Expert.",
-      "feedback_request": "Czy ta odpowiedź była pomocna? Twoja opinia pomaga nam się poprawić."
+      "feedback_request": "Czy ta odpowiedź była pomocna? Twoja opinia pomaga nam się poprawić.",
+      "veterinary_disclaimer": "**Ważne**: Te informacje są podawane w celach edukacyjnych. W przypadku jakichkolwiek pytań dotyczących zdrowia zwierząt, skonsultuj się z wykwalifikowanym weterynarzem."
     },
 
     "zh": {
@@ -178,7 +187,8 @@
       "farewell": "再见!如果您对家禽养殖有更多问题,请随时回来。",
       "success_generic": "操作成功完成。",
       "feedback_thanks": "感谢您的反馈!这有助于我们改进 Intelia Expert。",
-      "feedback_request": "这个答案对您有帮助吗?您的反馈帮助我们改进。"
+      "feedback_request": "这个答案对您有帮助吗?您的反馈帮助我们改进。",
+      "veterinary_disclaimer": "**重要提示**:此信息仅供教育目的。有关动物健康的任何问题,请咨询合格的兽医。"
     },
 
     "hi": {
@@ -194,7 +204,8 @@
       "farewell": "अलविदा! यदि पोल्ट्री के बारे में आपके और प्रश्न हैं तो वापस आने में संकोच न करें।",
       "success_generic": "ऑपरेशन सफलतापूर्वक पूर्ण हुआ।",
       "feedback_thanks": "आपकी प्रतिक्रिया के लिए धन्यवाद! यह हमें इंटेलिया एक्सपर्ट में सुधार करने में मदद करता है।",
-      "feedback_request": "क्या यह उत्तर सहायक था? आपकी प्रतिक्रिया हमें सुधारने में मदद करती है।"
+      "feedback_request": "क्या यह उत्तर सहायक था? आपकी प्रतिक्रिया हमें सुधारने में मदद करती है।",
+      "veterinary_disclaimer": "**महत्वपूर्ण**: यह जानकारी शैक्षिक उद्देश्यों के लिए प्रदान की गई है। अपने पशुओं के स्वास्थ्य के बारे में किसी भी प्रश्न के लिए, एक योग्य पशु चिकित्सक से परामर्श करें।"
     },
 
     "id": {
@@ -210,7 +221,8 @@
       "farewell": "Selamat tinggal! Jangan ragu untuk kembali jika Anda memiliki lebih banyak pertanyaan tentang unggas.",
       "success_generic": "Operasi berhasil diselesaikan.",
       "feedback_thanks": "Terima kasih atas masukan Anda! Ini membantu kami meningkatkan Intelia Expert.",
-      "feedback_request": "Apakah jawaban ini membantu? Masukan Anda membantu kami meningkatkan."
+      "feedback_request": "Apakah jawaban ini membantu? Masukan Anda membantu kami meningkatkan.",
+      "veterinary_disclaimer": "**Penting**: Informasi ini disediakan untuk tujuan pendidikan. Untuk pertanyaan mengenai kesehatan hewan Anda, konsultasikan dengan dokter hewan yang berkualifikasi."
     },
 
     "th": {
@@ -226,7 +238,8 @@
       "farewell": "ลาก่อน! อย่าลังเลที่จะกลับมาถ้าคุณมีคำถามเพิ่มเติมเกี่ยวกับสัตว์ปีก",
       "success_generic": "ดำเนินการเสร็จสมบูรณ์",
       "feedback_thanks": "ขอบคุณสำหรับความคิดเห็นของคุณ! มันช่วยให้เราปรับปรุง Intelia Expert ได้",
-      "feedback_request": "คำตอบนี้มีประโยชน์หรือไม่? ความคิดเห็นของคุณช่วยให้เราปรับปรุงได้"
+      "feedback_request": "คำตอบนี้มีประโยชน์หรือไม่? ความคิดเห็นของคุณช่วยให้เราปรับปรุงได้",
+      "veterinary_disclaimer": "**สำคัญ**: ข้อมูลนี้จัดทำขึ้นเพื่อการศึกษาเท่านั้น สำหรับคำถามเกี่ยวกับสุขภาพของสัตว์ กรุณาปรึกษาสัตวแพทย์ที่มีคุณสมบัติ"
     }
   },
 
