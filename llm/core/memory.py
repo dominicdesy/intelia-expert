@@ -30,11 +30,24 @@ class ConversationMemory:
 
     async def get_contextual_memory(self, tenant_id: str, current_query: str) -> str:
         """Récupère le contexte conversationnel enrichi"""
+
+        # 🔍 DEBUG CRITIQUE - Logs d'entrée
+        logger.info("🔍 MEMORY - get_contextual_memory appelée")
+        logger.info(f"🔍 MEMORY - tenant_id: {tenant_id}")
+        logger.info(f"🔍 MEMORY - current_query: {current_query[:50]}...")
+        logger.info(f"🔍 MEMORY - memory_store keys: {list(self.memory_store.keys())}")
+
         if tenant_id not in self.memory_store:
+            logger.info(f"🔍 MEMORY - Aucun historique pour tenant_id: {tenant_id}")
             return ""
 
         history = self.memory_store[tenant_id]
+
+        # 🔍 DEBUG - État de l'historique
+        logger.info(f"🔍 MEMORY - Historique trouvé, longueur: {len(history)}")
+
         if not history:
+            logger.info(f"🔍 MEMORY - Historique vide pour tenant_id: {tenant_id}")
             return ""
 
         try:
@@ -42,18 +55,50 @@ class ConversationMemory:
             context_parts = []
             total_length = 0
 
-            for exchange in reversed(history[-3:]):  # 3 derniers max
+            # 🔍 DEBUG - Traitement des échanges
+            logger.info(
+                f"🔍 MEMORY - Traitement des {len(history[-3:])} derniers échanges"
+            )
+
+            for i, exchange in enumerate(reversed(history[-3:])):  # 3 derniers max
+                logger.info(
+                    f"🔍 MEMORY - Échange {i}: Q={exchange['question'][:50]}... R={exchange['answer'][:50]}..."
+                )
+
                 exchange_text = f"Q: {exchange['question'][:150]}... R: {exchange['answer'][:200]}..."
                 if total_length + len(exchange_text) <= MAX_CONVERSATION_CONTEXT:
                     context_parts.insert(0, exchange_text)
                     total_length += len(exchange_text)
+                    logger.info(
+                        f"🔍 MEMORY - Échange {i} ajouté, total_length: {total_length}"
+                    )
                 else:
+                    logger.info(f"🔍 MEMORY - Échange {i} ignoré (dépassement limite)")
                     break
 
-            return " | ".join(context_parts)
+            formatted_context = " | ".join(context_parts)
+
+            # 🔍 DEBUG - Résultat final
+            logger.info(
+                f"🔍 MEMORY - Contexte formaté (longueur: {len(formatted_context)})"
+            )
+            logger.info(
+                f"🔍 MEMORY - Contexte preview: {formatted_context[:200] if formatted_context else 'VIDE'}..."
+            )
+            logger.info(
+                f"🔍 MEMORY - MAX_CONVERSATION_CONTEXT utilisé: {MAX_CONVERSATION_CONTEXT}"
+            )
+
+            return formatted_context
 
         except Exception as e:
-            logger.warning(f"Erreur mémoire: {e}")
+            logger.error(
+                f"❌ MEMORY - Exception dans get_contextual_memory: {e}", exc_info=True
+            )
+            logger.error(f"❌ MEMORY - Type erreur: {type(e).__name__}")
+            logger.error(
+                f"❌ MEMORY - État memory_store au moment de l'erreur: {len(self.memory_store)}"
+            )
             return ""
 
     def add_exchange(self, tenant_id: str, question: str, answer: str):
@@ -136,7 +181,7 @@ class ConversationMemory:
         }
 
         logger.info(
-            f"🔔 Clarification marquée en attente pour {tenant_id}: "
+            f"🔒 Clarification marquée en attente pour {tenant_id}: "
             f"manquant={missing_fields}"
         )
 
@@ -292,7 +337,7 @@ class ConversationMemory:
             # Si c'est une phrase complète, essayer d'extraire l'info clé
             merged = f"{original_query}. Contexte additionnel: {clarification_clean}"
 
-        logger.info(f"📝 Question fusionnée: {merged[:100]}...")
+        logger.info(f"🔗 Question fusionnée: {merged[:100]}...")
         return merged
 
     def get_all_pending_clarifications(self) -> Dict[str, Dict[str, Any]]:
