@@ -1040,13 +1040,13 @@ class StandardQueryHandler(BaseQueryHandler):
             return self._format_context_as_fallback(context_docs)
 
         try:
-            # ✅ NOUVEAU : Récupérer l'historique depuis preprocessed_data
-            conversation_history = preprocessed_data.get("conversation_history", "")
+            # ✅ BONNE CLÉ: Récupérer l'historique depuis preprocessed_data
+            conversation_history = preprocessed_data.get("contextual_history", "")
 
             logger.info(
                 f"📝 Génération réponse avec historique "
                 f"(docs={len(context_docs)}, langue={language}, "
-                f"historique={len(conversation_history)} chars)"
+                f"historique={'OUI' if conversation_history else 'NON'})"
             )
 
             response = await self.response_generator.generate_response(
