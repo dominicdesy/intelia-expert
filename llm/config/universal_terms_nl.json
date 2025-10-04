@@ -3,36 +3,244 @@
     "language": "nl",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 19,
-    "description": "Universele terminologie voor expertsysteem in pluimveeproductie - Nederlandse versie"
+    "total_domains": 24,
+    "description": "Universele terminologie voor pluimveeproductie expert systeem - Nederlandse versie"
   },
 
   "domains": {
+    "contextual_references": {
+      "same": {
+        "canonical": "zelfde",
+        "confidence": 0.90,
+        "variants": ["zelfde", "same", "dezelfde", "hetzelfde", "op hetzelfde"]
+      },
+      "same_age": {
+        "canonical": "zelfde_leeftijd",
+        "confidence": 0.90,
+        "variants": ["op dezelfde leeftijd", "same age", "zelfde leeftijd", "op leeftijd", "in hetzelfde stadium"]
+      },
+      "and_for": {
+        "canonical": "en_voor",
+        "confidence": 0.90,
+        "variants": ["en voor", "and for", "en voor de", "evenals voor", "eveneens voor"]
+      },
+      "what_about": {
+        "canonical": "hoe_zit_het_met",
+        "confidence": 0.90,
+        "variants": ["hoe zit het met", "what about", "hoe zit het", "en wat betreft", "en met betrekking tot"]
+      },
+      "females": {
+        "canonical": "vrouwtjes",
+        "confidence": 0.95,
+        "variants": ["vrouwtjes", "females", "de vrouwtjes", "vrouwelijk", "hennen", "de hennen"]
+      },
+      "males": {
+        "canonical": "mannetjes",
+        "confidence": 0.95,
+        "variants": ["mannetjes", "males", "de mannetjes", "mannelijk", "hanen", "de hanen"]
+      },
+      "and_the": {
+        "canonical": "en_de",
+        "confidence": 0.90,
+        "variants": ["en de", "and the", "evenals de", "samen met de"]
+      },
+      "also_for": {
+        "canonical": "ook_voor",
+        "confidence": 0.90,
+        "variants": ["ook voor", "also for", "eveneens voor", "evenzo voor", "hetzelfde voor"]
+      }
+    },
+
+    "metrics": {
+      "weight": {
+        "canonical": "gewicht",
+        "confidence": 0.95,
+        "variants": ["gewicht", "weight", "massa", "lichaamsgewicht", "kg", "gram", "g", "lbs"]
+      },
+      "fcr": {
+        "canonical": "vcr",
+        "confidence": 0.95,
+        "variants": ["vcr", "fcr", "voederconversie", "feed conversion", "conversieratio", "voederefficiëntie"]
+      },
+      "gain": {
+        "canonical": "groei",
+        "confidence": 0.95,
+        "variants": ["groei", "gain", "gewichtstoename", "toename", "groei", "adg"]
+      },
+      "conversion": {
+        "canonical": "conversie",
+        "confidence": 0.95,
+        "variants": ["conversie", "conversion", "conversieverhouding", "efficiëntie"]
+      },
+      "consumption": {
+        "canonical": "consumptie",
+        "confidence": 0.95,
+        "variants": ["consumptie", "consumption", "opname", "intake", "geconsumeerd", "gegeten", "voeropname"]
+      },
+      "production": {
+        "canonical": "productie",
+        "confidence": 0.95,
+        "variants": ["productie", "production", "opbrengst", "yield", "productiviteit", "prestatie"]
+      },
+      "growth": {
+        "canonical": "groei",
+        "confidence": 0.95,
+        "variants": ["groei", "growth", "ontwikkeling", "groeien", "groeisnelheid"]
+      },
+      "performance": {
+        "canonical": "prestatie",
+        "confidence": 0.95,
+        "variants": ["prestatie", "performance", "resultaten", "efficiëntie", "opbrengst"]
+      },
+      "index": {
+        "canonical": "index",
+        "confidence": 0.95,
+        "variants": ["index", "ratio", "coëfficiënt", "percentage", "factor"]
+      }
+    },
+
+    "health": {
+      "disease": {
+        "canonical": "ziekte",
+        "confidence": 0.95,
+        "variants": ["ziekte", "disease", "pathologie", "infectie", "aandoening", "infectieziekte"]
+      },
+      "symptoms": {
+        "canonical": "symptomen",
+        "confidence": 0.95,
+        "variants": ["symptomen", "symptoms", "tekenen", "manifestaties", "klinische tekenen", "indicaties"]
+      },
+      "treatment": {
+        "canonical": "behandeling",
+        "confidence": 0.95,
+        "variants": ["behandeling", "treatment", "therapie", "medicatie", "genezing", "zorg"]
+      },
+      "coccidiosis": {
+        "canonical": "coccidiose",
+        "confidence": 0.95,
+        "variants": ["coccidiose", "coccidiosis", "coccidia", "eimeria", "coccidiostat"]
+      },
+      "vaccination": {
+        "canonical": "vaccinatie",
+        "confidence": 0.95,
+        "variants": ["vaccinatie", "vaccination", "vaccin", "immunisatie", "profylaxe", "vaccineren"]
+      },
+      "gumboro": {
+        "canonical": "gumboro",
+        "confidence": 0.95,
+        "variants": ["gumboro", "gumboro ziekte", "infectieuze bursitis", "ibdv", "ibd"]
+      },
+      "enteritis": {
+        "canonical": "enteritis",
+        "confidence": 0.95,
+        "variants": ["enteritis", "necrotische enteritis", "darmontsteking"]
+      },
+      "mortality": {
+        "canonical": "mortaliteit",
+        "confidence": 0.95,
+        "variants": ["mortaliteit", "mortality", "sterfte", "dood", "sterfgevallen", "verliezen", "sterftecijfer"]
+      },
+      "diagnosis": {
+        "canonical": "diagnose",
+        "confidence": 0.95,
+        "variants": ["diagnose", "diagnosis", "diagnostic", "analyse", "identificatie", "detectie"]
+      }
+    },
+
+    "environment": {
+      "temperature": {
+        "canonical": "temperatuur",
+        "confidence": 0.95,
+        "variants": ["temperatuur", "temperature", "temp", "graden", "celsius", "warmte"]
+      },
+      "humidity": {
+        "canonical": "luchtvochtigheid",
+        "confidence": 0.95,
+        "variants": ["luchtvochtigheid", "humidity", "rv", "relatieve vochtigheid", "vocht", "vochtigheidsniveau"]
+      },
+      "ventilation": {
+        "canonical": "ventilatie",
+        "confidence": 0.95,
+        "variants": ["ventilatie", "ventilation", "luchtstroom", "luchtuitwisseling", "luchtcirculatie"]
+      },
+      "lighting": {
+        "canonical": "verlichting",
+        "confidence": 0.95,
+        "variants": ["verlichting", "lighting", "licht", "belichting", "helderheid"]
+      },
+      "density": {
+        "canonical": "bezettingsdichtheid",
+        "confidence": 0.95,
+        "variants": ["bezettingsdichtheid", "density", "bezetting", "kg/m2", "dieren/m2"]
+      },
+      "space": {
+        "canonical": "ruimte",
+        "confidence": 0.95,
+        "variants": ["ruimte", "space", "oppervlakte", "cm/dier", "beschikbare ruimte"]
+      },
+      "feeder": {
+        "canonical": "voerbak",
+        "confidence": 0.95,
+        "variants": ["voerbak", "feeder", "voersysteem", "voerpan", "trog"]
+      },
+      "drinker": {
+        "canonical": "drinkbak",
+        "confidence": 0.95,
+        "variants": ["drinkbak", "drinker", "watersysteem", "drinkpunt"]
+      },
+      "light": {
+        "canonical": "licht",
+        "confidence": 0.95,
+        "variants": ["licht", "light", "lighting", "lux", "lichtintensiteit", "fotoperiode"]
+      }
+    },
+
+    "species": {
+      "broiler": {
+        "canonical": "vleeskuiken",
+        "database_value": "broiler",
+        "confidence": 0.95,
+        "variants": ["vleeskuiken", "broiler", "vleeskuikens", "vleeskip", "vleesproductie"]
+      },
+      "layer": {
+        "canonical": "leghen",
+        "database_value": "layer",
+        "confidence": 0.95,
+        "variants": ["leghen", "layer", "leghennen", "legkip", "eierproductie"]
+      },
+      "breeder": {
+        "canonical": "ouderdier",
+        "database_value": "breeder",
+        "confidence": 0.95,
+        "variants": ["ouderdier", "breeder", "ouderdieren", "fokdier", "fokkoppel"]
+      }
+    },
+
     "general_terms": {
       "poultry": {
         "canonical": "pluimvee",
         "confidence": 0.95,
-        "variants": ["pluimvee", "pluimveehouderij", "pluimveeproductie", "gevogelte", "kippen"]
+        "variants": ["pluimvee", "poultry", "pluimveehouderij", "pluimveeproductie"]
       },
       "farm": {
         "canonical": "bedrijf",
         "confidence": 0.95,
-        "variants": ["bedrijf", "boerderij", "stal", "locatie", "productielocatie"]
+        "variants": ["bedrijf", "farm", "boerderij", "productielocatie", "faciliteit"]
       },
       "management": {
         "canonical": "management",
         "confidence": 0.90,
-        "variants": ["management", "beheer", "bedrijfsvoering", "leiding", "administratie"]
+        "variants": ["management", "beheer", "bedrijfsvoering", "administratie"]
       },
       "production": {
         "canonical": "productie",
         "confidence": 0.90,
-        "variants": ["productie", "opbrengst", "rendement", "productiviteit", "prestatie"]
+        "variants": ["productie", "production", "opbrengst", "productiviteit"]
       },
       "quality": {
         "canonical": "kwaliteit",
         "confidence": 0.90,
-        "variants": ["kwaliteit", "standaard", "classificatie", "klasse"]
+        "variants": ["kwaliteit", "quality", "standaard", "klasse", "classificatie"]
       }
     },
 
@@ -40,57 +248,57 @@
       "weight_query": {
         "canonical": "gewicht_vraag",
         "confidence": 0.92,
-        "variants": ["wat is het gewicht", "streefgewicht", "gemiddeld gewicht", "hoeveel weegt", "welk gewicht"]
+        "variants": ["wat is het gewicht", "what is the weight", "streefgewicht", "gemiddeld gewicht", "hoeveel weegt", "welk gewicht"]
       },
       "fcr_query": {
-        "canonical": "vc_vraag",
+        "canonical": "vcr_vraag",
         "confidence": 0.92,
-        "variants": ["optimale voederconversie", "voederconversie", "vc", "conversie", "gemiddelde vc"]
+        "variants": ["optimale vcr", "optimal fcr", "voederconversie", "feed conversion", "conversieratio", "gemiddelde vcr"]
       },
       "water_query": {
         "canonical": "water_vraag",
         "confidence": 0.92,
-        "variants": ["waterverbruik", "wateropname", "liter per dag", "ml per dier"]
+        "variants": ["waterconsumptie", "water consumption", "wateropname", "water intake", "liter per dag", "ml per dier"]
       },
       "nutrient_requirement_query": {
-        "canonical": "nutrient_vraag",
+        "canonical": "voedingsstof_vraag",
         "confidence": 0.92,
-        "variants": ["eiwitgehalte", "lysinebehoefte", "calciumbehoefte", "fosforgehalte"]
+        "variants": ["eiwitniveau", "protein level", "lysine behoefte", "calcium behoefte", "fosforgehalte"]
       },
       "environment_setpoint_query": {
         "canonical": "klimaat_vraag",
         "confidence": 0.92,
-        "variants": ["optimale temperatuur", "streeftemperatuur", "streefvochtigheid", "maximale co2", "ventilatie instelling"]
+        "variants": ["optimale temperatuur", "optimal temperature", "streef luchtvochtigheid", "maximale co2", "ventilatie instelling"]
       },
       "production_index_query": {
-        "canonical": "index_vraag",
+        "canonical": "productie_index_vraag",
         "confidence": 0.92,
-        "variants": ["gemiddelde epef", "normale productiegetal", "efficiëntie index", "efficiëntie index", "algehele prestatie"]
+        "variants": ["gemiddelde epef", "average epef", "normale iep", "efficiëntie index", "algehele prestatie"]
       },
       "vaccination_protocol_query": {
-        "canonical": "vaccinatie_vraag",
+        "canonical": "vaccinatie_protocol_vraag",
         "confidence": 0.92,
-        "variants": ["vaccinatieprotocol", "vaccinatieschema", "vaccinatieplan", "ent schema", "immunisatieplan"]
+        "variants": ["vaccinatieprotocol", "vaccination protocol", "vaccinatieschema", "vaccinatieprogramma", "immunisatieplan"]
       },
       "space_equipment_query": {
-        "canonical": "apparatuur_vraag",
+        "canonical": "ruimte_apparatuur_vraag",
         "confidence": 0.92,
-        "variants": ["voerruimte", "nippel instelling", "drinkbakhoogte", "cm per dier"]
+        "variants": ["voerruimte", "feeder space", "nippel instelling", "drinkbak hoogte", "cm per dier"]
       },
       "problem_report": {
         "canonical": "probleem_melding",
         "confidence": 0.90,
-        "variants": ["mijn kippen", "ik observeer", "mijn hennen", "probleem met", "mijn dieren"]
+        "variants": ["mijn kippen", "my chickens", "ik zie", "i observe", "mijn hennen", "probleem met", "mijn dieren"]
       },
       "health_diagnosis": {
         "canonical": "gezondheid_diagnose",
         "confidence": 0.92,
-        "variants": ["welke symptomen", "diagnose", "ziekte", "wat veroorzaakt", "klinische tekenen"]
+        "variants": ["welke symptomen", "what symptoms", "diagnose", "diagnosis", "ziekte", "disease", "wat veroorzaakt", "klinische tekenen"]
       },
       "management_how": {
         "canonical": "management_hoe",
         "confidence": 0.90,
-        "variants": ["hoe te managen", "hoe te behandelen", "wat te doen", "hoe te verbeteren", "beheer van"]
+        "variants": ["hoe te beheren", "how to manage", "hoe te behandelen", "how to treat", "wat te doen", "what to do", "hoe te verbeteren"]
       }
     },
 
@@ -98,7 +306,7 @@
       "ross_308": {
         "canonical": "ross_308",
         "confidence": 0.95,
-        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "ross 308 broiler"]
+        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "ross 308 broiler", "ross308 ap", "ross 308 ap"]
       },
       "ross_708": {
         "canonical": "ross_708",
@@ -143,12 +351,12 @@
       "isa_brown": {
         "canonical": "isa_brown",
         "confidence": 0.95,
-        "variants": ["isa brown", "isa", "isa-brown", "isa brown leghen", "isa kip"]
+        "variants": ["isa brown", "isa", "isa-brown", "isa brown layer", "isa brown hen"]
       },
       "lohmann_brown": {
         "canonical": "lohmann_brown",
         "confidence": 0.95,
-        "variants": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "lohmann brown leghen"]
+        "variants": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "lohmann brown layer"]
       },
       "hy_line": {
         "canonical": "hy_line",
@@ -161,47 +369,47 @@
       "feed_conversion_ratio": {
         "canonical": "voederconversie",
         "confidence": 0.95,
-        "variants": ["vc", "voederconversie", "voederconversiefactor", "voerconversie", "voerefficiëntie", "voerefficiëntie", "cumulatieve voederconversie", "conversie", "vcf"]
+        "variants": ["vcr", "voederconversie", "feed conversion ratio", "voederconversieratio", "conversieratio", "voederefficiëntie", "conversie-efficiëntie", "cumulatieve voederconversie", "vcr ratio"]
       },
       "average_daily_gain": {
         "canonical": "dagelijkse_groei",
         "confidence": 0.95,
-        "variants": ["dg", "dagelijkse groei", "groei per dag", "g/dag", "dagelijkse gewichtstoename", "groei", "groeisnelheid"]
+        "variants": ["dg", "dagelijkse groei", "average daily gain", "adg", "dagelijkse gewichtstoename", "g/dag", "gemiddelde groei", "groeisnelheid"]
       },
       "feed_intake": {
         "canonical": "voeropname",
         "confidence": 0.95,
-        "variants": ["voeropname", "voerverbruik", "voerconsumptie", "vo", "g/dier/dag", "dagelijkse voeropname", "verbruikt voer", "cumulatieve voeropname"]
+        "variants": ["voeropname", "feed intake", "vi", "voerconsumptie", "g/dier/dag", "dagelijkse voeropname", "voer geconsumeerd", "dagelijkse consumptie", "voer gegeten", "cumulatieve voeropname", "totale voeropname", "voer per dier"]
       },
       "water_intake": {
         "canonical": "wateropname",
         "confidence": 0.95,
-        "variants": ["wateropname", "waterverbruik", "waterconsumptie", "l/1000/dag", "ml/dier/dag", "dagelijkse wateropname", "verbruikt water", "water per dier"]
+        "variants": ["wateropname", "water intake", "waterconsumptie", "l/1000/dag", "ml/dier/dag", "dagelijkse wateropname", "water geconsumeerd", "water per dier", "drinkwater", "watergebruik"]
       },
       "body_weight": {
         "canonical": "lichaamsgewicht",
         "confidence": 0.95,
-        "variants": ["gewicht", "lichaamsgewicht", "levend gewicht", "gemiddeld gewicht", "streefgewicht", "lg", "diergewicht", "individueel gewicht", "standaard gewicht"]
+        "variants": ["gewicht", "lichaamsgewicht", "body weight", "levend gewicht", "gemiddeld gewicht", "streefgewicht", "lg", "diergewicht", "individueel gewicht", "gemiddeld gewicht", "standaard gewicht"]
       },
       "mortality": {
         "canonical": "mortaliteit",
         "confidence": 0.95,
-        "variants": ["mortaliteit", "uitval", "sterfte", "sterftecijfer", "verlies", "mortaliteitspercentage", "cumulatieve mortaliteit", "dagelijkse mortaliteit", "dode dieren", "verliezen", "overlevingspercentage"]
+        "variants": ["mortaliteit", "mortality", "sterfte", "sterftepercentage", "dood", "sterftecijfer", "verliezen", "cumulatieve mortaliteit", "dagelijkse mortaliteit", "dode dieren", "uitval", "overlevingspercentage"]
       },
       "egg_production": {
         "canonical": "eierproductie",
         "confidence": 0.95,
-        "variants": ["eierproductie", "legpercentage", "productiepercentage", "leg", "productie", "eieren per hen", "hen dag productie", "legprestatie", "dagelijkse productie"]
+        "variants": ["eierproductie", "egg production", "legpercentage", "productiepercentage", "legcijfer", "eieropbrengst", "eieren per hen", "hen-dag productie", "legpercentage", "eieropbrengst", "dagelijkse productie"]
       },
       "uniformity": {
         "canonical": "uniformiteit",
         "confidence": 0.95,
-        "variants": ["uniformiteit", "variëtiecoëfficiënt", "variatiecoëfficient", "cv", "homogeniteit", "gelijkmatigheid", "koppel uniformiteit", "gewicht uniformiteit", "consistentie"]
+        "variants": ["uniformiteit", "uniformity", "variatiecoëfficiënt", "coefficient of variation", "cv", "homogeniteit", "gelijkmatigheid", "koppel uniformiteit", "gewicht uniformiteit", "grootte uniformiteit", "variatiecoëfficiënt", "consistentie"]
       },
       "epef": {
         "canonical": "epef",
         "confidence": 0.95,
-        "variants": ["epef", "productiegetal", "europees productiegetal", "efficiëntie index", "efficiëntie index", "productiefactor"]
+        "variants": ["epef", "productie-efficiëntiefactor", "production efficiency factor", "prestatie-index", "performance index", "efficiëntie-index", "efficiency index", "europese productie-efficiëntiefactor", "efficiëntiefactor", "productie-index", "prestatiefactor"]
       }
     },
 
@@ -209,63 +417,63 @@
       "broiler_farm": {
         "canonical": "vleeskuikenbedrijf",
         "confidence": 0.95,
-        "variants": ["vleeskuiken", "vleeskuikenbedrijf", "vleeskip", "broiler", "vleeskuikenhouderij"]
+        "variants": ["vleeskuiken", "broiler", "vleeskuikenbedrijf", "broiler farm", "vleeskip", "kippenbedrijf", "pluimveebedrijf"]
       },
       "layer_farm": {
         "canonical": "leghennenbedrijf",
         "confidence": 0.95,
-        "variants": ["leghen", "leghennen", "leghennenbedrijf", "legkip", "legpluimvee"]
+        "variants": ["leghen", "layer", "leghennenbedrijf", "layer farm", "eierbedrijf", "egg farm", "legkip", "kippenstal"]
       },
       "breeder_farm": {
-        "canonical": "vermeerderingsbedrijf",
+        "canonical": "ouderdierbedrijf",
         "confidence": 0.95,
-        "variants": ["vermeerdering", "vermeerderingsbedrijf", "ouderdieren", "moederdieren", "parent stock"]
+        "variants": ["ouderdierbedrijf", "breeder farm", "fokbedrijf", "breeding farm", "ouderdieren", "parent stock", "fokdieren", "fokstapel"]
       },
       "hatchery": {
         "canonical": "broederij",
         "confidence": 0.95,
-        "variants": ["broederij", "uitbroeden", "kuikenbroederij", "broedlocatie"]
+        "variants": ["broederij", "hatchery", "incubatie", "incubation", "uitkomstfaciliteit"]
       },
       "feed_mill": {
         "canonical": "voerfabriek",
         "confidence": 0.95,
-        "variants": ["voerfabriek", "molen", "voerproducent", "mengvoerfabriek"]
+        "variants": ["voerfabriek", "feed mill", "voermolen", "molen", "voerinstallatie"]
       }
     },
 
     "production_phases": {
       "starter": {
-        "canonical": "startvoer",
+        "canonical": "startfase",
         "confidence": 0.95,
-        "variants": ["starter", "startvoer", "startfase", "fase 1", "pre-starter", "voorfase"]
+        "variants": ["starter", "start", "startfase", "starting phase", "fase 1", "pre-starter", "prestarter"]
       },
       "grower": {
-        "canonical": "opfokvoer",
+        "canonical": "groeifase",
         "confidence": 0.95,
-        "variants": ["grower", "opfokvoer", "groeifase", "fase 2", "ontwikkeling", "groei"]
+        "variants": ["groeier", "grower", "groeifase", "growing phase", "fase 2", "ontwikkeling", "groei"]
       },
       "finisher": {
-        "canonical": "afmestvoer",
+        "canonical": "afmestfase",
         "confidence": 0.95,
-        "variants": ["finisher", "afmestvoer", "eindvoer", "fase 3", "afmestfase", "eindgroeifase"]
+        "variants": ["afmester", "finisher", "afmestfase", "finishing phase", "finish", "fase 3", "eindstadium"]
       }
     },
 
     "sex_categories": {
       "male": {
-        "canonical": "haan",
+        "canonical": "mannelijk",
         "confidence": 0.95,
-        "variants": ["haan", "mannetje", "mannelijk", "haantje", "m"]
+        "variants": ["mannelijk", "male", "mannetjes", "haan", "hanen", "mannelijke broiler", "mannelijke kip", "m", "mannelijke dieren"]
       },
       "female": {
-        "canonical": "hen",
+        "canonical": "vrouwelijk",
         "confidence": 0.95,
-        "variants": ["hen", "vrouwtje", "vrouwelijk", "kip", "v"]
+        "variants": ["vrouwelijk", "female", "vrouwtjes", "hen", "hennen", "vrouwelijke broiler", "vrouwelijke kip", "v", "vrouwelijke dieren"]
       },
       "as_hatched": {
         "canonical": "gemengd",
         "confidence": 0.95,
-        "variants": ["gemengd", "ongegeslacht", "niet gesekst", "straight run", "sr", "mix", "beide geslachten"]
+        "variants": ["gemengd", "as-hatched", "ashatched", "as hatched", "mixed", "ongeslacht", "straight run", "straight-run", "sr", "gemengd geslacht", "beide geslachten"]
       }
     },
 
@@ -273,17 +481,17 @@
       "broiler": {
         "canonical": "vleeskuiken",
         "confidence": 0.95,
-        "variants": ["vleeskuiken", "vleeskip", "broiler", "slachtkip"]
+        "variants": ["vleeskuiken", "broiler", "vleeskip", "meat chicken", "vleeskuikens", "kip voor vlees"]
       },
       "layer": {
         "canonical": "leghen",
         "confidence": 0.95,
-        "variants": ["leghen", "legkip", "layer", "legpluimvee"]
+        "variants": ["leghen", "layer", "legkip", "laying hen", "leghennen", "eierlegger"]
       },
       "breeder": {
-        "canonical": "moederdier",
+        "canonical": "ouderdier",
         "confidence": 0.95,
-        "variants": ["moederdier", "ouderdier", "breeder", "parent stock", "fokdier"]
+        "variants": ["ouderdier", "breeder", "ouderdieren", "parent stock", "fokdier"]
       },
       "pullet": {
         "canonical": "opfokhen",
@@ -291,42 +499,42 @@
         "variants": ["opfokhen", "pullet", "jonge hen", "opfokdier"]
       },
       "chick": {
-        "canonical": "eendagskuiken",
+        "canonical": "kuiken",
         "confidence": 0.95,
-        "variants": ["eendagskuiken", "kuiken", "doc", "day old chick", "pieper"]
+        "variants": ["kuiken", "chick", "eendagskuiken", "day-old", "day old chick", "dok"]
       }
     },
 
     "equipment_types": {
       "chain_feeder": {
-        "canonical": "kettingvoer",
+        "canonical": "kettenvoer",
         "confidence": 0.95,
-        "variants": ["kettingvoer", "voerketting", "kettingsysteem", "chain feeder"]
+        "variants": ["kettenvoer", "chain feeder", "voerketting", "kettingvoersysteem", "feedchain"]
       },
       "pan_feeder": {
         "canonical": "rondevoerbak",
         "confidence": 0.95,
-        "variants": ["rondevoerbak", "voerpan", "pan feeder", "ronde bak"]
+        "variants": ["rondevoerbak", "pan feeder", "voerpan", "feed pan", "ronde voerbak"]
       },
       "tube_feeder": {
         "canonical": "buisvoerbak",
         "confidence": 0.95,
-        "variants": ["buisvoerbak", "voerbuis", "tube feeder", "buissysteem"]
+        "variants": ["buisvoerbak", "tube feeder", "voerbuis", "tubulaire voerbak"]
       },
       "bell_drinker": {
-        "canonical": "rondedrinkbak",
+        "canonical": "ronddrinkbak",
         "confidence": 0.95,
-        "variants": ["rondedrinkbak", "drinkklok", "bell drinker", "hangende drinkbak"]
+        "variants": ["ronddrinkbak", "bell drinker", "klokdrinkbak", "hangende drinkbak"]
       },
       "cup_drinker": {
-        "canonical": "cupdrinkbak",
+        "canonical": "kopjesdrinkbak",
         "confidence": 0.95,
-        "variants": ["cupdrinkbak", "drinkbakje", "cup drinker", "bekertje"]
+        "variants": ["kopjesdrinkbak", "cup drinker", "drinkbekertje", "waterbekertje"]
       },
       "nipple_drinker": {
-        "canonical": "nippeldrinker",
+        "canonical": "drinknippel",
         "confidence": 0.95,
-        "variants": ["nippeldrinker", "nippel", "nipple drinker", "drinknippel"]
+        "variants": ["drinknippel", "nipple drinker", "nippelsysteem", "nipple system"]
       },
       "tunnel_ventilation": {
         "canonical": "tunnelventilatie",
@@ -336,88 +544,88 @@
       "cross_ventilation": {
         "canonical": "dwarsventilatie",
         "confidence": 0.95,
-        "variants": ["dwarsventilatie", "cross ventilation", "kruisventilatie", "transversale ventilatie"]
+        "variants": ["dwarsventilatie", "cross ventilation", "transversale ventilatie", "dwarsstroming"]
       },
       "radiant_heaters": {
-        "canonical": "straalverwarmers",
+        "canonical": "stralingsverwarming",
         "confidence": 0.95,
-        "variants": ["straalverwarmers", "radiant heaters", "stralingsverwarming", "infraroodverwarming"]
+        "variants": ["stralingsverwarming", "radiant heaters", "straalverwarming", "radiant tubes", "infraroodverwarming"]
       },
       "hot_air_blowers": {
         "canonical": "heteluchtkanon",
         "confidence": 0.95,
-        "variants": ["heteluchtkanon", "hot air blowers", "warmtekanon", "luchtverwarmer"]
+        "variants": ["heteluchtkanon", "hot air blowers", "geforceerde luchtverwarming", "warme lucht ventilator"]
       }
     },
 
     "pathologies": {
       "avian_influenza": {
-        "canonical": "vogelgriep",
+        "canonical": "vogelpest",
         "confidence": 0.95,
-        "variants": ["vogelgriep", "avian influenza", "ai", "h5n1", "h7n9", "aviëre influenza", "aviere influenza"]
+        "variants": ["vogelpest", "avian influenza", "vogelgriep", "bird flu", "ai", "h5n1", "h7n9"]
       },
       "mareks_disease": {
         "canonical": "marek",
         "confidence": 0.95,
-        "variants": ["marek", "marek ziekte", "mareks disease", "md", "lymfoïde tumoren", "lymfoide tumoren"]
+        "variants": ["marek", "mareks disease", "marek disease", "md", "lymfoïde tumoren", "verlamming"]
       },
       "gumboro": {
         "canonical": "gumboro",
         "confidence": 0.95,
-        "variants": ["gumboro", "gumboro ziekte", "infectious bursal disease", "ibd", "ibdv", "bursaziekte"]
+        "variants": ["gumboro", "gumboro ziekte", "gumboro disease", "infectieuze bursitis", "infectious bursal disease", "ibdv", "ibd"]
       },
       "newcastle": {
         "canonical": "newcastle",
         "confidence": 0.95,
-        "variants": ["newcastle", "newcastle disease", "nd", "pseudo vogelpest"]
+        "variants": ["newcastle", "newcastle disease", "nd", "aviaire paramyxovirus", "pseudo-vogelpest"]
       },
       "coccidiosis": {
         "canonical": "coccidiose",
         "confidence": 0.95,
-        "variants": ["coccidiose", "coccidiosis", "coccidiën", "coccidiën", "eimeria"]
+        "variants": ["coccidiose", "coccidiosis", "coccidia", "eimeria", "coccidiostat"]
       },
       "colibacillosis": {
         "canonical": "colibacillose",
         "confidence": 0.95,
-        "variants": ["colibacillose", "colibacillosis", "e.coli", "e coli", "escherichia coli"]
+        "variants": ["colibacillose", "colibacillosis", "e.coli", "escherichia coli", "e coli"]
       },
       "necrotic_enteritis": {
         "canonical": "necrotische_enteritis",
         "confidence": 0.95,
-        "variants": ["necrotische enteritis", "necrotic enteritis", "ne", "clostridium perfringens", "darmnecrose"]
+        "variants": ["necrotische enteritis", "necrotic enteritis", "clostridium perfringens", "ne", "darmnecrose"]
       },
       "salmonella": {
-        "canonical": "salmonellose",
+        "canonical": "salmonella",
         "confidence": 0.95,
-        "variants": ["salmonellose", "salmonellosis", "salmonella", "hoeders tyfus"]
+        "variants": ["salmonella", "salmonellosis", "salmonellose", "paratyfus", "pullorum"]
       },
       "mycoplasma": {
-        "canonical": "mycoplasmose",
+        "canonical": "mycoplasma",
         "confidence": 0.95,
-        "variants": ["mycoplasmose", "mycoplasmosis", "mycoplasma", "crd", "chronische luchtweginfectie"]
+        "variants": ["mycoplasma", "mycoplasmosis", "mycoplasmose", "chronische luchtwegaandoening", "crd"]
       },
       "infectious_bronchitis": {
         "canonical": "infectieuze_bronchitis",
         "confidence": 0.95,
-        "variants": ["infectieuze bronchitis", "infectious bronchitis", "ib", "ibv", "bronchitisvirus"]
+        "variants": ["ibv", "infectieuze bronchitis", "infectious bronchitis", "ib", "bronchitis virus"]
       }
     },
 
     "clinical_signs": {
       "respiratory": {
-        "canonical": "respiratoir",
+        "canonical": "ademhalings",
         "confidence": 0.95,
-        "variants": ["respiratoir", "respiratory", "ademhaling", "hoesten", "rochelen", "neusuitvloeiing", "niezen"]
+        "variants": ["ademhalings", "respiratory", "hoesten", "dyspneu", "ademhaling", "neusuitvloeiing", "rochelen", "niezen"]
       },
       "digestive": {
-        "canonical": "vertering",
+        "canonical": "spijsverterings",
         "confidence": 0.95,
-        "variants": ["vertering", "digestive", "spijsvertering", "diarree", "braken", "anorexia", "verminderde eetlust"]
+        "variants": ["spijsverterings", "digestive", "diarree", "braken", "anorexia", "verminderde eetlust", "enteritis"]
       },
       "nervous": {
-        "canonical": "zenuwstelsel",
+        "canonical": "zenuw",
         "confidence": 0.95,
-        "variants": ["zenuwstelsel", "nervous", "neurologisch", "ataxie", "verlamming", "convulsies", "trillen"]
+        "variants": ["zenuw", "nervous", "ataxie", "verlamming", "stuipen", "trillen", "neurologisch"]
       },
       "general": {
         "canonical": "algemeen",
@@ -427,12 +635,12 @@
       "lameness": {
         "canonical": "kreupelheid",
         "confidence": 0.95,
-        "variants": ["kreupelheid", "lameness", "manken", "loopproblemen", "beenafwijking"]
+        "variants": ["kreupelheid", "lameness", "claudicatio", "loopproblemen", "gangafwijking", "beenproblemen"]
       },
       "pododermatitis": {
         "canonical": "voetzoollaesies",
         "confidence": 0.95,
-        "variants": ["voetzoollaesies", "pododermatitis", "footpad dermatitis", "fhd", "hakbrand", "voetzooldermatitis"]
+        "variants": ["voetzoollaesies", "pododermatitis", "footpad dermatitis", "hakbrand", "fhd", "voetbrand"]
       }
     },
 
@@ -440,22 +648,22 @@
       "crude_protein": {
         "canonical": "ruw_eiwit",
         "confidence": 0.95,
-        "variants": ["ruw eiwit", "crude protein", "re", "eiwit", "proteïne", "proteine"]
+        "variants": ["ruw eiwit", "crude protein", "re", "eiwit", "proteïne", "ruw proteïne"]
       },
       "metabolizable_energy": {
-        "canonical": "omzetbare_energie",
+        "canonical": "metaboliseerbare_energie",
         "confidence": 0.95,
-        "variants": ["omzetbare energie", "metabolizable energy", "oe", "me", "kcal/kg", "energiedichtheid"]
+        "variants": ["metaboliseerbare energie", "metabolizable energy", "me", "kcal/kg", "energiedichtheid"]
       },
       "lysine": {
         "canonical": "lysine",
         "confidence": 0.95,
-        "variants": ["lysine", "verteerbare lysine", "lys", "lysine vert"]
+        "variants": ["lysine", "verteerbaar lysine", "digestible lysine", "lys", "lysine vert"]
       },
       "methionine": {
         "canonical": "methionine",
         "confidence": 0.95,
-        "variants": ["methionine", "met", "methionine+cysteïne", "methionine+cysteine", "met+cys", "tsaa"]
+        "variants": ["methionine", "met", "methionine+cysteine", "met+cys", "tsaa", "zwavelhoudende aminozuren"]
       },
       "calcium": {
         "canonical": "calcium",
@@ -475,17 +683,17 @@
       "electrolyte_balance": {
         "canonical": "elektrolytenbalans",
         "confidence": 0.95,
-        "variants": ["elektrolytenbalans", "electrolyte balance", "deb", "elektrolytenevenwicht"]
+        "variants": ["voeder elektrolytenbalans", "dietary electrolyte balance", "deb", "elektrolytenbalans"]
       },
       "sodium": {
         "canonical": "natrium",
         "confidence": 0.95,
-        "variants": ["natrium", "sodium", "na", "zout"]
+        "variants": ["natrium", "sodium", "na", "zout", "salt"]
       },
       "chloride": {
         "canonical": "chloride",
         "confidence": 0.95,
-        "variants": ["chloride", "cl", "chloor"]
+        "variants": ["chloride", "cl", "chloor", "chlorine"]
       },
       "potassium": {
         "canonical": "kalium",
@@ -498,17 +706,17 @@
       "temperature": {
         "canonical": "temperatuur",
         "confidence": 0.95,
-        "variants": ["temperatuur", "temperature", "temp", "graden", "celsius", "staltemperatuur"]
+        "variants": ["temperatuur", "temperature", "temp", "graden", "degrees", "celsius", "omgevingstemperatuur"]
       },
       "humidity": {
         "canonical": "luchtvochtigheid",
         "confidence": 0.95,
-        "variants": ["luchtvochtigheid", "humidity", "relatieve luchtvochtigheid", "rv", "%rv", "vochtigheid"]
+        "variants": ["luchtvochtigheid", "humidity", "relatieve vochtigheid", "relative humidity", "rv", "%rv", "vocht"]
       },
       "ventilation_rate": {
-        "canonical": "ventilatiecapaciteit",
+        "canonical": "ventilatiesnelheid",
         "confidence": 0.95,
-        "variants": ["ventilatiecapaciteit", "ventilation rate", "luchtsnelheid", "m3/h/kg", "luchtverversing", "minimale ventilatie"]
+        "variants": ["ventilatiesnelheid", "ventilation rate", "luchtstroom", "airflow rate", "m3/h/kg", "luchtuitwisseling", "minimale ventilatie"]
       },
       "static_pressure": {
         "canonical": "statische_druk",
@@ -523,17 +731,17 @@
       "co2": {
         "canonical": "co2",
         "confidence": 0.95,
-        "variants": ["co2", "koolstofdioxide", "ppm co2", "co2 concentratie", "co2 niveau"]
+        "variants": ["co2", "kooldioxide", "carbon dioxide", "ppm co2", "co2 concentratie", "co2 niveau"]
       },
       "light_intensity": {
         "canonical": "lichtintensiteit",
         "confidence": 0.95,
-        "variants": ["lichtintensiteit", "light intensity", "lux", "verlichting", "helderheid"]
+        "variants": ["lichtintensiteit", "light intensity", "lux", "verlichting", "illumination", "helderheid"]
       },
       "lighting_hours": {
-        "canonical": "lichturen",
+        "canonical": "verlichtingsduur",
         "confidence": 0.95,
-        "variants": ["lichturen", "lighting hours", "daglengte", "photoperiode", "uur/dag", "lichtschema"]
+        "variants": ["verlichtingsduur", "lighting hours", "fotoperiode", "photoperiod", "lichturen", "u/dag", "lichtprogramma"]
       }
     },
 
@@ -541,22 +749,22 @@
       "biosecurity": {
         "canonical": "biosecurity",
         "confidence": 0.95,
-        "variants": ["biosecurity", "bioveiligheid", "biologische veiligheid", "all in all out", "sanitatie", "hygiëne", "hygiene"]
+        "variants": ["biosecurity", "biologische veiligheid", "biological security", "all-in all-out", "ontsmetting"]
       },
       "probiotics": {
         "canonical": "probiotica",
         "confidence": 0.95,
-        "variants": ["probiotica", "probiotics", "nuttige microörganismen", "nutige microorganismen", "levende culturen", "darmgezondheid"]
+        "variants": ["probiotica", "probiotics", "nuttige micro-organismen", "levende culturen", "darmgezondheid"]
       },
       "antibiotics": {
         "canonical": "antibiotica",
         "confidence": 0.95,
-        "variants": ["antibiotica", "antibiotics", "antimicrobiële middelen", "antimicrobiele middelen", "therapeutisch", "groeibevorderaar"]
+        "variants": ["antibiotica", "antibiotics", "antimicrobiële middelen", "antimicrobials", "therapeutisch", "agp", "groeibevorderaars"]
       },
       "vaccine": {
         "canonical": "vaccin",
         "confidence": 0.95,
-        "variants": ["vaccin", "vaccine", "vaccinatie", "vaccination", "immunisatie", "enting"]
+        "variants": ["vaccin", "vaccine", "vaccinatie", "vaccination", "immunisatie", "profylaxe"]
       }
     },
 
@@ -569,22 +777,22 @@
       "heat_stress": {
         "canonical": "hittestress",
         "confidence": 0.95,
-        "variants": ["hittestress", "heat stress", "warmtestress", "hyperthermie", "oververhitting"]
+        "variants": ["hittestress", "heat stress", "thermische stress", "hyperthermie", "hitteberoerte", "oververhitting"]
       },
       "feather_pecking": {
         "canonical": "verenpikken",
         "confidence": 0.95,
-        "variants": ["verenpikken", "feather pecking", "pikken", "kannibalisme", "verenpluizen"]
+        "variants": ["verenpikken", "feather pecking", "pikken", "cannibalisme", "verentrekken"]
       },
       "feeder_space": {
         "canonical": "voerruimte",
         "confidence": 0.95,
-        "variants": ["voerruimte", "feeder space", "cm/dier", "voerbaklengte", "voeropnameruimte"]
+        "variants": ["voerruimte", "feeder space", "cm/dier", "cm/bird", "voerbaklengte", "voerplaats"]
       },
       "drinker_flow_rate": {
-        "canonical": "waterdebiet",
+        "canonical": "waterdoorstroming",
         "confidence": 0.95,
-        "variants": ["waterdebiet", "drinker flow rate", "nippeldebiet", "ml/min/nippel", "waterdruk"]
+        "variants": ["waterdoorstroming", "drinker flow rate", "nippelstroom", "nipple flow", "ml/min/nippel", "waterdruk"]
       }
     },
 
@@ -592,17 +800,17 @@
       "litter": {
         "canonical": "strooisel",
         "confidence": 0.95,
-        "variants": ["strooisel", "litter", "bodembedekking", "onderlaag", "substraat"]
+        "variants": ["strooisel", "litter", "bodembedekking", "bedding", "vloerbedekking", "substraat"]
       },
       "wood_shavings": {
         "canonical": "houtkrullen",
         "confidence": 0.95,
-        "variants": ["houtkrullen", "wood shavings", "schaafsel", "zaagsel", "houtsnippers"]
+        "variants": ["houtkrullen", "wood shavings", "schaafsel", "houtsnippers", "zaagsel"]
       },
       "rice_husks": {
         "canonical": "rijstdoppen",
         "confidence": 0.95,
-        "variants": ["rijstdoppen", "rice husks", "rijstschillen", "padieschillen"]
+        "variants": ["rijstdoppen", "rice husks", "rice hulls", "padi doppen", "rijstkaf"]
       },
       "straw": {
         "canonical": "stro",
@@ -615,27 +823,27 @@
       "egg_weight": {
         "canonical": "eigewicht",
         "confidence": 0.95,
-        "variants": ["eigewicht", "egg weight", "eimassa", "gemiddeld eigewicht", "eigrootte", "eikaliber"]
+        "variants": ["eigewicht", "egg weight", "eimassa", "egg mass", "gemiddeld eigewicht", "eiergrootte", "kaliber"]
       },
       "shell_quality": {
         "canonical": "schaalkwaliteit",
         "confidence": 0.95,
-        "variants": ["schaalkwaliteit", "shell quality", "schaaldikte", "schaalsterkte", "dunne schalen", "zwakke schalen"]
+        "variants": ["schaalkwaliteit", "shell quality", "schaaldikte", "shell thickness", "schaalsterkte", "zachte schaal", "dunne schaal"]
       },
       "cracked_shell": {
         "canonical": "gebarsten_schaal",
         "confidence": 0.95,
-        "variants": ["gebarsten schaal", "cracked shell", "schaalbreuk", "gekraakt ei", "haarscheur"]
+        "variants": ["gebarsten schaal", "cracked shell", "schaalbarst", "gebarsten ei", "haarscheur"]
       },
       "soft_shelled_egg": {
-        "canonical": "windei",
+        "canonical": "zachtschalig_ei",
         "confidence": 0.95,
-        "variants": ["windei", "soft shelled egg", "zachte schaal", "ei zonder schaal", "schaalloos ei"]
+        "variants": ["zachtschalig ei", "soft shelled egg", "zachte schaal", "schaalloos ei", "rubber ei"]
       },
       "misshapen_egg": {
-        "canonical": "misvormde_ei",
+        "canonical": "misvormd_ei",
         "confidence": 0.95,
-        "variants": ["misvormde ei", "misshapen egg", "abnormale vorm", "onregelmatig ei"]
+        "variants": ["misvormd ei", "misshapen egg", "vervormd ei", "abnormale vorm", "onregelmatig ei"]
       }
     },
 
@@ -643,22 +851,22 @@
       "vaccination": {
         "canonical": "vaccinatie",
         "confidence": 0.95,
-        "variants": ["vaccinatie", "vaccination", "vaccin", "vaccine", "immunisatie", "enting"]
+        "variants": ["vaccinatie", "vaccination", "vaccin", "vaccine", "immunisatie", "inenting"]
       },
       "biosecurity_protocol": {
         "canonical": "biosecurity_protocol",
         "confidence": 0.95,
-        "variants": ["biosecurity", "bioveiligheid", "desinfectie", "disinfection", "reiniging", "quarantaine"]
+        "variants": ["biosecurity", "desinfectie", "disinfection", "reiniging", "cleaning", "quarantaine"]
       },
       "treatment": {
         "canonical": "behandeling",
         "confidence": 0.95,
-        "variants": ["behandeling", "treatment", "medicatie", "medication", "therapie", "therapy"]
+        "variants": ["behandeling", "treatment", "medicatie", "medication", "therapie", "genezing"]
       },
       "lab_diagnostics": {
         "canonical": "laboratorium_diagnostiek",
         "confidence": 0.95,
-        "variants": ["diagnostiek", "diagnostic", "test", "analyse", "analysis", "laboratorium", "lab"]
+        "variants": ["diagnostiek", "diagnostic", "test", "analyse", "laboratorium", "laboratory", "lab"]
       }
     },
 
@@ -666,37 +874,37 @@
       "out_of_domain": {
         "canonical": "buiten_domein",
         "confidence": 1.0,
-        "variants": ["buiten domein", "out of domain", "niet in domein", "buiten bereik"]
+        "variants": ["buiten domein", "out of domain", "buiten bereik", "outside scope", "niet in domein"]
       },
       "error_generic": {
-        "canonical": "fout_algemeen",
+        "canonical": "generieke_fout",
         "confidence": 1.0,
-        "variants": ["fout", "error", "algemene fout", "verwerkingsfout"]
+        "variants": ["fout", "error", "generieke fout", "generic error", "verwerkingsfout"]
       },
       "welcome": {
         "canonical": "welkom",
         "confidence": 1.0,
-        "variants": ["welkom", "welcome", "begroeting", "hallo"]
+        "variants": ["welkom", "welcome", "begroeting", "greeting", "hallo", "hello"]
       },
       "clarification_needed": {
         "canonical": "verduidelijking_nodig",
         "confidence": 1.0,
-        "variants": ["verduidelijking nodig", "clarification needed", "graag verduidelijken", "meer informatie nodig"]
+        "variants": ["verduidelijking nodig", "clarification needed", "gelieve te verduidelijken", "please clarify", "meer info nodig"]
       },
       "no_results": {
         "canonical": "geen_resultaten",
         "confidence": 1.0,
-        "variants": ["geen resultaten", "no results", "niets gevonden", "geen data"]
+        "variants": ["geen resultaten", "no results", "niets gevonden", "nothing found", "geen gegevens"]
       },
       "processing": {
         "canonical": "verwerken",
         "confidence": 1.0,
-        "variants": ["verwerken", "processing", "een moment geduld", "bezig"]
+        "variants": ["verwerken", "processing", "even geduld", "please wait", "bezig"]
       },
       "farewell": {
-        "canonical": "tot_ziens",
+        "canonical": "afscheid",
         "confidence": 1.0,
-        "variants": ["tot ziens", "goodbye", "doei", "dag"]
+        "variants": ["tot ziens", "goodbye", "afscheid", "farewell", "dag", "bye"]
       }
     }
   }

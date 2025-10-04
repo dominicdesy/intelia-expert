@@ -3,36 +3,244 @@
     "language": "hi",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 19,
+    "total_domains": 24,
     "description": "मुर्गी पालन उत्पादन में विशेषज्ञ प्रणाली के लिए सार्वभौमिक शब्दावली - हिंदी संस्करण"
   },
 
   "domains": {
+    "contextual_references": {
+      "same": {
+        "canonical": "समान",
+        "confidence": 0.90,
+        "variants": ["समान", "same", "वही", "उसी", "एक ही"]
+      },
+      "same_age": {
+        "canonical": "समान_आयु",
+        "confidence": 0.90,
+        "variants": ["समान आयु में", "same age", "उसी उम्र में", "उसी चरण में"]
+      },
+      "and_for": {
+        "canonical": "और_के_लिए",
+        "confidence": 0.90,
+        "variants": ["और के लिए", "and for", "साथ ही", "के लिए भी"]
+      },
+      "what_about": {
+        "canonical": "क्या_बारे_में",
+        "confidence": 0.90,
+        "variants": ["क्या बारे में", "what about", "कैसे", "और क्या", "और के बारे में"]
+      },
+      "females": {
+        "canonical": "मादा",
+        "confidence": 0.95,
+        "variants": ["मादा", "females", "मादाएं", "मुर्गियां", "मुर्गी"]
+      },
+      "males": {
+        "canonical": "नर",
+        "confidence": 0.95,
+        "variants": ["नर", "males", "नर पक्षी", "मुर्गे", "मुर्गा"]
+      },
+      "and_the": {
+        "canonical": "और",
+        "confidence": 0.90,
+        "variants": ["और", "and the", "साथ ही", "के साथ"]
+      },
+      "also_for": {
+        "canonical": "के_लिए_भी",
+        "confidence": 0.90,
+        "variants": ["के लिए भी", "also for", "इसी प्रकार", "उसी तरह"]
+      }
+    },
+
+    "metrics": {
+      "weight": {
+        "canonical": "वजन",
+        "confidence": 0.95,
+        "variants": ["वजन", "vazan", "weight", "भार", "bhar", "शरीर का वजन", "kg", "ग्राम", "g", "lbs"]
+      },
+      "fcr": {
+        "canonical": "fcr",
+        "confidence": 0.95,
+        "variants": ["fcr", "चारा रूपांतरण", "chara roopantaran", "feed conversion", "रूपांतरण अनुपात", "चारा दक्षता"]
+      },
+      "gain": {
+        "canonical": "वृद्धि",
+        "confidence": 0.95,
+        "variants": ["वृद्धि", "vriddhi", "gain", "वजन बढ़ना", "vazan badhna", "बढ़ोतरी", "adg"]
+      },
+      "conversion": {
+        "canonical": "रूपांतरण",
+        "confidence": 0.95,
+        "variants": ["रूपांतरण", "roopantaran", "conversion", "रूपांतरण दर", "दक्षता"]
+      },
+      "consumption": {
+        "canonical": "खपत",
+        "confidence": 0.95,
+        "variants": ["खपत", "khapat", "consumption", "सेवन", "sevan", "intake", "खाया गया", "चारा सेवन"]
+      },
+      "production": {
+        "canonical": "उत्पादन",
+        "confidence": 0.95,
+        "variants": ["उत्पादन", "utpadan", "production", "उत्पादकता", "productivity", "प्रदर्शन"]
+      },
+      "growth": {
+        "canonical": "वृद्धि",
+        "confidence": 0.95,
+        "variants": ["वृद्धि", "vriddhi", "growth", "विकास", "vikas", "बढ़ना", "वृद्धि दर"]
+      },
+      "performance": {
+        "canonical": "प्रदर्शन",
+        "confidence": 0.95,
+        "variants": ["प्रदर्शन", "pradarshan", "performance", "परिणाम", "दक्षता", "उत्पादन"]
+      },
+      "index": {
+        "canonical": "सूचकांक",
+        "confidence": 0.95,
+        "variants": ["सूचकांक", "suchkaank", "index", "अनुपात", "गुणांक", "दर", "कारक"]
+      }
+    },
+
+    "health": {
+      "disease": {
+        "canonical": "रोग",
+        "confidence": 0.95,
+        "variants": ["रोग", "rog", "disease", "बीमारी", "bimari", "संक्रमण", "बीमार", "संक्रामक रोग"]
+      },
+      "symptoms": {
+        "canonical": "लक्षण",
+        "confidence": 0.95,
+        "variants": ["लक्षण", "lakshan", "symptoms", "संकेत", "sanket", "signs", "नैदानिक संकेत"]
+      },
+      "treatment": {
+        "canonical": "उपचार",
+        "confidence": 0.95,
+        "variants": ["उपचार", "upchar", "treatment", "चिकित्सा", "chikitsa", "दवा", "इलाज"]
+      },
+      "coccidiosis": {
+        "canonical": "कोक्सीडियोसिस",
+        "confidence": 0.95,
+        "variants": ["कोक्सीडियोसिस", "coccidiosis", "कोक्सीडिया", "coccidia", "eimeria"]
+      },
+      "vaccination": {
+        "canonical": "टीकाकरण",
+        "confidence": 0.95,
+        "variants": ["टीकाकरण", "tikakaran", "vaccination", "टीका", "vaccine", "immunization", "prophylaxis"]
+      },
+      "gumboro": {
+        "canonical": "गंबोरो",
+        "confidence": 0.95,
+        "variants": ["गंबोरो", "gumboro", "गुमबोरो रोग", "infectious bursal disease", "ibdv", "ibd"]
+      },
+      "enteritis": {
+        "canonical": "आंत्रशोथ",
+        "confidence": 0.95,
+        "variants": ["आंत्रशोथ", "aantrashoth", "enteritis", "परिगलित आंत्रशोथ", "necrotic enteritis"]
+      },
+      "mortality": {
+        "canonical": "मृत्यु_दर",
+        "confidence": 0.95,
+        "variants": ["मृत्यु दर", "mrityu dar", "mortality", "मृत्यु", "मौत", "हानि", "मृत्यु प्रतिशत"]
+      },
+      "diagnosis": {
+        "canonical": "निदान",
+        "confidence": 0.95,
+        "variants": ["निदान", "nidan", "diagnosis", "diagnostic", "विश्लेषण", "पहचान", "जांच"]
+      }
+    },
+
+    "environment": {
+      "temperature": {
+        "canonical": "तापमान",
+        "confidence": 0.95,
+        "variants": ["तापमान", "taapman", "temperature", "temp", "डिग्री", "degree", "सेल्सियस", "गर्मी"]
+      },
+      "humidity": {
+        "canonical": "आर्द्रता",
+        "confidence": 0.95,
+        "variants": ["आर्द्रता", "ardrata", "humidity", "rh", "सापेक्ष आर्द्रता", "नमी", "नमी का स्तर"]
+      },
+      "ventilation": {
+        "canonical": "वेंटिलेशन",
+        "confidence": 0.95,
+        "variants": ["वेंटिलेशन", "ventilation", "हवा प्रवाह", "airflow", "हवा का आदान-प्रदान"]
+      },
+      "lighting": {
+        "canonical": "प्रकाश",
+        "confidence": 0.95,
+        "variants": ["प्रकाश", "prakash", "lighting", "रोशनी", "रोशनी व्यवस्था", "चमक"]
+      },
+      "density": {
+        "canonical": "घनत्व",
+        "confidence": 0.95,
+        "variants": ["घनत्व", "ghanatva", "density", "भंडारण घनत्व", "stocking density", "kg/m2", "पक्षी/m2"]
+      },
+      "space": {
+        "canonical": "स्थान",
+        "confidence": 0.95,
+        "variants": ["स्थान", "sthan", "space", "क्षेत्र", "kshetra", "जगह", "cm/पक्षी", "उपलब्ध स्थान"]
+      },
+      "feeder": {
+        "canonical": "फीडर",
+        "confidence": 0.95,
+        "variants": ["फीडर", "feeder", "चारा देने वाला", "feeding system", "feed pan", "चारा पात्र"]
+      },
+      "drinker": {
+        "canonical": "ड्रिंकर",
+        "confidence": 0.95,
+        "variants": ["ड्रिंकर", "drinker", "पानी पिलाने वाला", "watering system", "पानी का बिंदु"]
+      },
+      "light": {
+        "canonical": "प्रकाश",
+        "confidence": 0.95,
+        "variants": ["प्रकाश", "prakash", "light", "lighting", "lux", "प्रकाश तीव्रता", "photoperiod"]
+      }
+    },
+
+    "species": {
+      "broiler": {
+        "canonical": "ब्रॉयलर",
+        "database_value": "broiler",
+        "confidence": 0.95,
+        "variants": ["ब्रॉयलर", "broiler", "broilers", "मांस मुर्गी", "meat chicken", "मांस के लिए मुर्गी", "मांस उत्पादन"]
+      },
+      "layer": {
+        "canonical": "लेयर",
+        "database_value": "layer",
+        "confidence": 0.95,
+        "variants": ["लेयर", "layer", "layers", "अंडा देने वाली मुर्गी", "laying hen", "laying hens", "अंडा लेयर", "अंडा उत्पादन"]
+      },
+      "breeder": {
+        "canonical": "प्रजनक",
+        "database_value": "breeder",
+        "confidence": 0.95,
+        "variants": ["प्रजनक", "prajanak", "breeder", "breeders", "breeding", "माता-पिता स्टॉक", "breeding stock", "प्रजनक झुंड"]
+      }
+    },
+
     "general_terms": {
       "poultry": {
         "canonical": "मुर्गी_पालन",
         "confidence": 0.95,
-        "variants": ["मुर्गी पालन", "murgi palan", "मुर्गीपालन", "कुक्कुट पालन", "kukkut palan", "पोल्ट्री", "poultry"]
+        "variants": ["मुर्गी पालन", "murgi palan", "poultry", "कुक्कुट पालन", "kukkut palan", "मुर्गीपालन"]
       },
       "farm": {
         "canonical": "फार्म",
         "confidence": 0.95,
-        "variants": ["फार्म", "farm", "खेत", "khet", "पोल्ट्री फार्म", "poultry farm", "मुर्गी फार्म"]
+        "variants": ["फार्म", "farm", "खेत", "khet", "उत्पादन स्थल", "सुविधा"]
       },
       "management": {
         "canonical": "प्रबंधन",
         "confidence": 0.90,
-        "variants": ["प्रबंधन", "prabandhan", "management", "संचालन", "sanchaalan", "व्यवस्थापन"]
+        "variants": ["प्रबंधन", "prabandhan", "management", "संचालन", "व्यवस्थापन"]
       },
       "production": {
         "canonical": "उत्पादन",
         "confidence": 0.90,
-        "variants": ["उत्पादन", "utpadan", "production", "उत्पादकता", "utpadakta", "पैदावार", "paidavar"]
+        "variants": ["उत्पादन", "utpadan", "production", "उत्पादकता", "पैदावार"]
       },
       "quality": {
         "canonical": "गुणवत्ता",
         "confidence": 0.90,
-        "variants": ["गुणवत्ता", "gunvatta", "quality", "मानक", "maanak", "standard"]
+        "variants": ["गुणवत्ता", "gunvatta", "quality", "मानक", "standard", "श्रेणी"]
       }
     },
 
@@ -40,57 +248,57 @@
       "weight_query": {
         "canonical": "वजन_प्रश्न",
         "confidence": 0.92,
-        "variants": ["वजन क्या है", "vazan kya hai", "लक्ष्य वजन", "lakshya vazan", "औसत वजन", "ausat vazan", "कितना वजन"]
+        "variants": ["वजन क्या है", "vazan kya hai", "what is the weight", "लक्ष्य वजन", "target weight", "औसत वजन", "कितना वजन"]
       },
       "fcr_query": {
         "canonical": "fcr_प्रश्न",
         "confidence": 0.92,
-        "variants": ["एफसीआर", "fcr", "चारा रूपांतरण", "chara roopantaran", "feed conversion", "इष्टतम fcr"]
+        "variants": ["इष्टतम fcr", "optimal fcr", "चारा रूपांतरण", "feed conversion", "रूपांतरण अनुपात", "औसत fcr"]
       },
       "water_query": {
         "canonical": "पानी_प्रश्न",
         "confidence": 0.92,
-        "variants": ["पानी की खपत", "pani ki khapat", "water consumption", "पानी का सेवन", "लीटर प्रति दिन"]
+        "variants": ["पानी की खपत", "water consumption", "पानी का सेवन", "water intake", "लीटर प्रति दिन", "ml प्रति पक्षी"]
       },
       "nutrient_requirement_query": {
         "canonical": "पोषक_प्रश्न",
         "confidence": 0.92,
-        "variants": ["प्रोटीन स्तर", "protein star", "लाइसिन की आवश्यकता", "कैल्शियम की जरूरत", "फॉस्फोरस"]
+        "variants": ["प्रोटीन स्तर", "protein level", "लाइसिन की आवश्यकता", "lysine requirement", "कैल्शियम की जरूरत", "फॉस्फोरस सामग्री"]
       },
       "environment_setpoint_query": {
         "canonical": "पर्यावरण_प्रश्न",
         "confidence": 0.92,
-        "variants": ["इष्टतम तापमान", "ishtam taapman", "optimal temperature", "लक्ष्य आर्द्रता", "ventilation setting"]
+        "variants": ["इष्टतम तापमान", "optimal temperature", "लक्ष्य आर्द्रता", "target humidity", "अधिकतम co2", "वेंटिलेशन सेटिंग"]
       },
       "production_index_query": {
         "canonical": "सूचकांक_प्रश्न",
         "confidence": 0.92,
-        "variants": ["औसत epef", "ausat epef", "दक्षता सूचकांक", "dakshata suchkaank", "efficiency index"]
+        "variants": ["औसत epef", "average epef", "सामान्य iep", "normal iep", "दक्षता सूचकांक", "efficiency index", "समग्र प्रदर्शन"]
       },
       "vaccination_protocol_query": {
         "canonical": "टीकाकरण_प्रश्न",
         "confidence": 0.92,
-        "variants": ["टीकाकरण प्रोटोकॉल", "tikakaran protocol", "vaccination protocol", "टीके का कार्यक्रम"]
+        "variants": ["टीकाकरण प्रोटोकॉल", "vaccination protocol", "टीके का कार्यक्रम", "vaccine schedule", "टीकाकरण कार्यक्रम", "प्रतिरक्षण योजना"]
       },
       "space_equipment_query": {
         "canonical": "उपकरण_प्रश्न",
         "confidence": 0.92,
-        "variants": ["फीडर स्पेस", "feeder space", "निप्पल सेटिंग", "nipple setting", "पानी की ऊंचाई"]
+        "variants": ["फीडर स्पेस", "feeder space", "निप्पल सेटिंग", "nipple setting", "ड्रिंकर की ऊंचाई", "cm प्रति पक्षी"]
       },
       "problem_report": {
         "canonical": "समस्या_रिपोर्ट",
         "confidence": 0.90,
-        "variants": ["मेरी मुर्गियां", "meri murgiyan", "मैं देख रहा हूं", "main dekh raha hun", "समस्या है"]
+        "variants": ["मेरी मुर्गियां", "my chickens", "मैं देख रहा हूं", "i observe", "मेरी मुर्गी", "समस्या है", "मेरे पक्षी"]
       },
       "health_diagnosis": {
         "canonical": "स्वास्थ्य_निदान",
         "confidence": 0.92,
-        "variants": ["क्या लक्षण", "kya lakshan", "निदान", "nidan", "diagnosis", "बीमारी", "bimari"]
+        "variants": ["क्या लक्षण", "what symptoms", "निदान", "diagnosis", "रोग", "disease", "क्या कारण", "नैदानिक संकेत"]
       },
       "management_how": {
         "canonical": "प्रबंधन_कैसे",
         "confidence": 0.90,
-        "variants": ["कैसे प्रबंधित करें", "kaise prabandhit karen", "how to manage", "कैसे सुधारें"]
+        "variants": ["कैसे प्रबंधित करें", "how to manage", "कैसे उपचार करें", "how to treat", "क्या करें", "what to do", "कैसे सुधारें"]
       }
     },
 
@@ -98,7 +306,7 @@
       "ross_308": {
         "canonical": "ross_308",
         "confidence": 0.95,
-        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "रॉस 308", "रॉस", "ros 308"]
+        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "ross 308 broiler", "ross308 ap", "ross 308 ap", "रॉस 308", "रॉस"]
       },
       "ross_708": {
         "canonical": "ross_708",
@@ -108,7 +316,7 @@
       "cobb_500": {
         "canonical": "cobb_500",
         "confidence": 0.95,
-        "variants": ["cobb 500", "cobb500", "cobb-500", "c500", "cobb", "कॉब 500", "कॉब", "kob 500"]
+        "variants": ["cobb 500", "cobb500", "cobb-500", "c500", "cobb", "cobb 500 broiler", "कॉब 500", "कॉब"]
       },
       "cobb_700": {
         "canonical": "cobb_700",
@@ -123,32 +331,32 @@
       "hubbard_classic": {
         "canonical": "hubbard_classic",
         "confidence": 0.95,
-        "variants": ["hubbard classic", "classic", "hubbard-classic", "हबर्ड क्लासिक", "हबर्ड"]
+        "variants": ["hubbard classic", "classic", "hubbard-classic", "hclassic", "hubbard", "हबर्ड क्लासिक", "हबर्ड"]
       },
       "hubbard_flex": {
         "canonical": "hubbard_flex",
         "confidence": 0.95,
-        "variants": ["hubbard flex", "flex", "hubbard-flex", "हबर्ड फ्लेक्स"]
+        "variants": ["hubbard flex", "flex", "hubbard-flex", "hflex", "हबर्ड फ्लेक्स"]
       },
       "hubbard_ja87": {
         "canonical": "hubbard_ja87",
         "confidence": 0.95,
-        "variants": ["hubbard ja87", "ja87", "hubbard-ja87", "ja 87", "हबर्ड ja87"]
+        "variants": ["hubbard ja87", "ja87", "hubbard-ja87", "ja 87", "ja-87", "हबर्ड ja87"]
       },
       "freedom_ranger": {
         "canonical": "freedom_ranger",
         "confidence": 0.95,
-        "variants": ["freedom ranger", "freedom", "ranger", "फ्रीडम रेंजर"]
+        "variants": ["freedom ranger", "freedom", "ranger", "redbro", "freedom-ranger", "फ्रीडम रेंजर"]
       },
       "isa_brown": {
         "canonical": "isa_brown",
         "confidence": 0.95,
-        "variants": ["isa brown", "isa", "isa-brown", "आईएसए ब्राउन", "isa layer"]
+        "variants": ["isa brown", "isa", "isa-brown", "isa brown layer", "isa brown hen", "आईएसए ब्राउन"]
       },
       "lohmann_brown": {
         "canonical": "lohmann_brown",
         "confidence": 0.95,
-        "variants": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "लोहमन ब्राउन"]
+        "variants": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "lohmann brown layer", "लोहमन ब्राउन"]
       },
       "hy_line": {
         "canonical": "hy_line",
@@ -161,47 +369,47 @@
       "feed_conversion_ratio": {
         "canonical": "चारा_रूपांतरण_अनुपात",
         "confidence": 0.95,
-        "variants": ["fcr", "चारा रूपांतरण अनुपात", "chara roopantaran anupaath", "feed conversion ratio", "चारा दक्षता", "fcr ratio"]
+        "variants": ["fcr", "चारा रूपांतरण अनुपात", "chara roopantaran anupaath", "feed conversion ratio", "feed conversion", "रूपांतरण अनुपात", "चारा दक्षता", "रूपांतरण दक्षता", "संचयी चारा रूपांतरण", "fcr ratio"]
       },
       "average_daily_gain": {
         "canonical": "औसत_दैनिक_वृद्धि",
         "confidence": 0.95,
-        "variants": ["adg", "औसत दैनिक वृद्धि", "ausat dainik vriddhi", "average daily gain", "दैनिक वजन बढ़ना", "g/दिन"]
+        "variants": ["adg", "औसत दैनिक वृद्धि", "ausat dainik vriddhi", "average daily gain", "दैनिक वृद्धि", "g/दिन", "daily weight gain", "प्रति दिन वजन बढ़ना", "औसत वृद्धि", "दैनिक विकास", "वृद्धि दर"]
       },
       "feed_intake": {
         "canonical": "चारा_सेवन",
         "confidence": 0.95,
-        "variants": ["चारा सेवन", "chara sevan", "feed intake", "चारा खपत", "chara khapat", "fi", "g/पक्षी/दिन"]
+        "variants": ["चारा सेवन", "chara sevan", "feed intake", "fi", "चारा खपत", "chara khapat", "feed consumption", "g/पक्षी/दिन", "दैनिक चारा सेवन", "चारा खाया गया", "दैनिक खपत", "संचयी चारा सेवन", "कुल चारा सेवन", "प्रति पक्षी चारा"]
       },
       "water_intake": {
         "canonical": "पानी_सेवन",
         "confidence": 0.95,
-        "variants": ["पानी सेवन", "pani sevan", "water intake", "पानी की खपत", "pani ki khapat", "l/1000/दिन", "ml/पक्षी/दिन"]
+        "variants": ["पानी सेवन", "pani sevan", "water intake", "पानी की खपत", "pani ki khapat", "water consumption", "l/1000/दिन", "ml/पक्षी/दिन", "दैनिक पानी सेवन", "पानी का उपभोग", "प्रति पक्षी पानी", "पीने का पानी", "पानी का उपयोग"]
       },
       "body_weight": {
         "canonical": "शरीर_भार",
         "confidence": 0.95,
-        "variants": ["वजन", "vazan", "weight", "शरीर भार", "sharir bhar", "body weight", "जीवित वजन", "औसत वजन", "लक्ष्य वजन"]
+        "variants": ["वजन", "vazan", "weight", "शरीर भार", "sharir bhar", "body weight", "जीवित वजन", "live weight", "औसत वजन", "average weight", "लक्ष्य वजन", "target weight", "bw", "पक्षी का वजन", "व्यक्तिगत वजन", "माध्य वजन", "मानक वजन"]
       },
       "mortality": {
         "canonical": "मृत्यु_दर",
         "confidence": 0.95,
-        "variants": ["मृत्यु दर", "mrityu dar", "mortality", "मृत्यु", "मरना", "हानि", "mortality rate", "मृत पक्षी"]
+        "variants": ["मृत्यु दर", "mrityu dar", "mortality", "mortality rate", "मृत्यु", "मौत", "death", "death rate", "हानि", "loss", "मृत्यु प्रतिशत", "संचयी मृत्यु दर", "दैनिक मृत्यु दर", "मृत पक्षी", "हानियां", "जीवित रहने की दर"]
       },
       "egg_production": {
         "canonical": "अंडा_उत्पादन",
         "confidence": 0.95,
-        "variants": ["अंडा उत्पादन", "anda utpadan", "egg production", "अंडे देना", "laying rate", "उत्पादन दर"]
+        "variants": ["अंडा उत्पादन", "anda utpadan", "egg production", "अंडे देने की दर", "laying rate", "उत्पादन दर", "production rate", "lay rate", "अंडा उत्पादन", "प्रति मुर्गी अंडे", "hen day production", "अंडे देने का प्रतिशत", "अंडे की उपज", "दैनिक उत्पादन"]
       },
       "uniformity": {
         "canonical": "समरूपता",
         "confidence": 0.95,
-        "variants": ["समरूपता", "samaroopata", "uniformity", "एकरूपता", "ekroopata", "cv", "सजातीयता"]
+        "variants": ["समरूपता", "samaroopata", "uniformity", "विचरण गुणांक", "coefficient of variation", "cv", "सजातीयता", "homogeneity", "एकरूपता", "झुंड समरूपता", "वजन समरूपता", "आकार समरूपता", "विचरण गुणांक", "स्थिरता"]
       },
       "epef": {
         "canonical": "epef",
         "confidence": 0.95,
-        "variants": ["epef", "उत्पादन दक्षता कारक", "utpadan dakshata kaarak", "production efficiency factor", "दक्षता सूचकांक"]
+        "variants": ["epef", "उत्पादन दक्षता कारक", "utpadan dakshata kaarak", "production efficiency factor", "प्रदर्शन सूचकांक", "performance index", "दक्षता सूचकांक", "efficiency index", "यूरोपीय उत्पादन दक्षता कारक", "दक्षता कारक", "उत्पादन सूचकांक", "प्रदर्शन कारक"]
       }
     },
 
@@ -209,27 +417,27 @@
       "broiler_farm": {
         "canonical": "ब्रॉयलर_फार्म",
         "confidence": 0.95,
-        "variants": ["ब्रॉयलर", "broiler", "ब्रॉयलर फार्म", "broiler farm", "मांस मुर्गी", "mans murgi"]
+        "variants": ["ब्रॉयलर", "broiler", "ब्रॉयलर फार्म", "broiler farm", "मांस मुर्गी", "meat chicken", "मुर्गी फार्म", "chicken farm", "मुर्गी पालन फार्म"]
       },
       "layer_farm": {
         "canonical": "लेयर_फार्म",
         "confidence": 0.95,
-        "variants": ["लेयर", "layer", "लेयर फार्म", "layer farm", "अंडा देने वाली मुर्गी", "anda dene wali murgi"]
+        "variants": ["लेयर", "layer", "लेयर फार्म", "layer farm", "अंडा फार्म", "egg farm", "अंडा देने वाली मुर्गी", "laying hen", "मुर्गी घर"]
       },
       "breeder_farm": {
         "canonical": "प्रजनक_फार्म",
         "confidence": 0.95,
-        "variants": ["प्रजनक", "prajanak", "breeder", "प्रजनक फार्म", "breeder farm", "माता-पिता स्टॉक"]
+        "variants": ["प्रजनक फार्म", "breeder farm", "प्रजनन फार्म", "breeding farm", "माता-पिता स्टॉक", "parent stock", "प्रजनक", "breeders", "प्रजनन स्टॉक"]
       },
       "hatchery": {
         "canonical": "हैचरी",
         "confidence": 0.95,
-        "variants": ["हैचरी", "hatchery", "इनक्यूबेशन", "incubation", "अंडे सेने की जगह"]
+        "variants": ["हैचरी", "hatchery", "इनक्यूबेशन", "incubation", "अंडे सेने की सुविधा", "hatching facility"]
       },
       "feed_mill": {
         "canonical": "चारा_मिल",
         "confidence": 0.95,
-        "variants": ["चारा मिल", "chara mill", "feed mill", "चारा कारखाना", "फीड मिल"]
+        "variants": ["चारा मिल", "chara mill", "feed mill", "चारा कारखाना", "feed factory", "मिल", "mill", "चारा संयंत्र"]
       }
     },
 
@@ -237,17 +445,17 @@
       "starter": {
         "canonical": "स्टार्टर",
         "confidence": 0.95,
-        "variants": ["स्टार्टर", "starter", "प्रारंभिक", "prarambhik", "शुरुआती चरण", "phase 1", "चरण 1"]
+        "variants": ["स्टार्टर", "starter", "start", "प्रारंभिक चरण", "starting phase", "phase 1", "चरण 1", "pre-starter", "prestarter"]
       },
       "grower": {
         "canonical": "ग्रोअर",
         "confidence": 0.95,
-        "variants": ["ग्रोअर", "grower", "वृद्धि", "vriddhi", "विकास चरण", "phase 2", "चरण 2"]
+        "variants": ["ग्रोअर", "grower", "विकास चरण", "growing phase", "phase 2", "चरण 2", "developer", "वृद्धि"]
       },
       "finisher": {
         "canonical": "फिनिशर",
         "confidence": 0.95,
-        "variants": ["फिनिशर", "finisher", "अंतिम", "antim", "समाप्ति चरण", "phase 3", "चरण 3"]
+        "variants": ["फिनिशर", "finisher", "समाप्ति चरण", "finishing phase", "finish", "phase 3", "चरण 3", "अंतिम"]
       }
     },
 
@@ -255,17 +463,17 @@
       "male": {
         "canonical": "नर",
         "confidence": 0.95,
-        "variants": ["नर", "nar", "male", "मुर्गा", "murga", "पुरुष", "purush", "m"]
+        "variants": ["नर", "nar", "male", "males", "मुर्गा", "murga", "rooster", "roosters", "cock", "cocks", "नर ब्रॉयलर", "नर मुर्गी", "m", "नर पक्षी"]
       },
       "female": {
         "canonical": "मादा",
         "confidence": 0.95,
-        "variants": ["मादा", "mada", "female", "मुर्गी", "murgi", "स्त्री", "stri", "f"]
+        "variants": ["मादा", "mada", "female", "females", "मुर्गी", "murgi", "hen", "hens", "pullet", "pullets", "मादा ब्रॉयलर", "मादा मुर्गी", "f", "मादा पक्षी"]
       },
       "as_hatched": {
         "canonical": "मिश्रित",
         "confidence": 0.95,
-        "variants": ["मिश्रित", "mishrit", "mixed", "असॉर्टेड", "unsexed", "straight run", "sr", "दोनों लिंग"]
+        "variants": ["मिश्रित", "mishrit", "as-hatched", "ashatched", "as hatched", "mixed", "unsexed", "straight run", "straight-run", "sr", "मिश्रित लिंग", "दोनों लिंग"]
       }
     },
 
@@ -273,27 +481,27 @@
       "broiler": {
         "canonical": "ब्रॉयलर",
         "confidence": 0.95,
-        "variants": ["ब्रॉयलर", "broiler", "मांस मुर्गी", "mans murgi", "meat chicken"]
+        "variants": ["ब्रॉयलर", "broiler", "मांस मुर्गी", "meat chicken", "broilers", "मांस के लिए मुर्गी"]
       },
       "layer": {
         "canonical": "लेयर",
         "confidence": 0.95,
-        "variants": ["लेयर", "layer", "अंडा देने वाली मुर्गी", "anda dene wali murgi", "laying hen"]
+        "variants": ["लेयर", "layer", "अंडा देने वाली मुर्गी", "laying hen", "layers", "अंडा लेयर"]
       },
       "breeder": {
         "canonical": "प्रजनक",
         "confidence": 0.95,
-        "variants": ["प्रजनक", "prajanak", "breeder", "माता-पिता", "parent stock"]
+        "variants": ["प्रजनक", "prajanak", "breeder", "breeders", "माता-पिता स्टॉक", "parent stock", "प्रजनन पक्षी"]
       },
       "pullet": {
         "canonical": "युवा_मुर्गी",
         "confidence": 0.95,
-        "variants": ["युवा मुर्गी", "yuva murgi", "pullet", "पुलेट", "young hen"]
+        "variants": ["युवा मुर्गी", "yuva murgi", "pullet", "pullets", "young hen", "पालन पक्षी"]
       },
       "chick": {
         "canonical": "चूजा",
         "confidence": 0.95,
-        "variants": ["चूजा", "chuja", "chick", "एक दिन का चूजा", "day-old chick", "doc"]
+        "variants": ["चूजा", "chuja", "chick", "chicks", "एक दिन का", "day-old", "एक दिन का चूजा", "day old chick", "doc"]
       }
     },
 
@@ -301,52 +509,52 @@
       "chain_feeder": {
         "canonical": "चेन_फीडर",
         "confidence": 0.95,
-        "variants": ["चेन फीडर", "chain feeder", "श्रृंखला फीडर", "feeding chain"]
+        "variants": ["चेन फीडर", "chain feeder", "खिलाने की श्रृंखला", "feeding chain", "चेन फीडिंग सिस्टम", "feedchain"]
       },
       "pan_feeder": {
         "canonical": "पैन_फीडर",
         "confidence": 0.95,
-        "variants": ["पैन फीडर", "pan feeder", "थाली फीडर", "feeding pan"]
+        "variants": ["पैन फीडर", "pan feeder", "फीडिंग पैन", "feeding pan", "feed pan", "गोलाकार फीडर"]
       },
       "tube_feeder": {
         "canonical": "ट्यूब_फीडर",
         "confidence": 0.95,
-        "variants": ["ट्यूब फीडर", "tube feeder", "नली फीडर", "tubular feeder"]
+        "variants": ["ट्यूब फीडर", "tube feeder", "फीडिंग ट्यूब", "feeding tube", "ट्यूबलर फीडर"]
       },
       "bell_drinker": {
         "canonical": "बेल_ड्रिंकर",
         "confidence": 0.95,
-        "variants": ["बेल ड्रिंकर", "bell drinker", "घंटी पानी पिलाने वाला", "suspended drinker"]
+        "variants": ["बेल ड्रिंकर", "bell drinker", "बेल वाटरर", "bell waterer", "लटकने वाला ड्रिंकर"]
       },
       "cup_drinker": {
         "canonical": "कप_ड्रिंकर",
         "confidence": 0.95,
-        "variants": ["कप ड्रिंकर", "cup drinker", "प्याला पानी पिलाने वाला"]
+        "variants": ["कप ड्रिंकर", "cup drinker", "पीने का कप", "drinking cup", "पानी का कप"]
       },
       "nipple_drinker": {
         "canonical": "निप्पल_ड्रिंकर",
         "confidence": 0.95,
-        "variants": ["निप्पल ड्रिंकर", "nipple drinker", "निप्पल", "nipple system"]
+        "variants": ["निप्पल ड्रिंकर", "nipple drinker", "निप्पल वाटरर", "nipple waterer", "निप्पल सिस्टम"]
       },
       "tunnel_ventilation": {
         "canonical": "टनल_वेंटिलेशन",
         "confidence": 0.95,
-        "variants": ["टनल वेंटिलेशन", "tunnel ventilation", "सुरंग हवादार", "tunnel effect"]
+        "variants": ["टनल वेंटिलेशन", "tunnel ventilation", "टनल प्रभाव", "tunnel effect", "अनुदैर्ध्य वेंटिलेशन"]
       },
       "cross_ventilation": {
         "canonical": "क्रॉस_वेंटिलेशन",
         "confidence": 0.95,
-        "variants": ["क्रॉस वेंटिलेशन", "cross ventilation", "अनुप्रस्थ हवादार"]
+        "variants": ["क्रॉस वेंटिलेशन", "cross ventilation", "अनुप्रस्थ वेंटिलेशन", "transverse ventilation", "क्रॉस फ्लो"]
       },
       "radiant_heaters": {
         "canonical": "रेडिएंट_हीटर",
         "confidence": 0.95,
-        "variants": ["रेडिएंट हीटर", "radiant heaters", "विकिरण हीटर", "infrared heaters"]
+        "variants": ["रेडिएंट हीटर", "radiant heaters", "रेडिएंट हीटिंग", "radiant heating", "रेडिएंट ट्यूब", "इन्फ्रारेड हीटर"]
       },
       "hot_air_blowers": {
         "canonical": "गर्म_हवा_ब्लोअर",
         "confidence": 0.95,
-        "variants": ["गर्म हवा ब्लोअर", "hot air blowers", "गर्म हवा देने वाला"]
+        "variants": ["गर्म हवा ब्लोअर", "hot air blowers", "जबरन हवा हीटर", "forced air heaters", "गर्म हवा ब्लोअर"]
       }
     },
 
@@ -354,52 +562,52 @@
       "avian_influenza": {
         "canonical": "एवियन_इन्फ्लूएंजा",
         "confidence": 0.95,
-        "variants": ["एवियन इन्फ्लूएंजा", "avian influenza", "बर्ड फ्लू", "bird flu", "पक्षी फ्लू", "ai", "h5n1", "h7n9"]
+        "variants": ["एवियन इन्फ्लूएंजा", "avian influenza", "बर्ड फ्लू", "bird flu", "ai", "h5n1", "h7n9", "मुर्गी प्लेग"]
       },
       "mareks_disease": {
         "canonical": "मारेक_रोग",
         "confidence": 0.95,
-        "variants": ["मारेक रोग", "mareks disease", "marek disease", "md", "मारेक की बीमारी"]
+        "variants": ["मारेक रोग", "mareks disease", "marek disease", "md", "लिम्फोइड ट्यूमर", "रेंज पैरालिसिस"]
       },
       "gumboro": {
         "canonical": "गंबोरो",
         "confidence": 0.95,
-        "variants": ["गंबोरो", "gumboro", "गुमबोरो रोग", "infectious bursal disease", "ibd", "ibdv"]
+        "variants": ["गंबोरो", "gumboro", "गुमबोरो रोग", "gumboro disease", "संक्रामक बर्सल रोग", "infectious bursal disease", "ibdv", "ibd"]
       },
       "newcastle": {
         "canonical": "न्यूकैसल",
         "confidence": 0.95,
-        "variants": ["न्यूकैसल", "newcastle", "न्यूकैसल रोग", "newcastle disease", "nd", "रानीखेत"]
+        "variants": ["न्यूकैसल", "newcastle", "न्यूकैसल रोग", "newcastle disease", "nd", "एवियन पैरामिक्सोवायरस", "रानीखेत"]
       },
       "coccidiosis": {
         "canonical": "कोक्सीडियोसिस",
         "confidence": 0.95,
-        "variants": ["कोक्सीडियोसिस", "coccidiosis", "कोक्सीडिया", "coccidia", "eimeria"]
+        "variants": ["कोक्सीडियोसिस", "coccidiosis", "कोक्सीडिया", "coccidia", "eimeria", "coccidiostat"]
       },
       "colibacillosis": {
         "canonical": "कोलीबैसिलोसिस",
         "confidence": 0.95,
-        "variants": ["कोलीबैसिलोसिस", "colibacillosis", "e.coli", "e coli", "ई कोली"]
+        "variants": ["कोलीबैसिलोसिस", "colibacillosis", "e.coli", "escherichia coli", "e coli", "ई कोली"]
       },
       "necrotic_enteritis": {
         "canonical": "परिगलित_आंत्रशोथ",
         "confidence": 0.95,
-        "variants": ["परिगलित आंत्रशोथ", "necrotic enteritis", "ne", "clostridium perfringens"]
+        "variants": ["परिगलित आंत्रशोथ", "necrotic enteritis", "clostridium perfringens", "ne", "आंत का परिगलन"]
       },
       "salmonella": {
         "canonical": "साल्मोनेला",
         "confidence": 0.95,
-        "variants": ["साल्मोनेला", "salmonella", "salmonellosis", "साल्मोनेलोसिस"]
+        "variants": ["साल्मोनेला", "salmonella", "salmonellosis", "साल्मोनेलोसिस", "paratyphoid", "pullorum"]
       },
       "mycoplasma": {
         "canonical": "माइकोप्लाज्मा",
         "confidence": 0.95,
-        "variants": ["माइकोप्लाज्मा", "mycoplasma", "mycoplasmosis", "crd"]
+        "variants": ["माइकोप्लाज्मा", "mycoplasma", "mycoplasmosis", "माइकोप्लास्मोसिस", "chronic respiratory disease", "crd"]
       },
       "infectious_bronchitis": {
         "canonical": "संक्रामक_श्वसनीशोथ",
         "confidence": 0.95,
-        "variants": ["संक्रामक श्वसनीशोथ", "infectious bronchitis", "ib", "ibv"]
+        "variants": ["ibv", "संक्रामक श्वसनीशोथ", "infectious bronchitis", "ib", "ब्रोंकाइटिस वायरस"]
       }
     },
 
@@ -407,32 +615,32 @@
       "respiratory": {
         "canonical": "श्वसन",
         "confidence": 0.95,
-        "variants": ["श्वसन", "shvasan", "respiratory", "खांसी", "khansi", "cough", "सांस लेने में कठिनाई"]
+        "variants": ["श्वसन", "shvasan", "respiratory", "खांसी", "khansi", "cough", "dyspnea", "सांस लेना", "breathing", "नाक से स्राव", "rales", "छींक आना"]
       },
       "digestive": {
         "canonical": "पाचन",
         "confidence": 0.95,
-        "variants": ["पाचन", "paachan", "digestive", "दस्त", "dast", "diarrhea", "उल्टी", "vomiting"]
+        "variants": ["पाचन", "paachan", "digestive", "दस्त", "diarrhea", "उल्टी", "vomiting", "anorexia", "भूख न लगना", "आंत्रशोथ"]
       },
       "nervous": {
         "canonical": "तंत्रिका",
         "confidence": 0.95,
-        "variants": ["तंत्रिका", "tantrika", "nervous", "लकवा", "lakwa", "paralysis", "दौरा"]
+        "variants": ["तंत्रिका", "tantrika", "nervous", "ataxia", "लकवा", "paralysis", "दौरा", "convulsions", "कंपन", "न्यूरोलॉजिकल"]
       },
       "general": {
         "canonical": "सामान्य",
         "confidence": 0.90,
-        "variants": ["सामान्य", "samanya", "general", "सुस्ती", "susti", "lethargy", "बुखार", "bukhar", "fever"]
+        "variants": ["सामान्य", "samanya", "general", "सुस्ती", "lethargy", "बुखार", "fever", "कमजोरी", "weakness", "अवसाद", "मलिसे"]
       },
       "lameness": {
         "canonical": "लंगड़ापन",
         "confidence": 0.95,
-        "variants": ["लंगड़ापन", "langdapan", "lameness", "लंगड़ाना", "चलने में कठिनाई"]
+        "variants": ["लंगड़ापन", "langdapan", "lameness", "claudication", "चलने में समस्या", "locomotor problems", "चाल असामान्यता", "पैर की समस्या"]
       },
       "pododermatitis": {
         "canonical": "पोडोडर्मेटाइटिस",
         "confidence": 0.95,
-        "variants": ["पोडोडर्मेटाइटिस", "pododermatitis", "footpad dermatitis", "पैर में जलन"]
+        "variants": ["पोडोडर्मेटाइटिस", "pododermatitis", "footpad dermatitis", "फुटपैड डर्मेटाइटिस", "hock burn", "fhd", "पैर जलना"]
       }
     },
 
@@ -440,57 +648,57 @@
       "crude_protein": {
         "canonical": "कच्चा_प्रोटीन",
         "confidence": 0.95,
-        "variants": ["कच्चा प्रोटीन", "kaccha protein", "crude protein", "cp", "प्रोटीन"]
+        "variants": ["कच्चा प्रोटीन", "kaccha protein", "crude protein", "cp", "प्रोटीन", "proteins", "कच्चा प्रोटीन"]
       },
       "metabolizable_energy": {
         "canonical": "चयापचय_ऊर्जा",
         "confidence": 0.95,
-        "variants": ["चयापचय ऊर्जा", "chayapachay urja", "metabolizable energy", "me", "ऊर्जा", "kcal/kg"]
+        "variants": ["चयापचय ऊर्जा", "chayapachay urja", "metabolizable energy", "me", "kcal/kg", "ऊर्जा घनत्व"]
       },
       "lysine": {
         "canonical": "लाइसिन",
         "confidence": 0.95,
-        "variants": ["लाइसिन", "lysine", "पाच्य लाइसिन", "digestible lysine"]
+        "variants": ["लाइसिन", "lysine", "पाच्य लाइसिन", "digestible lysine", "lys", "lysine dig"]
       },
       "methionine": {
         "canonical": "मेथियोनिन",
         "confidence": 0.95,
-        "variants": ["मेथियोनिन", "methionine", "met", "मेथियोनिन+सिस्टीन", "tsaa"]
+        "variants": ["मेथियोनिन", "methionine", "met", "मेथियोनिन+सिस्टीन", "methionine+cysteine", "met+cys", "tsaa"]
       },
       "calcium": {
         "canonical": "कैल्शियम",
         "confidence": 0.95,
-        "variants": ["कैल्शियम", "calcium", "ca", "चूना"]
+        "variants": ["कैल्शियम", "calcium", "ca", "चूना", "lime", "कैल्शियम कार्बोनेट"]
       },
       "phosphorus": {
         "canonical": "फास्फोरस",
         "confidence": 0.95,
-        "variants": ["फास्फोरस", "phosphorus", "p", "पाच्य फास्फोरस", "digestible phosphorus"]
+        "variants": ["फास्फोरस", "phosphorus", "p", "पाच्य फास्फोरस", "digestible phosphorus", "p dig", "उपलब्ध फास्फोरस"]
       },
       "digestible_phosphorus": {
         "canonical": "पाच्य_फास्फोरस",
         "confidence": 0.95,
-        "variants": ["पाच्य फास्फोरस", "pachya phosphorus", "digestible phosphorus", "dp"]
+        "variants": ["पाच्य फास्फोरस", "pachya phosphorus", "digestible phosphorus", "dp", "उपलब्ध फास्फोरस", "dig p"]
       },
       "electrolyte_balance": {
         "canonical": "इलेक्ट्रोलाइट_संतुलन",
         "confidence": 0.95,
-        "variants": ["इलेक्ट्रोलाइट संतुलन", "electrolyte balance", "deb"]
+        "variants": ["आहार इलेक्ट्रोलाइट संतुलन", "dietary electrolyte balance", "deb", "इलेक्ट्रोलाइट संतुलन"]
       },
       "sodium": {
         "canonical": "सोडियम",
         "confidence": 0.95,
-        "variants": ["सोडियम", "sodium", "na", "नमक", "namak", "salt"]
+        "variants": ["सोडियम", "sodium", "na", "नमक", "salt"]
       },
       "chloride": {
         "canonical": "क्लोराइड",
         "confidence": 0.95,
-        "variants": ["क्लोराइड", "chloride", "cl"]
+        "variants": ["क्लोराइड", "chloride", "cl", "क्लोरीन", "chlorine"]
       },
       "potassium": {
         "canonical": "पोटेशियम",
         "confidence": 0.95,
-        "variants": ["पोटेशियम", "potassium", "k"]
+        "variants": ["पोटेशियम", "potassium", "k", "potash"]
       }
     },
 
@@ -498,42 +706,42 @@
       "temperature": {
         "canonical": "तापमान",
         "confidence": 0.95,
-        "variants": ["तापमान", "taapman", "temperature", "temp", "डिग्री", "degree", "सेल्सियस"]
+        "variants": ["तापमान", "taapman", "temperature", "temp", "डिग्री", "degrees", "सेल्सियस", "celsius", "परिवेश तापमान"]
       },
       "humidity": {
         "canonical": "आर्द्रता",
         "confidence": 0.95,
-        "variants": ["आर्द्रता", "ardrata", "humidity", "नमी", "nami", "relative humidity", "rh"]
+        "variants": ["आर्द्रता", "ardrata", "humidity", "सापेक्ष आर्द्रता", "relative humidity", "rh", "%rh", "नमी"]
       },
       "ventilation_rate": {
         "canonical": "वेंटिलेशन_दर",
         "confidence": 0.95,
-        "variants": ["वेंटिलेशन दर", "ventilation rate", "हवादार दर", "m3/h/kg", "न्यूनतम वेंटिलेशन"]
+        "variants": ["वेंटिलेशन दर", "ventilation rate", "हवा प्रवाह दर", "airflow rate", "m3/h/kg", "हवा का आदान-प्रदान", "न्यूनतम वेंटिलेशन"]
       },
       "static_pressure": {
         "canonical": "स्थिर_दबाव",
         "confidence": 0.95,
-        "variants": ["स्थिर दबाव", "sthir dabav", "static pressure", "pa", "pascal", "दबाव"]
+        "variants": ["स्थिर दबाव", "sthir dabav", "static pressure", "pa", "pascal", "नकारात्मक दबाव", "भवन दबाव"]
       },
       "ammonia": {
         "canonical": "अमोनिया",
         "confidence": 0.95,
-        "variants": ["अमोनिया", "ammonia", "nh3", "ppm", "अमोनिया स्तर"]
+        "variants": ["अमोनिया", "ammonia", "nh3", "ppm", "अमोनिया एकाग्रता", "अमोनिया स्तर"]
       },
       "co2": {
         "canonical": "co2",
         "confidence": 0.95,
-        "variants": ["co2", "कार्बन डाइऑक्साइड", "carbon dioxide", "ppm co2"]
+        "variants": ["co2", "कार्बन डाइऑक्साइड", "carbon dioxide", "ppm co2", "co2 एकाग्रता", "co2 स्तर"]
       },
       "light_intensity": {
         "canonical": "प्रकाश_तीव्रता",
         "confidence": 0.95,
-        "variants": ["प्रकाश तीव्रता", "prakash tivrata", "light intensity", "lux", "रोशनी"]
+        "variants": ["प्रकाश तीव्रता", "prakash tivrata", "light intensity", "lux", "रोशनी", "illumination", "चमक"]
       },
       "lighting_hours": {
         "canonical": "प्रकाश_घंटे",
         "confidence": 0.95,
-        "variants": ["प्रकाश घंटे", "prakash ghante", "lighting hours", "photoperiod", "h/दिन"]
+        "variants": ["प्रकाश घंटे", "prakash ghante", "lighting hours", "photoperiod", "प्रकाश घंटे", "h/दिन", "प्रकाश कार्यक्रम"]
       }
     },
 
@@ -541,22 +749,22 @@
       "biosecurity": {
         "canonical": "जैवसुरक्षा",
         "confidence": 0.95,
-        "variants": ["जैवसुरक्षा", "jaivasuraksha", "biosecurity", "जैविक सुरक्षा", "sanitization"]
+        "variants": ["जैवसुरक्षा", "jaivasuraksha", "biosecurity", "जैविक सुरक्षा", "biological security", "all-in all-out", "कीटाणुशोधन"]
       },
       "probiotics": {
         "canonical": "प्रोबायोटिक्स",
         "confidence": 0.95,
-        "variants": ["प्रोबायोटिक्स", "probiotics", "लाभकारी सूक्ष्मजीव", "gut health"]
+        "variants": ["प्रोबायोटिक्स", "probiotics", "लाभकारी सूक्ष्मजीव", "beneficial microorganisms", "जीवित संस्कृति", "आंत स्वास्थ्य"]
       },
       "antibiotics": {
         "canonical": "एंटीबायोटिक्स",
         "confidence": 0.95,
-        "variants": ["एंटीबायोटिक्स", "antibiotics", "प्रतिजैविक", "antimicrobials"]
+        "variants": ["एंटीबायोटिक्स", "antibiotics", "प्रतिजैविक", "antimicrobials", "चिकित्सीय", "agp", "वृद्धि प्रमोटर"]
       },
       "vaccine": {
         "canonical": "टीका",
         "confidence": 0.95,
-        "variants": ["टीका", "tika", "vaccine", "टीकाकरण", "tikakaran", "vaccination", "immunization"]
+        "variants": ["टीका", "tika", "vaccine", "टीकाकरण", "vaccination", "immunization", "प्रतिरक्षण", "prophylaxis"]
       }
     },
 
@@ -564,27 +772,27 @@
       "stocking_density": {
         "canonical": "भंडारण_घनत्व",
         "confidence": 0.95,
-        "variants": ["भंडारण घनत्व", "bhandaran ghanatva", "stocking density", "घनत्व", "density", "kg/m2", "पक्षी/m2"]
+        "variants": ["भंडारण घनत्व", "bhandaran ghanatva", "stocking density", "घनत्व", "density", "kg/m2", "पक्षी/m2", "birds/m2", "पक्षी घनत्व"]
       },
       "heat_stress": {
         "canonical": "गर्मी_तनाव",
         "confidence": 0.95,
-        "variants": ["गर्मी तनाव", "garmi tanav", "heat stress", "तापीय तनाव", "hyperthermia"]
+        "variants": ["गर्मी तनाव", "garmi tanav", "heat stress", "तापीय तनाव", "thermal stress", "hyperthermia", "heat stroke", "अधिक गर्मी"]
       },
       "feather_pecking": {
         "canonical": "पंख_चोंचना",
         "confidence": 0.95,
-        "variants": ["पंख चोंचना", "pankh chochna", "feather pecking", "नरभक्षण", "cannibalism"]
+        "variants": ["पंख चोंचना", "pankh chochna", "feather pecking", "चोंचना", "pecking", "नरभक्षण", "cannibalism", "पंख तोड़ना"]
       },
       "feeder_space": {
         "canonical": "फीडर_स्थान",
         "confidence": 0.95,
-        "variants": ["फीडर स्थान", "feeder space", "चारा स्थान", "cm/पक्षी"]
+        "variants": ["फीडर स्थान", "feeder space", "cm/पक्षी", "cm/bird", "फीडर लंबाई", "खिलाने की जगह"]
       },
       "drinker_flow_rate": {
         "canonical": "पानी_प्रवाह_दर",
         "confidence": 0.95,
-        "variants": ["पानी प्रवाह दर", "pani pravah dar", "drinker flow rate", "निप्पल प्रवाह", "ml/min/nipple"]
+        "variants": ["पानी प्रवाह दर", "pani pravah dar", "drinker flow rate", "निप्पल प्रवाह", "nipple flow", "ml/min/nipple", "पानी का दबाव"]
       }
     },
 
@@ -592,22 +800,22 @@
       "litter": {
         "canonical": "बिछावन",
         "confidence": 0.95,
-        "variants": ["बिछावन", "bichhavan", "litter", "बिस्तर", "bistar", "bedding"]
+        "variants": ["बिछावन", "bichhavan", "litter", "बिस्तर", "bedding", "फर्श कवरिंग", "substrate"]
       },
       "wood_shavings": {
         "canonical": "लकड़ी_के_छीलन",
         "confidence": 0.95,
-        "variants": ["लकड़ी के छीलन", "lakdi ke chilan", "wood shavings", "बुरादा", "burada", "sawdust"]
+        "variants": ["लकड़ी के छीलन", "lakdi ke chilan", "wood shavings", "छीलन", "shavings", "लकड़ी के चिप्स", "बुरादा"]
       },
       "rice_husks": {
         "canonical": "चावल_की_भूसी",
         "confidence": 0.95,
-        "variants": ["चावल की भूसी", "chawal ki bhusi", "rice husks", "धान की भूसी"]
+        "variants": ["चावल की भूसी", "chawal ki bhusi", "rice husks", "rice hulls", "धान की भूसी", "चावल की भूसी"]
       },
       "straw": {
         "canonical": "पुआल",
         "confidence": 0.95,
-        "variants": ["पुआल", "pual", "straw", "भूसा", "bhusa", "तिनका"]
+        "variants": ["पुआल", "pual", "straw", "गेहूं का पुआल", "wheat straw", "जौ का पुआल", "जई का पुआल"]
       }
     },
 
@@ -615,27 +823,27 @@
       "egg_weight": {
         "canonical": "अंडे_का_वजन",
         "confidence": 0.95,
-        "variants": ["अंडे का वजन", "ande ka vazan", "egg weight", "अंडे का आकार", "egg size"]
+        "variants": ["अंडे का वजन", "ande ka vazan", "egg weight", "अंडे का द्रव्यमान", "egg mass", "औसत अंडा वजन", "अंडे का आकार", "अंडा कैलिबर"]
       },
       "shell_quality": {
         "canonical": "खोल_गुणवत्ता",
         "confidence": 0.95,
-        "variants": ["खोल गुणवत्ता", "khol gunvatta", "shell quality", "खोल की मोटाई", "shell thickness"]
+        "variants": ["खोल गुणवत्ता", "khol gunvatta", "shell quality", "खोल की मोटाई", "shell thickness", "खोल की मजबूती", "नरम खोल", "पतले खोल"]
       },
       "cracked_shell": {
         "canonical": "टूटा_खोल",
         "confidence": 0.95,
-        "variants": ["टूटा खोल", "tuta khol", "cracked shell", "दरार", "darar", "crack"]
+        "variants": ["टूटा खोल", "tuta khol", "cracked shell", "खोल में दरार", "shell crack", "टूटा अंडा", "बालों की दरार"]
       },
       "soft_shelled_egg": {
         "canonical": "नरम_खोल_अंडा",
         "confidence": 0.95,
-        "variants": ["नरम खोल अंडा", "naram khol anda", "soft shelled egg", "नरम खोल"]
+        "variants": ["नरम खोल अंडा", "naram khol anda", "soft shelled egg", "नरम खोल", "soft shell", "खोल रहित अंडा", "रबर अंडा"]
       },
       "misshapen_egg": {
         "canonical": "विकृत_अंडा",
         "confidence": 0.95,
-        "variants": ["विकृत अंडा", "vikrit anda", "misshapen egg", "असामान्य आकार"]
+        "variants": ["विकृत अंडा", "vikrit anda", "misshapen egg", "विकृत अंडा", "deformed egg", "असामान्य आकार", "अनियमित अंडा"]
       }
     },
 
@@ -643,22 +851,22 @@
       "vaccination": {
         "canonical": "टीकाकरण",
         "confidence": 0.95,
-        "variants": ["टीकाकरण", "tikakaran", "vaccination", "टीका", "tika", "vaccine", "immunization"]
+        "variants": ["टीकाकरण", "tikakaran", "vaccination", "टीका", "vaccine", "immunization", "प्रतिरक्षण", "inoculation"]
       },
       "biosecurity_protocol": {
         "canonical": "जैवसुरक्षा_प्रोटोकॉल",
         "confidence": 0.95,
-        "variants": ["जैवसुरक्षा", "jaivasuraksha", "biosecurity", "कीटाणुशोधन", "disinfection", "सफाई"]
+        "variants": ["जैवसुरक्षा", "jaivasuraksha", "biosecurity", "कीटाणुशोधन", "disinfection", "सफाई", "cleaning", "संगरोध"]
       },
       "treatment": {
         "canonical": "उपचार",
         "confidence": 0.95,
-        "variants": ["उपचार", "upchar", "treatment", "इलाज", "ilaj", "medication", "therapy"]
+        "variants": ["उपचार", "upchar", "treatment", "दवा", "medication", "चिकित्सा", "therapy", "इलाज"]
       },
       "lab_diagnostics": {
         "canonical": "प्रयोगशाला_निदान",
         "confidence": 0.95,
-        "variants": ["प्रयोगशाला निदान", "prayogshala nidan", "lab diagnostics", "परीक्षण", "test", "विश्लेषण"]
+        "variants": ["निदान", "diagnostic", "परीक्षण", "test", "विश्लेषण", "analyse", "प्रयोगशाला", "laboratory", "lab"]
       }
     },
 
@@ -666,37 +874,37 @@
       "out_of_domain": {
         "canonical": "क्षेत्र_से_बाहर",
         "confidence": 1.0,
-        "variants": ["क्षेत्र से बाहर", "kshetra se bahar", "out of domain", "दायरे से बाहर"]
+        "variants": ["क्षेत्र से बाहर", "out of domain", "दायरे से बाहर", "outside scope", "डोमेन में नहीं"]
       },
       "error_generic": {
         "canonical": "सामान्य_त्रुटि",
         "confidence": 1.0,
-        "variants": ["त्रुटि", "truti", "error", "सामान्य त्रुटि", "generic error"]
+        "variants": ["त्रुटि", "error", "सामान्य त्रुटि", "generic error", "प्रसंस्करण त्रुटि"]
       },
       "welcome": {
         "canonical": "स्वागत",
         "confidence": 1.0,
-        "variants": ["स्वागत", "swagat", "welcome", "नमस्ते", "namaste", "hello"]
+        "variants": ["स्वागत", "swagat", "welcome", "अभिवादन", "greeting", "नमस्ते", "hello"]
       },
       "clarification_needed": {
         "canonical": "स्पष्टीकरण_आवश्यक",
         "confidence": 1.0,
-        "variants": ["स्पष्टीकरण आवश्यक", "spashtiikaran avashyak", "clarification needed", "कृपया स्पष्ट करें"]
+        "variants": ["स्पष्टीकरण आवश्यक", "clarification needed", "कृपया स्पष्ट करें", "please clarify", "अधिक जानकारी चाहिए"]
       },
       "no_results": {
         "canonical": "कोई_परिणाम_नहीं",
         "confidence": 1.0,
-        "variants": ["कोई परिणाम नहीं", "koi parinam nahin", "no results", "कुछ नहीं मिला"]
+        "variants": ["कोई परिणाम नहीं", "no results", "कुछ नहीं मिला", "nothing found", "कोई डेटा नहीं"]
       },
       "processing": {
         "canonical": "प्रसंस्करण",
         "confidence": 1.0,
-        "variants": ["प्रसंस्करण", "prasanskaran", "processing", "कृपया प्रतीक्षा करें"]
+        "variants": ["प्रसंस्करण", "prasanskaran", "processing", "कृपया प्रतीक्षा करें", "please wait", "काम कर रहा है"]
       },
       "farewell": {
         "canonical": "विदाई",
         "confidence": 1.0,
-        "variants": ["विदाई", "vidai", "goodbye", "अलविदा", "alvida", "नमस्ते"]
+        "variants": ["अलविदा", "goodbye", "विदाई", "farewell", "नमस्ते", "bye"]
       }
     }
   }

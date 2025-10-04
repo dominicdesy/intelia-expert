@@ -3,94 +3,349 @@
     "language": "th",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 19,
-    "description": "คำศัพท์สากลสำหรับระบบผู้เชี่ยวชาญด้านการผลิตสัตว์ปีก - ฉบับภาษาไทย"
+    "total_domains": 24,
+    "description": "คำศัพท์สากลสำหรับระบบผู้เชี่ยวชาญการผลิตสัตว์ปีก - เวอร์ชันภาษาไทย"
   },
 
   "domains": {
+    "contextual_references": {
+      "same": {
+        "canonical": "เหมือนกัน",
+        "confidence": 0.90,
+        "variants": ["เหมือนกัน", "same", "อันเดียวกัน", "ที่เหมือนกัน", "สำหรับอันเดียวกัน"]
+      },
+      "same_age": {
+        "canonical": "อายุเท่ากัน",
+        "confidence": 0.90,
+        "variants": ["ที่อายุเท่ากัน", "same age", "อายุเท่ากัน", "ที่อายุ", "ในช่วงเดียวกัน"]
+      },
+      "and_for": {
+        "canonical": "และสำหรับ",
+        "confidence": 0.90,
+        "variants": ["และสำหรับ", "and for", "และสำหรับของ", "เช่นเดียวกับสำหรับ", "เช่นกันสำหรับ"]
+      },
+      "what_about": {
+        "canonical": "แล้วเรื่อง",
+        "confidence": 0.90,
+        "variants": ["แล้วเรื่อง", "what about", "แล้วเกี่ยวกับ", "และเกี่ยวกับ", "และเรื่อง"]
+      },
+      "females": {
+        "canonical": "ตัวเมีย",
+        "confidence": 0.95,
+        "variants": ["ตัวเมีย", "females", "แม่ไก่", "ตัวเมียทั้งหมด", "เพศเมีย"]
+      },
+      "males": {
+        "canonical": "ตัวผู้",
+        "confidence": 0.95,
+        "variants": ["ตัวผู้", "males", "ไก่ตัวผู้", "ตัวผู้ทั้งหมด", "เพศผู้", "ไก่งวง"]
+      },
+      "and_the": {
+        "canonical": "และ",
+        "confidence": 0.90,
+        "variants": ["และ", "and the", "เช่นเดียวกับ", "พร้อมกับ"]
+      },
+      "also_for": {
+        "canonical": "สำหรับด้วย",
+        "confidence": 0.90,
+        "variants": ["สำหรับด้วย", "also for", "เช่นกันสำหรับ", "เหมือนกันสำหรับ", "เช่นเดียวกันสำหรับ"]
+      }
+    },
+
+    "metrics": {
+      "weight": {
+        "canonical": "น้ำหนัก",
+        "confidence": 0.95,
+        "variants": ["น้ำหนัก", "weight", "มวล", "น้ำหนักตัว", "kg", "กรัม", "g", "lbs"]
+      },
+      "fcr": {
+        "canonical": "อัตราแปลงอาหาร",
+        "confidence": 0.95,
+        "variants": ["fcr", "อัตราแปลงอาหาร", "feed conversion", "อัตราการแปลง", "ประสิทธิภาพอาหาร"]
+      },
+      "gain": {
+        "canonical": "การเพิ่มน้ำหนัก",
+        "confidence": 0.95,
+        "variants": ["การเพิ่มน้ำหนัก", "gain", "น้ำหนักที่เพิ่ม", "การเติบโต", "adg"]
+      },
+      "conversion": {
+        "canonical": "การแปลง",
+        "confidence": 0.95,
+        "variants": ["การแปลง", "conversion", "อัตราการแปลง", "ประสิทธิภาพ"]
+      },
+      "consumption": {
+        "canonical": "การบริโภค",
+        "confidence": 0.95,
+        "variants": ["การบริโภค", "consumption", "การกิน", "intake", "ที่กิน", "การกินอาหาร"]
+      },
+      "production": {
+        "canonical": "การผลิต",
+        "confidence": 0.95,
+        "variants": ["การผลิต", "production", "ผลผลิต", "yield", "ผลิตภาพ", "ประสิทธิภาพ"]
+      },
+      "growth": {
+        "canonical": "การเติบโต",
+        "confidence": 0.95,
+        "variants": ["การเติบโต", "growth", "การพัฒนา", "การเจริญเติบโต", "อัตราการเติบโต"]
+      },
+      "performance": {
+        "canonical": "ประสิทธิภาพ",
+        "confidence": 0.95,
+        "variants": ["ประสิทธิภาพ", "performance", "ผลลัพธ์", "ผลผลิต"]
+      },
+      "index": {
+        "canonical": "ดัชนี",
+        "confidence": 0.95,
+        "variants": ["ดัชนี", "index", "อัตราส่วน", "สัมประสิทธิ์", "อัตรา", "ตัวประกอบ"]
+      }
+    },
+
+    "health": {
+      "disease": {
+        "canonical": "โรค",
+        "confidence": 0.95,
+        "variants": ["โรค", "disease", "โรคภัย", "การติดเชื้อ", "โรคติดต่อ"]
+      },
+      "symptoms": {
+        "canonical": "อาการ",
+        "confidence": 0.95,
+        "variants": ["อาการ", "symptoms", "สัญญาณ", "อาการแสดง", "สัญญาณทางคลินิก"]
+      },
+      "treatment": {
+        "canonical": "การรักษา",
+        "confidence": 0.95,
+        "variants": ["การรักษา", "treatment", "การให้ยา", "medication", "การบำบัด", "therapy", "การรักษาโรค"]
+      },
+      "lab_diagnostics": {
+        "canonical": "การวินิจฉัยห้องปฏิบัติการ",
+        "confidence": 0.95,
+        "variants": ["การวินิจฉัย", "diagnostic", "การทดสอบ", "test", "การวิเคราะห์", "analyse", "ห้องปฏิบัติการ", "laboratory", "lab"]
+      }
+    },
+
+    "system_messages": {
+      "out_of_domain": {
+        "canonical": "นอกขอบเขต",
+        "confidence": 1.0,
+        "variants": ["นอกขอบเขต", "out of domain", "นอกขอบข่าย", "outside scope", "ไม่อยู่ในโดเมน"]
+      },
+      "error_generic": {
+        "canonical": "ข้อผิดพลาดทั่วไป",
+        "confidence": 1.0,
+        "variants": ["ข้อผิดพลาด", "error", "ข้อผิดพลาดทั่วไป", "generic error", "ข้อผิดพลาดการประมวลผล"]
+      },
+      "welcome": {
+        "canonical": "ยินดีต้อนรับ",
+        "confidence": 1.0,
+        "variants": ["ยินดีต้อนรับ", "welcome", "การทักทาย", "greeting", "สวัสดี", "hello"]
+      },
+      "clarification_needed": {
+        "canonical": "ต้องการคำชี้แจง",
+        "confidence": 1.0,
+        "variants": ["ต้องการคำชี้แจง", "clarification needed", "กรุณาชี้แจง", "please clarify", "ต้องการข้อมูลเพิ่มเติม"]
+      },
+      "no_results": {
+        "canonical": "ไม่มีผลลัพธ์",
+        "confidence": 1.0,
+        "variants": ["ไม่มีผลลัพธ์", "no results", "ไม่พบอะไร", "nothing found", "ไม่มีข้อมูล"]
+      },
+      "processing": {
+        "canonical": "กำลังประมวลผล",
+        "confidence": 1.0,
+        "variants": ["กำลังประมวลผล", "processing", "กรุณารอสักครู่", "please wait", "กำลังทำงาน"]
+      },
+      "farewell": {
+        "canonical": "ลาก่อน",
+        "confidence": 1.0,
+        "variants": ["ลาก่อน", "goodbye", "สวัสดี", "farewell", "บาย", "bye"]
+      }
+    }
+  }
+}", "treatment", "การบำบัด", "การให้ยา", "การดูแล"]
+      },
+      "coccidiosis": {
+        "canonical": "โรคลำไส้อักเสบ",
+        "confidence": 0.95,
+        "variants": ["โรคลำไส้อักเสบ", "coccidiosis", "coccidia", "eimeria", "ค็อกซิดิโอซิส"]
+      },
+      "vaccination": {
+        "canonical": "การฉีดวัคซีน",
+        "confidence": 0.95,
+        "variants": ["การฉีดวัคซีน", "vaccination", "วัคซีน", "vaccine", "การสร้างภูมิคุ้มกัน", "การป้องกัน"]
+      },
+      "gumboro": {
+        "canonical": "โรคกัมโบโร",
+        "confidence": 0.95,
+        "variants": ["โรคกัมโบโร", "gumboro", "gumboro disease", "infectious bursal disease", "ibdv", "ibd"]
+      },
+      "enteritis": {
+        "canonical": "โรคลำไส้อักเสบ",
+        "confidence": 0.95,
+        "variants": ["โรคลำไส้อักเสบ", "enteritis", "necrotic enteritis", "การอักเสบของลำไส้"]
+      },
+      "mortality": {
+        "canonical": "อัตราการตาย",
+        "confidence": 0.95,
+        "variants": ["อัตราการตาย", "mortality", "การตาย", "อัตราตาย", "การสูญเสีย"]
+      },
+      "diagnosis": {
+        "canonical": "การวินิจฉัย",
+        "confidence": 0.95,
+        "variants": ["การวินิจฉัย", "diagnosis", "diagnostic", "การวิเคราะห์", "การตรวจหา"]
+      }
+    },
+
+    "environment": {
+      "temperature": {
+        "canonical": "อุณหภูมิ",
+        "confidence": 0.95,
+        "variants": ["อุณหภูมิ", "temperature", "temp", "องศา", "เซลเซียส", "ความร้อน"]
+      },
+      "humidity": {
+        "canonical": "ความชื้น",
+        "confidence": 0.95,
+        "variants": ["ความชื้น", "humidity", "rh", "ความชื้นสัมพัทธ์", "ระดับความชื้น"]
+      },
+      "ventilation": {
+        "canonical": "การระบายอากาศ",
+        "confidence": 0.95,
+        "variants": ["การระบายอากาศ", "ventilation", "การถ่ายเทอากาศ", "การหมุนเวียนอากาศ"]
+      },
+      "lighting": {
+        "canonical": "แสงสว่าง",
+        "confidence": 0.95,
+        "variants": ["แสงสว่าง", "lighting", "แสง", "การให้แสง", "ความสว่าง"]
+      },
+      "density": {
+        "canonical": "ความหนาแน่น",
+        "confidence": 0.95,
+        "variants": ["ความหนาแน่น", "density", "ความหนาแน่นของการเลี้ยง", "stocking density", "kg/m2", "ตัว/m2"]
+      },
+      "space": {
+        "canonical": "พื้นที่",
+        "confidence": 0.95,
+        "variants": ["พื้นที่", "space", "เนื้อที่", "cm/ตัว", "พื้นที่ว่าง"]
+      },
+      "feeder": {
+        "canonical": "ที่ให้อาหาร",
+        "confidence": 0.95,
+        "variants": ["ที่ให้อาหาร", "feeder", "ภาชนะอาหาร", "ระบบให้อาหาร", "รางอาหาร"]
+      },
+      "drinker": {
+        "canonical": "ที่ให้น้ำ",
+        "confidence": 0.95,
+        "variants": ["ที่ให้น้ำ", "drinker", "ภาชนะน้ำ", "ระบบน้ำ", "จุดน้ำ"]
+      },
+      "light": {
+        "canonical": "แสง",
+        "confidence": 0.95,
+        "variants": ["แสง", "light", "lighting", "lux", "ความเข้มแสง", "ช่วงแสง"]
+      }
+    },
+
+    "species": {
+      "broiler": {
+        "canonical": "ไก่เนื้อ",
+        "database_value": "broiler",
+        "confidence": 0.95,
+        "variants": ["ไก่เนื้อ", "broiler", "ไก่สำหรับเนื้อ", "การผลิตเนื้อ"]
+      },
+      "layer": {
+        "canonical": "ไก่ไข่",
+        "database_value": "layer",
+        "confidence": 0.95,
+        "variants": ["ไก่ไข่", "layer", "แม่ไก่ไข่", "ไก่วางไข่", "การผลิตไข่"]
+      },
+      "breeder": {
+        "canonical": "พ่อแม่พันธุ์",
+        "database_value": "breeder",
+        "confidence": 0.95,
+        "variants": ["พ่อแม่พันธุ์", "breeder", "ไก่พันธุ์", "ฝูงพันธุ์"]
+      }
+    },
+
     "general_terms": {
       "poultry": {
         "canonical": "สัตว์ปีก",
         "confidence": 0.95,
-        "variants": ["สัตว์ปีก", "satw pik", "poultry", "การเลี้ยงสัตว์ปีก", "การผลิตสัตว์ปีก", "ไก่"]
+        "variants": ["สัตว์ปีก", "poultry", "การเลี้ยงสัตว์ปีก", "การผลิตสัตว์ปีก"]
       },
       "farm": {
         "canonical": "ฟาร์ม",
         "confidence": 0.95,
-        "variants": ["ฟาร์ม", "farm", "โรงเรือน", "rong ruan", "สถานที่เลี้ยง", "โรงเพาะเลี้ยง"]
+        "variants": ["ฟาร์ม", "farm", "ฟาร์มเลี้ยง", "สถานที่เลี้ยง", "โรงเรือน"]
       },
       "management": {
         "canonical": "การจัดการ",
         "confidence": 0.90,
-        "variants": ["การจัดการ", "kan jad kan", "management", "การบริหาร", "การดูแล"]
+        "variants": ["การจัดการ", "management", "การบริหาร", "การดำเนินการ"]
       },
       "production": {
         "canonical": "การผลิต",
         "confidence": 0.90,
-        "variants": ["การผลิต", "kan pha lit", "production", "ผลผลิต", "ผลิตภาพ", "ประสิทธิภาพ"]
+        "variants": ["การผลิต", "production", "ผลผลิต", "ผลิตภาพ"]
       },
       "quality": {
         "canonical": "คุณภาพ",
         "confidence": 0.90,
-        "variants": ["คุณภาพ", "khun phap", "quality", "มาตรฐาน", "เกรด"]
+        "variants": ["คุณภาพ", "quality", "มาตรฐาน", "เกรด", "การจำแนก"]
       }
     },
 
     "question_patterns": {
       "weight_query": {
-        "canonical": "คำถาม_น้ำหนัก",
+        "canonical": "คำถามน้ำหนัก",
         "confidence": 0.92,
-        "variants": ["น้ำหนักเท่าไร", "nam nak thao rai", "น้ำหนักเป้าหมาย", "น้ำหนักเฉลี่ย", "หนักเท่าไร"]
+        "variants": ["น้ำหนักเท่าไร", "what is the weight", "น้ำหนักเป้าหมาย", "target weight", "น้ำหนักเฉลี่ย", "หนักเท่าไร"]
       },
       "fcr_query": {
         "canonical": "คำถาม_fcr",
         "confidence": 0.92,
-        "variants": ["fcr ที่ดี", "fcr thi di", "อัตราแลกเนื้อ", "at lak nuea", "fcr", "ค่าแลกเนื้อ"]
+        "variants": ["fcr ที่เหมาะสม", "optimal fcr", "อัตราแปลงอาหาร", "feed conversion", "อัตราการแปลง", "fcr เฉลี่ย"]
       },
       "water_query": {
-        "canonical": "คำถาม_น้ำ",
+        "canonical": "คำถามน้ำ",
         "confidence": 0.92,
-        "variants": ["การใช้น้ำ", "kan chai nam", "ปริมาณน้ำ", "ลิตรต่อวัน", "ml ต่อตัว"]
+        "variants": ["การบริโภคน้ำ", "water consumption", "การกินน้ำ", "water intake", "ลิตรต่อวัน", "มล.ต่อตัว"]
       },
       "nutrient_requirement_query": {
-        "canonical": "คำถาม_โภชนะ",
+        "canonical": "คำถามสารอาหาร",
         "confidence": 0.92,
-        "variants": ["ระดับโปรตีน", "ra dap pro tin", "ความต้องการไลซีน", "ความต้องการแคลเซียม"]
+        "variants": ["ระดับโปรตีน", "protein level", "ความต้องการไลซีน", "lysine requirement", "ความต้องการแคลเซียม", "ปริมาณฟอสฟอรัส"]
       },
       "environment_setpoint_query": {
-        "canonical": "คำถาม_สภาพแวดล้อม",
+        "canonical": "คำถามสภาพแวดล้อม",
         "confidence": 0.92,
-        "variants": ["อุณหภูมิที่เหมาะสม", "un ha phum thi mo som", "ความชื้นเป้าหมาย", "การตั้งค่าพัดลม"]
+        "variants": ["อุณหภูมิที่เหมาะสม", "optimal temperature", "ความชื้นเป้าหมาย", "target humidity", "co2 สูงสุด", "การตั้งค่าระบายอากาศ"]
       },
       "production_index_query": {
-        "canonical": "คำถาม_ดัชนี",
+        "canonical": "คำถามดัชนี",
         "confidence": 0.92,
-        "variants": ["epef เฉลี่ย", "epef cha lia", "ดัชนีประสิทธิภาพ", "dat ni pra sit thi phap"]
+        "variants": ["epef เฉลี่ย", "average epef", "iep ปกติ", "normal iep", "ดัชนีประสิทธิภาพ", "ประสิทธิภาพโดยรวม"]
       },
       "vaccination_protocol_query": {
-        "canonical": "คำถาม_วัคซีน",
+        "canonical": "คำถามวัคซีน",
         "confidence": 0.92,
-        "variants": ["โปรแกรมวัคซีน", "pro gram vak sin", "ตารางวัคซีน", "ta rang vak sin", "แผนการฉีดวัคซีน"]
+        "variants": ["โปรโตคอลวัคซีน", "vaccination protocol", "ตารางวัคซีน", "vaccine schedule", "โครงการวัคซีน", "แผนภูมิคุ้มกัน"]
       },
       "space_equipment_query": {
-        "canonical": "คำถาม_อุปกรณ์",
+        "canonical": "คำถามอุปกรณ์",
         "confidence": 0.92,
-        "variants": ["พื้นที่ให้อาหาร", "phun thi hai a han", "การตั้งค่านิปเปิ้ล", "ความสูงที่กินน้ำ"]
+        "variants": ["พื้นที่ให้อาหาร", "feeder space", "การตั้งค่านิปเปิล", "nipple setting", "ความสูงที่ให้น้ำ", "ซม.ต่อตัว"]
       },
       "problem_report": {
-        "canonical": "รายงาน_ปัญหา",
+        "canonical": "รายงานปัญหา",
         "confidence": 0.90,
-        "variants": ["ไก่ของฉัน", "kai khong chan", "ฉันสังเกตเห็น", "ปัญหากับ", "ฝูงของฉัน"]
+        "variants": ["ไก่ของฉัน", "my chickens", "ฉันสังเกตเห็น", "i observe", "แม่ไก่ของฉัน", "ปัญหากับ", "ไก่ของฉัน"]
       },
       "health_diagnosis": {
-        "canonical": "การวินิจฉัย_สุขภาพ",
+        "canonical": "การวินิจฉัยสุขภาพ",
         "confidence": 0.92,
-        "variants": ["อาการอะไร", "a kan a rai", "การวินิจฉัย", "โรค", "สาเหตุคืออะไร", "อาการทางคลินิก"]
+        "variants": ["อาการอะไร", "what symptoms", "การวินิจฉัย", "diagnosis", "โรค", "disease", "สาเหตุอะไร", "สัญญาณทางคลินิก"]
       },
       "management_how": {
-        "canonical": "การจัดการ_อย่างไร",
+        "canonical": "วิธีจัดการ",
         "confidence": 0.90,
-        "variants": ["จัดการอย่างไร", "jad kan yang rai", "รักษาอย่างไร", "ทำอย่างไร", "ปรับปรุงอย่างไร"]
+        "variants": ["จัดการอย่างไร", "how to manage", "รักษาอย่างไร", "how to treat", "ทำอย่างไร", "what to do", "ปรับปรุงอย่างไร"]
       }
     },
 
@@ -98,7 +353,7 @@
       "ross_308": {
         "canonical": "ross_308",
         "confidence": 0.95,
-        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "รอส 308", "ross 308 broiler"]
+        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "ross 308 broiler", "ross308 ap", "ross 308 ap", "รอส 308"]
       },
       "ross_708": {
         "canonical": "ross_708",
@@ -108,7 +363,7 @@
       "cobb_500": {
         "canonical": "cobb_500",
         "confidence": 0.95,
-        "variants": ["cobb 500", "cobb500", "cobb-500", "c500", "cobb", "คอบบ์ 500", "cobb 500 broiler"]
+        "variants": ["cobb 500", "cobb500", "cobb-500", "c500", "cobb", "cobb 500 broiler", "คอบบ์ 500"]
       },
       "cobb_700": {
         "canonical": "cobb_700",
@@ -123,32 +378,32 @@
       "hubbard_classic": {
         "canonical": "hubbard_classic",
         "confidence": 0.95,
-        "variants": ["hubbard classic", "classic", "hubbard-classic", "ฮับบาร์ด คลาสสิค", "hubbard"]
+        "variants": ["hubbard classic", "classic", "hubbard-classic", "hclassic", "hubbard", "ฮับบาร์ด คลาสสิก"]
       },
       "hubbard_flex": {
         "canonical": "hubbard_flex",
         "confidence": 0.95,
-        "variants": ["hubbard flex", "flex", "hubbard-flex", "ฮับบาร์ด เฟล็กซ์"]
+        "variants": ["hubbard flex", "flex", "hubbard-flex", "hflex", "ฮับบาร์ด เฟล็กซ์"]
       },
       "hubbard_ja87": {
         "canonical": "hubbard_ja87",
         "confidence": 0.95,
-        "variants": ["hubbard ja87", "ja87", "hubbard-ja87", "ja 87", "ฮับบาร์ด ja87"]
+        "variants": ["hubbard ja87", "ja87", "hubbard-ja87", "ja 87", "ja-87", "ฮับบาร์ด ja87"]
       },
       "freedom_ranger": {
         "canonical": "freedom_ranger",
         "confidence": 0.95,
-        "variants": ["freedom ranger", "freedom", "ranger", "ฟรีดอม เรนเจอร์"]
+        "variants": ["freedom ranger", "freedom", "ranger", "redbro", "freedom-ranger", "ฟรีดอม เรนเจอร์"]
       },
       "isa_brown": {
         "canonical": "isa_brown",
         "confidence": 0.95,
-        "variants": ["isa brown", "isa", "isa-brown", "ไอเอสเอ บราวน์", "isa layer"]
+        "variants": ["isa brown", "isa", "isa-brown", "isa brown layer", "isa brown hen", "ไอเอสเอ บราวน์"]
       },
       "lohmann_brown": {
         "canonical": "lohmann_brown",
         "confidence": 0.95,
-        "variants": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "โลห์มันน์ บราวน์"]
+        "variants": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "lohmann brown layer", "โลห์มันน์ บราวน์"]
       },
       "hy_line": {
         "canonical": "hy_line",
@@ -159,49 +414,49 @@
 
     "performance_metrics": {
       "feed_conversion_ratio": {
-        "canonical": "อัตราแลกเนื้อ",
+        "canonical": "อัตราแปลงอาหาร",
         "confidence": 0.95,
-        "variants": ["fcr", "อัตราแลกเนื้อ", "at lak nuea", "ค่าแลกเนื้อ", "feed conversion", "fcr สะสม", "อัตราการแปลงอาหาร"]
+        "variants": ["fcr", "อัตราแปลงอาหาร", "feed conversion ratio", "feed conversion", "อัตราการแปลง", "ประสิทธิภาพอาหาร", "อัตราแปลงสะสม", "fcr ratio"]
       },
       "average_daily_gain": {
-        "canonical": "อัตราการเจริญเติบโต",
+        "canonical": "น้ำหนักเพิ่มเฉลี่ยต่อวัน",
         "confidence": 0.95,
-        "variants": ["adg", "อัตราการเจริญเติบโต", "at kan cha roen toep to", "การเพิ่มน้ำหนักต่อวัน", "กรัมต่อวัน", "g/day"]
+        "variants": ["adg", "น้ำหนักเพิ่มเฉลี่ยต่อวัน", "average daily gain", "น้ำหนักเพิ่มต่อวัน", "กรัม/วัน", "g/day", "น้ำหนักเพิ่มเฉลี่ย", "การเติบโตต่อวัน", "อัตราการเติบโต"]
       },
       "feed_intake": {
-        "canonical": "การกินอาหาร",
+        "canonical": "ปริมาณอาหารที่กิน",
         "confidence": 0.95,
-        "variants": ["การกินอาหาร", "kan kin a han", "ปริมาณอาหาร", "fi", "feed intake", "g/ตัว/วัน", "การบริโภคอาหาร"]
+        "variants": ["ปริมาณอาหารที่กิน", "feed intake", "fi", "การบริโภคอาหาร", "กรัม/ตัว/วัน", "g/bird/day", "อาหารต่อวัน", "อาหารที่กิน", "การบริโภคต่อวัน", "อาหารสะสม", "อาหารรวม", "อาหารต่อตัว"]
       },
       "water_intake": {
-        "canonical": "การดื่มน้ำ",
+        "canonical": "ปริมาณน้ำที่กิน",
         "confidence": 0.95,
-        "variants": ["การดื่มน้ำ", "kan duem nam", "ปริมาณน้ำ", "water intake", "l/1000/วัน", "ml/ตัว/วัน"]
+        "variants": ["ปริมาณน้ำที่กิน", "water intake", "การบริโภคน้ำ", "ลิตร/1000/วัน", "l/1000/day", "มล./ตัว/วัน", "ml/bird/day", "น้ำต่อวัน", "น้ำที่กิน", "น้ำต่อตัว", "น้ำดื่ม", "การใช้น้ำ"]
       },
       "body_weight": {
         "canonical": "น้ำหนักตัว",
         "confidence": 0.95,
-        "variants": ["น้ำหนัก", "nam nak", "weight", "น้ำหนักตัว", "น้ำหนักเป้าหมาย", "น้ำหนักเฉลี่ย", "bw"]
+        "variants": ["น้ำหนัก", "weight", "น้ำหนักตัว", "body weight", "น้ำหนักมีชีวิต", "live weight", "น้ำหนักเฉลี่ย", "average weight", "น้ำหนักเป้าหมาย", "target weight", "bw", "น้ำหนักไก่", "น้ำหนักแต่ละตัว", "น้ำหนักมาตรฐาน"]
       },
       "mortality": {
         "canonical": "อัตราการตาย",
         "confidence": 0.95,
-        "variants": ["อัตราการตาย", "at kan tai", "mortality", "การตาย", "สูญเสีย", "เปอร์เซ็นต์การตาย", "อัตราการตายสะสม"]
+        "variants": ["อัตราการตาย", "mortality", "mortality rate", "การตาย", "death", "อัตราตาย", "death rate", "การสูญเสีย", "loss", "เปอร์เซ็นต์การตาย", "อัตราตายสะสม", "อัตราตายต่อวัน", "ตัวที่ตาย", "การสูญเสีย", "อัตรารอดชีวิต"]
       },
       "egg_production": {
         "canonical": "การผลิตไข่",
         "confidence": 0.95,
-        "variants": ["การผลิตไข่", "kan pha lit khai", "egg production", "อัตราการไข่", "เปอร์เซ็นต์การไข่", "ไข่ต่อตัว"]
+        "variants": ["การผลิตไข่", "egg production", "อัตราการวางไข่", "laying rate", "อัตราการผลิต", "production rate", "ผลผลิตไข่", "ไข่ต่อตัว", "การผลิตต่อวัน", "hen day production", "เปอร์เซ็นต์การวางไข่", "ผลผลิตไข่", "การผลิตรายวัน"]
       },
       "uniformity": {
         "canonical": "ความสม่ำเสมอ",
         "confidence": 0.95,
-        "variants": ["ความสม่ำเสมอ", "khwam sa mam samoe", "uniformity", "ค่าสัมประสิทธิ์การแปรผัน", "cv"]
+        "variants": ["ความสม่ำเสมอ", "uniformity", "สัมประสิทธิ์การแปรผัน", "coefficient of variation", "cv", "ความเป็นเนื้อเดียวกัน", "homogeneity", "ความสม่ำเสมอของฝูง", "ความสม่ำเสมอของน้ำหนัก", "ความสม่ำเสมอของขนาด", "ความคงที่"]
       },
       "epef": {
         "canonical": "epef",
         "confidence": 0.95,
-        "variants": ["epef", "ดัชนีประสิทธิภาพ", "dat ni pra sit thi phap", "production efficiency factor", "performance index"]
+        "variants": ["epef", "ตัวประกอบประสิทธิภาพการผลิต", "production efficiency factor", "ดัชนีประสิทธิภาพ", "performance index", "ดัชนีประสิทธิภาพ", "efficiency index", "ตัวประกอบประสิทธิภาพการผลิตยุโรป", "ตัวประกอบประสิทธิภาพ", "ดัชนีการผลิต"]
       }
     },
 
@@ -209,45 +464,45 @@
       "broiler_farm": {
         "canonical": "ฟาร์มไก่เนื้อ",
         "confidence": 0.95,
-        "variants": ["ไก่เนื้อ", "kai nuea", "broiler", "ฟาร์มไก่เนื้อ", "farm kai nuea", "ไก่พันธุ์เนื้อ"]
+        "variants": ["ไก่เนื้อ", "broiler", "ฟาร์มไก่เนื้อ", "broiler farm", "ไก่เนื้อ", "ฟาร์มไก่", "ฟาร์มสัตว์ปีก"]
       },
       "layer_farm": {
         "canonical": "ฟาร์มไก่ไข่",
         "confidence": 0.95,
-        "variants": ["ไก่ไข่", "kai khai", "layer", "ฟาร์มไก่ไข่", "farm kai khai", "ไก่พันธุ์ไข่"]
+        "variants": ["ไก่ไข่", "layer", "ฟาร์มไก่ไข่", "layer farm", "ฟาร์มไข่", "egg farm", "แม่ไก่ไข่", "โรงเรือนไก่ไข่"]
       },
       "breeder_farm": {
-        "canonical": "ฟาร์มไก่พ่อแม่พันธุ์",
+        "canonical": "ฟาร์มพ่อแม่พันธุ์",
         "confidence": 0.95,
-        "variants": ["ไก่พ่อแม่พันธุ์", "kai pho mae phan", "breeder", "parent stock", "ps", "ฟาร์มพ่อแม่พันธุ์"]
+        "variants": ["ฟาร์มพ่อแม่พันธุ์", "breeder farm", "ฟาร์มผสมพันธุ์", "breeding farm", "พ่อแม่พันธุ์", "parent stock", "ไก่พันธุ์", "breeders", "ฝูงพันธุ์"]
       },
       "hatchery": {
         "canonical": "โรงฟักไข่",
         "confidence": 0.95,
-        "variants": ["โรงฟักไข่", "rong fak khai", "hatchery", "ฟาร์มฟักไข่", "โรงเพาะฟัก"]
+        "variants": ["โรงฟักไข่", "hatchery", "การฟักไข่", "incubation", "สถานที่ฟักไข่"]
       },
       "feed_mill": {
         "canonical": "โรงงานอาหาร",
         "confidence": 0.95,
-        "variants": ["โรงงานอาหาร", "rong ngan a han", "feed mill", "โรงผลิตอาหาร", "โรงสี"]
+        "variants": ["โรงงานอาหาร", "feed mill", "โรงงานอาหารสัตว์", "โรงงานผลิตอาหาร", "โรงโม่", "mill"]
       }
     },
 
     "production_phases": {
       "starter": {
-        "canonical": "สตาร์ทเตอร์",
+        "canonical": "ระยะเริ่มต้น",
         "confidence": 0.95,
-        "variants": ["สตาร์ทเตอร์", "starter", "ระยะเริ่มต้น", "ra ya roem ton", "เฟส 1", "phase 1", "pre-starter"]
+        "variants": ["ระยะเริ่มต้น", "starter", "start", "ช่วงเริ่มต้น", "starting phase", "ระยะที่ 1", "phase 1", "pre-starter"]
       },
       "grower": {
-        "canonical": "โกรเวอร์",
+        "canonical": "ระยะเจริญเติบโต",
         "confidence": 0.95,
-        "variants": ["โกรเวอร์", "grower", "ระยะเจริญเติบโต", "ra ya cha roen toep to", "เฟส 2", "phase 2"]
+        "variants": ["ระยะเจริญเติบโต", "grower", "ช่วงเติบโต", "growing phase", "ระยะที่ 2", "phase 2", "การพัฒนา", "growth"]
       },
       "finisher": {
-        "canonical": "ฟินิชเชอร์",
+        "canonical": "ระยะสุดท้าย",
         "confidence": 0.95,
-        "variants": ["ฟินิชเชอร์", "finisher", "ระยะสุดท้าย", "ra ya sut thai", "เฟส 3", "phase 3"]
+        "variants": ["ระยะสุดท้าย", "finisher", "ช่วงสุดท้าย", "finishing phase", "finish", "ระยะที่ 3", "phase 3", "ตัดจำหน่าย"]
       }
     },
 
@@ -255,17 +510,17 @@
       "male": {
         "canonical": "เพศผู้",
         "confidence": 0.95,
-        "variants": ["เพศผู้", "phet phu", "male", "ตัวผู้", "tua phu", "ไก่ตัวผู้", "m"]
+        "variants": ["เพศผู้", "male", "ตัวผู้", "males", "ไก่ตัวผู้", "rooster", "roosters", "ไก่เนื้อตัวผู้", "ไก่ผู้", "m", "ตัวผู้"]
       },
       "female": {
         "canonical": "เพศเมีย",
         "confidence": 0.95,
-        "variants": ["เพศเมีย", "phet mia", "female", "ตัวเมีย", "tua mia", "ไก่ตัวเมีย", "f"]
+        "variants": ["เพศเมีย", "female", "ตัวเมีย", "females", "แม่ไก่", "hen", "hens", "ไก่เนื้อตัวเมีย", "ไก่เมีย", "f", "ตัวเมีย"]
       },
       "as_hatched": {
-        "canonical": "เพศผสม",
+        "canonical": "ผสม",
         "confidence": 0.95,
-        "variants": ["เพศผสม", "phet phasom", "mixed", "ไม่คัดเพศ", "mai khat phet", "straight run", "sr", "รวมเพศ"]
+        "variants": ["ผสม", "as-hatched", "ashatched", "as hatched", "mixed", "ไม่คัดเพศ", "unsexed", "straight run", "straight-run", "sr", "เพศผสม", "ทั้งสองเพศ"]
       }
     },
 
@@ -273,80 +528,80 @@
       "broiler": {
         "canonical": "ไก่เนื้อ",
         "confidence": 0.95,
-        "variants": ["ไก่เนื้อ", "kai nuea", "broiler", "ไก่พันธุ์เนื้อ", "kai phan nuea"]
+        "variants": ["ไก่เนื้อ", "broiler", "ไก่เนื้อ", "meat chicken", "ไก่สำหรับเนื้อ"]
       },
       "layer": {
         "canonical": "ไก่ไข่",
         "confidence": 0.95,
-        "variants": ["ไก่ไข่", "kai khai", "layer", "ไก่พันธุ์ไข่", "kai phan khai"]
+        "variants": ["ไก่ไข่", "layer", "แม่ไก่ไข่", "laying hen", "ไก่วางไข่"]
       },
       "breeder": {
-        "canonical": "ไก่พ่อแม่พันธุ์",
+        "canonical": "พ่อแม่พันธุ์",
         "confidence": 0.95,
-        "variants": ["ไก่พ่อแม่พันธุ์", "kai pho mae phan", "breeder", "parent stock", "ps"]
+        "variants": ["พ่อแม่พันธุ์", "breeder", "พ่อแม่พันธุ์", "breeders", "parent stock", "ไก่พันธุ์"]
       },
       "pullet": {
-        "canonical": "ไก่รุ่น",
+        "canonical": "ไก่สาว",
         "confidence": 0.95,
-        "variants": ["ไก่รุ่น", "kai run", "pullet", "ไก่สาว", "kai sao"]
+        "variants": ["ไก่สาว", "pullet", "pullets", "แม่ไก่อ่อน", "ไก่เลี้ยง"]
       },
       "chick": {
         "canonical": "ลูกไก่",
         "confidence": 0.95,
-        "variants": ["ลูกไก่", "luk kai", "chick", "ลูกไก่อายุ 1 วัน", "doc", "day old chick"]
+        "variants": ["ลูกไก่", "chick", "chicks", "ลูกไก่วันแรก", "day-old", "day old chick", "doc"]
       }
     },
 
     "equipment_types": {
       "chain_feeder": {
-        "canonical": "รางอาหารแบบโซ่",
+        "canonical": "ที่ให้อาหารแบบโซ่",
         "confidence": 0.95,
-        "variants": ["รางอาหารแบบโซ่", "rang a han baep so", "chain feeder", "ระบบโซ่", "ra bop so"]
+        "variants": ["ที่ให้อาหารแบบโซ่", "chain feeder", "โซ่ให้อาหาร", "feeding chain", "ระบบโซ่ให้อาหาร"]
       },
       "pan_feeder": {
-        "canonical": "รางอาหารแบบถาด",
+        "canonical": "ที่ให้อาหารแบบจาน",
         "confidence": 0.95,
-        "variants": ["รางอาหารแบบถาด", "rang a han baep thad", "pan feeder", "ถาดอาหาร", "thad a han"]
+        "variants": ["ที่ให้อาหารแบบจาน", "pan feeder", "จานอาหาร", "feeding pan", "feed pan", "ที่ให้อาหารกลม"]
       },
       "tube_feeder": {
-        "canonical": "รางอาหารแบบท่อ",
+        "canonical": "ที่ให้อาหารแบบท่อ",
         "confidence": 0.95,
-        "variants": ["รางอาหารแบบท่อ", "rang a han baep tho", "tube feeder", "ท่ออาหาร", "tho a han"]
+        "variants": ["ที่ให้อาหารแบบท่อ", "tube feeder", "ท่ออาหาร", "feeding tube", "ที่ให้อาหารท่อ"]
       },
       "bell_drinker": {
-        "canonical": "ที่กินน้ำแบบระฆัง",
+        "canonical": "ที่ให้น้ำแบบระฆัง",
         "confidence": 0.95,
-        "variants": ["ที่กินน้ำแบบระฆัง", "thi kin nam baep ra khang", "bell drinker", "ระฆังน้ำ", "ra khang nam"]
+        "variants": ["ที่ให้น้ำแบบระฆัง", "bell drinker", "ที่ให้น้ำระฆัง", "bell waterer", "ที่ให้น้ำแขวน"]
       },
       "cup_drinker": {
-        "canonical": "ที่กินน้ำแบบถ้วย",
+        "canonical": "ที่ให้น้ำแบบถ้วย",
         "confidence": 0.95,
-        "variants": ["ที่กินน้ำแบบถ้วย", "thi kin nam baep thuai", "cup drinker", "ถ้วยน้ำ", "thuai nam"]
+        "variants": ["ที่ให้น้ำแบบถ้วย", "cup drinker", "ถ้วยน้ำ", "drinking cup", "ถ้วยน้ำดื่ม"]
       },
       "nipple_drinker": {
-        "canonical": "ที่กินน้ำแบบนิปเปิ้ล",
+        "canonical": "ที่ให้น้ำแบบนิปเปิล",
         "confidence": 0.95,
-        "variants": ["ที่กินน้ำแบบนิปเปิ้ล", "thi kin nam baep nip poen", "nipple drinker", "นิปเปิ้ล", "nipple"]
+        "variants": ["ที่ให้น้ำแบบนิปเปิล", "nipple drinker", "นิปเปิลน้ำ", "nipple waterer", "ระบบนิปเปิล"]
       },
       "tunnel_ventilation": {
-        "canonical": "ระบบระบายอากาศแบบอุโมงค์",
+        "canonical": "ระบายอากาศแบบอุโมงค์",
         "confidence": 0.95,
-        "variants": ["ระบบระบายอากาศแบบอุโมงค์", "ra bop ra bai a kat baep u mong", "tunnel ventilation", "อุโมงค์ลม", "u mong lom"]
+        "variants": ["ระบายอากาศแบบอุโมงค์", "tunnel ventilation", "ผลกระทบอุโมงค์", "tunnel effect", "ระบายอากาศตามยาว"]
       },
       "cross_ventilation": {
-        "canonical": "ระบบระบายอากาศแบบขวาง",
+        "canonical": "ระบายอากาศแบบขวาง",
         "confidence": 0.95,
-        "variants": ["ระบบระบายอากาศแบบขวาง", "ra bop ra bai a kat baep khwang", "cross ventilation", "ลมขวาง", "lom khwang"]
+        "variants": ["ระบายอากาศแบบขวาง", "cross ventilation", "ระบายอากาศตัดขวาง", "transverse ventilation", "การไหลขวาง"]
       },
       "radiant_heaters": {
-        "canonical": "เครื่องให้ความร้อนแบบแผ่รังสี",
+        "canonical": "เครื่องทำความร้อนแบบแผ่รังสี",
         "confidence": 0.95,
-        "variants": ["เครื่องให้ความร้อนแบบแผ่รังสี", "khruang hai khwam ron baep phae rang si", "radiant heaters", "ฮีตเตอร์แผ่รังสี"]
+        "variants": ["เครื่องทำความร้อนแบบแผ่รังสี", "radiant heaters", "ความร้อนแผ่รังสี", "radiant heating", "ท่อแผ่รังสี", "เครื่องทำความร้อนอินฟราเรด"]
       },
       "hot_air_blowers": {
         "canonical": "เครื่องเป่าลมร้อน",
         "confidence": 0.95,
-        "variants": ["เครื่องเป่าลมร้อน", "khruang pao lom ron", "hot air blowers", "พัดลมร้อน", "phat lom ron"]
+        "variants": ["เครื่องเป่าลมร้อน", "hot air blowers", "เครื่องทำความร้อนแบบบังคับ", "forced air heaters", "พัดลมลมร้อน"]
       }
     },
 
@@ -354,143 +609,143 @@
       "avian_influenza": {
         "canonical": "ไข้หวัดนก",
         "confidence": 0.95,
-        "variants": ["ไข้หวัดนก", "khai wat nok", "avian influenza", "bird flu", "ai", "h5n1", "h7n9"]
+        "variants": ["ไข้หวัดนก", "avian influenza", "bird flu", "ai", "h5n1", "h7n9", "โรคระบาดในสัตว์ปีก"]
       },
       "mareks_disease": {
         "canonical": "โรคมาเร็ค",
         "confidence": 0.95,
-        "variants": ["โรคมาเร็ค", "rok ma rek", "mareks disease", "marek", "md"]
+        "variants": ["โรคมาเร็ค", "mareks disease", "marek disease", "md", "เนื้องอกลิมฟอยด์", "อัมพาต"]
       },
       "gumboro": {
         "canonical": "โรคกัมโบโร",
         "confidence": 0.95,
-        "variants": ["โรคกัมโบโร", "rok kam bo ro", "gumboro", "ibd", "ibdv", "infectious bursal disease"]
+        "variants": ["โรคกัมโบโร", "gumboro", "gumboro disease", "โรคบูร์ซาอักเสบ", "infectious bursal disease", "ibdv", "ibd"]
       },
       "newcastle": {
         "canonical": "โรคนิวคาสเซิล",
         "confidence": 0.95,
-        "variants": ["โรคนิวคาสเซิล", "rok niu khat soen", "newcastle", "nd", "newcastle disease"]
+        "variants": ["โรคนิวคาสเซิล", "newcastle", "newcastle disease", "nd", "พาราไมโซไวรัสในสัตว์ปีก"]
       },
       "coccidiosis": {
         "canonical": "โรคลำไส้อักเสบ",
         "confidence": 0.95,
-        "variants": ["โรคลำไส้อักเสบ", "rok lam sai ak sep", "coccidiosis", "คอกซิเดีย", "coccididia", "eimeria"]
+        "variants": ["โรคลำไส้อักเสบ", "coccidiosis", "coccidia", "eimeria", "ค็อกซิดิโอสแตท"]
       },
       "colibacillosis": {
         "canonical": "โรคอีโคไล",
         "confidence": 0.95,
-        "variants": ["โรคอีโคไล", "rok i kho lai", "colibacillosis", "e.coli", "e coli", "escherichia coli"]
+        "variants": ["โรคอีโคไล", "colibacillosis", "e.coli", "escherichia coli", "e coli"]
       },
       "necrotic_enteritis": {
-        "canonical": "โรคลำไส้อักเสบเน่าตาย",
+        "canonical": "โรคลำไส้อักเสบตายเน่า",
         "confidence": 0.95,
-        "variants": ["โรคลำไส้อักเสบเน่าตาย", "rok lam sai ak sep nao tai", "necrotic enteritis", "ne", "clostridium perfringens"]
+        "variants": ["โรคลำไส้อักเสบตายเน่า", "necrotic enteritis", "clostridium perfringens", "ne", "ลำไส้เน่าตาย"]
       },
       "salmonella": {
         "canonical": "โรคซัลโมเนลลา",
         "confidence": 0.95,
-        "variants": ["โรคซัลโมเนลลา", "rok san mo nen la", "salmonella", "salmonellosis"]
+        "variants": ["ซัลโมเนลลา", "salmonella", "โรคซัลโมเนลลา", "salmonellosis", "พาราไทฟอยด์", "พูลลอรัม"]
       },
       "mycoplasma": {
         "canonical": "โรคไมโคพลาสมา",
         "confidence": 0.95,
-        "variants": ["โรคไมโคพลาสมา", "rok mai kho phlat ma", "mycoplasma", "mycoplasmosis", "crd"]
+        "variants": ["ไมโคพลาสมา", "mycoplasma", "โรคไมโคพลาสมา", "mycoplasmosis", "โรคทางเดินหายใจเรื้อรัง", "crd"]
       },
       "infectious_bronchitis": {
         "canonical": "โรคหลอดลมอักเสบติดเชื้อ",
         "confidence": 0.95,
-        "variants": ["โรคหลอดลมอักเสบติดเชื้อ", "rok lot lom ak sep tit chuea", "infectious bronchitis", "ib", "ibv"]
+        "variants": ["ibv", "โรคหลอดลมอักเสบติดเชื้อ", "infectious bronchitis", "ib", "ไวรัสหลอดลมอักเสบ"]
       }
     },
 
     "clinical_signs": {
       "respiratory": {
-        "canonical": "อาการทางเดินหายใจ",
+        "canonical": "ทางเดินหายใจ",
         "confidence": 0.95,
-        "variants": ["อาการทางเดินหายใจ", "a kan thang doen hai jai", "respiratory", "ไอ", "ai", "หายใจลำบาก", "มีน้ำมูก"]
+        "variants": ["ทางเดินหายใจ", "respiratory", "ไอ", "cough", "หายใจลำบาก", "dyspnea", "การหายใจ", "breathing", "มีน้ำมูก", "เสียงหายใจ", "จาม"]
       },
       "digestive": {
-        "canonical": "อาการทางเดินอาหาร",
+        "canonical": "ทางเดินอาหาร",
         "confidence": 0.95,
-        "variants": ["อาการทางเดินอาหาร", "a kan thang doen a han", "digestive", "ท้องเสีย", "thong sia", "อาเจียน", "เบื่ออาหาร"]
+        "variants": ["ทางเดินอาหาร", "digestive", "ท้องเสีย", "diarrhea", "อาเจียน", "vomiting", "เบื่ออาหาร", "anorexia", "ไม่กินอาหาร", "ลำไส้อักเสบ"]
       },
       "nervous": {
-        "canonical": "อาการทางระบบประสาท",
+        "canonical": "ระบบประสาท",
         "confidence": 0.95,
-        "variants": ["อาการทางระบบประสาท", "a kan thang ra bop pra sat", "nervous", "อัมพาต", "am phat", "ชัก", "chak", "สั่น", "san"]
+        "variants": ["ระบบประสาท", "nervous", "เดินโซเซ", "ataxia", "อัมพาต", "paralysis", "ชัก", "convulsions", "สั่น", "ระบบประสาท"]
       },
       "general": {
-        "canonical": "อาการทั่วไป",
+        "canonical": "ทั่วไป",
         "confidence": 0.90,
-        "variants": ["อาการทั่วไป", "a kan thua pai", "general", "อ่อนเพลีย", "on phlia", "มีไข้", "mi khai", "อ่อนแอ"]
+        "variants": ["ทั่วไป", "general", "เฉื่อยชา", "lethargy", "มีไข้", "fever", "อ่อนแรง", "weakness", "ซึม", "เพลีย"]
       },
       "lameness": {
-        "canonical": "อาการขาพิการ",
+        "canonical": "ขาเป๋",
         "confidence": 0.95,
-        "variants": ["อาการขาพิการ", "a kan kha phi kan", "lameness", "เดินกะเผลก", "doen ka phlok", "ปัญหาการเดิน"]
+        "variants": ["ขาเป๋", "lameness", "ปัญหาการเดิน", "locomotor problems", "การเดินผิดปกติ", "ปัญหาขา"]
       },
       "pododermatitis": {
-        "canonical": "โรคฝ่าเท้าอักเสบ",
+        "canonical": "โรคฝ่าเท้า",
         "confidence": 0.95,
-        "variants": ["โรคฝ่าเท้าอักเสบ", "rok fa thao ak sep", "pododermatitis", "footpad dermatitis", "fhd"]
+        "variants": ["โรคฝ่าเท้า", "pododermatitis", "โรคฝ่าเท้าอักเสบ", "footpad dermatitis", "ไหม้ข้อ", "hock burn", "fhd", "ไหม้เท้า"]
       }
     },
 
     "nutrition_parameters": {
       "crude_protein": {
-        "canonical": "โปรตีนรวม",
+        "canonical": "โปรตีนหยาบ",
         "confidence": 0.95,
-        "variants": ["โปรตีนรวม", "pro tin ruam", "crude protein", "cp", "โปรตีน", "pro tin"]
+        "variants": ["โปรตีนหยาบ", "crude protein", "cp", "โปรตีน", "proteins"]
       },
       "metabolizable_energy": {
         "canonical": "พลังงานที่ใช้ประโยชน์ได้",
         "confidence": 0.95,
-        "variants": ["พลังงานที่ใช้ประโยชน์ได้", "pha lang ngan thi chai pra yot dai", "metabolizable energy", "me", "kcal/kg"]
+        "variants": ["พลังงานที่ใช้ประโยชน์ได้", "metabolizable energy", "me", "kcal/kg", "ความหนาแน่นของพลังงาน"]
       },
       "lysine": {
         "canonical": "ไลซีน",
         "confidence": 0.95,
-        "variants": ["ไลซีน", "lai sin", "lysine", "ไลซีนย่อยได้", "lys"]
+        "variants": ["ไลซีน", "lysine", "ไลซีนย่อยได้", "digestible lysine", "lys"]
       },
       "methionine": {
-        "canonical": "เมไทโอนีน",
+        "canonical": "เมไธโอนีน",
         "confidence": 0.95,
-        "variants": ["เมไทโอนีน", "me thai o nin", "methionine", "met", "เมไทโอนีน+ซิสเทอีน", "tsaa"]
+        "variants": ["เมไธโอนีน", "methionine", "met", "เมไธโอนีน+ซิสทีน", "methionine+cysteine", "met+cys", "tsaa", "กรดอะมิโนซัลเฟอร์"]
       },
       "calcium": {
         "canonical": "แคลเซียม",
         "confidence": 0.95,
-        "variants": ["แคลเซียม", "khaen siam", "calcium", "ca", "ปูนขาว"]
+        "variants": ["แคลเซียม", "calcium", "ca", "ปูนขาว", "lime", "แคลเซียมคาร์บอเนต"]
       },
       "phosphorus": {
         "canonical": "ฟอสฟอรัส",
         "confidence": 0.95,
-        "variants": ["ฟอสฟอรัส", "fot fo rat", "phosphorus", "p", "ฟอสฟอรัสย่อยได้", "ฟอสฟอรัสที่ใช้ได้"]
+        "variants": ["ฟอสฟอรัส", "phosphorus", "p", "ฟอสฟอรัสย่อยได้", "digestible phosphorus", "p dig", "ฟอสฟอรัสที่มี"]
       },
       "digestible_phosphorus": {
         "canonical": "ฟอสฟอรัสย่อยได้",
         "confidence": 0.95,
-        "variants": ["ฟอสฟอรัสย่อยได้", "fot fo rat yoi dai", "digestible phosphorus", "dp"]
+        "variants": ["ฟอสฟอรัสย่อยได้", "digestible phosphorus", "dp", "ฟอสฟอรัสที่มี", "dig p"]
       },
       "electrolyte_balance": {
         "canonical": "สมดุลอิเล็กโทรไลต์",
         "confidence": 0.95,
-        "variants": ["สมดุลอิเล็กโทรไลต์", "sa ma dun i lek tro lai", "electrolyte balance", "deb"]
+        "variants": ["สมดุลอิเล็กโทรไลต์ในอาหาร", "dietary electrolyte balance", "deb", "สมดุลอิเล็กโทรไลต์"]
       },
       "sodium": {
         "canonical": "โซเดียม",
         "confidence": 0.95,
-        "variants": ["โซเดียม", "so diam", "sodium", "na", "เกลือ", "kluea"]
+        "variants": ["โซเดียม", "sodium", "na", "เกลือ", "salt"]
       },
       "chloride": {
         "canonical": "คลอไรด์",
         "confidence": 0.95,
-        "variants": ["คลอไรด์", "khlo rai", "chloride", "cl"]
+        "variants": ["คลอไรด์", "chloride", "cl", "คลอรีน", "chlorine"]
       },
       "potassium": {
         "canonical": "โพแทสเซียม",
         "confidence": 0.95,
-        "variants": ["โพแทสเซียม", "pho thaet siam", "potassium", "k"]
+        "variants": ["โพแทสเซียม", "potassium", "k", "โพแทช"]
       }
     },
 
@@ -498,42 +753,42 @@
       "temperature": {
         "canonical": "อุณหภูมิ",
         "confidence": 0.95,
-        "variants": ["อุณหภูมิ", "un ha phum", "temperature", "temp", "องศา", "ong sa", "เซลเซียส"]
+        "variants": ["อุณหภูมิ", "temperature", "temp", "องศา", "degrees", "เซลเซียส", "celsius", "อุณหภูมิแวดล้อม"]
       },
       "humidity": {
         "canonical": "ความชื้น",
         "confidence": 0.95,
-        "variants": ["ความชื้น", "khwam chuen", "humidity", "ความชื้นสัมพัทธ์", "khwam chuen sam phat", "rh", "%rh"]
+        "variants": ["ความชื้น", "humidity", "ความชื้นสัมพัทธ์", "relative humidity", "rh", "%rh", "ความชื้น"]
       },
       "ventilation_rate": {
         "canonical": "อัตราการระบายอากาศ",
         "confidence": 0.95,
-        "variants": ["อัตราการระบายอากาศ", "at kan ra bai a kat", "ventilation rate", "m3/h/kg", "การถ่ายเทอากาศ", "ระบายอากาศขั้นต่ำ"]
+        "variants": ["อัตราการระบายอากาศ", "ventilation rate", "อัตราการไหลของอากาศ", "airflow rate", "m3/h/kg", "การแลกเปลี่ยนอากาศ", "การระบายอากาศขั้นต่ำ"]
       },
       "static_pressure": {
         "canonical": "ความดันคงที่",
         "confidence": 0.95,
-        "variants": ["ความดันคงที่", "khwam dan khong thi", "static pressure", "pa", "pascal", "ความดันลบ"]
+        "variants": ["ความดันคงที่", "static pressure", "pa", "pascal", "ความดันลบ", "ความดันในอาคาร"]
       },
       "ammonia": {
         "canonical": "แอมโมเนีย",
         "confidence": 0.95,
-        "variants": ["แอมโมเนีย", "aem mo nia", "ammonia", "nh3", "ppm", "ระดับแอมโมเนีย"]
+        "variants": ["แอมโมเนีย", "ammonia", "nh3", "ppm", "ความเข้มข้นแอมโมเนีย", "ระดับแอมโมเนีย"]
       },
       "co2": {
         "canonical": "co2",
         "confidence": 0.95,
-        "variants": ["co2", "คาร์บอนไดออกไซด์", "khan bon dai ok sai", "ppm co2", "ระดับ co2"]
+        "variants": ["co2", "คาร์บอนไดออกไซด์", "carbon dioxide", "ppm co2", "ความเข้มข้น co2", "ระดับ co2"]
       },
       "light_intensity": {
         "canonical": "ความเข้มแสง",
         "confidence": 0.95,
-        "variants": ["ความเข้มแสง", "khwam khem saeng", "light intensity", "lux", "แสงสว่าง"]
+        "variants": ["ความเข้มแสง", "light intensity", "lux", "แสงสว่าง", "illumination", "ความสว่าง"]
       },
       "lighting_hours": {
-        "canonical": "ชั่วโมงให้แสง",
+        "canonical": "ชั่วโมงแสง",
         "confidence": 0.95,
-        "variants": ["ชั่วโมงให้แสง", "chua mong hai saeng", "lighting hours", "โฟโตพีเรียด", "photoperiod", "ชม/วัน"]
+        "variants": ["ชั่วโมงแสง", "lighting hours", "ช่วงแสง", "photoperiod", "ชั่วโมงให้แสง", "ชม./วัน", "โปรแกรมแสง"]
       }
     },
 
@@ -541,50 +796,50 @@
       "biosecurity": {
         "canonical": "ความปลอดภัยทางชีวภาพ",
         "confidence": 0.95,
-        "variants": ["ความปลอดภัยทางชีวภาพ", "khwam plot phai thang chi wa phap", "biosecurity", "all in all out", "การฆ่าเชื้อ"]
+        "variants": ["ความปลอดภัยทางชีวภาพ", "biosecurity", "ความปลอดภัยทางชีวภาพ", "biological security", "all-in all-out", "การฆ่าเชื้อ"]
       },
       "probiotics": {
         "canonical": "โพรไบโอติก",
         "confidence": 0.95,
-        "variants": ["โพรไบโอติก", "phro bai o tik", "probiotics", "จุลินทรีย์มีประโยชน์", "สุขภาพลำไส้"]
+        "variants": ["โพรไบโอติก", "probiotics", "จุลินทรีย์ที่เป็นประโยชน์", "beneficial microorganisms", "เชื้อมีชีวิต", "สุขภาพลำไส้"]
       },
       "antibiotics": {
         "canonical": "ยาปฏิชีวนะ",
         "confidence": 0.95,
-        "variants": ["ยาปฏิชีวนะ", "ya pa ti chi wa na", "antibiotics", "ยาต้านเชื้อ", "ya tan chuea"]
+        "variants": ["ยาปฏิชีวนะ", "antibiotics", "ยาต้านจุลชีพ", "antimicrobials", "การรักษา", "agp", "สารส่งเสริมการเจริญเติบโต"]
       },
       "vaccine": {
         "canonical": "วัคซีน",
         "confidence": 0.95,
-        "variants": ["วัคซีน", "vak sin", "vaccine", "การฉีดวัคซีน", "kan chit vak sin", "immunization"]
+        "variants": ["วัคซีน", "vaccine", "การฉีดวัคซีน", "vaccination", "การสร้างภูมิคุ้มกัน", "การป้องกัน"]
       }
     },
 
     "welfare_indicators": {
       "stocking_density": {
-        "canonical": "ความหนาแน่นของการเลี้ยง",
+        "canonical": "ความหนาแน่นการเลี้ยง",
         "confidence": 0.95,
-        "variants": ["ความหนาแน่นของการเลี้ยง", "khwam na naen khong kan liang", "stocking density", "density", "kg/m2", "ตัว/m2"]
+        "variants": ["ความหนาแน่นการเลี้ยง", "stocking density", "ความหนาแน่น", "density", "kg/m2", "ตัว/m2", "birds/m2", "ความหนาแน่นของไก่"]
       },
       "heat_stress": {
         "canonical": "ความเครียดจากความร้อน",
         "confidence": 0.95,
-        "variants": ["ความเครียดจากความร้อน", "khwam khriiat chak khwam ron", "heat stress", "อาการร้อนเกิน"]
+        "variants": ["ความเครียดจากความร้อน", "heat stress", "ความเครียดความร้อน", "thermal stress", "ภาวะร้อนเกิน", "hyperthermia", "ลมแดด", "ร้อนเกินไป"]
       },
       "feather_pecking": {
         "canonical": "การจิกขน",
         "confidence": 0.95,
-        "variants": ["การจิกขน", "kan chik khon", "feather pecking", "การกัดกินกัน", "kan kat kin kan", "cannibalism"]
+        "variants": ["การจิกขน", "feather pecking", "การจิก", "pecking", "การกินเนื้อพวกเดียวกัน", "cannibalism", "การถอนขน"]
       },
       "feeder_space": {
         "canonical": "พื้นที่ให้อาหาร",
         "confidence": 0.95,
-        "variants": ["พื้นที่ให้อาหาร", "phun thi hai a han", "feeder space", "cm/ตัว", "ความยาวรางอาหาร"]
+        "variants": ["พื้นที่ให้อาหาร", "feeder space", "ซม./ตัว", "cm/bird", "ความยาวที่ให้อาหาร", "พื้นที่กินอาหาร"]
       },
       "drinker_flow_rate": {
         "canonical": "อัตราการไหลของน้ำ",
         "confidence": 0.95,
-        "variants": ["อัตราการไหลของน้ำ", "at kan lai khong nam", "drinker flow rate", "อัตราการไหลนิปเปิ้ล", "ml/min/nipple"]
+        "variants": ["อัตราการไหลของน้ำ", "drinker flow rate", "การไหลของนิปเปิล", "nipple flow", "ml/min/nipple", "ความดันน้ำ"]
       }
     },
 
@@ -592,22 +847,22 @@
       "litter": {
         "canonical": "เศษวัสดุรองพื้น",
         "confidence": 0.95,
-        "variants": ["เศษวัสดุรองพื้น", "set wat du rong phun", "litter", "แคร่", "khrae", "วัสดุรองพื้น"]
+        "variants": ["เศษวัสดุรองพื้น", "litter", "วัสดุรองพื้น", "bedding", "วัสดุปูพื้น", "substrate"]
       },
       "wood_shavings": {
-        "canonical": "ขี้กบ",
+        "canonical": "ขี้เลื่อย",
         "confidence": 0.95,
-        "variants": ["ขี้กบ", "khi kop", "wood shavings", "เศษไม้", "set mai", "ขี้เลื่อย"]
+        "variants": ["ขี้เลื่อย", "wood shavings", "เศษไม้", "shavings", "ชิปไม้", "wood chips", "ผงเลื่อย"]
       },
       "rice_husks": {
         "canonical": "แกลบ",
         "confidence": 0.95,
-        "variants": ["แกลบ", "klaep", "rice husks", "แกลบข้าว", "klaep khao"]
+        "variants": ["แกลบ", "rice husks", "rice hulls", "เปลือกข้าว", "แกลบข้าว"]
       },
       "straw": {
         "canonical": "ฟาง",
         "confidence": 0.95,
-        "variants": ["ฟาง", "fang", "straw", "ฟางข้าวสาลี", "fang khao sa li"]
+        "variants": ["ฟาง", "straw", "ฟางข้าวสาลี", "wheat straw", "ฟางข้าวบาร์เลย์", "ฟางข้าวโอ๊ต"]
       }
     },
 
@@ -615,27 +870,27 @@
       "egg_weight": {
         "canonical": "น้ำหนักไข่",
         "confidence": 0.95,
-        "variants": ["น้ำหนักไข่", "nam nak khai", "egg weight", "น้ำหนักเฉลี่ยไข่", "ขนาดไข่"]
+        "variants": ["น้ำหนักไข่", "egg weight", "มวลไข่", "egg mass", "น้ำหนักเฉลี่ยไข่", "ขนาดไข่", "เบอร์ไข่"]
       },
       "shell_quality": {
-        "canonical": "คุณภาพเปลือกไข่",
+        "canonical": "คุณภาพเปลือก",
         "confidence": 0.95,
-        "variants": ["คุณภาพเปลือกไข่", "khun phap plueak khai", "shell quality", "ความหนาเปลือก", "ความแข็งแรงเปลือก"]
+        "variants": ["คุณภาพเปลือก", "shell quality", "ความหนาเปลือก", "shell thickness", "ความแข็งแรงเปลือก", "เปลือกอ่อน", "เปลือกบาง"]
       },
       "cracked_shell": {
         "canonical": "เปลือกแตก",
         "confidence": 0.95,
-        "variants": ["เปลือกแตก", "plueak taek", "cracked shell", "ไข่แตก", "khai taek", "รอยร้าว"]
+        "variants": ["เปลือกแตก", "cracked shell", "รอยแตกเปลือก", "shell crack", "ไข่แตก", "รอยแตกเส้นผม"]
       },
       "soft_shelled_egg": {
         "canonical": "ไข่เปลือกอ่อน",
         "confidence": 0.95,
-        "variants": ["ไข่เปลือกอ่อน", "khai plueak on", "soft shelled egg", "เปลือกอ่อน", "ไข่ไม่มีเปลือก"]
+        "variants": ["ไข่เปลือกอ่อน", "soft shelled egg", "เปลือกอ่อน", "soft shell", "ไข่ไม่มีเปลือก", "ไข่ยาง"]
       },
       "misshapen_egg": {
         "canonical": "ไข่ผิดรูป",
         "confidence": 0.95,
-        "variants": ["ไข่ผิดรูป", "khai phit rup", "misshapen egg", "รูปร่างผิดปกติ", "ไข่ไม่สม่ำเสมอ"]
+        "variants": ["ไข่ผิดรูป", "misshapen egg", "ไข่ผิดรูปร่าง", "deformed egg", "รูปร่างผิดปกติ", "ไข่ไม่สม่ำเสมอ"]
       }
     },
 
@@ -643,61 +898,14 @@
       "vaccination": {
         "canonical": "การฉีดวัคซีน",
         "confidence": 0.95,
-        "variants": ["การฉีดวัคซีน", "kan chit vak sin", "vaccination", "วัคซีน", "vak sin", "vaccine", "immunization"]
+        "variants": ["การฉีดวัคซีน", "vaccination", "วัคซีน", "vaccine", "การสร้างภูมิคุ้มกัน", "การฉีดป้องกัน"]
       },
       "biosecurity_protocol": {
-        "canonical": "โปรโตคอลความปลอดภัยทางชีวภาพ",
+        "canonical": "โปรโตคอลความปลอดภัย",
         "confidence": 0.95,
-        "variants": ["ความปลอดภัยทางชีวภาพ", "biosecurity", "การฆ่าเชื้อ", "disinfection", "การทำความสะอาด", "กักกัน"]
+        "variants": ["ความปลอดภัยทางชีวภาพ", "biosecurity", "การฆ่าเชื้อ", "disinfection", "การทำความสะอาด", "cleaning", "การกักกัน"]
       },
       "treatment": {
         "canonical": "การรักษา",
         "confidence": 0.95,
-        "variants": ["การรักษา", "kan rak sa", "treatment", "การให้ยา", "kan hai ya", "medication", "therapy"]
-      },
-      "lab_diagnostics": {
-        "canonical": "การวินิจฉัยทางห้องปฏิบัติการ",
-        "confidence": 0.95,
-        "variants": ["การวินิจฉัย", "kan wi nit chai", "diagnostic", "การทดสอบ", "kan thot sop", "test", "การวิเคราะห์", "ห้องปฏิบัติการ"]
-      }
-    },
-
-    "system_messages": {
-      "out_of_domain": {
-        "canonical": "นอกขอบเขต",
-        "confidence": 1.0,
-        "variants": ["นอกขอบเขต", "nok khop khet", "out of domain", "ไม่ในขอบเขต", "นอกขอบข่าย"]
-      },
-      "error_generic": {
-        "canonical": "ข้อผิดพลาดทั่วไป",
-        "confidence": 1.0,
-        "variants": ["ข้อผิดพลาด", "kho phit phlat", "error", "ข้อผิดพลาดทั่วไป", "ข้อผิดพลาดการประมวลผล"]
-      },
-      "welcome": {
-        "canonical": "ยินดีต้อนรับ",
-        "confidence": 1.0,
-        "variants": ["ยินดีต้อนรับ", "yin di ton rap", "welcome", "สวัสดี", "sa wat di", "hello"]
-      },
-      "clarification_needed": {
-        "canonical": "ต้องการคำชี้แจง",
-        "confidence": 1.0,
-        "variants": ["ต้องการคำชี้แจง", "tong kan kham chi chaeng", "clarification needed", "กรุณาชี้แจง", "ต้องการข้อมูลเพิ่มเติม"]
-      },
-      "no_results": {
-        "canonical": "ไม่มีผลลัพธ์",
-        "confidence": 1.0,
-        "variants": ["ไม่มีผลลัพธ์", "mai mi phon la phat", "no results", "ไม่พบ", "mai phop", "ไม่มีข้อมูล"]
-      },
-      "processing": {
-        "canonical": "กำลังประมวลผล",
-        "confidence": 1.0,
-        "variants": ["กำลังประมวลผล", "kam lang pra muan phon", "processing", "กรุณารอสักครู่", "กำลังทำงาน"]
-      },
-      "farewell": {
-        "canonical": "ลาก่อน",
-        "confidence": 1.0,
-        "variants": ["ลาก่อน", "la kon", "goodbye", "สวัสดี", "sa wat di", "บายบาย"]
-      }
-    }
-  }
-}
+        "variants": ["การรักษา

@@ -3,26 +3,234 @@
     "language": "it",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 19,
-    "description": "Terminologia universale per sistema esperto nella produzione avicola - Versione italiana"
+    "total_domains": 24,
+    "description": "Terminologia universale per sistema esperto in produzione avicola - Versione italiana"
   },
 
   "domains": {
+    "contextual_references": {
+      "same": {
+        "canonical": "stesso",
+        "confidence": 0.90,
+        "variants": ["stesso", "stessa", "lo stesso", "la stessa", "allo stesso", "alla stessa"]
+      },
+      "same_age": {
+        "canonical": "stessa_eta",
+        "confidence": 0.90,
+        "variants": ["alla stessa età", "alla stessa eta", "stessa età", "stessa eta", "all'età di", "alla stessa fase"]
+      },
+      "and_for": {
+        "canonical": "e_per",
+        "confidence": 0.90,
+        "variants": ["e per", "e per i", "e per le", "così come per", "cosi come per", "ugualmente per"]
+      },
+      "what_about": {
+        "canonical": "che_dire_di",
+        "confidence": 0.90,
+        "variants": ["che dire di", "e riguardo a", "e per quanto riguarda", "e che ne dici di"]
+      },
+      "females": {
+        "canonical": "femmine",
+        "confidence": 0.95,
+        "variants": ["femmine", "le femmine", "femmina", "la femmina", "galline", "le galline"]
+      },
+      "males": {
+        "canonical": "maschi",
+        "confidence": 0.95,
+        "variants": ["maschi", "i maschi", "maschio", "il maschio", "galli", "i galli"]
+      },
+      "and_the": {
+        "canonical": "e_i",
+        "confidence": 0.90,
+        "variants": ["e i", "e le", "e il", "e la", "così come i", "cosi come i"]
+      },
+      "also_for": {
+        "canonical": "anche_per",
+        "confidence": 0.90,
+        "variants": ["anche per", "ugualmente per", "similmente per", "lo stesso per"]
+      }
+    },
+
+    "metrics": {
+      "weight": {
+        "canonical": "peso",
+        "confidence": 0.95,
+        "variants": ["peso", "massa", "peso corporeo", "kg", "grammi", "g"]
+      },
+      "fcr": {
+        "canonical": "ica",
+        "confidence": 0.95,
+        "variants": ["ica", "indice di conversione", "conversione alimentare", "efficienza alimentare"]
+      },
+      "gain": {
+        "canonical": "incremento",
+        "confidence": 0.95,
+        "variants": ["incremento", "aumento di peso", "guadagno", "crescita", "ipg"]
+      },
+      "conversion": {
+        "canonical": "conversione",
+        "confidence": 0.95,
+        "variants": ["conversione", "tasso di conversione", "efficienza alimentare", "rendimento"]
+      },
+      "consumption": {
+        "canonical": "consumo",
+        "confidence": 0.95,
+        "variants": ["consumo", "assunzione", "ingestione", "consumato", "mangiato"]
+      },
+      "production": {
+        "canonical": "produzione",
+        "confidence": 0.95,
+        "variants": ["produzione", "resa", "produttività", "produttivita", "performance"]
+      },
+      "growth": {
+        "canonical": "crescita",
+        "confidence": 0.95,
+        "variants": ["crescita", "sviluppo", "tasso di crescita", "accrescimento"]
+      },
+      "performance": {
+        "canonical": "performance",
+        "confidence": 0.95,
+        "variants": ["performance", "prestazioni", "risultati", "efficienza", "rendimento"]
+      },
+      "index": {
+        "canonical": "indice",
+        "confidence": 0.95,
+        "variants": ["indice", "rapporto", "coefficiente", "tasso", "fattore"]
+      }
+    },
+
+    "health": {
+      "disease": {
+        "canonical": "malattia",
+        "confidence": 0.95,
+        "variants": ["malattia", "patologia", "infezione", "malattie", "malattia infettiva"]
+      },
+      "symptoms": {
+        "canonical": "sintomi",
+        "confidence": 0.95,
+        "variants": ["sintomi", "segni", "manifestazioni", "segni clinici", "sintomatologia"]
+      },
+      "treatment": {
+        "canonical": "trattamento",
+        "confidence": 0.95,
+        "variants": ["trattamento", "terapia", "medicazione", "cura", "cure"]
+      },
+      "coccidiosis": {
+        "canonical": "coccidiosi",
+        "confidence": 0.95,
+        "variants": ["coccidiosi", "coccidi", "eimeria", "coccidiostatico"]
+      },
+      "vaccination": {
+        "canonical": "vaccinazione",
+        "confidence": 0.95,
+        "variants": ["vaccinazione", "vaccino", "immunizzazione", "profilassi", "vaccinale"]
+      },
+      "gumboro": {
+        "canonical": "gumboro",
+        "confidence": 0.95,
+        "variants": ["gumboro", "malattia di gumboro", "bursite infettiva", "ibdv", "ibd"]
+      },
+      "enteritis": {
+        "canonical": "enterite",
+        "confidence": 0.95,
+        "variants": ["enterite", "enterite necrotica", "infiammazione intestinale"]
+      },
+      "mortality": {
+        "canonical": "mortalita",
+        "confidence": 0.95,
+        "variants": ["mortalità", "mortalita", "morte", "decesso", "tasso di mortalità", "tasso di mortalita", "perdite"]
+      },
+      "diagnosis": {
+        "canonical": "diagnosi",
+        "confidence": 0.95,
+        "variants": ["diagnosi", "diagnostica", "analisi", "identificazione", "rilevamento"]
+      }
+    },
+
+    "environment": {
+      "temperature": {
+        "canonical": "temperatura",
+        "confidence": 0.95,
+        "variants": ["temperatura", "temp", "t°", "gradi", "celsius", "calore"]
+      },
+      "humidity": {
+        "canonical": "umidita",
+        "confidence": 0.95,
+        "variants": ["umidità", "umidita", "ur", "umidità relativa", "umidita relativa", "livello di umidità", "livello di umidita"]
+      },
+      "ventilation": {
+        "canonical": "ventilazione",
+        "confidence": 0.95,
+        "variants": ["ventilazione", "flusso d'aria", "ricambio d'aria", "circolazione dell'aria"]
+      },
+      "lighting": {
+        "canonical": "illuminazione",
+        "confidence": 0.95,
+        "variants": ["illuminazione", "luce", "luminosità", "luminosita", "illuminamento"]
+      },
+      "density": {
+        "canonical": "densita",
+        "confidence": 0.95,
+        "variants": ["densità", "densita", "densità di allevamento", "densita di allevamento", "carico", "kg/m2", "capi/m2"]
+      },
+      "space": {
+        "canonical": "spazio",
+        "confidence": 0.95,
+        "variants": ["spazio", "area", "superficie", "cm/capo", "spazio disponibile"]
+      },
+      "feeder": {
+        "canonical": "mangiatoia",
+        "confidence": 0.95,
+        "variants": ["mangiatoia", "mangiatoie", "sistema di alimentazione", "piatto di alimentazione"]
+      },
+      "drinker": {
+        "canonical": "abbeveratoio",
+        "confidence": 0.95,
+        "variants": ["abbeveratoio", "abbeveratoi", "sistema di abbeveraggio", "punto acqua", "nipple"]
+      },
+      "light": {
+        "canonical": "luce",
+        "confidence": 0.95,
+        "variants": ["luce", "illuminazione", "lux", "intensità luminosa", "intensita luminosa", "fotoperiodo"]
+      }
+    },
+
+    "species": {
+      "broiler": {
+        "canonical": "broiler",
+        "database_value": "broiler",
+        "confidence": 0.95,
+        "variants": ["broiler", "pollo da carne", "polli da carne", "carne", "produzione di carne"]
+      },
+      "layer": {
+        "canonical": "layer",
+        "database_value": "layer",
+        "confidence": 0.95,
+        "variants": ["layer", "ovaiola", "ovaiole", "gallina ovaiola", "galline ovaiole", "produzione di uova"]
+      },
+      "breeder": {
+        "canonical": "breeder",
+        "database_value": "breeder",
+        "confidence": 0.95,
+        "variants": ["breeder", "riproduttore", "riproduttori", "riproduzione", "stock parentale", "parentali"]
+      }
+    },
+
     "general_terms": {
       "poultry": {
         "canonical": "avicoltura",
         "confidence": 0.95,
-        "variants": ["avicoltura", "pollame", "allevamento avicolo", "produzione avicola", "polli"]
+        "variants": ["avicoltura", "produzione avicola", "allevamento avicolo", "pollame"]
       },
       "farm": {
         "canonical": "allevamento",
         "confidence": 0.95,
-        "variants": ["allevamento", "azienda", "capannone", "sito produttivo", "fattoria"]
+        "variants": ["allevamento", "azienda", "impianto", "unità produttiva", "unita produttiva", "stabilimento"]
       },
       "management": {
         "canonical": "gestione",
         "confidence": 0.90,
-        "variants": ["gestione", "management", "conduzione", "amministrazione", "direzione"]
+        "variants": ["gestione", "management", "conduzione", "amministrazione", "operazione"]
       },
       "production": {
         "canonical": "produzione",
@@ -40,42 +248,42 @@
       "weight_query": {
         "canonical": "domanda_peso",
         "confidence": 0.92,
-        "variants": ["qual è il peso", "qual e il peso", "peso obiettivo", "peso medio", "quanto pesa", "che peso"]
+        "variants": ["qual è il peso", "qual e il peso", "peso target", "peso medio", "quanto pesa", "che peso"]
       },
       "fcr_query": {
         "canonical": "domanda_ica",
         "confidence": 0.92,
-        "variants": ["ica ottimale", "indice di conversione", "conversione alimentare", "ica medio", "fcr"]
+        "variants": ["ica ottimale", "indice di conversione", "conversione alimentare", "ica medio"]
       },
       "water_query": {
         "canonical": "domanda_acqua",
         "confidence": 0.92,
-        "variants": ["consumo acqua", "consumo di acqua", "litri al giorno", "ml per capo"]
+        "variants": ["consumo d'acqua", "consumo acqua", "litri al giorno", "ml per capo"]
       },
       "nutrient_requirement_query": {
         "canonical": "domanda_nutrienti",
         "confidence": 0.92,
-        "variants": ["livello proteico", "fabbisogno di lisina", "fabbisogno di calcio", "contenuto di fosforo"]
+        "variants": ["livello di proteine", "fabbisogno di lisina", "fabbisogno di calcio", "contenuto di fosforo"]
       },
       "environment_setpoint_query": {
         "canonical": "domanda_ambiente",
         "confidence": 0.92,
-        "variants": ["temperatura ottimale", "umidità target", "umidita target", "co2 massima", "regolazione ventilazione"]
+        "variants": ["temperatura ottimale", "umidità target", "umidita target", "co2 massimo", "impostazione ventilazione"]
       },
       "production_index_query": {
         "canonical": "domanda_indice",
         "confidence": 0.92,
-        "variants": ["epef medio", "indice normale", "indice di efficienza", "performance complessiva"]
+        "variants": ["epef medio", "iep normale", "indice di efficienza", "performance complessiva"]
       },
       "vaccination_protocol_query": {
         "canonical": "domanda_vaccinazione",
         "confidence": 0.92,
-        "variants": ["protocollo vaccinale", "programma vaccinale", "piano vaccinale", "schema di immunizzazione"]
+        "variants": ["protocollo di vaccinazione", "programma vaccinale", "piano di vaccinazione", "calendario vaccinale"]
       },
       "space_equipment_query": {
         "canonical": "domanda_attrezzatura",
         "confidence": 0.92,
-        "variants": ["spazio mangiatoia", "regolazione nippel", "altezza abbeveratoio", "cm per capo"]
+        "variants": ["spazio mangiatoia", "regolazione nipple", "altezza abbeveratoio", "cm per capo"]
       },
       "problem_report": {
         "canonical": "segnalazione_problema",
@@ -98,7 +306,7 @@
       "ross_308": {
         "canonical": "ross_308",
         "confidence": 0.95,
-        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "ross 308 broiler"]
+        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "ross 308 broiler", "ross308 ap", "ross 308 ap"]
       },
       "ross_708": {
         "canonical": "ross_708",
@@ -159,49 +367,49 @@
 
     "performance_metrics": {
       "feed_conversion_ratio": {
-        "canonical": "indice_conversione",
+        "canonical": "indice_conversione_alimentare",
         "confidence": 0.95,
-        "variants": ["ica", "indice di conversione alimentare", "conversione alimentare", "efficienza alimentare", "ica cumulativo", "rapporto di conversione", "fcr"]
+        "variants": ["ica", "indice di conversione alimentare", "conversione alimentare", "efficienza alimentare", "ica cumulativo", "tasso di conversione"]
       },
       "average_daily_gain": {
-        "canonical": "accrescimento_giornaliero",
+        "canonical": "incremento_ponderale_giornaliero",
         "confidence": 0.95,
-        "variants": ["img", "incremento medio giornaliero", "accrescimento giornaliero", "g/giorno", "incremento giornaliero", "tasso di crescita"]
+        "variants": ["ipg", "incremento ponderale giornaliero", "incremento giornaliero", "g/giorno", "aumento di peso giornaliero", "crescita giornaliera", "tasso di crescita"]
       },
       "feed_intake": {
-        "canonical": "consumo_mangime",
+        "canonical": "consumo_alimentare",
         "confidence": 0.95,
-        "variants": ["consumo di mangime", "consumo mangime", "ingestione", "g/capo/giorno", "consumo giornaliero", "mangime consumato", "consumo cumulativo"]
+        "variants": ["consumo alimentare", "assunzione di alimento", "g/capo/giorno", "consumo giornaliero", "alimento consumato", "consumo cumulativo", "consumo totale"]
       },
       "water_intake": {
         "canonical": "consumo_acqua",
         "confidence": 0.95,
-        "variants": ["consumo di acqua", "consumo acqua", "l/1000/giorno", "ml/capo/giorno", "consumo idrico giornaliero", "acqua consumata", "acqua per capo"]
+        "variants": ["consumo d'acqua", "consumo acqua", "l/1000/giorno", "ml/capo/giorno", "consumo idrico giornaliero", "acqua consumata", "acqua per capo"]
       },
       "body_weight": {
-        "canonical": "peso_vivo",
+        "canonical": "peso_corporeo",
         "confidence": 0.95,
-        "variants": ["peso", "peso vivo", "peso corporeo", "peso medio", "peso obiettivo", "pv", "peso del capo", "peso individuale"]
+        "variants": ["peso", "peso corporeo", "peso vivo", "peso medio", "peso target", "pc", "peso degli animali", "peso individuale", "peso standard"]
       },
       "mortality": {
         "canonical": "mortalita",
         "confidence": 0.95,
-        "variants": ["mortalità", "mortalita", "tasso di mortalità", "tasso di mortalita", "morte", "perdite", "percentuale mortalità", "percentuale mortalita", "mortalità cumulativa", "mortalita cumulativa"]
+        "variants": ["mortalità", "mortalita", "tasso di mortalità", "tasso di mortalita", "morte", "perdita", "percentuale di mortalità", "percentuale di mortalita", "mortalità cumulativa", "mortalita cumulativa", "mortalità giornaliera", "mortalita giornaliera", "animali morti", "perdite", "tasso di sopravvivenza"]
       },
       "egg_production": {
         "canonical": "produzione_uova",
         "confidence": 0.95,
-        "variants": ["produzione di uova", "produzione uova", "tasso di deposizione", "percentuale di deposizione", "uova per gallina", "hen day production", "resa uova"]
+        "variants": ["produzione di uova", "produzione uova", "tasso di deposizione", "intensità di deposizione", "intensita di deposizione", "uova per gallina", "produzione per gallina-giorno", "percentuale di deposizione", "resa uova"]
       },
       "uniformity": {
         "canonical": "uniformita",
         "confidence": 0.95,
-        "variants": ["uniformità", "uniformita", "coefficiente di variazione", "cv", "omogeneità", "omogenita", "uniformità del gruppo", "uniformita del gruppo"]
+        "variants": ["uniformità", "uniformita", "coefficiente di variazione", "cv", "omogenità", "omogeneita", "uniformità del gruppo", "uniformita del gruppo", "uniformità di peso", "uniformita di peso", "uniformità di taglia", "uniformita di taglia", "consistenza"]
       },
       "epef": {
         "canonical": "epef",
         "confidence": 0.95,
-        "variants": ["epef", "indice di efficienza produttiva europea", "fattore di efficienza", "indice di produttività", "indice di produttivita"]
+        "variants": ["epef", "indice di efficienza europeo", "fattore di efficienza", "iep", "indice di performance", "fattore di produzione"]
       }
     },
 
@@ -209,7 +417,7 @@
       "broiler_farm": {
         "canonical": "allevamento_broiler",
         "confidence": 0.95,
-        "variants": ["broiler", "allevamento broiler", "pollo da carne", "allevamento da ingrasso", "capannone broiler"]
+        "variants": ["broiler", "allevamento broiler", "pollo da carne", "allevamento da carne", "capannone broiler"]
       },
       "layer_farm": {
         "canonical": "allevamento_ovaiole",
@@ -219,12 +427,12 @@
       "breeder_farm": {
         "canonical": "allevamento_riproduttori",
         "confidence": 0.95,
-        "variants": ["riproduttori", "allevamento riproduttori", "parent stock", "capi riproduttori", "linea parentale"]
+        "variants": ["riproduttore", "allevamento riproduttori", "stock parentale", "riproduttori", "parentali"]
       },
       "hatchery": {
         "canonical": "incubatoio",
         "confidence": 0.95,
-        "variants": ["incubatoio", "schiuditoio", "incubazione", "impianto di schiusa"]
+        "variants": ["incubatoio", "incubazione", "impianto di schiusa"]
       },
       "feed_mill": {
         "canonical": "mangimificio",
@@ -237,17 +445,17 @@
       "starter": {
         "canonical": "starter",
         "confidence": 0.95,
-        "variants": ["starter", "inizio", "fase iniziale", "fase 1", "pre-starter", "prestarter"]
+        "variants": ["starter", "avviamento", "fase starter", "fase iniziale", "fase 1", "pre-starter"]
       },
       "grower": {
-        "canonical": "accrescimento",
+        "canonical": "grower",
         "confidence": 0.95,
-        "variants": ["grower", "accrescimento", "fase di crescita", "fase 2", "sviluppo"]
+        "variants": ["grower", "accrescimento", "fase grower", "fase di crescita", "fase 2", "sviluppo"]
       },
       "finisher": {
         "canonical": "finisher",
         "confidence": 0.95,
-        "variants": ["finisher", "ingrasso", "fase finale", "fase 3", "fine"]
+        "variants": ["finisher", "finissaggio", "fase finisher", "fase finale", "fase 3", "finale"]
       }
     },
 
@@ -255,17 +463,17 @@
       "male": {
         "canonical": "maschio",
         "confidence": 0.95,
-        "variants": ["maschio", "maschi", "gallo", "galli", "capi maschi", "m"]
+        "variants": ["maschio", "maschi", "gallo", "galli", "maschile", "maschi da carne", "m"]
       },
       "female": {
         "canonical": "femmina",
         "confidence": 0.95,
-        "variants": ["femmina", "femmine", "gallina", "galline", "capi femmine", "f"]
+        "variants": ["femmina", "femmine", "gallina", "galline", "femminile", "pollastra", "pollastre", "femmine da carne", "f"]
       },
       "as_hatched": {
         "canonical": "misto",
         "confidence": 0.95,
-        "variants": ["misto", "non sessato", "straight run", "sr", "sesso misto", "entrambi i sessi"]
+        "variants": ["misto", "non sessato", "non sessati", "straight run", "sr", "sesso misto", "entrambi i sessi"]
       }
     },
 
@@ -273,70 +481,70 @@
       "broiler": {
         "canonical": "broiler",
         "confidence": 0.95,
-        "variants": ["broiler", "pollo da carne", "pollo da ingrasso", "da carne"]
+        "variants": ["broiler", "pollo da carne", "polli da carne", "pollo da macello"]
       },
       "layer": {
         "canonical": "ovaiola",
         "confidence": 0.95,
-        "variants": ["ovaiola", "ovaiole", "gallina ovaiola", "da uova"]
+        "variants": ["ovaiola", "gallina ovaiola", "ovaiole", "gallina da uova"]
       },
       "breeder": {
         "canonical": "riproduttore",
         "confidence": 0.95,
-        "variants": ["riproduttore", "riproduttori", "parent stock", "capo riproduttore"]
+        "variants": ["riproduttore", "riproduttori", "parentali", "stock parentale", "animale riproduttore"]
       },
       "pullet": {
-        "canonical": "pollastre",
+        "canonical": "pollastra",
         "confidence": 0.95,
-        "variants": ["pollastre", "pollastra", "giovane gallina", "capo in rimonta"]
+        "variants": ["pollastra", "pollastre", "gallina giovane", "animale in allevamento"]
       },
       "chick": {
         "canonical": "pulcino",
         "confidence": 0.95,
-        "variants": ["pulcino", "pulcini", "day old chick", "doc", "pulcino di un giorno"]
+        "variants": ["pulcino", "pulcini", "pulcino di un giorno", "doc"]
       }
     },
 
     "equipment_types": {
       "chain_feeder": {
-        "canonical": "mangiatoia_catena",
+        "canonical": "catena_alimentazione",
         "confidence": 0.95,
-        "variants": ["mangiatoia a catena", "catena alimentazione", "sistema a catena", "chain feeder"]
+        "variants": ["catena di alimentazione", "catena mangiatoia", "sistema a catena"]
       },
       "pan_feeder": {
-        "canonical": "mangiatoia_piatto",
+        "canonical": "piatto_alimentazione",
         "confidence": 0.95,
-        "variants": ["mangiatoia a piatto", "piattello", "pan feeder", "mangiatoia circolare"]
+        "variants": ["piatto di alimentazione", "piatto", "mangiatoia a piatto", "mangiatoia circolare"]
       },
       "tube_feeder": {
-        "canonical": "mangiatoia_tubo",
+        "canonical": "tubo_alimentazione",
         "confidence": 0.95,
-        "variants": ["mangiatoia a tubo", "mangiatoia tubolare", "tube feeder"]
+        "variants": ["tubo di alimentazione", "tubo", "mangiatoia a tubo", "mangiatoia tubolare"]
       },
       "bell_drinker": {
         "canonical": "abbeveratoio_campana",
         "confidence": 0.95,
-        "variants": ["abbeveratoio a campana", "campana", "bell drinker", "abbeveratoio sospeso"]
+        "variants": ["abbeveratoio a campana", "campana", "abbeveratoio sospeso"]
       },
       "cup_drinker": {
         "canonical": "abbeveratoio_coppa",
         "confidence": 0.95,
-        "variants": ["abbeveratoio a coppa", "coppa", "cup drinker"]
+        "variants": ["abbeveratoio a coppa", "coppa", "abbeveratoio a tazza"]
       },
       "nipple_drinker": {
-        "canonical": "abbeveratoio_nippel",
+        "canonical": "abbeveratoio_nipple",
         "confidence": 0.95,
-        "variants": ["abbeveratoio a nippel", "nippel", "nipple drinker", "sistema nippel"]
+        "variants": ["abbeveratoio a nipple", "nipple", "sistema nipple", "gocciolatore"]
       },
       "tunnel_ventilation": {
         "canonical": "ventilazione_tunnel",
         "confidence": 0.95,
-        "variants": ["ventilazione tunnel", "effetto tunnel", "ventilazione longitudinale"]
+        "variants": ["ventilazione a tunnel", "effetto tunnel", "ventilazione longitudinale"]
       },
       "cross_ventilation": {
         "canonical": "ventilazione_trasversale",
         "confidence": 0.95,
-        "variants": ["ventilazione trasversale", "ventilazione incrociata", "cross ventilation"]
+        "variants": ["ventilazione trasversale", "ventilazione incrociata", "flusso incrociato"]
       },
       "radiant_heaters": {
         "canonical": "riscaldatori_radianti",
@@ -344,9 +552,9 @@
         "variants": ["riscaldatori radianti", "riscaldamento radiante", "tubi radianti", "riscaldatori a infrarossi"]
       },
       "hot_air_blowers": {
-        "canonical": "generatori_aria_calda",
+        "canonical": "ventilconvettori",
         "confidence": 0.95,
-        "variants": ["generatori di aria calda", "generatori aria calda", "soffianti aria calda", "riscaldamento forzato"]
+        "variants": ["ventilconvettori", "soffiatori aria calda", "riscaldamento ad aria forzata"]
       }
     },
 
@@ -354,22 +562,22 @@
       "avian_influenza": {
         "canonical": "influenza_aviaria",
         "confidence": 0.95,
-        "variants": ["influenza aviaria", "aviaria", "bird flu", "ai", "h5n1", "h7n9", "peste aviaria"]
+        "variants": ["influenza aviaria", "influenza aviare", "ia", "h5n1", "h7n9", "peste aviaria"]
       },
       "mareks_disease": {
         "canonical": "malattia_marek",
         "confidence": 0.95,
-        "variants": ["malattia di marek", "marek", "md", "tumori linfoidi", "paralisi"]
+        "variants": ["malattia di marek", "marek", "md", "tumori linfoidi", "paralisi di marek"]
       },
       "gumboro": {
         "canonical": "gumboro",
         "confidence": 0.95,
-        "variants": ["gumboro", "malattia di gumboro", "bursite infettiva", "ibd", "ibdv"]
+        "variants": ["gumboro", "malattia di gumboro", "bursite infettiva", "ibdv", "ibd"]
       },
       "newcastle": {
         "canonical": "newcastle",
         "confidence": 0.95,
-        "variants": ["newcastle", "malattia di newcastle", "nd", "pseudopeste aviaria"]
+        "variants": ["newcastle", "malattia di newcastle", "nd", "paramixovirus aviare"]
       },
       "coccidiosis": {
         "canonical": "coccidiosi",
@@ -384,22 +592,22 @@
       "necrotic_enteritis": {
         "canonical": "enterite_necrotica",
         "confidence": 0.95,
-        "variants": ["enterite necrotica", "necrotic enteritis", "ne", "clostridium perfringens", "necrosi intestinale"]
+        "variants": ["enterite necrotica", "clostridium perfringens", "ne", "necrosi intestinale"]
       },
       "salmonella": {
-        "canonical": "salmonellosi",
+        "canonical": "salmonella",
         "confidence": 0.95,
-        "variants": ["salmonellosi", "salmonella", "paratifo", "pullorosi"]
+        "variants": ["salmonella", "salmonellosi", "paratifo", "pullorosi"]
       },
       "mycoplasma": {
         "canonical": "micoplasmosi",
         "confidence": 0.95,
-        "variants": ["micoplasmosi", "micoplasma", "mycoplasma", "crd", "malattia respiratoria cronica"]
+        "variants": ["micoplasmosi", "micoplasma", "malattia respiratoria cronica", "crd"]
       },
       "infectious_bronchitis": {
         "canonical": "bronchite_infettiva",
         "confidence": 0.95,
-        "variants": ["bronchite infettiva", "ib", "ibv", "virus della bronchite"]
+        "variants": ["bronchite infettiva", "bi", "ibv", "virus della bronchite"]
       }
     },
 
@@ -422,17 +630,17 @@
       "general": {
         "canonical": "generale",
         "confidence": 0.90,
-        "variants": ["generale", "letargia", "febbre", "debolezza", "depressione", "malessere"]
+        "variants": ["generale", "letargia", "febbre", "debolezza", "depressione", "abbattimento"]
       },
       "lameness": {
         "canonical": "zoppia",
         "confidence": 0.95,
-        "variants": ["zoppia", "claudicazione", "problemi locomotori", "anomalia dell'andatura", "anomalia dell andatura", "problemi zampe"]
+        "variants": ["zoppia", "claudicazione", "problemi locomotori", "anomalia della deambulazione", "problemi alle zampe"]
       },
       "pododermatitis": {
         "canonical": "pododermatite",
         "confidence": 0.95,
-        "variants": ["pododermatite", "dermatite del cuscinetto plantare", "hock burn", "fhd", "ustione zampa"]
+        "variants": ["pododermatite", "dermatite plantare", "ustione del garretto", "fhd", "ustione della zampa"]
       }
     },
 
@@ -440,57 +648,57 @@
       "crude_protein": {
         "canonical": "proteina_grezza",
         "confidence": 0.95,
-        "variants": ["proteina grezza", "crude protein", "pg", "proteine", "proteina"]
+        "variants": ["proteina grezza", "pg", "proteine", "proteina"]
       },
       "metabolizable_energy": {
         "canonical": "energia_metabolizzabile",
         "confidence": 0.95,
-        "variants": ["energia metabolizzabile", "metabolizable energy", "em", "me", "kcal/kg", "densità energetica", "densita energetica"]
+        "variants": ["energia metabolizzabile", "em", "kcal/kg", "densità energetica", "densita energetica"]
       },
       "lysine": {
         "canonical": "lisina",
         "confidence": 0.95,
-        "variants": ["lisina", "lysine", "lisina digeribile", "lys"]
+        "variants": ["lisina", "lisina digeribile", "lys", "lisina dig"]
       },
       "methionine": {
         "canonical": "metionina",
         "confidence": 0.95,
-        "variants": ["metionina", "methionine", "met", "metionina+cistina", "met+cys", "tsaa"]
+        "variants": ["metionina", "met", "metionina+cisteina", "met+cys", "tsaa"]
       },
       "calcium": {
         "canonical": "calcio",
         "confidence": 0.95,
-        "variants": ["calcio", "calcium", "ca", "calcare", "carbonato di calcio"]
+        "variants": ["calcio", "ca", "calcare", "carbonato di calcio"]
       },
       "phosphorus": {
         "canonical": "fosforo",
         "confidence": 0.95,
-        "variants": ["fosforo", "phosphorus", "p", "fosforo digeribile", "p dig", "fosforo disponibile"]
+        "variants": ["fosforo", "p", "fosforo digeribile", "p dig", "fosforo disponibile"]
       },
       "digestible_phosphorus": {
         "canonical": "fosforo_digeribile",
         "confidence": 0.95,
-        "variants": ["fosforo digeribile", "digestible phosphorus", "fd", "fosforo disponibile", "dig p"]
+        "variants": ["fosforo digeribile", "pd", "fosforo disponibile", "dig p"]
       },
       "electrolyte_balance": {
         "canonical": "bilancio_elettrolitico",
         "confidence": 0.95,
-        "variants": ["bilancio elettrolitico", "electrolyte balance", "deb", "equilibrio elettrolitico"]
+        "variants": ["bilancio elettrolitico", "bed", "equilibrio elettrolitico"]
       },
       "sodium": {
         "canonical": "sodio",
         "confidence": 0.95,
-        "variants": ["sodio", "sodium", "na", "sale"]
+        "variants": ["sodio", "na", "sale"]
       },
       "chloride": {
         "canonical": "cloruro",
         "confidence": 0.95,
-        "variants": ["cloruro", "chloride", "cl", "cloro"]
+        "variants": ["cloruro", "cl", "cloro"]
       },
       "potassium": {
         "canonical": "potassio",
         "confidence": 0.95,
-        "variants": ["potassio", "potassium", "k"]
+        "variants": ["potassio", "k", "potassa"]
       }
     },
 
@@ -498,42 +706,42 @@
       "temperature": {
         "canonical": "temperatura",
         "confidence": 0.95,
-        "variants": ["temperatura", "temperature", "temp", "gradi", "celsius", "temperatura capannone"]
+        "variants": ["temperatura", "temp", "gradi", "celsius", "temperatura ambiente"]
       },
       "humidity": {
         "canonical": "umidita",
         "confidence": 0.95,
-        "variants": ["umidità", "umidita", "humidity", "umidità relativa", "umidita relativa", "ur", "%ur"]
+        "variants": ["umidità", "umidita", "umidità relativa", "umidita relativa", "ur", "%ur"]
       },
       "ventilation_rate": {
         "canonical": "portata_ventilazione",
         "confidence": 0.95,
-        "variants": ["portata ventilazione", "ventilation rate", "flusso d'aria", "flusso d aria", "m3/h/kg", "ricambio d'aria", "ricambio d aria", "ventilazione minima"]
+        "variants": ["portata di ventilazione", "tasso di ventilazione", "m3/h/kg", "ricambio d'aria", "ventilazione minima"]
       },
       "static_pressure": {
         "canonical": "pressione_statica",
         "confidence": 0.95,
-        "variants": ["pressione statica", "static pressure", "pa", "pascal", "depressione", "pressione capannone"]
+        "variants": ["pressione statica", "pa", "pascal", "depressione", "pressione del capannone"]
       },
       "ammonia": {
         "canonical": "ammoniaca",
         "confidence": 0.95,
-        "variants": ["ammoniaca", "ammonia", "nh3", "ppm", "concentrazione ammoniaca", "livello ammoniaca"]
+        "variants": ["ammoniaca", "nh3", "ppm", "concentrazione di ammoniaca", "livello di ammoniaca"]
       },
       "co2": {
         "canonical": "co2",
         "confidence": 0.95,
-        "variants": ["co2", "anidride carbonica", "ppm co2", "concentrazione co2", "livello co2"]
+        "variants": ["co2", "anidride carbonica", "ppm co2", "concentrazione di co2", "livello di co2"]
       },
       "light_intensity": {
-        "canonical": "intensita_luce",
+        "canonical": "intensita_luminosa",
         "confidence": 0.95,
-        "variants": ["intensità luce", "intensita luce", "light intensity", "lux", "illuminazione", "luminosità", "luminosita"]
+        "variants": ["intensità luminosa", "intensita luminosa", "lux", "illuminamento", "luminosità", "luminosita"]
       },
       "lighting_hours": {
         "canonical": "ore_luce",
         "confidence": 0.95,
-        "variants": ["ore di luce", "ore luce", "lighting hours", "fotoperiodo", "ore illuminazione", "h/giorno", "programma luminoso"]
+        "variants": ["ore di luce", "fotoperiodo", "ore luce", "h/giorno", "programma luminoso"]
       }
     },
 
@@ -541,22 +749,22 @@
       "biosecurity": {
         "canonical": "biosicurezza",
         "confidence": 0.95,
-        "variants": ["biosicurezza", "biosecurity", "sicurezza biologica", "tutto pieno tutto vuoto", "disinfezione"]
+        "variants": ["biosicurezza", "sicurezza biologica", "tutto pieno tutto vuoto", "disinfezione"]
       },
       "probiotics": {
         "canonical": "probiotici",
         "confidence": 0.95,
-        "variants": ["probiotici", "probiotics", "microrganismi benefici", "colture vive", "salute intestinale"]
+        "variants": ["probiotici", "microrganismi benefici", "colture vive", "salute intestinale"]
       },
       "antibiotics": {
         "canonical": "antibiotici",
         "confidence": 0.95,
-        "variants": ["antibiotici", "antibiotics", "antimicrobici", "terapeutico", "promotori della crescita"]
+        "variants": ["antibiotici", "antimicrobici", "terapeutico", "promotori di crescita"]
       },
       "vaccine": {
         "canonical": "vaccino",
         "confidence": 0.95,
-        "variants": ["vaccino", "vaccine", "vaccinazione", "vaccination", "immunizzazione", "profilassi"]
+        "variants": ["vaccino", "vaccinazione", "immunizzazione", "profilassi"]
       }
     },
 
@@ -564,27 +772,27 @@
       "stocking_density": {
         "canonical": "densita_allevamento",
         "confidence": 0.95,
-        "variants": ["densità di allevamento", "densita di allevamento", "stocking density", "densità", "densita", "kg/m2", "capi/m2", "carico"]
+        "variants": ["densità di allevamento", "densita di allevamento", "densità", "densita", "kg/m2", "capi/m2", "carico"]
       },
       "heat_stress": {
         "canonical": "stress_termico",
         "confidence": 0.95,
-        "variants": ["stress termico", "heat stress", "stress da calore", "ipertermia", "colpo di calore", "surriscaldamento"]
+        "variants": ["stress termico", "stress da calore", "ipertermia", "colpo di calore", "surriscaldamento"]
       },
       "feather_pecking": {
         "canonical": "beccaggio_penne",
         "confidence": 0.95,
-        "variants": ["beccaggio delle penne", "beccaggio penne", "feather pecking", "cannibalismo", "spiumamento"]
+        "variants": ["beccaggio delle penne", "beccaggio", "cannibalismo", "strappo delle penne"]
       },
       "feeder_space": {
         "canonical": "spazio_mangiatoia",
         "confidence": 0.95,
-        "variants": ["spazio mangiatoia", "feeder space", "cm/capo", "lunghezza mangiatoia", "spazio alimentazione"]
+        "variants": ["spazio mangiatoia", "cm/capo", "lunghezza mangiatoia", "spazio di alimentazione"]
       },
       "drinker_flow_rate": {
         "canonical": "portata_abbeveratoio",
         "confidence": 0.95,
-        "variants": ["portata abbeveratoio", "drinker flow rate", "flusso nippel", "ml/min/nippel", "pressione acqua"]
+        "variants": ["portata abbeveratoio", "flusso nipple", "ml/min/nipple", "pressione acqua"]
       }
     },
 
@@ -592,22 +800,22 @@
       "litter": {
         "canonical": "lettiera",
         "confidence": 0.95,
-        "variants": ["lettiera", "litter", "copertura pavimento", "substrato"]
+        "variants": ["lettiera", "lettiere", "copertura del pavimento", "substrato"]
       },
       "wood_shavings": {
         "canonical": "trucioli_legno",
         "confidence": 0.95,
-        "variants": ["trucioli di legno", "trucioli", "wood shavings", "segatura"]
+        "variants": ["trucioli di legno", "trucioli", "segatura"]
       },
       "rice_husks": {
         "canonical": "lolla_riso",
         "confidence": 0.95,
-        "variants": ["lolla di riso", "lolla riso", "rice husks", "bucce di riso"]
+        "variants": ["lolla di riso", "lolla", "pula di riso"]
       },
       "straw": {
         "canonical": "paglia",
         "confidence": 0.95,
-        "variants": ["paglia", "straw", "paglia di grano", "paglia d'orzo", "paglia d orzo", "paglia d'avena", "paglia d avena"]
+        "variants": ["paglia", "paglia di grano", "paglia d'orzo", "paglia d'avena"]
       }
     },
 
@@ -615,27 +823,27 @@
       "egg_weight": {
         "canonical": "peso_uovo",
         "confidence": 0.95,
-        "variants": ["peso uovo", "egg weight", "massa uovo", "peso medio uovo", "calibro uovo", "dimensione uovo"]
+        "variants": ["peso dell'uovo", "peso uovo", "massa dell'uovo", "peso medio dell'uovo", "calibro dell'uovo", "dimensione dell'uovo"]
       },
       "shell_quality": {
         "canonical": "qualita_guscio",
         "confidence": 0.95,
-        "variants": ["qualità guscio", "qualita guscio", "shell quality", "spessore guscio", "resistenza guscio", "gusci sottili", "gusci deboli"]
+        "variants": ["qualità del guscio", "qualita del guscio", "spessore del guscio", "resistenza del guscio", "gusci molli", "gusci sottili"]
       },
       "cracked_shell": {
         "canonical": "guscio_incrinato",
         "confidence": 0.95,
-        "variants": ["guscio incrinato", "cracked shell", "frattura guscio", "uovo incrinato", "crepa"]
+        "variants": ["guscio incrinato", "incrinatura guscio", "uovo incrinato", "microfessura"]
       },
       "soft_shelled_egg": {
         "canonical": "uovo_guscio_molle",
         "confidence": 0.95,
-        "variants": ["uovo con guscio molle", "uovo guscio molle", "soft shelled egg", "guscio molle", "uovo senza guscio"]
+        "variants": ["uovo a guscio molle", "guscio molle", "uovo senza guscio", "uovo molle"]
       },
       "misshapen_egg": {
         "canonical": "uovo_deforme",
         "confidence": 0.95,
-        "variants": ["uovo deforme", "misshapen egg", "forma anomala", "uovo irregolare"]
+        "variants": ["uovo deforme", "uovo malformato", "forma anomala", "uovo irregolare"]
       }
     },
 
@@ -643,60 +851,60 @@
       "vaccination": {
         "canonical": "vaccinazione",
         "confidence": 0.95,
-        "variants": ["vaccinazione", "vaccination", "vaccino", "vaccine", "immunizzazione", "immunization"]
+        "variants": ["vaccinazione", "vaccino", "immunizzazione", "inoculazione"]
       },
       "biosecurity_protocol": {
         "canonical": "protocollo_biosicurezza",
         "confidence": 0.95,
-        "variants": ["biosicurezza", "biosecurity", "disinfezione", "disinfection", "pulizia", "quarantena"]
+        "variants": ["biosicurezza", "disinfezione", "pulizia", "quarantena"]
       },
       "treatment": {
         "canonical": "trattamento",
         "confidence": 0.95,
-        "variants": ["trattamento", "treatment", "terapia", "therapy", "medicazione", "medication"]
+        "variants": ["trattamento", "medicazione", "terapia", "cura"]
       },
       "lab_diagnostics": {
         "canonical": "diagnostica_laboratorio",
         "confidence": 0.95,
-        "variants": ["diagnostica", "diagnostic", "test", "analisi", "analysis", "laboratorio", "lab"]
+        "variants": ["diagnostica", "test", "analisi", "laboratorio", "lab"]
       }
     },
 
     "system_messages": {
       "out_of_domain": {
-        "canonical": "fuori_ambito",
+        "canonical": "fuori_dominio",
         "confidence": 1.0,
-        "variants": ["fuori ambito", "out of domain", "non nel dominio", "fuori campo"]
+        "variants": ["fuori dominio", "fuori ambito", "non nel dominio"]
       },
       "error_generic": {
         "canonical": "errore_generico",
         "confidence": 1.0,
-        "variants": ["errore", "error", "errore generico", "errore di elaborazione"]
+        "variants": ["errore", "errore generico", "errore di elaborazione"]
       },
       "welcome": {
         "canonical": "benvenuto",
         "confidence": 1.0,
-        "variants": ["benvenuto", "welcome", "saluto", "ciao"]
+        "variants": ["benvenuto", "benvenuta", "saluto", "ciao"]
       },
       "clarification_needed": {
         "canonical": "chiarimento_necessario",
         "confidence": 1.0,
-        "variants": ["chiarimento necessario", "clarification needed", "si prega di chiarire", "serve più informazione", "serve piu informazione"]
+        "variants": ["chiarimento necessario", "si prega di chiarire", "serve più informazione", "serve piu informazione"]
       },
       "no_results": {
         "canonical": "nessun_risultato",
         "confidence": 1.0,
-        "variants": ["nessun risultato", "no results", "niente trovato", "nessun dato"]
+        "variants": ["nessun risultato", "niente trovato", "nessun dato"]
       },
       "processing": {
         "canonical": "elaborazione",
         "confidence": 1.0,
-        "variants": ["elaborazione", "processing", "attendere", "in lavorazione"]
+        "variants": ["elaborazione", "attendere prego", "in elaborazione"]
       },
       "farewell": {
         "canonical": "arrivederci",
         "confidence": 1.0,
-        "variants": ["arrivederci", "goodbye", "ciao", "addio"]
+        "variants": ["arrivederci", "addio", "ciao"]
       }
     }
   }

@@ -3,36 +3,244 @@
     "language": "zh",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 19,
-    "description": "家禽生产专家系统通用术语 - 中文简体版"
+    "total_domains": 24,
+    "description": "家禽生产专家系统通用术语 - 中文版"
   },
 
   "domains": {
+    "contextual_references": {
+      "same": {
+        "canonical": "相同",
+        "confidence": 0.90,
+        "variants": ["相同", "同样", "一样", "同一", "相同的"]
+      },
+      "same_age": {
+        "canonical": "同龄",
+        "confidence": 0.90,
+        "variants": ["同龄", "相同日龄", "同一日龄", "同样日龄", "在相同日龄"]
+      },
+      "and_for": {
+        "canonical": "以及",
+        "confidence": 0.90,
+        "variants": ["以及", "和", "对于", "还有", "同样对于"]
+      },
+      "what_about": {
+        "canonical": "那么",
+        "confidence": 0.90,
+        "variants": ["那么", "那", "关于", "至于", "怎么样"]
+      },
+      "females": {
+        "canonical": "母鸡",
+        "confidence": 0.95,
+        "variants": ["母鸡", "母", "母禽", "雌性", "母鸡群"]
+      },
+      "males": {
+        "canonical": "公鸡",
+        "confidence": 0.95,
+        "variants": ["公鸡", "公", "公禽", "雄性", "公鸡群"]
+      },
+      "and_the": {
+        "canonical": "和",
+        "confidence": 0.90,
+        "variants": ["和", "与", "以及", "还有"]
+      },
+      "also_for": {
+        "canonical": "也适用于",
+        "confidence": 0.90,
+        "variants": ["也适用于", "同样适用于", "也对", "同样对于"]
+      }
+    },
+
+    "metrics": {
+      "weight": {
+        "canonical": "体重",
+        "confidence": 0.95,
+        "variants": ["体重", "重量", "体重量", "公斤", "克", "kg", "g"]
+      },
+      "fcr": {
+        "canonical": "料肉比",
+        "confidence": 0.95,
+        "variants": ["料肉比", "料重比", "饲料转化率", "料比", "fcr"]
+      },
+      "gain": {
+        "canonical": "增重",
+        "confidence": 0.95,
+        "variants": ["增重", "增长", "体重增长", "日增重", "adg"]
+      },
+      "conversion": {
+        "canonical": "转化率",
+        "confidence": 0.95,
+        "variants": ["转化率", "转化", "饲料转化", "转换率"]
+      },
+      "consumption": {
+        "canonical": "消耗",
+        "confidence": 0.95,
+        "variants": ["消耗", "采食", "采食量", "摄入", "摄入量", "消耗量"]
+      },
+      "production": {
+        "canonical": "生产",
+        "confidence": 0.95,
+        "variants": ["生产", "产量", "生产性能", "产出", "生产率"]
+      },
+      "growth": {
+        "canonical": "生长",
+        "confidence": 0.95,
+        "variants": ["生长", "发育", "生长速度", "生长率"]
+      },
+      "performance": {
+        "canonical": "性能",
+        "confidence": 0.95,
+        "variants": ["性能", "表现", "生产性能", "效率", "成绩"]
+      },
+      "index": {
+        "canonical": "指数",
+        "confidence": 0.95,
+        "variants": ["指数", "指标", "系数", "比率", "因子"]
+      }
+    },
+
+    "health": {
+      "disease": {
+        "canonical": "疾病",
+        "confidence": 0.95,
+        "variants": ["疾病", "病", "病理", "感染", "传染病"]
+      },
+      "symptoms": {
+        "canonical": "症状",
+        "confidence": 0.95,
+        "variants": ["症状", "表现", "临床症状", "临床表现", "病症"]
+      },
+      "treatment": {
+        "canonical": "治疗",
+        "confidence": 0.95,
+        "variants": ["治疗", "疗法", "用药", "医治", "处理"]
+      },
+      "coccidiosis": {
+        "canonical": "球虫病",
+        "confidence": 0.95,
+        "variants": ["球虫病", "球虫", "艾美耳", "抗球虫药"]
+      },
+      "vaccination": {
+        "canonical": "疫苗接种",
+        "confidence": 0.95,
+        "variants": ["疫苗接种", "免疫", "接种", "疫苗", "免疫接种", "预防接种"]
+      },
+      "gumboro": {
+        "canonical": "法氏囊病",
+        "confidence": 0.95,
+        "variants": ["法氏囊病", "传染性法氏囊病", "ibdv", "ibd", "甘保罗"]
+      },
+      "enteritis": {
+        "canonical": "肠炎",
+        "confidence": 0.95,
+        "variants": ["肠炎", "坏死性肠炎", "肠道炎症"]
+      },
+      "mortality": {
+        "canonical": "死亡率",
+        "confidence": 0.95,
+        "variants": ["死亡率", "死亡", "淘汰率", "损失", "成活率"]
+      },
+      "diagnosis": {
+        "canonical": "诊断",
+        "confidence": 0.95,
+        "variants": ["诊断", "检查", "分析", "识别", "检测"]
+      }
+    },
+
+    "environment": {
+      "temperature": {
+        "canonical": "温度",
+        "confidence": 0.95,
+        "variants": ["温度", "温", "度", "摄氏度", "热"]
+      },
+      "humidity": {
+        "canonical": "湿度",
+        "confidence": 0.95,
+        "variants": ["湿度", "相对湿度", "湿", "湿度水平"]
+      },
+      "ventilation": {
+        "canonical": "通风",
+        "confidence": 0.95,
+        "variants": ["通风", "换气", "空气流通", "气流"]
+      },
+      "lighting": {
+        "canonical": "光照",
+        "confidence": 0.95,
+        "variants": ["光照", "照明", "灯光", "光线"]
+      },
+      "density": {
+        "canonical": "密度",
+        "confidence": 0.95,
+        "variants": ["密度", "饲养密度", "存栏密度", "kg/m2", "只/m2"]
+      },
+      "space": {
+        "canonical": "空间",
+        "confidence": 0.95,
+        "variants": ["空间", "面积", "场地", "cm/只", "可用空间"]
+      },
+      "feeder": {
+        "canonical": "料槽",
+        "confidence": 0.95,
+        "variants": ["料槽", "料桶", "喂料器", "饲喂系统", "料线"]
+      },
+      "drinker": {
+        "canonical": "饮水器",
+        "confidence": 0.95,
+        "variants": ["饮水器", "水线", "乳头", "饮水系统", "水嘴"]
+      },
+      "light": {
+        "canonical": "光",
+        "confidence": 0.95,
+        "variants": ["光", "光照", "照明", "勒克斯", "光照强度", "光周期"]
+      }
+    },
+
+    "species": {
+      "broiler": {
+        "canonical": "broiler",
+        "database_value": "broiler",
+        "confidence": 0.95,
+        "variants": ["肉鸡", "肉用鸡", "白羽肉鸡", "broiler", "肉鸡生产"]
+      },
+      "layer": {
+        "canonical": "layer",
+        "database_value": "layer",
+        "confidence": 0.95,
+        "variants": ["蛋鸡", "产蛋鸡", "蛋用鸡", "layer", "蛋鸡生产"]
+      },
+      "breeder": {
+        "canonical": "breeder",
+        "database_value": "breeder",
+        "confidence": 0.95,
+        "variants": ["种鸡", "父母代", "繁殖鸡", "breeder", "种禽"]
+      }
+    },
+
     "general_terms": {
       "poultry": {
         "canonical": "家禽",
         "confidence": 0.95,
-        "variants": ["家禽", "jia qin", "poultry", "家禽养殖", "禽类", "qin lei", "鸡"]
+        "variants": ["家禽", "禽类", "家禽养殖", "家禽生产", "养禽"]
       },
       "farm": {
         "canonical": "养殖场",
         "confidence": 0.95,
-        "variants": ["养殖场", "yang zhi chang", "farm", "农场", "nong chang", "鸡舍", "ji she", "养殖基地"]
+        "variants": ["养殖场", "鸡场", "农场", "生产基地", "养殖基地"]
       },
       "management": {
         "canonical": "管理",
         "confidence": 0.90,
-        "variants": ["管理", "guan li", "management", "饲养管理", "经营", "jing ying"]
+        "variants": ["管理", "饲养管理", "经营", "运营", "操作"]
       },
       "production": {
         "canonical": "生产",
         "confidence": 0.90,
-        "variants": ["生产", "sheng chan", "production", "产量", "chan liang", "生产力", "产能"]
+        "variants": ["生产", "产量", "生产力", "产出"]
       },
       "quality": {
         "canonical": "质量",
         "confidence": 0.90,
-        "variants": ["质量", "zhi liang", "quality", "品质", "pin zhi", "标准", "biao zhun"]
+        "variants": ["质量", "品质", "标准", "等级", "分级"]
       }
     },
 
@@ -40,57 +248,57 @@
       "weight_query": {
         "canonical": "体重查询",
         "confidence": 0.92,
-        "variants": ["体重是多少", "ti zhong shi duo shao", "目标体重", "平均体重", "多重", "体重"]
+        "variants": ["体重是多少", "目标体重", "平均体重", "重量多少", "多重"]
       },
       "fcr_query": {
         "canonical": "料肉比查询",
         "confidence": 0.92,
-        "variants": ["最佳料肉比", "zui jia liao rou bi", "料肉比", "liao rou bi", "fcr", "饲料转化率", "平均料肉比"]
+        "variants": ["最佳料肉比", "料肉比", "饲料转化率", "平均料肉比"]
       },
       "water_query": {
         "canonical": "饮水查询",
         "confidence": 0.92,
-        "variants": ["饮水量", "yin shui liang", "用水量", "升每天", "毫升每只"]
+        "variants": ["饮水量", "耗水量", "每天升数", "每只毫升"]
       },
       "nutrient_requirement_query": {
         "canonical": "营养需求查询",
         "confidence": 0.92,
-        "variants": ["蛋白质水平", "dan bai zhi shui ping", "赖氨酸需求", "钙需求", "磷含量"]
+        "variants": ["蛋白质水平", "赖氨酸需求", "钙需求", "磷含量"]
       },
       "environment_setpoint_query": {
-        "canonical": "环境参数查询",
+        "canonical": "环境设定查询",
         "confidence": 0.92,
-        "variants": ["最佳温度", "zui jia wen du", "目标湿度", "最大co2", "通风设置"]
+        "variants": ["最佳温度", "目标湿度", "最大二氧化碳", "通风设置"]
       },
       "production_index_query": {
-        "canonical": "生产指标查询",
+        "canonical": "生产指数查询",
         "confidence": 0.92,
-        "variants": ["平均epef", "ping jun epef", "正常指数", "效率指数", "综合表现"]
+        "variants": ["平均欧洲效益指数", "正常生产指数", "效率指数", "总体性能"]
       },
       "vaccination_protocol_query": {
-        "canonical": "疫苗程序查询",
+        "canonical": "免疫程序查询",
         "confidence": 0.92,
-        "variants": ["疫苗程序", "yi miao cheng xu", "免疫程序", "mian yi cheng xu", "疫苗计划", "免疫计划"]
+        "variants": ["免疫程序", "疫苗计划", "接种程序", "免疫计划"]
       },
       "space_equipment_query": {
         "canonical": "设备空间查询",
         "confidence": 0.92,
-        "variants": ["料槽空间", "liao cao kong jian", "乳头设置", "饮水器高度", "厘米每只"]
+        "variants": ["料槽空间", "乳头设置", "饮水器高度", "每只厘米"]
       },
       "problem_report": {
         "canonical": "问题报告",
         "confidence": 0.90,
-        "variants": ["我的鸡", "wo de ji", "我观察到", "问题是", "我的鸡群"]
+        "variants": ["我的鸡", "我观察到", "我的家禽", "问题", "我的鸡群"]
       },
       "health_diagnosis": {
         "canonical": "健康诊断",
         "confidence": 0.92,
-        "variants": ["什么症状", "shen me zheng zhuang", "诊断", "zhen duan", "疾病", "ji bing", "原因是什么", "临床症状"]
+        "variants": ["什么症状", "诊断", "疾病", "什么原因", "临床症状"]
       },
       "management_how": {
         "canonical": "管理方法",
         "confidence": 0.90,
-        "variants": ["如何管理", "ru he guan li", "如何治疗", "怎么办", "如何改善", "管理"]
+        "variants": ["如何管理", "如何治疗", "该怎么办", "如何改善", "管理"]
       }
     },
 
@@ -98,110 +306,110 @@
       "ross_308": {
         "canonical": "ross_308",
         "confidence": 0.95,
-        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "罗斯308", "luo si 308", "ross 308 broiler"]
+        "variants": ["ross 308", "ross308", "ross-308", "r308", "ross", "罗斯308", "罗斯308肉鸡", "ross 308 ap"]
       },
       "ross_708": {
         "canonical": "ross_708",
         "confidence": 0.95,
-        "variants": ["ross 708", "ross708", "ross-708", "r708", "罗斯708", "luo si 708"]
+        "variants": ["ross 708", "ross708", "ross-708", "r708", "罗斯708"]
       },
       "cobb_500": {
         "canonical": "cobb_500",
         "confidence": 0.95,
-        "variants": ["cobb 500", "cobb500", "cobb-500", "c500", "cobb", "科宝500", "ke bao 500", "cobb 500 broiler"]
+        "variants": ["cobb 500", "cobb500", "cobb-500", "c500", "cobb", "科宝500", "科宝500肉鸡"]
       },
       "cobb_700": {
         "canonical": "cobb_700",
         "confidence": 0.95,
-        "variants": ["cobb 700", "cobb700", "cobb-700", "c700", "科宝700", "ke bao 700"]
+        "variants": ["cobb 700", "cobb700", "cobb-700", "c700", "科宝700"]
       },
       "cobb_400": {
         "canonical": "cobb_400",
         "confidence": 0.95,
-        "variants": ["cobb 400", "cobb400", "cobb-400", "c400", "科宝400", "ke bao 400"]
+        "variants": ["cobb 400", "cobb400", "cobb-400", "c400", "科宝400"]
       },
       "hubbard_classic": {
         "canonical": "hubbard_classic",
         "confidence": 0.95,
-        "variants": ["hubbard classic", "classic", "hubbard-classic", "哈伯德经典", "ha bo de jing dian", "hubbard"]
+        "variants": ["hubbard classic", "classic", "hubbard-classic", "hclassic", "hubbard", "哈伯德"]
       },
       "hubbard_flex": {
         "canonical": "hubbard_flex",
         "confidence": 0.95,
-        "variants": ["hubbard flex", "flex", "hubbard-flex", "哈伯德弹性", "ha bo de tan xing"]
+        "variants": ["hubbard flex", "flex", "hubbard-flex", "hflex"]
       },
       "hubbard_ja87": {
         "canonical": "hubbard_ja87",
         "confidence": 0.95,
-        "variants": ["hubbard ja87", "ja87", "hubbard-ja87", "ja 87", "哈伯德ja87"]
+        "variants": ["hubbard ja87", "ja87", "hubbard-ja87", "ja 87", "ja-87"]
       },
       "freedom_ranger": {
         "canonical": "freedom_ranger",
         "confidence": 0.95,
-        "variants": ["freedom ranger", "freedom", "ranger", "自由放养", "zi you fang yang"]
+        "variants": ["freedom ranger", "freedom", "ranger", "redbro", "freedom-ranger"]
       },
       "isa_brown": {
         "canonical": "isa_brown",
         "confidence": 0.95,
-        "variants": ["isa brown", "isa", "isa-brown", "伊莎褐", "yi sha he", "isa layer"]
+        "variants": ["isa brown", "isa", "isa-brown", "伊莎褐", "isa褐壳蛋鸡"]
       },
       "lohmann_brown": {
         "canonical": "lohmann_brown",
         "confidence": 0.95,
-        "variants": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "罗曼褐", "luo man he"]
+        "variants": ["lohmann brown", "lohmann", "lohmann-brown", "lb", "罗曼褐", "罗曼褐壳蛋鸡"]
       },
       "hy_line": {
         "canonical": "hy_line",
         "confidence": 0.95,
-        "variants": ["hy-line", "hyline", "hy line", "hl", "海兰", "hai lan"]
+        "variants": ["hy-line", "hyline", "hy line", "hl", "海兰"]
       }
     },
 
     "performance_metrics": {
       "feed_conversion_ratio": {
-        "canonical": "料肉比",
+        "canonical": "饲料转化率",
         "confidence": 0.95,
-        "variants": ["fcr", "料肉比", "liao rou bi", "饲料转化率", "si liao zhuan hua lv", "料重比", "饲料效率", "累计料肉比"]
+        "variants": ["料肉比", "饲料转化率", "料重比", "饲料效率", "累计料肉比", "转化率", "fcr"]
       },
       "average_daily_gain": {
-        "canonical": "日增重",
+        "canonical": "平均日增重",
         "confidence": 0.95,
-        "variants": ["adg", "日增重", "ri zeng zhong", "日均增重", "平均日增重", "克/天", "生长速度"]
+        "variants": ["日增重", "平均日增重", "日增长", "克/天", "每日增重", "日均增重", "生长速度", "adg"]
       },
       "feed_intake": {
         "canonical": "采食量",
         "confidence": 0.95,
-        "variants": ["采食量", "cai shi liang", "饲料消耗", "si liao xiao hao", "fi", "克/只/天", "日采食量", "累计采食量"]
+        "variants": ["采食量", "饲料采食量", "饲料摄入", "克/只/天", "日采食量", "累计采食量", "总采食量"]
       },
       "water_intake": {
         "canonical": "饮水量",
         "confidence": 0.95,
-        "variants": ["饮水量", "yin shui liang", "用水量", "l/1000/天", "ml/只/天", "日饮水量", "水消耗"]
+        "variants": ["饮水量", "耗水量", "升/1000/天", "毫升/只/天", "日饮水量", "用水量"]
       },
       "body_weight": {
         "canonical": "体重",
         "confidence": 0.95,
-        "variants": ["体重", "ti zhong", "weight", "活重", "huo zhong", "平均体重", "目标体重", "bw", "个体重"]
+        "variants": ["体重", "活重", "体重量", "平均体重", "目标体重", "bw", "鸡只体重", "单只体重", "标准体重"]
       },
       "mortality": {
         "canonical": "死亡率",
         "confidence": 0.95,
-        "variants": ["死亡率", "si wang lv", "mortality", "死淘率", "损失", "死亡百分比", "累计死亡率", "日死亡率", "存活率"]
+        "variants": ["死亡率", "死亡", "淘汰", "损失", "死亡百分比", "累计死亡率", "日死亡率", "死鸡", "成活率"]
       },
       "egg_production": {
-        "canonical": "产蛋率",
+        "canonical": "产蛋量",
         "confidence": 0.95,
-        "variants": ["产蛋率", "chan dan lv", "egg production", "产蛋量", "蛋鸡日产", "产蛋百分比", "hen day production"]
+        "variants": ["产蛋量", "产蛋率", "生产率", "产蛋性能", "蛋产量", "每只产蛋", "母鸡日产蛋", "产蛋百分比"]
       },
       "uniformity": {
         "canonical": "均匀度",
         "confidence": 0.95,
-        "variants": ["均匀度", "jun yun du", "uniformity", "变异系数", "bian yi xi shu", "cv", "整齐度", "一致性"]
+        "variants": ["均匀度", "变异系数", "cv", "整齐度", "鸡群均匀度", "体重均匀度", "大小均匀度", "一致性"]
       },
       "epef": {
-        "canonical": "epef",
+        "canonical": "欧洲效益指数",
         "confidence": 0.95,
-        "variants": ["epef", "欧洲效率因子", "ou zhou xiao lv yin zi", "生产效率指数", "performance index", "效率指数"]
+        "variants": ["欧洲效益指数", "epef", "生产效率因子", "性能指数", "效率指数", "生产指数"]
       }
     },
 
@@ -209,45 +417,45 @@
       "broiler_farm": {
         "canonical": "肉鸡场",
         "confidence": 0.95,
-        "variants": ["肉鸡", "rou ji", "broiler", "肉鸡场", "rou ji chang", "肉鸡养殖场", "肉用鸡"]
+        "variants": ["肉鸡", "肉鸡场", "肉鸡养殖场", "肉鸡生产场"]
       },
       "layer_farm": {
         "canonical": "蛋鸡场",
         "confidence": 0.95,
-        "variants": ["蛋鸡", "dan ji", "layer", "蛋鸡场", "dan ji chang", "蛋鸡养殖场", "产蛋鸡"]
+        "variants": ["蛋鸡", "蛋鸡场", "产蛋鸡场", "蛋鸡养殖场", "鸡舍"]
       },
       "breeder_farm": {
         "canonical": "种鸡场",
         "confidence": 0.95,
-        "variants": ["种鸡", "zhong ji", "breeder", "种鸡场", "zhong ji chang", "parent stock", "父母代"]
+        "variants": ["种鸡", "种鸡场", "父母代鸡场", "种禽场"]
       },
       "hatchery": {
         "canonical": "孵化场",
         "confidence": 0.95,
-        "variants": ["孵化场", "fu hua chang", "hatchery", "孵化厂", "孵化基地"]
+        "variants": ["孵化场", "孵化厂", "孵化", "孵化设施"]
       },
       "feed_mill": {
         "canonical": "饲料厂",
         "confidence": 0.95,
-        "variants": ["饲料厂", "si liao chang", "feed mill", "饲料加工厂", "饲料公司"]
+        "variants": ["饲料厂", "饲料加工厂", "饲料工厂", "饲料厂"]
       }
     },
 
     "production_phases": {
       "starter": {
-        "canonical": "前期料",
+        "canonical": "前期",
         "confidence": 0.95,
-        "variants": ["前期料", "qian qi liao", "starter", "育雏期", "yu chu qi", "第一阶段", "phase 1", "开食料"]
+        "variants": ["前期", "育雏期", "开食期", "第一阶段", "预开食期"]
       },
       "grower": {
-        "canonical": "中期料",
+        "canonical": "中期",
         "confidence": 0.95,
-        "variants": ["中期料", "zhong qi liao", "grower", "生长期", "sheng zhang qi", "第二阶段", "phase 2"]
+        "variants": ["中期", "育成期", "生长期", "第二阶段", "发育期"]
       },
       "finisher": {
-        "canonical": "后期料",
+        "canonical": "后期",
         "confidence": 0.95,
-        "variants": ["后期料", "hou qi liao", "finisher", "育肥期", "yu fei qi", "第三阶段", "phase 3", "出栏料"]
+        "variants": ["后期", "育肥期", "出栏期", "第三阶段", "终期"]
       }
     },
 
@@ -255,17 +463,17 @@
       "male": {
         "canonical": "公",
         "confidence": 0.95,
-        "variants": ["公", "gong", "male", "雄", "xiong", "公鸡", "gong ji", "m"]
+        "variants": ["公", "公鸡", "雄", "雄性", "公肉鸡", "m"]
       },
       "female": {
         "canonical": "母",
         "confidence": 0.95,
-        "variants": ["母", "mu", "female", "雌", "ci", "母鸡", "mu ji", "f"]
+        "variants": ["母", "母鸡", "雌", "雌性", "母肉鸡", "f"]
       },
       "as_hatched": {
         "canonical": "混合",
         "confidence": 0.95,
-        "variants": ["混合", "hun he", "mixed", "未分性别", "wei fen xing bie", "straight run", "sr", "公母混养"]
+        "variants": ["混合", "未分性别", "公母混合", "straight run", "sr", "混养", "公母"]
       }
     },
 
@@ -273,80 +481,80 @@
       "broiler": {
         "canonical": "肉鸡",
         "confidence": 0.95,
-        "variants": ["肉鸡", "rou ji", "broiler", "肉用鸡", "rou yong ji", "白羽肉鸡"]
+        "variants": ["肉鸡", "肉用鸡", "白羽肉鸡", "肉用仔鸡"]
       },
       "layer": {
         "canonical": "蛋鸡",
         "confidence": 0.95,
-        "variants": ["蛋鸡", "dan ji", "layer", "产蛋鸡", "chan dan ji", "蛋用鸡"]
+        "variants": ["蛋鸡", "产蛋鸡", "蛋用鸡"]
       },
       "breeder": {
         "canonical": "种鸡",
         "confidence": 0.95,
-        "variants": ["种鸡", "zhong ji", "breeder", "parent stock", "父母代", "fu mu dai"]
+        "variants": ["种鸡", "种用鸡", "父母代", "繁殖鸡"]
       },
       "pullet": {
         "canonical": "育成鸡",
         "confidence": 0.95,
-        "variants": ["育成鸡", "yu cheng ji", "pullet", "青年鸡", "qing nian ji", "后备鸡"]
+        "variants": ["育成鸡", "青年鸡", "后备鸡", "幼鸡"]
       },
       "chick": {
         "canonical": "雏鸡",
         "confidence": 0.95,
-        "variants": ["雏鸡", "chu ji", "chick", "鸡苗", "ji miao", "一日龄雏鸡", "doc"]
+        "variants": ["雏鸡", "小鸡", "鸡苗", "鸡雏", "日龄雏", "doc"]
       }
     },
 
     "equipment_types": {
       "chain_feeder": {
-        "canonical": "链式料槽",
+        "canonical": "链式料线",
         "confidence": 0.95,
-        "variants": ["链式料槽", "lian shi liao cao", "chain feeder", "料链", "liao lian", "链条喂料"]
+        "variants": ["链式料线", "料链", "链条喂料", "链式系统"]
       },
       "pan_feeder": {
         "canonical": "料盘",
         "confidence": 0.95,
-        "variants": ["料盘", "liao pan", "pan feeder", "圆盘料槽", "yuan pan liao cao", "料盆"]
+        "variants": ["料盘", "料桶", "圆盘料槽", "料盘系统"]
       },
       "tube_feeder": {
-        "canonical": "料桶",
+        "canonical": "料筒",
         "confidence": 0.95,
-        "variants": ["料桶", "liao tong", "tube feeder", "管式料槽", "guan shi liao cao"]
+        "variants": ["料筒", "管式料槽", "管式喂料器"]
       },
       "bell_drinker": {
-        "canonical": "钟式饮水器",
+        "canonical": "钟型饮水器",
         "confidence": 0.95,
-        "variants": ["钟式饮水器", "zhong shi yin shui qi", "bell drinker", "吊钟", "diao zhong", "水钟"]
+        "variants": ["钟型饮水器", "钟式水线", "吊式饮水器"]
       },
       "cup_drinker": {
         "canonical": "杯式饮水器",
         "confidence": 0.95,
-        "variants": ["杯式饮水器", "bei shi yin shui qi", "cup drinker", "水杯", "shui bei"]
+        "variants": ["杯式饮水器", "水杯", "杯型饮水器"]
       },
       "nipple_drinker": {
         "canonical": "乳头饮水器",
         "confidence": 0.95,
-        "variants": ["乳头饮水器", "ru tou yin shui qi", "nipple drinker", "乳头", "ru tou", "nipple"]
+        "variants": ["乳头饮水器", "乳头", "乳头系统", "水嘴"]
       },
       "tunnel_ventilation": {
         "canonical": "纵向通风",
         "confidence": 0.95,
-        "variants": ["纵向通风", "zong xiang tong feng", "tunnel ventilation", "隧道通风", "sui dao tong feng"]
+        "variants": ["纵向通风", "隧道通风", "纵向风", "隧道效应"]
       },
       "cross_ventilation": {
         "canonical": "横向通风",
         "confidence": 0.95,
-        "variants": ["横向通风", "heng xiang tong feng", "cross ventilation", "交叉通风", "jiao cha tong feng"]
+        "variants": ["横向通风", "横向风", "交叉通风", "横流"]
       },
       "radiant_heaters": {
         "canonical": "辐射加热器",
         "confidence": 0.95,
-        "variants": ["辐射加热器", "fu she jia re qi", "radiant heaters", "红外加热", "hong wai jia re", "辐射供暖"]
+        "variants": ["辐射加热器", "辐射供暖", "辐射管", "红外加热器"]
       },
       "hot_air_blowers": {
         "canonical": "热风机",
         "confidence": 0.95,
-        "variants": ["热风机", "re feng ji", "hot air blowers", "暖风机", "nuan feng ji", "强制送风"]
+        "variants": ["热风机", "热风炉", "强制供暖", "暖风机"]
       }
     },
 
@@ -354,52 +562,52 @@
       "avian_influenza": {
         "canonical": "禽流感",
         "confidence": 0.95,
-        "variants": ["禽流感", "qin liu gan", "avian influenza", "bird flu", "ai", "h5n1", "h7n9"]
+        "variants": ["禽流感", "禽流行性感冒", "ai", "h5n1", "h7n9", "鸡瘟"]
       },
       "mareks_disease": {
         "canonical": "马立克病",
         "confidence": 0.95,
-        "variants": ["马立克病", "ma li ke bing", "mareks disease", "marek", "md", "淋巴瘤"]
+        "variants": ["马立克病", "马立克", "md", "淋巴肿瘤", "马立克麻痹"]
       },
       "gumboro": {
-        "canonical": "传染性法氏囊病",
+        "canonical": "法氏囊病",
         "confidence": 0.95,
-        "variants": ["传染性法氏囊病", "chuan ran xing fa shi nang bing", "gumboro", "ibd", "ibdv", "法氏囊炎"]
+        "variants": ["法氏囊病", "传染性法氏囊病", "ibdv", "ibd", "甘保罗病"]
       },
       "newcastle": {
         "canonical": "新城疫",
         "confidence": 0.95,
-        "variants": ["新城疫", "xin cheng yi", "newcastle", "nd", "newcastle disease", "鸡瘟"]
+        "variants": ["新城疫", "新城病", "nd", "亚洲鸡瘟", "副黏病毒"]
       },
       "coccidiosis": {
         "canonical": "球虫病",
         "confidence": 0.95,
-        "variants": ["球虫病", "qiu chong bing", "coccidiosis", "球虫", "qiu chong", "eimeria"]
+        "variants": ["球虫病", "球虫", "艾美耳球虫", "抗球虫"]
       },
       "colibacillosis": {
         "canonical": "大肠杆菌病",
         "confidence": 0.95,
-        "variants": ["大肠杆菌病", "da chang gan jun bing", "colibacillosis", "e.coli", "e coli", "大肠杆菌"]
+        "variants": ["大肠杆菌病", "大肠杆菌", "e.coli", "e coli", "大肠菌"]
       },
       "necrotic_enteritis": {
         "canonical": "坏死性肠炎",
         "confidence": 0.95,
-        "variants": ["坏死性肠炎", "huai si xing chang yan", "necrotic enteritis", "ne", "clostridium perfringens", "肠毒综合症"]
+        "variants": ["坏死性肠炎", "魏氏梭菌", "产气荚膜梭菌", "ne", "肠道坏死"]
       },
       "salmonella": {
         "canonical": "沙门氏菌病",
         "confidence": 0.95,
-        "variants": ["沙门氏菌病", "sha men shi jun bing", "salmonella", "salmonellosis", "沙门氏菌"]
+        "variants": ["沙门氏菌病", "沙门氏菌", "白痢", "副伤寒"]
       },
       "mycoplasma": {
-        "canonical": "支原体病",
+        "canonical": "支原体",
         "confidence": 0.95,
-        "variants": ["支原体病", "zhi yuan ti bing", "mycoplasma", "mycoplasmosis", "crd", "慢性呼吸道病"]
+        "variants": ["支原体", "支原体病", "慢性呼吸道病", "crd", "霉形体"]
       },
       "infectious_bronchitis": {
         "canonical": "传染性支气管炎",
         "confidence": 0.95,
-        "variants": ["传染性支气管炎", "chuan ran xing zhi qi guan yan", "infectious bronchitis", "ib", "ibv"]
+        "variants": ["传染性支气管炎", "传支", "ib", "ibv", "支气管炎病毒"]
       }
     },
 
@@ -407,32 +615,32 @@
       "respiratory": {
         "canonical": "呼吸道症状",
         "confidence": 0.95,
-        "variants": ["呼吸道症状", "hu xi dao zheng zhuang", "respiratory", "咳嗽", "ke sou", "呼吸困难", "流鼻涕"]
+        "variants": ["呼吸道", "咳嗽", "呼吸困难", "呼吸", "鼻液", "呼噜", "喷嚏"]
       },
       "digestive": {
         "canonical": "消化道症状",
         "confidence": 0.95,
-        "variants": ["消化道症状", "xiao hua dao zheng zhuang", "digestive", "腹泻", "fu xie", "呕吐", "ou tu", "食欲不振"]
+        "variants": ["消化道", "拉稀", "腹泻", "呕吐", "厌食", "食欲不振", "肠炎"]
       },
       "nervous": {
         "canonical": "神经症状",
         "confidence": 0.95,
-        "variants": ["神经症状", "shen jing zheng zhuang", "nervous", "共济失调", "gong ji shi tiao", "麻痹", "ma bi", "抽搐", "颤抖"]
+        "variants": ["神经", "共济失调", "瘫痪", "抽搐", "震颤", "神经学"]
       },
       "general": {
-        "canonical": "全身症状",
+        "canonical": "一般症状",
         "confidence": 0.90,
-        "variants": ["全身症状", "quan shen zheng zhuang", "general", "精神沉郁", "jing shen chen yu", "发热", "fa re", "虚弱"]
+        "variants": ["一般", "精神沉郁", "发热", "虚弱", "萎靡", "无精打采"]
       },
       "lameness": {
         "canonical": "跛行",
         "confidence": 0.95,
-        "variants": ["跛行", "bo xing", "lameness", "瘸腿", "que tui", "行走困难", "腿部问题"]
+        "variants": ["跛行", "跛足", "运动障碍", "步态异常", "腿病"]
       },
       "pododermatitis": {
-        "canonical": "脚垫皮炎",
+        "canonical": "脚垫炎",
         "confidence": 0.95,
-        "variants": ["脚垫皮炎", "jiao dian pi yan", "pododermatitis", "footpad dermatitis", "fhd", "脚掌炎"]
+        "variants": ["脚垫炎", "脚底皮炎", "关节烧伤", "fhd", "脚垫灼伤"]
       }
     },
 
@@ -440,57 +648,57 @@
       "crude_protein": {
         "canonical": "粗蛋白",
         "confidence": 0.95,
-        "variants": ["粗蛋白", "cu dan bai", "crude protein", "cp", "蛋白质", "dan bai zhi"]
+        "variants": ["粗蛋白", "cp", "蛋白质", "蛋白", "粗蛋白质"]
       },
       "metabolizable_energy": {
         "canonical": "代谢能",
         "confidence": 0.95,
-        "variants": ["代谢能", "dai xie neng", "metabolizable energy", "me", "千卡/千克", "能量密度"]
+        "variants": ["代谢能", "me", "千卡/公斤", "能量密度"]
       },
       "lysine": {
         "canonical": "赖氨酸",
         "confidence": 0.95,
-        "variants": ["赖氨酸", "lai an suan", "lysine", "可消化赖氨酸", "lys"]
+        "variants": ["赖氨酸", "可消化赖氨酸", "lys", "赖氨酸消化"]
       },
       "methionine": {
         "canonical": "蛋氨酸",
         "confidence": 0.95,
-        "variants": ["蛋氨酸", "dan an suan", "methionine", "met", "蛋氨酸+胱氨酸", "met+cys", "tsaa"]
+        "variants": ["蛋氨酸", "甲硫氨酸", "met", "蛋氨酸+胱氨酸", "met+cys", "tsaa"]
       },
       "calcium": {
         "canonical": "钙",
         "confidence": 0.95,
-        "variants": ["钙", "gai", "calcium", "ca", "石粉", "shi fen", "碳酸钙"]
+        "variants": ["钙", "ca", "石粉", "碳酸钙"]
       },
       "phosphorus": {
         "canonical": "磷",
         "confidence": 0.95,
-        "variants": ["磷", "lin", "phosphorus", "p", "可消化磷", "可利用磷", "有效磷"]
+        "variants": ["磷", "p", "可消化磷", "可利用磷", "有效磷"]
       },
       "digestible_phosphorus": {
         "canonical": "可消化磷",
         "confidence": 0.95,
-        "variants": ["可消化磷", "ke xiao hua lin", "digestible phosphorus", "dp", "有效磷", "you xiao lin"]
+        "variants": ["可消化磷", "dp", "可利用磷", "有效磷"]
       },
       "electrolyte_balance": {
         "canonical": "电解质平衡",
         "confidence": 0.95,
-        "variants": ["电解质平衡", "dian jie zhi ping heng", "electrolyte balance", "deb", "日粮电解质平衡"]
+        "variants": ["日粮电解质平衡", "电解质平衡", "deb"]
       },
       "sodium": {
         "canonical": "钠",
         "confidence": 0.95,
-        "variants": ["钠", "na", "sodium", "盐", "yan", "食盐"]
+        "variants": ["钠", "na", "盐"]
       },
       "chloride": {
         "canonical": "氯",
         "confidence": 0.95,
-        "variants": ["氯", "lv", "chloride", "cl", "氯化物"]
+        "variants": ["氯", "cl", "氯化物"]
       },
       "potassium": {
         "canonical": "钾",
         "confidence": 0.95,
-        "variants": ["钾", "jia", "potassium", "k"]
+        "variants": ["钾", "k", "钾盐"]
       }
     },
 
@@ -498,42 +706,42 @@
       "temperature": {
         "canonical": "温度",
         "confidence": 0.95,
-        "variants": ["温度", "wen du", "temperature", "temp", "度", "摄氏度", "she shi du", "舍温"]
+        "variants": ["温度", "temp", "度", "摄氏度", "环境温度"]
       },
       "humidity": {
         "canonical": "湿度",
         "confidence": 0.95,
-        "variants": ["湿度", "shi du", "humidity", "相对湿度", "xiang dui shi du", "rh", "%rh"]
+        "variants": ["湿度", "相对湿度", "rh", "%rh", "湿"]
       },
       "ventilation_rate": {
         "canonical": "通风量",
         "confidence": 0.95,
-        "variants": ["通风量", "tong feng liang", "ventilation rate", "风速", "feng su", "m3/h/kg", "换气量", "最小通风"]
+        "variants": ["通风量", "通风率", "空气流量", "立方米/小时/公斤", "换气量", "最小通风"]
       },
       "static_pressure": {
         "canonical": "静压",
         "confidence": 0.95,
-        "variants": ["静压", "jing ya", "static pressure", "pa", "帕斯卡", "pa si ka", "负压", "舍内压力"]
+        "variants": ["静压", "pa", "帕", "负压", "舍内压力"]
       },
       "ammonia": {
         "canonical": "氨气",
         "confidence": 0.95,
-        "variants": ["氨气", "an qi", "ammonia", "nh3", "ppm", "氨气浓度", "氨气水平"]
+        "variants": ["氨气", "nh3", "ppm", "氨浓度", "氨气水平"]
       },
       "co2": {
-        "canonical": "co2",
+        "canonical": "二氧化碳",
         "confidence": 0.95,
-        "variants": ["co2", "二氧化碳", "er yang hua tan", "ppm co2", "co2浓度", "co2水平"]
+        "variants": ["二氧化碳", "co2", "ppm co2", "二氧化碳浓度", "二氧化碳水平"]
       },
       "light_intensity": {
         "canonical": "光照强度",
         "confidence": 0.95,
-        "variants": ["光照强度", "guang zhao qiang du", "light intensity", "lux", "勒克斯", "le ke si", "光照", "亮度"]
+        "variants": ["光照强度", "勒克斯", "照度", "亮度"]
       },
       "lighting_hours": {
         "canonical": "光照时间",
         "confidence": 0.95,
-        "variants": ["光照时间", "guang zhao shi jian", "lighting hours", "光周期", "guang zhou qi", "photoperiod", "小时/天", "光照制度"]
+        "variants": ["光照时间", "光周期", "光照小时", "小时/天", "光照程序"]
       }
     },
 
@@ -541,22 +749,22 @@
       "biosecurity": {
         "canonical": "生物安全",
         "confidence": 0.95,
-        "variants": ["生物安全", "sheng wu an quan", "biosecurity", "全进全出", "quan jin quan chu", "消毒", "xiao du"]
+        "variants": ["生物安全", "生物安保", "全进全出", "消毒"]
       },
       "probiotics": {
         "canonical": "益生菌",
         "confidence": 0.95,
-        "variants": ["益生菌", "yi sheng jun", "probiotics", "有益微生物", "you yi wei sheng wu", "肠道健康"]
+        "variants": ["益生菌", "有益菌", "活菌", "肠道健康"]
       },
       "antibiotics": {
         "canonical": "抗生素",
         "confidence": 0.95,
-        "variants": ["抗生素", "kang sheng su", "antibiotics", "抗菌药", "kang jun yao", "促生长剂"]
+        "variants": ["抗生素", "抗菌药", "治疗用", "促生长剂"]
       },
       "vaccine": {
         "canonical": "疫苗",
         "confidence": 0.95,
-        "variants": ["疫苗", "yi miao", "vaccine", "免疫", "mian yi", "vaccination", "预防接种"]
+        "variants": ["疫苗", "接种", "免疫", "预防"]
       }
     },
 
@@ -564,27 +772,27 @@
       "stocking_density": {
         "canonical": "饲养密度",
         "confidence": 0.95,
-        "variants": ["饲养密度", "si yang mi du", "stocking density", "密度", "mi du", "kg/m2", "只/m2", "养殖密度"]
+        "variants": ["饲养密度", "密度", "kg/m2", "只/m2", "存栏密度"]
       },
       "heat_stress": {
         "canonical": "热应激",
         "confidence": 0.95,
-        "variants": ["热应激", "re ying ji", "heat stress", "热应力", "re ying li", "中暑", "zhong shu", "过热"]
+        "variants": ["热应激", "热应力", "高温应激", "中暑", "过热"]
       },
       "feather_pecking": {
         "canonical": "啄羽",
         "confidence": 0.95,
-        "variants": ["啄羽", "zhuo yu", "feather pecking", "啄毛", "zhuo mao", "啄癖", "同类相残"]
+        "variants": ["啄羽", "啄癖", "啄毛", "食同类", "拔毛"]
       },
       "feeder_space": {
-        "canonical": "采食位",
+        "canonical": "料位",
         "confidence": 0.95,
-        "variants": ["采食位", "cai shi wei", "feeder space", "料位", "liao wei", "厘米/只", "料槽长度"]
+        "variants": ["料位", "厘米/只", "料槽长度", "采食空间"]
       },
       "drinker_flow_rate": {
-        "canonical": "饮水器流量",
+        "canonical": "饮水流量",
         "confidence": 0.95,
-        "variants": ["饮水器流量", "yin shui qi liu liang", "drinker flow rate", "乳头流量", "ru tou liu liang", "毫升/分钟/乳头", "水压"]
+        "variants": ["饮水流量", "乳头流量", "毫升/分钟/乳头", "水压"]
       }
     },
 
@@ -592,22 +800,22 @@
       "litter": {
         "canonical": "垫料",
         "confidence": 0.95,
-        "variants": ["垫料", "dian liao", "litter", "垫草", "dian cao", "地面覆盖物", "基质"]
+        "variants": ["垫料", "垫草", "地面覆盖", "基质"]
       },
       "wood_shavings": {
-        "canonical": "刨花",
+        "canonical": "木屑",
         "confidence": 0.95,
-        "variants": ["刨花", "bao hua", "wood shavings", "木屑", "mu xie", "锯末", "ju mo"]
+        "variants": ["木屑", "刨花", "木刨花", "锯末"]
       },
       "rice_husks": {
         "canonical": "稻壳",
         "confidence": 0.95,
-        "variants": ["稻壳", "dao ke", "rice husks", "谷壳", "gu ke", "米糠壳"]
+        "variants": ["稻壳", "谷壳", "米糠壳"]
       },
       "straw": {
-        "canonical": "秸秆",
+        "canonical": "稻草",
         "confidence": 0.95,
-        "variants": ["秸秆", "jie gan", "straw", "麦秸", "mai jie", "稻草", "dao cao"]
+        "variants": ["稻草", "麦秸", "小麦秸秆", "大麦秸秆", "燕麦秸秆"]
       }
     },
 
@@ -615,27 +823,27 @@
       "egg_weight": {
         "canonical": "蛋重",
         "confidence": 0.95,
-        "variants": ["蛋重", "dan zhong", "egg weight", "鸡蛋重量", "ji dan zhong liang", "平均蛋重", "蛋的大小"]
+        "variants": ["蛋重", "鸡蛋重量", "蛋的质量", "平均蛋重", "蛋大小", "蛋级别"]
       },
       "shell_quality": {
         "canonical": "蛋壳质量",
         "confidence": 0.95,
-        "variants": ["蛋壳质量", "dan ke zhi liang", "shell quality", "蛋壳厚度", "dan ke hou du", "蛋壳强度", "薄壳蛋"]
+        "variants": ["蛋壳质量", "蛋壳厚度", "蛋壳强度", "软壳", "薄壳"]
       },
       "cracked_shell": {
-        "canonical": "裂纹蛋",
+        "canonical": "裂壳蛋",
         "confidence": 0.95,
-        "variants": ["裂纹蛋", "lie wen dan", "cracked shell", "破壳蛋", "po ke dan", "裂缝", "破损蛋"]
+        "variants": ["裂壳蛋", "蛋壳裂缝", "破蛋", "裂纹"]
       },
       "soft_shelled_egg": {
         "canonical": "软壳蛋",
         "confidence": 0.95,
-        "variants": ["软壳蛋", "ruan ke dan", "soft shelled egg", "软蛋", "ruan dan", "无壳蛋", "wu ke dan"]
+        "variants": ["软壳蛋", "软壳", "无壳蛋", "软蛋"]
       },
       "misshapen_egg": {
         "canonical": "畸形蛋",
         "confidence": 0.95,
-        "variants": ["畸形蛋", "ji xing dan", "misshapen egg", "变形蛋", "bian xing dan", "异常形状", "不规则蛋"]
+        "variants": ["畸形蛋", "变形蛋", "异常形状", "不规则蛋"]
       }
     },
 
@@ -643,22 +851,22 @@
       "vaccination": {
         "canonical": "免疫接种",
         "confidence": 0.95,
-        "variants": ["免疫接种", "mian yi jie zhong", "vaccination", "疫苗", "yi miao", "vaccine", "immunization", "打疫苗"]
+        "variants": ["免疫接种", "疫苗", "免疫", "接种"]
       },
       "biosecurity_protocol": {
         "canonical": "生物安全程序",
         "confidence": 0.95,
-        "variants": ["生物安全", "sheng wu an quan", "biosecurity", "消毒", "xiao du", "disinfection", "清洁", "qing jie", "隔离"]
+        "variants": ["生物安全", "消毒", "清洁", "隔离"]
       },
       "treatment": {
         "canonical": "治疗",
         "confidence": 0.95,
-        "variants": ["治疗", "zhi liao", "treatment", "用药", "yong yao", "medication", "疗法", "liao fa", "therapy"]
+        "variants": ["治疗", "用药", "疗法", "医治"]
       },
       "lab_diagnostics": {
         "canonical": "实验室诊断",
         "confidence": 0.95,
-        "variants": ["诊断", "zhen duan", "diagnostic", "检测", "jian ce", "test", "化验", "hua yan", "analysis", "实验室", "shi yan shi"]
+        "variants": ["诊断", "检测", "化验", "实验室", "检验"]
       }
     },
 
@@ -666,37 +874,37 @@
       "out_of_domain": {
         "canonical": "超出范围",
         "confidence": 1.0,
-        "variants": ["超出范围", "chao chu fan wei", "out of domain", "不在范围内", "bu zai fan wei nei", "超出领域"]
+        "variants": ["超出范围", "不在范围内", "不在领域内"]
       },
       "error_generic": {
-        "canonical": "错误",
+        "canonical": "一般错误",
         "confidence": 1.0,
-        "variants": ["错误", "cuo wu", "error", "一般错误", "yi ban cuo wu", "处理错误"]
+        "variants": ["错误", "一般错误", "处理错误"]
       },
       "welcome": {
         "canonical": "欢迎",
         "confidence": 1.0,
-        "variants": ["欢迎", "huan ying", "welcome", "问候", "wen hou", "你好", "ni hao"]
+        "variants": ["欢迎", "问候", "您好"]
       },
       "clarification_needed": {
         "canonical": "需要澄清",
         "confidence": 1.0,
-        "variants": ["需要澄清", "xu yao cheng qing", "clarification needed", "请澄清", "qing cheng qing", "需要更多信息"]
+        "variants": ["需要澄清", "请说明", "需要更多信息"]
       },
       "no_results": {
         "canonical": "无结果",
         "confidence": 1.0,
-        "variants": ["无结果", "wu jie guo", "no results", "未找到", "wei zhao dao", "没有数据"]
+        "variants": ["无结果", "未找到", "无数据"]
       },
       "processing": {
         "canonical": "处理中",
         "confidence": 1.0,
-        "variants": ["处理中", "chu li zhong", "processing", "请稍候", "qing shao hou", "正在工作"]
+        "variants": ["处理中", "请稍候", "正在处理"]
       },
       "farewell": {
         "canonical": "再见",
         "confidence": 1.0,
-        "variants": ["再见", "zai jian", "goodbye", "拜拜", "bai bai"]
+        "variants": ["再见", "告别", "拜拜"]
       }
     }
   }
