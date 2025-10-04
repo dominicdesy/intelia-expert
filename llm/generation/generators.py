@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version 3.2 - CORRECTION CRITIQUE: Support dict et Document pour context_docs
+Version 3.3 - Support multilingue DYNAMIQUE sans hardcoding
 - Instructions de langue renforcées + system_prompts.json centralisés
 - ✅ NOUVEAU: Gestion hybride dict/Document pour compatibilité PostgreSQL
+- ✅ NOUVEAU: Chargement dynamique des langues depuis SUPPORTED_LANGUAGES
 """
 
 import logging
@@ -12,7 +13,12 @@ from dataclasses import dataclass
 from pathlib import Path
 import json
 from core.data_models import Document
-from config.config import ENTITY_CONTEXTS, MAX_CONVERSATION_CONTEXT
+from config.config import (
+    ENTITY_CONTEXTS,
+    MAX_CONVERSATION_CONTEXT,
+    SUPPORTED_LANGUAGES,
+    FALLBACK_LANGUAGE,
+)
 from utils.utilities import METRICS
 
 # Import du gestionnaire de prompts centralisé
@@ -169,7 +175,7 @@ class EntityDescriptionsManager:
 class EnhancedResponseGenerator:
     """
     Générateur avec enrichissement d'entités et cache externe + ton affirmatif expert
-    Version 3.2: Support dict et Document pour context_docs
+    Version 3.3: Support multilingue dynamique sans hardcoding
     """
 
     def __init__(
@@ -220,6 +226,72 @@ class EnhancedResponseGenerator:
                 if entity_type not in self.entity_descriptions.descriptions:
                     self.entity_descriptions.descriptions[entity_type] = {}
                 self.entity_descriptions.descriptions[entity_type].update(contexts)
+
+        # ✅ NOUVEAU: Charger les noms de langues dynamiquement
+        self.language_display_names = self._load_language_names()
+
+    def _load_language_names(self) -> Dict[str, str]:
+        """
+        Charge les noms d'affichage des langues depuis languages.json
+        Fallback vers noms simples si fichier absent
+        """
+        try:
+            from config.messages import load_messages
+
+            messages_data = load_messages()
+
+            # Extraire les noms de langues depuis metadata
+            if (
+                "metadata" in messages_data
+                and "language_names" in messages_data["metadata"]
+            ):
+                logger.info("✅ Noms de langues chargés depuis languages.json")
+                return messages_data["metadata"]["language_names"]
+
+            logger.warning(
+                "language_names absent de languages.json, utilisation fallback"
+            )
+
+        except Exception as e:
+            logger.warning(
+                f"Erreur chargement noms de langues: {e}, utilisation fallback"
+            )
+
+        # Fallback: génération automatique depuis SUPPORTED_LANGUAGES
+        return self._generate_fallback_language_names()
+
+    def _generate_fallback_language_names(self) -> Dict[str, str]:
+        """
+        Génère des noms de langues de fallback à partir des codes ISO
+        Utilise SUPPORTED_LANGUAGES de config.py
+        """
+        # Mapping minimal pour les langues supportées
+        base_names = {
+            "de": "GERMAN / DEUTSCH",
+            "en": "ENGLISH",
+            "es": "SPANISH / ESPAÑOL",
+            "fr": "FRENCH / FRANÇAIS",
+            "hi": "HINDI / हिन्दी",
+            "id": "INDONESIAN / BAHASA INDONESIA",
+            "it": "ITALIAN / ITALIANO",
+            "nl": "DUTCH / NEDERLANDS",
+            "pl": "POLISH / POLSKI",
+            "pt": "PORTUGUESE / PORTUGUÊS",
+            "th": "THAI / ไทย",
+            "zh": "CHINESE / 中文",
+        }
+
+        # Ne garder que les langues vraiment supportées
+        result = {}
+        for lang_code in SUPPORTED_LANGUAGES:
+            if lang_code in base_names:
+                result[lang_code] = base_names[lang_code]
+            else:
+                # Fallback pour langues non mappées
+                result[lang_code] = lang_code.upper()
+
+        logger.info(f"✅ Fallback language names loaded: {len(result)} languages")
+        return result
 
     def _get_doc_content(self, doc: Union[Document, dict]) -> str:
         """
@@ -273,7 +345,7 @@ class EnhancedResponseGenerator:
         """
         Génère une réponse enrichie avec cache externe + ton affirmatif expert
 
-        VERSION 3.2: Accepte maintenant List[Document] OU List[dict]
+        VERSION 3.3: Accepte maintenant List[Document] OU List[dict]
         """
 
         lang = language or self.language
@@ -528,12 +600,12 @@ class EnhancedResponseGenerator:
         """
         Construit un prompt enrichi avec instructions de langue renforcées
 
-        VERSION 3.2: Support dict et Document
+        VERSION 3.3: Support dict et Document + instructions multilingues dynamiques
         """
 
         # DEBUG CRITIQUE : Logger la langue reçue
         logger.info(
-            f"🌍 _build_enhanced_prompt received language parameter: '{language}'"
+            f"🌐 _build_enhanced_prompt received language parameter: '{language}'"
         )
         logger.debug(f"Query: '{query[:50]}...'")
 
@@ -590,7 +662,7 @@ MÉTRIQUES PRIORITAIRES:
 """
             system_prompt_parts.append(metrics_section)
 
-            # ✅ INSTRUCTIONS DE LANGUE RENFORCÉES
+            # ✅ INSTRUCTIONS DE LANGUE RENFORCÉES (DYNAMIQUES)
             critical_instructions = self._get_critical_language_instructions(language)
             system_prompt_parts.append(critical_instructions)
 
@@ -626,42 +698,29 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
 
     def _get_critical_language_instructions(self, language: str) -> str:
         """
-        Instructions de langue ULTRA-RENFORCÉES avec vérification et logs
-        Garantit que le LLM répond dans la langue de la question
+        Instructions multilingues DYNAMIQUES - pas de hardcoding
+        Génère les instructions à partir de SUPPORTED_LANGUAGES
         """
 
-        # DEBUG CRITIQUE : Logger la langue reçue
-        logger.info(f"🌍 _get_critical_language_instructions received: '{language}'")
+        logger.info(f"🌐 _get_critical_language_instructions received: '{language}'")
 
-        # VÉRIFICATION DÉFENSIVE : Alerter si langue suspecte
+        # VALIDATION DÉFENSIVE
         if not language:
             logger.error("❌ CRITICAL: language parameter is empty/None!")
-            language = "en"  # Fallback sécurisé
-        elif language == "fr":
+            language = FALLBACK_LANGUAGE
+        elif language not in SUPPORTED_LANGUAGES:
             logger.warning(
-                "⚠️ WARNING: language='fr' received - might be unwanted default"
+                f"⚠️ WARNING: language '{language}' not in SUPPORTED_LANGUAGES, using fallback"
             )
+            language = FALLBACK_LANGUAGE
 
-        # Mapping des noms de langue
-        language_names = {
-            "en": "ENGLISH",
-            "fr": "FRENCH / FRANÇAIS",
-            "es": "SPANISH / ESPAÑOL",
-            "de": "GERMAN / DEUTSCH",
-            "it": "ITALIAN / ITALIANO",
-            "pt": "PORTUGUESE / PORTUGUÊS",
-            "nl": "DUTCH / NEDERLANDS",
-            "pl": "POLISH / POLSKI",
-            "zh": "CHINESE / 中文",
-            "hi": "HINDI / हिन्दी",
-            "th": "THAI / ไทย",
-            "id": "INDONESIAN / BAHASA INDONESIA",
-        }
+        # Récupérer le nom d'affichage
+        language_name = self.language_display_names.get(language, language.upper())
 
-        language_name = language_names.get(language, language.upper())
-
-        # DEBUG : Logger le résultat du mapping
         logger.info(f"🌍 Language mapped: '{language}' → '{language_name}'")
+
+        # Générer la liste des exemples de langues DYNAMIQUEMENT
+        language_examples = self._generate_language_examples()
 
         return f"""
 INSTRUCTIONS CRITIQUES - STRUCTURE ET FORMAT:
@@ -670,14 +729,16 @@ INSTRUCTIONS CRITIQUES - STRUCTURE ET FORMAT:
 - Présente 2-3 éléments principaux, pas plus
 - Utilise un ton affirmatif mais sobre, sans formatage excessif
 - NE conclus PAS avec des recommandations pratiques sauf si explicitement demandé
+- RÉPONDS UNIQUEMENT À CE QUI EST DEMANDÉ - n'ajoute pas de métriques ou sections non sollicitées
+- Si la question porte sur le poids, donne UNIQUEMENT le poids (pas FCR, feed intake, etc.)
+- Maximum 2-3 phrases sauf si plus de détails sont explicitement demandés
 
 COMPORTEMENT CONVERSATIONNEL:
-- Pour questions techniques: réponse structurée et détaillée avec données chiffrées
-- Pour questions générales ou clarifications: ton professionnel mais accessible, réponses plus courtes acceptables
-- Évite de poser trop de questions - réponds d'abord à la requête, même si ambiguë, puis demande clarification si nécessaire
-- Si question vague: fournis la meilleure réponse possible puis propose de préciser
-- N'utilise PAS d'emojis sauf si l'utilisateur en utilise dans sa question
-- Si l'utilisateur semble insatisfait: maintiens le professionnalisme et rappelle qu'il peut utiliser le feedback pour améliorer les réponses
+- Pour questions techniques: réponse structurée mais CONCISE avec données chiffrées
+- Pour questions générales: ton professionnel mais accessible, réponses courtes
+- Évite de poser trop de questions - réponds d'abord à la requête
+- N'utilise PAS d'emojis sauf si l'utilisateur en utilise
+- Maintiens la cohérence de format entre TOUTES les langues
 
 {"="*80}
 ⚠️ CRITICAL LANGUAGE REQUIREMENT - IMPÉRATIF ABSOLU DE LANGUE ⚠️
@@ -692,31 +753,7 @@ VOUS DEVEZ RÉPONDRE EXCLUSIVEMENT DANS LA MÊME LANGUE QUE LA QUESTION.
 DO NOT translate. DO NOT switch languages. DO NOT mix languages.
 NE PAS traduire. NE PAS changer de langue. NE PAS mélanger les langues.
 
-If question is in ENGLISH → Answer 100% in ENGLISH
-If question is in FRENCH → Answer 100% in FRENCH  
-If question is in SPANISH → Answer 100% in SPANISH
-If question is in GERMAN → Answer 100% in GERMAN
-If question is in ITALIAN → Answer 100% in ITALIAN
-If question is in PORTUGUESE → Answer 100% in PORTUGUESE
-If question is in DUTCH → Answer 100% in DUTCH
-If question is in POLISH → Answer 100% in POLISH
-If question is in CHINESE → Answer 100% in CHINESE
-If question is in HINDI → Answer 100% in HINDI
-If question is in THAI → Answer 100% in THAI
-If question is in INDONESIAN → Answer 100% in INDONESIAN
-
-Si question en ANGLAIS → Réponse 100% en ANGLAIS
-Si question en FRANÇAIS → Réponse 100% en FRANÇAIS
-Si question en ESPAGNOL → Réponse 100% en ESPAGNOL
-Si question en ALLEMAND → Réponse 100% en ALLEMAND
-Si question en ITALIEN → Réponse 100% en ITALIEN
-Si question en PORTUGAIS → Réponse 100% en PORTUGAIS
-Si question en NÉERLANDAIS → Réponse 100% en NÉERLANDAIS
-Si question en POLONAIS → Réponse 100% en POLONAIS
-Si question en CHINOIS → Réponse 100% en CHINOIS
-Si question en HINDI → Réponse 100% en HINDI
-Si question en THAÏ → Réponse 100% en THAÏ
-Si question en INDONÉSIEN → Réponse 100% en INDONÉSIEN
+{language_examples}
 
 THIS INSTRUCTION OVERRIDES ALL OTHER INSTRUCTIONS.
 CETTE INSTRUCTION PRÉVAUT SUR TOUTES LES AUTRES INSTRUCTIONS.
@@ -724,31 +761,43 @@ CETTE INSTRUCTION PRÉVAUT SUR TOUTES LES AUTRES INSTRUCTIONS.
 YOUR RESPONSE LANGUAGE MUST BE: {language_name}
 LANGUE DE VOTRE RÉPONSE DOIT ÊTRE: {language_name}
 
+🎯 CRITICAL FORMAT CONSISTENCY:
+- Answer format MUST be IDENTICAL regardless of language
+- If question asks for weight → give ONLY weight (2-3 sentences max)
+- If question asks for multiple metrics → give ONLY those metrics
+- NO extra sections, NO extra bullet points beyond what was asked
+- Maintain EXACT SAME level of detail across ALL languages
+
 {"="*80}
 """
+
+    def _generate_language_examples(self) -> str:
+        """
+        Génère dynamiquement les exemples de langues
+        Basé sur SUPPORTED_LANGUAGES au lieu de hardcoding
+        """
+        examples = []
+
+        for lang_code in sorted(SUPPORTED_LANGUAGES):
+            lang_name = self.language_display_names.get(lang_code, lang_code.upper())
+            examples.append(
+                f"If question is in {lang_name} → Answer 100% in {lang_name}"
+            )
+            examples.append(f"Si question en {lang_name} → Réponse 100% en {lang_name}")
+
+        return "\n".join(examples)
 
     def _get_fallback_system_prompt(
         self, enrichment: ContextEnrichment, language: str
     ) -> str:
-        """Prompt système de secours avec instructions de langue renforcées"""
+        """Prompt système de secours avec instructions dynamiques"""
 
-        # Mapping des noms de langue
-        language_names = {
-            "en": "ENGLISH",
-            "fr": "FRENCH / FRANÇAIS",
-            "es": "SPANISH / ESPAÑOL",
-            "de": "GERMAN / DEUTSCH",
-            "it": "ITALIAN / ITALIANO",
-            "pt": "PORTUGUESE / PORTUGUÊS",
-            "nl": "DUTCH / NEDERLANDS",
-            "pl": "POLISH / POLSKI",
-            "zh": "CHINESE / 中文",
-            "hi": "HINDI / हिन्दी",
-            "th": "THAI / ไทย",
-            "id": "INDONESIAN / BAHASA INDONESIA",
-        }
+        # Validation langue
+        if not language or language not in SUPPORTED_LANGUAGES:
+            logger.warning(f"Invalid language '{language}', using {FALLBACK_LANGUAGE}")
+            language = FALLBACK_LANGUAGE
 
-        language_name = language_names.get(language, language.upper())
+        language_name = self.language_display_names.get(language, language.upper())
 
         return f"""Tu es un expert avicole reconnu avec une expertise approfondie en production avicole.
 
@@ -765,6 +814,7 @@ DIRECTIVES DE RÉPONSE - STYLE EXPERT ÉQUILIBRÉ:
 3. **Structure sobre** : Utilise des titres en gras (**Titre**) uniquement pour les sous-sections
 4. **Concision** : Présente 2-3 points principaux maximum
 5. **Données précises** : Fournis des valeurs chiffrées quand pertinent
+6. **COHÉRENCE MULTILINGUE** : Maintiens le MÊME format de réponse quelle que soit la langue
 
 MÉTRIQUES PRIORITAIRES:
 {', '.join(enrichment.performance_indicators[:3]) if enrichment.performance_indicators else 'Paramètres généraux de production'}
@@ -778,6 +828,9 @@ VOUS DEVEZ RÉPONDRE EXCLUSIVEMENT EN: {language_name}
 
 DO NOT translate or switch languages under ANY circumstances.
 NE traduisez PAS ou ne changez PAS de langue sous AUCUNE circonstance.
+
+MAINTAIN IDENTICAL RESPONSE FORMAT ACROSS ALL LANGUAGES.
+MAINTENEZ UN FORMAT DE RÉPONSE IDENTIQUE POUR TOUTES LES LANGUES.
 
 THIS IS THE MOST IMPORTANT INSTRUCTION.
 CECI EST L'INSTRUCTION LA PLUS IMPORTANTE.

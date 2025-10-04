@@ -3,6 +3,20 @@
     "version": "2.0.0",
     "description": "Messages système multilingues pour Intelia Expert - Système expert avicole",
     "supported_languages": ["de", "en", "es", "fr", "hi", "id", "it", "nl", "pl", "pt", "th", "zh"],
+    "language_names": {
+      "de": "GERMAN / DEUTSCH",
+      "en": "ENGLISH",
+      "es": "SPANISH / ESPAÑOL",
+      "fr": "FRENCH / FRANÇAIS",
+      "hi": "HINDI / हिन्दी",
+      "id": "INDONESIAN / BAHASA INDONESIA",
+      "it": "ITALIAN / ITALIANO",
+      "nl": "DUTCH / NEDERLANDS",
+      "pl": "POLISH / POLSKI",
+      "pt": "PORTUGUESE / PORTUGUÊS",
+      "th": "THAI / ไทย",
+      "zh": "CHINESE / 中文"
+    },
     "message_types": [
       "out_of_domain",
       "error_generic",
@@ -152,26 +166,26 @@
     },
 
     "zh": {
-      "out_of_domain": "Intelia Expert 是专门从事家禽生产的专家系统，无法处理此领域之外的问题。我在这里为您提供家禽养殖各方面的支持。我如何帮助您进行家禽养殖？",
+      "out_of_domain": "Intelia Expert 是专门从事家禽生产的专家系统,无法处理此领域之外的问题。我在这里为您提供家禽养殖各方面的支持。我如何帮助您进行家禽养殖?",
       "error_generic": "处理您的请求时发生错误。请稍后重试。",
       "error_connection": "系统连接错误。请检查您的互联网连接并重试。",
       "error_timeout": "请求耗时过长。请重新表述您的问题或重试。",
       "error_not_found": "在我们的家禽知识库中未找到信息。",
-      "welcome": "您好！我是 Intelia Expert，您的家禽养殖专业助手。今天我能为您做些什么？",
-      "clarification_needed": "您能否澄清您的问题，以便我提供更准确的答案？",
-      "no_results": "我在家禽知识库中没有找到相关信息。您能重新表述您的问题吗？",
-      "processing": "正在处理您的请求，请稍候片刻...",
-      "farewell": "再见！如果您对家禽养殖有更多问题，请随时回来。",
+      "welcome": "您好!我是 Intelia Expert,您的家禽养殖专业助手。今天我能为您做些什么?",
+      "clarification_needed": "您能否澄清您的问题,以便我提供更准确的答案?",
+      "no_results": "我在家禽知识库中没有找到相关信息。您能重新表述您的问题吗?",
+      "processing": "正在处理您的请求,请稍候片刻...",
+      "farewell": "再见!如果您对家禽养殖有更多问题,请随时回来。",
       "success_generic": "操作成功完成。",
-      "feedback_thanks": "感谢您的反馈！这有助于我们改进 Intelia Expert。",
-      "feedback_request": "这个答案对您有帮助吗？您的反馈帮助我们改进。"
+      "feedback_thanks": "感谢您的反馈!这有助于我们改进 Intelia Expert。",
+      "feedback_request": "这个答案对您有帮助吗?您的反馈帮助我们改进。"
     },
 
     "hi": {
       "out_of_domain": "इंटेलिया एक्सपर्ट कुक्कुट उत्पादन में विशेषज्ञता प्राप्त एक विशेषज्ञ प्रणाली है और इस क्षेत्र के बाहर के सवालों में सहायता नहीं कर सकती। मैं यहां पोल्ट्री फार्मिंग के सभी पहलुओं पर आपका समर्थन करने के लिए हूं। मैं पोल्ट्री में आपकी कैसे मदद कर सकता हूं?",
-      "error_generic": "आपके अनुरोध को संसाधित करते समय एक त्रुटि हुई। कृपया कुछ क्षणों में पुन: प्रयास करें।",
-      "error_connection": "सिस्टम से कनेक्शन त्रुटि। कृपया अपना इंटरनेट कनेक्शन जांचें और पुन: प्रयास करें।",
-      "error_timeout": "अनुरोध में बहुत समय लग गया। कृपया अपने प्रश्न को फिर से शब्दों में बताएं या पुन: प्रयास करें।",
+      "error_generic": "आपके अनुरोध को संसाधित करते समय एक त्रुटि हुई। कृपया कुछ क्षणों में पुनः प्रयास करें।",
+      "error_connection": "सिस्टम से कनेक्शन त्रुटि। कृपया अपना इंटरनेट कनेक्शन जांचें और पुनः प्रयास करें।",
+      "error_timeout": "अनुरोध में बहुत समय लग गया। कृपया अपने प्रश्न को फिर से शब्दों में बताएं या पुनः प्रयास करें।",
       "error_not_found": "हमारे पोल्ट्री ज्ञान आधार में जानकारी नहीं मिली।",
       "welcome": "नमस्ते! मैं इंटेलिया एक्सपर्ट हूं, पोल्ट्री पालन में आपका विशेष सहायक। आज मैं आपकी कैसे मदद कर सकता हूं?",
       "clarification_needed": "क्या आप अपने प्रश्न को स्पष्ट कर सकते हैं ताकि मैं अधिक सटीक उत्तर दे सकूं?",
