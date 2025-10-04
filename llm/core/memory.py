@@ -18,11 +18,12 @@ logger = logging.getLogger(__name__)
 class ConversationMemory:
     """Mémoire conversationnelle avec contexte et clarifications"""
 
-    def __init__(self, client):
+    # 🔄 Stockage partagé entre toutes les instances
+    _shared_memory_store = {}
+    _shared_pending_clarifications = {}
+
+    def __init__(self, client=None):
         self.client = client
-        self.memory_store = {}
-        # 🆕 Stockage des clarifications en attente
-        self.pending_clarifications = {}
         # Utilisation de la configuration centralisée
         self.max_exchanges = int(
             os.getenv("MAX_EXCHANGES", "8")
@@ -35,13 +36,15 @@ class ConversationMemory:
         logger.info("🔍 MEMORY - get_contextual_memory appelée")
         logger.info(f"🔍 MEMORY - tenant_id: {tenant_id}")
         logger.info(f"🔍 MEMORY - current_query: {current_query[:50]}...")
-        logger.info(f"🔍 MEMORY - memory_store keys: {list(self.memory_store.keys())}")
+        logger.info(
+            f"🔍 MEMORY - memory_store keys: {list(self._shared_memory_store.keys())}"
+        )
 
-        if tenant_id not in self.memory_store:
+        if tenant_id not in self._shared_memory_store:
             logger.info(f"🔍 MEMORY - Aucun historique pour tenant_id: {tenant_id}")
             return ""
 
-        history = self.memory_store[tenant_id]
+        history = self._shared_memory_store[tenant_id]
 
         # 🔍 DEBUG - État de l'historique
         logger.info(f"🔍 MEMORY - Historique trouvé, longueur: {len(history)}")
@@ -97,40 +100,48 @@ class ConversationMemory:
             )
             logger.error(f"❌ MEMORY - Type erreur: {type(e).__name__}")
             logger.error(
-                f"❌ MEMORY - État memory_store au moment de l'erreur: {len(self.memory_store)}"
+                f"❌ MEMORY - État memory_store au moment de l'erreur: {len(self._shared_memory_store)}"
             )
             return ""
 
     def add_exchange(self, tenant_id: str, question: str, answer: str):
-        """Ajoute un échange avec métadonnées"""
-        if tenant_id not in self.memory_store:
-            self.memory_store[tenant_id] = []
+        """Ajoute un échange avec métadonnées dans le store partagé"""
+        if tenant_id not in self._shared_memory_store:
+            self._shared_memory_store[tenant_id] = []
 
-        self.memory_store[tenant_id].append(
+        self._shared_memory_store[tenant_id].append(
             {"question": question, "answer": answer, "timestamp": time.time()}
         )
 
+        # 🔍 DEBUG - Sauvegarde
+        logger.debug(
+            f"💾 SAVE - memory_store keys: {list(self._shared_memory_store.keys())}"
+        )
+        logger.debug(
+            f"💾 SAVE - tenant {tenant_id} entries: {len(self._shared_memory_store[tenant_id])}"
+        )
+
         # Maintenir la limite d'échanges
-        if len(self.memory_store[tenant_id]) > self.max_exchanges:
-            self.memory_store[tenant_id] = self.memory_store[tenant_id][
+        if len(self._shared_memory_store[tenant_id]) > self.max_exchanges:
+            self._shared_memory_store[tenant_id] = self._shared_memory_store[tenant_id][
                 -self.max_exchanges :
             ]
 
     def clear_memory(self, tenant_id: str):
         """Efface la mémoire pour un tenant"""
-        if tenant_id in self.memory_store:
-            del self.memory_store[tenant_id]
+        if tenant_id in self._shared_memory_store:
+            del self._shared_memory_store[tenant_id]
 
         # 🆕 Nettoyer aussi les clarifications en attente
-        if tenant_id in self.pending_clarifications:
-            del self.pending_clarifications[tenant_id]
+        if tenant_id in self._shared_pending_clarifications:
+            del self._shared_pending_clarifications[tenant_id]
 
     def get_memory_stats(self, tenant_id: str) -> dict:
         """Statistiques de la mémoire pour un tenant"""
-        if tenant_id not in self.memory_store:
+        if tenant_id not in self._shared_memory_store:
             return {"exchanges": 0, "total_characters": 0}
 
-        history = self.memory_store[tenant_id]
+        history = self._shared_memory_store[tenant_id]
         total_chars = sum(len(ex["question"]) + len(ex["answer"]) for ex in history)
 
         stats = {
@@ -141,9 +152,9 @@ class ConversationMemory:
         }
 
         # 🆕 Ajouter info sur clarifications en attente
-        if tenant_id in self.pending_clarifications:
+        if tenant_id in self._shared_pending_clarifications:
             stats["pending_clarification"] = True
-            stats["clarification_timestamp"] = self.pending_clarifications[
+            stats["clarification_timestamp"] = self._shared_pending_clarifications[
                 tenant_id
             ].get("timestamp")
 
@@ -171,7 +182,7 @@ class ConversationMemory:
             suggestions: Suggestions pour chaque champ manquant
             language: Langue de la conversation
         """
-        self.pending_clarifications[tenant_id] = {
+        self._shared_pending_clarifications[tenant_id] = {
             "original_query": original_query,
             "missing_fields": missing_fields,
             "suggestions": suggestions or {},
@@ -196,7 +207,7 @@ class ConversationMemory:
             Dict avec original_query, missing_fields, suggestions, language, timestamp
             ou None si pas de clarification en attente
         """
-        return self.pending_clarifications.get(tenant_id)
+        return self._shared_pending_clarifications.get(tenant_id)
 
     def clear_pending_clarification(self, tenant_id: str):
         """
@@ -205,8 +216,8 @@ class ConversationMemory:
         Args:
             tenant_id: Identifiant du tenant
         """
-        if tenant_id in self.pending_clarifications:
-            del self.pending_clarifications[tenant_id]
+        if tenant_id in self._shared_pending_clarifications:
+            del self._shared_pending_clarifications[tenant_id]
             logger.info(f"✅ Clarification résolue pour {tenant_id}")
 
     def increment_clarification_attempt(self, tenant_id: str):
@@ -217,9 +228,9 @@ class ConversationMemory:
         Args:
             tenant_id: Identifiant du tenant
         """
-        if tenant_id in self.pending_clarifications:
-            self.pending_clarifications[tenant_id]["attempts"] += 1
-            attempts = self.pending_clarifications[tenant_id]["attempts"]
+        if tenant_id in self._shared_pending_clarifications:
+            self._shared_pending_clarifications[tenant_id]["attempts"] += 1
+            attempts = self._shared_pending_clarifications[tenant_id]["attempts"]
 
             logger.info(f"🔄 Tentative clarification #{attempts} pour {tenant_id}")
 
@@ -347,7 +358,7 @@ class ConversationMemory:
         Returns:
             Dictionnaire {tenant_id: clarification_data}
         """
-        return self.pending_clarifications.copy()
+        return self._shared_pending_clarifications.copy()
 
     def cleanup_old_clarifications(self, max_age_seconds: int = 3600):
         """
@@ -360,7 +371,7 @@ class ConversationMemory:
         current_time = time.time()
         to_remove = []
 
-        for tenant_id, clarification in self.pending_clarifications.items():
+        for tenant_id, clarification in self._shared_pending_clarifications.items():
             age = current_time - clarification.get("timestamp", current_time)
             if age > max_age_seconds:
                 to_remove.append(tenant_id)
@@ -370,7 +381,7 @@ class ConversationMemory:
                 f"🧹 Nettoyage clarification expirée pour {tenant_id} "
                 f"(âge: {age/60:.1f} minutes)"
             )
-            del self.pending_clarifications[tenant_id]
+            del self._shared_pending_clarifications[tenant_id]
 
         if to_remove:
             logger.info(f"🧹 {len(to_remove)} clarifications expirées nettoyées")
@@ -382,14 +393,14 @@ class ConversationMemory:
         Returns:
             Dict avec statistiques globales
         """
-        if not self.pending_clarifications:
+        if not self._shared_pending_clarifications:
             return {"total_pending": 0, "avg_age_seconds": 0, "by_missing_field": {}}
 
         current_time = time.time()
         ages = []
         missing_fields_count = {}
 
-        for clarification in self.pending_clarifications.values():
+        for clarification in self._shared_pending_clarifications.values():
             # Âge
             age = current_time - clarification.get("timestamp", current_time)
             ages.append(age)
@@ -399,11 +410,12 @@ class ConversationMemory:
                 missing_fields_count[field] = missing_fields_count.get(field, 0) + 1
 
         return {
-            "total_pending": len(self.pending_clarifications),
+            "total_pending": len(self._shared_pending_clarifications),
             "avg_age_seconds": sum(ages) / len(ages) if ages else 0,
             "max_age_seconds": max(ages) if ages else 0,
             "by_missing_field": missing_fields_count,
             "total_attempts": sum(
-                c.get("attempts", 0) for c in self.pending_clarifications.values()
+                c.get("attempts", 0)
+                for c in self._shared_pending_clarifications.values()
             ),
         }
