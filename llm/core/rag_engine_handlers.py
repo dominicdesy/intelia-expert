@@ -594,6 +594,32 @@ class StandardQueryHandler(BaseQueryHandler):
             None  # ✅ NOUVEAU: Référence au générateur de réponses
         )
 
+    def configure(
+        self,
+        postgresql_system=None,
+        weaviate_core=None,
+        postgresql_validator=None,
+        response_generator=None,
+        **kwargs,
+    ):
+        """
+        Configure le handler avec les systèmes nécessaires
+
+        Args:
+            postgresql_system: Système de recherche PostgreSQL
+            weaviate_core: Système de recherche Weaviate
+            postgresql_validator: Validateur PostgreSQL
+            response_generator: Générateur de réponses LLM
+            **kwargs: Autres paramètres de configuration
+        """
+        self.postgresql_system = postgresql_system
+        self.weaviate_core = weaviate_core
+        self.postgresql_validator = postgresql_validator
+        self.response_generator = response_generator  # ✅ AJOUTER
+
+        # Appeler configure parent pour autres attributs si nécessaire
+        super().configure(**kwargs)
+
     async def handle(
         self,
         preprocessed_data: Dict[str, Any] = None,

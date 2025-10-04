@@ -303,6 +303,7 @@ class InteliaRAGEngine:
             postgresql_system=self.postgresql_retriever,
             weaviate_core=self.weaviate_core,
             postgresql_validator=None,  # Plus de validator séparé
+            response_generator=self.core.generator,  # ✅ AJOUTER LE GÉNÉRATEUR
         )
 
         logger.debug(
