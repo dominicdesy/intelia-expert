@@ -12,6 +12,9 @@ from collections import deque
 from fastapi import APIRouter
 from config.config import BASE_PATH
 
+# Import de la fonction utilitaire depuis utils (corrige l'import circulaire)
+from .utils import safe_serialize_for_json
+
 # Imports des modules d'endpoints
 from .endpoints_health import create_health_endpoints
 from .endpoints_diagnostic import create_diagnostic_endpoints
@@ -63,39 +66,6 @@ class MetricsCollector:
 
 
 metrics_collector = MetricsCollector()
-
-
-def safe_serialize_for_json(obj: Any) -> Any:
-    """
-    Sérialise un objet de manière sûre pour JSON
-    Gère les types non-sérialisables (datetime, bytes, etc.)
-    """
-    if obj is None:
-        return None
-
-    if isinstance(obj, (str, int, float, bool)):
-        return obj
-
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-
-    if isinstance(obj, bytes):
-        try:
-            return obj.decode("utf-8")
-        except Exception:
-            return str(obj)
-
-    if isinstance(obj, dict):
-        return {k: safe_serialize_for_json(v) for k, v in obj.items()}
-
-    if isinstance(obj, (list, tuple, set, deque)):
-        return [safe_serialize_for_json(item) for item in obj]
-
-    # Pour les autres types, convertir en string
-    try:
-        return str(obj)
-    except Exception:
-        return repr(obj)
 
 
 # ============================================================================

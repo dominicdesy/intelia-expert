@@ -13,11 +13,12 @@ from fastapi.responses import JSONResponse
 from config.config import BASE_PATH
 from utils.utilities import safe_get_attribute, safe_dict_get
 from utils.imports_and_dependencies import get_full_status_report
+from .utils import safe_serialize_for_json
 from .endpoints import (
-    safe_serialize_for_json,
     metrics_collector,
     conversation_memory,
 )
+
 
 logger = logging.getLogger(__name__)
 
