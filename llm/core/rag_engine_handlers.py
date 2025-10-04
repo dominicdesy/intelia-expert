@@ -1056,6 +1056,20 @@ class StandardQueryHandler(BaseQueryHandler):
                 # ✅ CORRECTION: Vérifier context_docs correctement
                 doc_count = len(result.context_docs) if result.context_docs else 0
 
+                # ✅ DEBUG CRITIQUE - AVANT LE IF
+                contextual_history_test = preprocessed_data.get(
+                    "contextual_history", ""
+                )
+                logger.info(
+                    f"🔴 DEBUG FINAL - preprocessed_data keys: {list(preprocessed_data.keys())}"
+                )
+                logger.info(
+                    f"🔴 DEBUG FINAL - contextual_history in preprocessed_data: {'contextual_history' in preprocessed_data}"
+                )
+                logger.info(
+                    f"🔴 DEBUG FINAL - contextual_history length: {len(contextual_history_test)}"
+                )
+
                 # ✅ NOUVEAU: Générer réponse avec contexte conversationnel si nécessaire
                 if result.context_docs and not result.answer:
                     logger.info(
