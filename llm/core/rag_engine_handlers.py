@@ -793,6 +793,15 @@ class StandardQueryHandler(BaseQueryHandler):
                 logger.info(
                     "✅ Routage Weaviate (suggestion OpenAI respectée pour requête qualitative)"
                 )
+                # ✅ DEBUG: Vérifier contextual_history avant appel
+                logger.info(
+                    f"🔍 AVANT WEAVIATE CALL #1 - contextual_history présent: {bool(contextual_history)}"
+                )
+                logger.info(
+                    f"🔍 AVANT WEAVIATE CALL #1 - contextual_history length: {len(contextual_history)}"
+                )
+
+                # ✅ CORRECTION: Passer preprocessed_data complet
                 return await self._search_weaviate_direct(
                     query,
                     entities,
@@ -800,8 +809,8 @@ class StandardQueryHandler(BaseQueryHandler):
                     is_optimization,
                     start_time,
                     language,
-                    filters,  # ✅ NOUVEAU paramètre
-                    contextual_history,  # ✅ NOUVEAU paramètre
+                    filters,
+                    preprocessed_data,  # ✅ Passer preprocessed_data complet
                 )
             else:
                 logger.info("⚠️ Suggestion Weaviate ignorée (présence âge/métrique)")
@@ -812,6 +821,15 @@ class StandardQueryHandler(BaseQueryHandler):
                 "🔄 Âge hors plage broilers → Weaviate direct (évite double appel)"
             )
             if self.weaviate_core:
+                # ✅ DEBUG: Vérifier contextual_history avant appel
+                logger.info(
+                    f"🔍 AVANT WEAVIATE CALL #2 - contextual_history présent: {bool(contextual_history)}"
+                )
+                logger.info(
+                    f"🔍 AVANT WEAVIATE CALL #2 - contextual_history length: {len(contextual_history)}"
+                )
+
+                # ✅ CORRECTION: Passer preprocessed_data complet
                 return await self._search_weaviate_direct(
                     query,
                     entities,
@@ -819,8 +837,8 @@ class StandardQueryHandler(BaseQueryHandler):
                     is_optimization,
                     start_time,
                     language,
-                    filters,  # ✅ NOUVEAU paramètre
-                    contextual_history,  # ✅ NOUVEAU paramètre
+                    filters,
+                    preprocessed_data,  # ✅ Passer preprocessed_data complet
                 )
 
         # PostgreSQL standard (UN SEUL APPEL) - seulement si pas déjà tenté avec routing hint
@@ -874,6 +892,7 @@ class StandardQueryHandler(BaseQueryHandler):
             logger.info(
                 f"📚 Recherche Weaviate (top_k={top_k}, langue={language}, filters={filters})"
             )
+            # ✅ CORRECTION: Passer preprocessed_data complet
             return await self._search_weaviate_direct(
                 query,
                 entities,
@@ -881,8 +900,8 @@ class StandardQueryHandler(BaseQueryHandler):
                 is_optimization,
                 start_time,
                 language,
-                filters,  # ✅ NOUVEAU paramètre
-                contextual_history,  # ✅ NOUVEAU paramètre
+                filters,
+                preprocessed_data,  # ✅ Passer preprocessed_data complet
             )
 
         return RAGResult(
@@ -995,15 +1014,20 @@ class StandardQueryHandler(BaseQueryHandler):
         is_optimization: bool,
         start_time: float,
         language: str = "fr",
-        filters: Dict[str, Any] = None,  # ✅ NOUVEAU paramètre
-        contextual_history: str = "",  # ✅ NOUVEAU paramètre pour historique
+        filters: Dict[str, Any] = None,
+        preprocessed_data: Dict[
+            str, Any
+        ] = None,  # ✅ CORRECTION: Recevoir preprocessed_data complet
     ) -> RAGResult:
         """
         Recherche directe dans Weaviate (fallback ou routage suggéré)
-        ✅ VERSION 4.6: Ajout paramètre filters
+        ✅ VERSION 4.7: Correction transmission preprocessed_data pour contextual_history
         """
         if filters is None:
             filters = {}
+
+        if preprocessed_data is None:
+            preprocessed_data = {}
 
         try:
             weaviate_top_k = 5 if is_optimization else top_k
@@ -1029,19 +1053,28 @@ class StandardQueryHandler(BaseQueryHandler):
                         "📝 Génération réponse Weaviate avec contexte conversationnel"
                     )
 
-                    # Construire preprocessed_data si nécessaire
-                    preprocessed_dict = {
-                        "contextual_history": contextual_history,
-                        "normalized_query": query,
-                        "entities": entities,
-                        "language": language,
-                    }
+                    # ✅ S'assurer que les clés nécessaires existent
+                    if "normalized_query" not in preprocessed_data:
+                        preprocessed_data["normalized_query"] = query
+                    if "entities" not in preprocessed_data:
+                        preprocessed_data["entities"] = entities
+                    if "language" not in preprocessed_data:
+                        preprocessed_data["language"] = language
+
+                    # ✅ LOG CRITIQUE
+                    contextual_history = preprocessed_data.get("contextual_history", "")
+                    logger.info(
+                        f"🔍 WEAVIATE - contextual_history présent: {bool(contextual_history)}"
+                    )
+                    logger.info(
+                        f"🔍 WEAVIATE - contextual_history length: {len(contextual_history)}"
+                    )
 
                     result.answer = await self._generate_response_with_generator(
                         context_docs=result.context_docs,
                         query=query,
                         language=language,
-                        preprocessed_data=preprocessed_dict,
+                        preprocessed_data=preprocessed_data,  # ✅ Passer preprocessed_data complet
                     )
 
                 # Enrichissement métadonnées
