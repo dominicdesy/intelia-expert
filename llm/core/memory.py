@@ -124,9 +124,7 @@ class ConversationMemory:
                 return ""
 
             # Formater avec header pour que query_enricher puisse parser
-            formatted_context = "Q: previous_conversation\nR: " + "\n".join(
-                context_parts
-            )
+            formatted_context = "\n".join(context_parts)
 
             # 🔍 DEBUG - Résultat final
             logger.info(
