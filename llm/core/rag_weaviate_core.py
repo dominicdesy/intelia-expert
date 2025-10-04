@@ -346,7 +346,7 @@ class WeaviateCore:
             raise
 
     async def _initialize_generator(self):
-        """Initialise le gÃ©nÃ©rateur de rÃ©ponses"""
+        """Initialise le générateur de réponses"""
 
         try:
             self.generator = EnhancedResponseGenerator(
@@ -414,18 +414,22 @@ class WeaviateCore:
         tenant_id: str = "default",
         conversation_context: List[Dict] = None,
         language: Optional[str] = None,
+        top_k: int = 10,
+        filters: Dict[str, Any] = None,
         **kwargs,
     ) -> RAGResult:
         """
         Méthode search manquante pour compatibilité avec rag_engine_handlers
 
-        CORRECTION: Cette méthode était appelée mais n'existait pas
+        ✅ CORRECTION: Cette méthode était appelée mais n'existait pas
         Délègue vers generate_response qui contient la logique principale
+
+        ✅ MODIFICATION MAJEURE: Accepte maintenant conversation_context pour le passer au générateur
         """
         logger.debug(f"WeaviateCore.search appelé avec query: {query}")
 
         try:
-            # CORRECTION: Respecter la vraie signature de generate_response
+            # ✅ CORRECTION: Respecter la vraie signature de generate_response
             result = await self.generate_response(
                 query=query,
                 intent_result=None,
@@ -512,7 +516,7 @@ class WeaviateCore:
                 except Exception as e:
                     logger.warning(f"Erreur OOD: {e}")
 
-            # Préparation contexte conversation
+            # ✅ MODIFICATION: Préparation contexte conversation (format string pour le générateur)
             conversation_context_str = ""
             if conversation_context and len(conversation_context) > 0:
                 recent_context = conversation_context[-MAX_CONVERSATION_CONTEXT:]
@@ -612,12 +616,12 @@ class WeaviateCore:
                     },
                 )
 
-            # Génération de la réponse
+            # ✅ MODIFICATION CRITIQUE: Génération de la réponse AVEC contexte conversationnel
             if self.generator:
                 response_text = await self.generator.generate_response(
                     query,
                     filtered_docs,
-                    conversation_context_str,
+                    conversation_context_str,  # ✅ Passer le contexte au générateur
                     language,
                     intent_result,
                 )
@@ -646,6 +650,9 @@ class WeaviateCore:
                         self.intelligent_rrf
                         and self.optimization_stats["intelligent_rrf_used"] > 0
                     ),
+                    "conversation_context_used": bool(
+                        conversation_context_str
+                    ),  # ✅ Traçabilité
                 },
             )
 
@@ -915,7 +922,7 @@ class WeaviateCore:
         language: str,
         conversation_context: List[Dict],
     ):
-        """Met en cache une rÃ©ponse"""
+        """Met en cache une réponse"""
 
         try:
             if hasattr(self.cache_manager, "semantic_cache"):
