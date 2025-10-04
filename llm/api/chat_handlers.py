@@ -18,7 +18,9 @@ from utils.utilities import (
     smart_chunk_text,
     get_aviculture_response,
 )
-from .endpoints_utils import (
+
+# CORRECTION: Import depuis utils au lieu de endpoints_utils
+from .utils import (
     safe_serialize_for_json,
     add_to_conversation_memory,
 )

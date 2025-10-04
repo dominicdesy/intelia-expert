@@ -710,7 +710,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
     async def conversation_stats():
         """Statistiques des conversations en mémoire"""
         try:
-            from .endpoints_utils import conversation_memory
+            from .utils import conversation_memory
 
             stats = conversation_memory.get_stats()
 
