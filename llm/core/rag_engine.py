@@ -2,12 +2,10 @@
 """
 rag_engine.py - RAG Engine Principal Refactorisé
 Point d'entrée principal avec délégation vers modules spécialisés
-VERSION 4.8.0 - INTÉGRATION QUERY ROUTER:
-- ✅ NOUVEAU: Utilisation de QueryRouter pour le routage unifié
-- ✅ Suppression de QueryPreprocessor (remplacé par QueryRouter)
-- ✅ Suppression de PostgreSQLValidator (validation intégrée dans QueryRouter)
-- ✅ Suppression de UnifiedQueryClassifier (logique dans QueryRouter)
-- ✅ Suppression de ValidationCore (validation centralisée dans QueryRouter)
+VERSION 4.8.1 - INTÉGRATION HISTORIQUE CONVERSATIONNEL:
+- ✅ NOUVEAU: Récupération automatique de l'historique via ConversationMemory
+- ✅ Intégration de get_contextual_memory() avant routage
+- ✅ Transmission de l'historique à tous les handlers
 - ✅ Support natif de NEEDS_CLARIFICATION via QueryRouter
 - ✅ Génération automatique de réponse LLM après récupération documents
 - ✅ Support des entités pré-extraites pour fusion conversationnelle
@@ -43,6 +41,16 @@ from .rag_engine_handlers import (
 # NOUVEAUX IMPORTS - QueryRouter remplace plusieurs modules
 from .query_router import QueryRouter
 from .entity_extractor import EntityExtractor
+
+# ✅ NOUVEAU: Import de ConversationMemory pour l'historique
+try:
+    from core.memory import ConversationMemory
+
+    CONVERSATION_MEMORY_AVAILABLE = True
+except ImportError as e:
+    CONVERSATION_MEMORY_AVAILABLE = False
+    ConversationMemory = None
+    logging.warning(f"⚠️ ConversationMemory non disponible: {e}")
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +93,7 @@ class InteliaRAGEngine:
     """
     RAG Engine principal avec architecture modulaire refactorisée
 
-    VERSION 4.8.0 - INTÉGRATION QUERY ROUTER:
+    VERSION 4.8.1 - INTÉGRATION HISTORIQUE CONVERSATIONNEL:
     - QueryRouter unifie classification, validation et routage
     - Support natif de NEEDS_CLARIFICATION
     - Configuration PostgreSQL chargée automatiquement depuis rag_postgresql_config.py
@@ -94,16 +102,26 @@ class InteliaRAGEngine:
     - ✅ CORRECTION CRITIQUE: Génération LLM automatique après récupération documents
     - ✅ NOUVEAU: Méthode generate_response_with_entities() pour fusion conversationnelle
     - ✅ Support du paramètre conversation_context dans generate_response()
+    - ✅ NOUVEAU: Intégration ConversationMemory pour historique contextuel
     """
 
     def __init__(self, openai_client: AsyncOpenAI = None):
-        """Initialisation avec QueryRouter centralisé"""
+        """Initialisation avec QueryRouter centralisé et ConversationMemory"""
         # Core engine
         self.core = RAGEngineCore(openai_client)
 
         # NOUVEAU MODULE CENTRALISÉ - QueryRouter
         self.query_router = QueryRouter(config_dir="/app/config")
         self.entity_extractor = EntityExtractor()
+
+        # ✅ NOUVEAU: ConversationMemory pour historique
+        self.conversation_memory = None
+        if CONVERSATION_MEMORY_AVAILABLE and ConversationMemory:
+            try:
+                self.conversation_memory = ConversationMemory(client=openai_client)
+                logger.info("✅ ConversationMemory initialisée")
+            except Exception as e:
+                logger.warning(f"⚠️ Échec initialisation ConversationMemory: {e}")
 
         # Handlers spécialisés
         self.temporal_handler = TemporalQueryHandler()
@@ -139,6 +157,7 @@ class InteliaRAGEngine:
             "llm_generations": 0,
             "errors_count": 0,
             "preextracted_entities_queries": 0,
+            "contextual_memory_queries": 0,
         }
 
     async def initialize(self):
@@ -146,7 +165,9 @@ class InteliaRAGEngine:
         if self.is_initialized:
             return
 
-        logger.info("🚀 Initialisation RAG Engine v4.8.0 (QueryRouter)")
+        logger.info(
+            "🚀 Initialisation RAG Engine v4.8.1 (QueryRouter + ConversationMemory)"
+        )
         self.initialization_errors = []
 
         try:
@@ -170,6 +191,7 @@ class InteliaRAGEngine:
                     ("ComparisonHandler", self.comparison_handler),
                     ("EntityExtractor", self.entity_extractor),
                     ("LLMGenerator", self.core.generator),
+                    ("ConversationMemory", self.conversation_memory),
                 ]
                 if module is not None
             ]
@@ -309,7 +331,7 @@ class InteliaRAGEngine:
             )
 
         effective_language = language or "fr"
-        logger.info(f"🌍 generate_response reçoit langue: {effective_language}")
+        logger.info(f"🌐 generate_response reçoit langue: {effective_language}")
 
         # Fallback si système indisponible
         if self.degraded_mode and not self.postgresql_retriever:
@@ -322,6 +344,23 @@ class InteliaRAGEngine:
         # ✅ Extraire conversation_context au format dict depuis kwargs si présent
         context_dict = kwargs.get("conversation_context")
 
+        # ✅ NOUVEAU: Récupérer l'historique conversationnel contextuel
+        contextual_history = None
+        if self.conversation_memory:
+            try:
+                contextual_history = (
+                    await self.conversation_memory.get_contextual_memory(
+                        tenant_id, query
+                    )
+                )
+                if contextual_history:
+                    self.optimization_stats["contextual_memory_queries"] += 1
+                    logger.info(
+                        f"📚 Historique contextuel récupéré: {len(contextual_history)} éléments"
+                    )
+            except Exception as e:
+                logger.warning(f"⚠️ Échec récupération historique: {e}")
+
         try:
             return await self._process_query(
                 query,
@@ -329,6 +368,7 @@ class InteliaRAGEngine:
                 tenant_id,
                 start_time,
                 conversation_context=context_dict,
+                contextual_history=contextual_history,
             )
         except Exception as e:
             logger.error(f"❌ Erreur generate_response: {e}")
@@ -384,9 +424,9 @@ class InteliaRAGEngine:
 
         effective_language = language or "fr"
         logger.info(
-            f"🌍 generate_response_with_entities reçoit langue: {effective_language}"
+            f"🌐 generate_response_with_entities reçoit langue: {effective_language}"
         )
-        logger.info(f"📄 Entités pré-extraites fournies: {entities}")
+        logger.info(f"📋 Entités pré-extraites fournies: {entities}")
 
         # Fallback si système indisponible
         if self.degraded_mode and not self.postgresql_retriever:
@@ -399,6 +439,23 @@ class InteliaRAGEngine:
         # ✅ Extraire conversation_context depuis kwargs si présent
         context_dict = kwargs.get("conversation_context")
 
+        # ✅ NOUVEAU: Récupérer l'historique conversationnel contextuel
+        contextual_history = None
+        if self.conversation_memory:
+            try:
+                contextual_history = (
+                    await self.conversation_memory.get_contextual_memory(
+                        tenant_id, query
+                    )
+                )
+                if contextual_history:
+                    self.optimization_stats["contextual_memory_queries"] += 1
+                    logger.info(
+                        f"📚 Historique contextuel récupéré: {len(contextual_history)} éléments"
+                    )
+            except Exception as e:
+                logger.warning(f"⚠️ Échec récupération historique: {e}")
+
         try:
             return await self._process_query_with_entities(
                 query,
@@ -407,6 +464,7 @@ class InteliaRAGEngine:
                 tenant_id,
                 start_time,
                 conversation_context=context_dict,
+                contextual_history=contextual_history,
             )
         except Exception as e:
             logger.error(f"❌ Erreur generate_response_with_entities: {e}")
@@ -423,6 +481,7 @@ class InteliaRAGEngine:
         tenant_id: str,
         start_time: float,
         conversation_context: Dict = None,
+        contextual_history: List[Dict] = None,
     ) -> RAGResult:
         """Pipeline de traitement avec QueryRouter
 
@@ -432,9 +491,10 @@ class InteliaRAGEngine:
             tenant_id: Identifiant du tenant
             start_time: Timestamp de début
             conversation_context: Contexte conversationnel (format dict)
+            contextual_history: Historique contextuel récupéré par ConversationMemory
         """
 
-        logger.info(f"🌍 _process_query traite avec langue: {language}")
+        logger.info(f"🌐 _process_query traite avec langue: {language}")
 
         # 1. ROUTAGE VIA QUERY ROUTER
         route = self.query_router.route(
@@ -503,6 +563,16 @@ class InteliaRAGEngine:
                 f"📝 Contexte conversationnel ajouté: {list(conversation_context.keys())}"
             )
 
+        # ✅ NOUVEAU: AJOUTER l'historique contextuel
+        if contextual_history:
+            preprocessed_data["contextual_history"] = contextual_history
+            preprocessed_data["metadata"]["contextual_history_count"] = len(
+                contextual_history
+            )
+            logger.info(
+                f"📚 Historique contextuel ajouté: {len(contextual_history)} éléments"
+            )
+
         # 5. MISE À JOUR DES STATS (basé sur query_type déterminé)
         if query_type == "comparative":
             self.optimization_stats["comparative_queries"] += 1
@@ -544,6 +614,7 @@ class InteliaRAGEngine:
         tenant_id: str,
         start_time: float,
         conversation_context: Dict = None,
+        contextual_history: List[Dict] = None,
     ) -> RAGResult:
         """
         Pipeline de traitement avec entités pré-extraites
@@ -558,10 +629,11 @@ class InteliaRAGEngine:
             tenant_id: Identifiant du tenant
             start_time: Timestamp de début
             conversation_context: Contexte conversationnel (format dict)
+            contextual_history: Historique contextuel récupéré par ConversationMemory
         """
 
-        logger.info(f"🌍 _process_query_with_entities traite avec langue: {language}")
-        logger.info(f"📄 Utilisation des entités pré-extraites: {entities}")
+        logger.info(f"🌐 _process_query_with_entities traite avec langue: {language}")
+        logger.info(f"📋 Utilisation des entités pré-extraites: {entities}")
 
         # 1. ROUTAGE VIA QUERY ROUTER (qui utilisera les entités si fournies)
         route = self.query_router.route(
@@ -633,6 +705,16 @@ class InteliaRAGEngine:
             preprocessed_data["conversation_context"] = conversation_context
             logger.info(
                 f"📝 Contexte conversationnel ajouté: {list(conversation_context.keys())}"
+            )
+
+        # ✅ NOUVEAU: AJOUTER l'historique contextuel
+        if contextual_history:
+            preprocessed_data["contextual_history"] = contextual_history
+            preprocessed_data["metadata"]["contextual_history_count"] = len(
+                contextual_history
+            )
+            logger.info(
+                f"📚 Historique contextuel ajouté: {len(contextual_history)} éléments"
             )
 
         # 5. MISE À JOUR DES STATS
@@ -788,7 +870,7 @@ class InteliaRAGEngine:
     ) -> RAGResult:
         """Route vers le handler approprié"""
 
-        logger.info(f"🌍 _route_to_handler avec langue: {language}")
+        logger.info(f"🌐 _route_to_handler avec langue: {language}")
 
         if query_type == "temporal_range":
             logger.debug("→ Routage vers TemporalQueryHandler")
@@ -833,8 +915,8 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v4.8.0_query_router",
-            "architecture": "modular_query_router",
+            "version": "v4.8.1_conversation_memory",
+            "architecture": "modular_query_router_with_memory",
             "modules": {
                 "core": True,
                 "rag_engine": True,
@@ -847,6 +929,7 @@ class InteliaRAGEngine:
                 "weaviate_core": bool(self.weaviate_core),
                 "comparison_handler": bool(self.comparison_handler),
                 "llm_generator": bool(self.core.generator),
+                "conversation_memory": bool(self.conversation_memory),
             },
             "optimization_stats": self.optimization_stats.copy(),
             "initialization_errors": self.initialization_errors,

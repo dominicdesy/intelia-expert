@@ -588,6 +588,12 @@ class TemporalQueryHandler(BaseQueryHandler):
 class StandardQueryHandler(BaseQueryHandler):
     """Handler pour les requêtes standard avec routage intelligent"""
 
+    def __init__(self):
+        super().__init__()
+        self.response_generator = (
+            None  # ✅ NOUVEAU: Référence au générateur de réponses
+        )
+
     async def handle(
         self,
         preprocessed_data: Dict[str, Any] = None,
@@ -1013,3 +1019,66 @@ class StandardQueryHandler(BaseQueryHandler):
                     "filters_attempted": filters,  # ✅ NOUVEAU
                 },
             )
+
+    async def _generate_response_with_generator(
+        self, context_docs: List, query: str, language: str, preprocessed_data: Dict
+    ) -> str:
+        """
+        ✅ NOUVELLE MÉTHODE: Génère une réponse en utilisant le générateur avec historique
+
+        Args:
+            context_docs: Documents de contexte récupérés
+            query: Question de l'utilisateur
+            language: Langue de la réponse
+            preprocessed_data: Données prétraitées contenant l'historique
+
+        Returns:
+            Réponse générée en texte
+        """
+        if not self.response_generator:
+            logger.warning("Response generator non disponible, retour contexte brut")
+            return self._format_context_as_fallback(context_docs)
+
+        try:
+            # ✅ NOUVEAU : Récupérer l'historique depuis preprocessed_data
+            conversation_history = preprocessed_data.get("conversation_history", "")
+
+            logger.info(
+                f"📝 Génération réponse avec historique "
+                f"(docs={len(context_docs)}, langue={language}, "
+                f"historique={len(conversation_history)} chars)"
+            )
+
+            response = await self.response_generator.generate_response(
+                query=query,
+                context_docs=context_docs,
+                language=language,
+                conversation_context=conversation_history,  # ✅ PASSER L'HISTORIQUE
+            )
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Erreur génération réponse avec historique: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+            return self._format_context_as_fallback(context_docs)
+
+    def _format_context_as_fallback(self, context_docs: List) -> str:
+        """
+        ✅ NOUVELLE MÉTHODE: Formatage fallback si générateur indisponible
+
+        Args:
+            context_docs: Documents de contexte
+
+        Returns:
+            Texte formaté des documents
+        """
+        if not context_docs:
+            return "Aucun document de contexte disponible."
+
+        formatted_parts = []
+        for i, doc in enumerate(context_docs[:5], 1):  # Limite à 5 docs
+            content = doc.get("content", "") if isinstance(doc, dict) else str(doc)
+            formatted_parts.append(f"[Doc {i}] {content[:200]}...")
+
+        return "\n\n".join(formatted_parts)

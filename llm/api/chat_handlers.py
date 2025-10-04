@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 api/chat_handlers.py - Logique de traitement des requêtes de chat
-Version 5.0.0 - INTÉGRATION QUERY ROUTER
-Le contexte conversationnel est maintenant géré par QueryRouter dans RAGEngine
+Version 5.1.0 - INTÉGRATION ConversationMemory
+Le contexte conversationnel est maintenant géré par QueryRouter + ConversationMemory
 """
 
 import time
@@ -30,11 +30,11 @@ class ChatHandlers:
     """
     Gestionnaires de logique métier pour les endpoints de chat
 
-    VERSION 5.0.0 - SIMPLIFICATION MAJEURE:
-    - Plus de gestion de contexte conversationnel ici
-    - Plus de gestion de clarification ici
-    - QueryRouter dans RAGEngine gère TOUT
-    - Cette classe fait juste l'interface entre endpoints et RAG
+    VERSION 5.1.0 - INTÉGRATION CONVERSATION MEMORY:
+    - Double sauvegarde: ConversationMemory + ancien système
+    - Initialisation lazy de ConversationMemory
+    - QueryRouter dans RAGEngine gère TOUT le routing
+    - Cette classe fait l'interface entre endpoints et RAG
     """
 
     def __init__(self, services: Dict[str, Any]):
@@ -47,6 +47,28 @@ class ChatHandlers:
         Note: context_manager supprimé - le router gère le contexte
         """
         self.services = services
+        self._conversation_memory = None  # Lazy initialization
+
+    @property
+    def conversation_memory(self):
+        """
+        Lazy initialization de ConversationMemory
+
+        Returns:
+            Instance de ConversationMemory
+        """
+        if self._conversation_memory is None:
+            try:
+                from core.memory import ConversationMemory
+
+                # Client Weaviate peut être None pour l'instant
+                # ConversationMemory utilisera Redis si disponible
+                self._conversation_memory = ConversationMemory(client=None)
+                logger.info("✅ ConversationMemory initialisé")
+            except Exception as e:
+                logger.warning(f"⚠️ Impossible d'initialiser ConversationMemory: {e}")
+                self._conversation_memory = None
+        return self._conversation_memory
 
     def get_rag_engine(self):
         """Helper pour récupérer le RAG Engine"""
@@ -67,11 +89,11 @@ class ChatHandlers:
         """
         Génère une réponse via le RAG Engine
 
-        VERSION 5.0.0:
+        VERSION 5.1.0:
         - Appel direct au RAG sans pré-traitement
         - Le QueryRouter dans RAGEngine gère:
           * Extraction d'entités
-          * Contexte conversationnel
+          * Contexte conversationnel (via ConversationMemory)
           * Validation
           * Routing
 
@@ -165,11 +187,46 @@ class ChatHandlers:
                     "json_system_attempted": use_json_search,
                     "genetic_line_filter": genetic_line_filter,
                     "preprocessing_enabled": True,
-                    "router_version": "5.0.0",
+                    "router_version": "5.1.0",
                 }
                 self.context_docs = []
 
         return FallbackResult(aviculture_response, fallback_reason)
+
+    async def _save_to_memory(
+        self,
+        tenant_id: str,
+        message: str,
+        answer: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Sauvegarde dans les deux systèmes de mémoire
+
+        Args:
+            tenant_id: ID utilisateur
+            message: Question de l'utilisateur
+            answer: Réponse générée
+            metadata: Métadonnées optionnelles
+        """
+        # 1. Sauvegarder dans ConversationMemory (nouveau système)
+        if self.conversation_memory:
+            try:
+                self.conversation_memory.add_exchange(
+                    tenant_id=tenant_id, question=message, answer=answer
+                )
+                logger.debug(f"✅ Sauvegarde ConversationMemory OK pour {tenant_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Erreur sauvegarde ConversationMemory: {e}")
+
+        # 2. Sauvegarder dans l'ancien système (rétrocompatibilité)
+        try:
+            add_to_conversation_memory(
+                tenant_id, message, str(answer), "rag_enhanced_json"
+            )
+            logger.debug(f"✅ Sauvegarde ancien système OK pour {tenant_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur sauvegarde ancien système: {e}")
 
     async def generate_streaming_response(
         self,
@@ -182,8 +239,9 @@ class ChatHandlers:
         """
         Génère un flux de réponse SSE (Server-Sent Events)
 
-        VERSION 5.0.0:
-        - Métadonnées simplifiées
+        VERSION 5.1.0:
+        - Double sauvegarde mémoire (ConversationMemory + ancien)
+        - Métadonnées enrichies
         - Plus de gestion de clarification ici
         - Le router a déjà géré tout le contexte
 
@@ -217,10 +275,11 @@ class ChatHandlers:
                 "confidence": float(confidence),
                 "processing_time": float(processing_time),
                 "fallback_used": safe_dict_get(metadata, "fallback_used", False),
-                "architecture": "query-router-v5",
+                "architecture": "query-router-v5.1",
                 "serialization_version": "optimized_cached",
                 "preprocessing_enabled": True,
-                "router_managed": True,  # Nouveau flag
+                "router_managed": True,
+                "memory_enabled": self.conversation_memory is not None,
                 "needs_clarification": metadata.get("needs_clarification", False),
                 "missing_fields": metadata.get("missing_fields", []),
                 "json_system_used": metadata.get("json_system", {}).get("used", False),
@@ -272,9 +331,10 @@ class ChatHandlers:
                 "confidence": float(confidence),
                 "documents_used": documents_used,
                 "source": source,
-                "architecture": "query-router-v5",
+                "architecture": "query-router-v5.1",
                 "preprocessing_enabled": True,
                 "router_managed": True,
+                "memory_enabled": self.conversation_memory is not None,
                 "needs_clarification": metadata.get("needs_clarification", False),
                 "is_contextual": metadata.get("is_contextual", False),
                 "json_system_used": metadata.get("json_system", {}).get("used", False),
@@ -284,20 +344,20 @@ class ChatHandlers:
                 "genetic_lines_detected": metadata.get("json_system", {}).get(
                     "genetic_lines_detected", []
                 ),
-                "detection_version": "5.0.0_query_router",
+                "detection_version": "5.1.0_conversation_memory",
             }
 
             yield sse_event(safe_serialize_for_json(end_data))
 
-            # Sauvegarder dans la mémoire conversationnelle
-            # (en plus du contexte géré par le router)
+            # Sauvegarder dans les deux systèmes de mémoire
+            # Seulement si c'est une vraie réponse (pas une clarification)
             if answer and source and not metadata.get("needs_clarification"):
-                try:
-                    add_to_conversation_memory(
-                        tenant_id, message, str(answer), "rag_enhanced_json"
-                    )
-                except Exception as e:
-                    logger.warning(f"Erreur sauvegarde mémoire: {e}")
+                await self._save_to_memory(
+                    tenant_id=tenant_id,
+                    message=message,
+                    answer=str(answer),
+                    metadata=metadata,
+                )
 
         except Exception as e:
             logger.error(f"Erreur streaming: {e}", exc_info=True)
@@ -313,7 +373,7 @@ class ChatHandlers:
         rag_engine = self.get_rag_engine()
 
         return {
-            "version": "5.0.0",
+            "version": "5.1.0",
             "architecture": "query-router-integrated",
             "rag_engine_available": rag_engine is not None,
             "rag_engine_initialized": (
@@ -323,4 +383,6 @@ class ChatHandlers:
             ),
             "context_management": "router_managed",
             "clarification_management": "router_managed",
+            "conversation_memory_enabled": self.conversation_memory is not None,
+            "dual_memory_system": True,  # Nouveau + ancien
         }
