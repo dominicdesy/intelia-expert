@@ -1048,25 +1048,17 @@ class StandardQueryHandler(BaseQueryHandler):
             # ✅ NOUVEAU: Extraire et convertir contextual_history pour Weaviate
             contextual_history = preprocessed_data.get("contextual_history", "")
 
-            # ✅ CONVERSION: String → List[Dict]
+            # ✅ CONVERSION SIMPLE: String → List[Dict]
             conversation_context_list = []
             if contextual_history:
-                # Parser le string formaté "Q: ... R: ..."
-                lines = contextual_history.split("\n")
-                current_q = ""
-                for line in lines:
-                    line = line.strip()
-                    if line.startswith("Q: "):
-                        current_q = line[3:].strip()
-                    elif line.startswith("R: ") and current_q:
-                        conversation_context_list.append(
-                            {"question": current_q, "answer": line[3:].strip()}
-                        )
-                        current_q = ""
+                # Passer le contexte formaté comme un seul "échange"
+                conversation_context_list = [
+                    {"question": "previous_conversation", "answer": contextual_history}
+                ]
 
-                logger.info(
-                    f"📝 Historique conversationnel parsé: {len(conversation_context_list)} échanges"
-                )
+            logger.info(
+                f"📝 Contexte transmis à Weaviate: {len(conversation_context_list)} éléments ({len(contextual_history)} chars)"
+            )
 
             result = await self.weaviate_core.search(
                 query=query,
