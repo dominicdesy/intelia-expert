@@ -454,30 +454,41 @@ class InteliaRAGEngine:
 
             return RAGResult(
                 source=RAGSource.NEEDS_CLARIFICATION,
+                answer=self._build_clarification_message(
+                    route.missing_fields, language
+                ),
                 metadata={
+                    "needs_clarification": True,
                     "missing_fields": route.missing_fields,
                     "entities": route.entities,
                     "validation_details": route.validation_details,
-                    "query_type": route.query_type,
                     "language": language,
                 },
             )
 
-        # 3. CRÉER PREPROCESSED_DATA DEPUIS ROUTE
+        # 3. DÉTERMINER QUERY_TYPE DEPUIS DESTINATION
+        if route.destination == "postgresql":
+            query_type = "standard"
+        elif route.destination == "weaviate":
+            query_type = "diagnostic"
+        else:  # hybrid
+            query_type = "standard"
+
+        # 4. CRÉER PREPROCESSED_DATA DEPUIS ROUTE
         preprocessed_data = {
             "normalized_query": query,
             "original_query": query,
             "entities": route.entities,
             "language": language,
             "routing_hint": route.destination,
-            "is_comparative": route.query_type == "comparative",
+            "is_comparative": False,
             "comparison_entities": [],
-            "query_type": route.query_type,
+            "query_type": query_type,
             "metadata": {
                 "original_query": query,
                 "normalized_query": query,
                 "routing_hint": route.destination,
-                "is_comparative": route.query_type == "comparative",
+                "is_comparative": False,
                 "routing_applied": True,
                 "confidence": route.confidence,
                 "language_detected": language,
@@ -492,8 +503,7 @@ class InteliaRAGEngine:
                 f"📝 Contexte conversationnel ajouté: {list(conversation_context.keys())}"
             )
 
-        # 4. MISE À JOUR DES STATS
-        query_type = route.query_type
+        # 5. MISE À JOUR DES STATS (basé sur query_type déterminé)
         if query_type == "comparative":
             self.optimization_stats["comparative_queries"] += 1
         elif query_type == "temporal_range":
@@ -507,7 +517,7 @@ class InteliaRAGEngine:
         elif query_type == "diagnostic":
             self.optimization_stats["diagnostic_queries"] += 1
 
-        # 5. ROUTAGE VERS HANDLER
+        # 6. ROUTAGE VERS HANDLER
         result = await self._route_to_handler(
             query_type, preprocessed_data, start_time, language
         )
@@ -517,7 +527,7 @@ class InteliaRAGEngine:
             result, preprocessed_data, query, language
         )
 
-        # 6. ENRICHIR MÉTADONNÉES
+        # 7. ENRICHIR MÉTADONNÉES
         result.metadata.update(preprocessed_data["metadata"])
         result.metadata["route_confidence"] = route.confidence
         result.metadata["route_destination"] = route.destination
@@ -574,31 +584,42 @@ class InteliaRAGEngine:
 
             return RAGResult(
                 source=RAGSource.NEEDS_CLARIFICATION,
+                answer=self._build_clarification_message(
+                    route.missing_fields, language
+                ),
                 metadata={
+                    "needs_clarification": True,
                     "missing_fields": route.missing_fields,
                     "entities": route.entities,
                     "validation_details": route.validation_details,
-                    "query_type": route.query_type,
                     "language": language,
                     "entities_preextracted": True,
                 },
             )
 
-        # 3. CRÉER PREPROCESSED_DATA
+        # 3. DÉTERMINER QUERY_TYPE DEPUIS DESTINATION
+        if route.destination == "postgresql":
+            query_type = "standard"
+        elif route.destination == "weaviate":
+            query_type = "diagnostic"
+        else:  # hybrid
+            query_type = "standard"
+
+        # 4. CRÉER PREPROCESSED_DATA
         preprocessed_data = {
             "normalized_query": query,
             "original_query": query,
             "entities": route.entities,  # Utiliser les entités validées par le router
             "language": language,
             "routing_hint": route.destination,
-            "is_comparative": route.query_type == "comparative",
+            "is_comparative": False,
             "comparison_entities": [],
-            "query_type": route.query_type,
+            "query_type": query_type,
             "metadata": {
                 "original_query": query,
                 "normalized_query": query,
                 "routing_hint": route.destination,
-                "is_comparative": route.query_type == "comparative",
+                "is_comparative": False,
                 "routing_applied": True,
                 "entities_preextracted": True,
                 "confidence": route.confidence,
@@ -614,8 +635,7 @@ class InteliaRAGEngine:
                 f"📝 Contexte conversationnel ajouté: {list(conversation_context.keys())}"
             )
 
-        # 4. MISE À JOUR DES STATS
-        query_type = route.query_type
+        # 5. MISE À JOUR DES STATS
         if query_type == "comparative":
             self.optimization_stats["comparative_queries"] += 1
         elif query_type == "temporal_range":
@@ -629,7 +649,7 @@ class InteliaRAGEngine:
         elif query_type == "diagnostic":
             self.optimization_stats["diagnostic_queries"] += 1
 
-        # 5. ROUTAGE VERS HANDLER (force standard pour PostgreSQL)
+        # 6. ROUTAGE VERS HANDLER (force standard pour PostgreSQL)
         result = await self.standard_handler.handle(
             preprocessed_data, start_time, language=language
         )
@@ -639,7 +659,7 @@ class InteliaRAGEngine:
             result, preprocessed_data, query, language
         )
 
-        # 6. ENRICHIR MÉTADONNÉES
+        # 7. ENRICHIR MÉTADONNÉES
         result.metadata.update(preprocessed_data["metadata"])
         result.metadata["route_confidence"] = route.confidence
         result.metadata["route_destination"] = route.destination
@@ -714,6 +734,50 @@ class InteliaRAGEngine:
                 result.metadata["llm_generation_error"] = str(e)
 
         return result
+
+    def _build_clarification_message(
+        self, missing_fields: List[str], language: str = "fr"
+    ) -> str:
+        """
+        Construit un message de clarification en français ou anglais
+
+        Args:
+            missing_fields: Liste des champs manquants
+            language: Langue du message ('fr' ou 'en')
+
+        Returns:
+            Message de clarification formaté
+        """
+        if language == "en":
+            if len(missing_fields) == 1:
+                return f"Please specify the {missing_fields[0]} to continue."
+            else:
+                fields = ", ".join(missing_fields[:-1]) + f" and {missing_fields[-1]}"
+                return f"Please specify the following information: {fields}."
+        else:  # français par défaut
+            if len(missing_fields) == 1:
+                field_fr = self._translate_field_name(missing_fields[0])
+                return f"Veuillez préciser {field_fr} pour continuer."
+            else:
+                fields_fr = [self._translate_field_name(f) for f in missing_fields]
+                fields_str = ", ".join(fields_fr[:-1]) + f" et {fields_fr[-1]}"
+                return f"Veuillez préciser les informations suivantes : {fields_str}."
+
+    def _translate_field_name(self, field: str) -> str:
+        """Traduit un nom de champ en français"""
+        translations = {
+            "breed": "la race",
+            "age": "l'âge",
+            "gender": "le sexe",
+            "weight": "le poids",
+            "metric": "la métrique",
+            "period": "la période",
+            "date": "la date",
+            "location": "le lieu",
+            "building": "le bâtiment",
+            "batch": "le lot",
+        }
+        return translations.get(field, field)
 
     async def _route_to_handler(
         self,
