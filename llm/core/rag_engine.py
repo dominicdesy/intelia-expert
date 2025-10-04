@@ -837,12 +837,15 @@ class InteliaRAGEngine:
             # ✅ CORRECTION : Récupérer le contexte conversationnel
             contextual_history = preprocessed_data.get("contextual_history", "")
 
-            # DEBUG CRITIQUE
+            # DEBUG CRITIQUE - AJOUTER CES LOGS
             logger.info(
                 f"🔍 ENSURE - contextual_history type: {type(contextual_history)}"
             )
             logger.info(
-                f"🔍 ENSURE - contextual_history value: {contextual_history[:200] if contextual_history else 'VIDE'}"
+                f"🔍 ENSURE - contextual_history length: {len(contextual_history) if contextual_history else 0}"
+            )
+            logger.info(
+                f"🔍 ENSURE - contextual_history preview: {contextual_history[:200] if contextual_history else 'VIDE'}"
             )
 
             # Formater l'historique pour le générateur
@@ -858,6 +861,11 @@ class InteliaRAGEngine:
                 logger.warning("⚠️ ENSURE - Pas d'historique dans preprocessed_data!")
 
             try:
+                # DEBUG : Vérifier ce qu'on envoie au générateur
+                logger.info(
+                    f"🔧 ENSURE - Appel generate_response avec conversation_context length: {len(conversation_context)}"
+                )
+
                 # Appel du générateur avec les documents récupérés ET le contexte conversationnel
                 generated_answer = await self.core.generator.generate_response(
                     query=preprocessed_data.get("original_query", original_query),
@@ -883,7 +891,7 @@ class InteliaRAGEngine:
                 )
 
             except Exception as e:
-                logger.error(f"❌ Erreur génération LLM: {e}")
+                logger.error(f"❌ Erreur génération LLM: {e}", exc_info=True)
                 result.answer = "Unable to generate response from the retrieved data."
                 result.metadata["llm_generation_error"] = str(e)
 
