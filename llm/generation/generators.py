@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version 3.3 - Support multilingue DYNAMIQUE sans hardcoding
-- Instructions de langue renforcées + system_prompts.json centralisés
-- ✅ NOUVEAU: Gestion hybride dict/Document pour compatibilité PostgreSQL
-- ✅ NOUVEAU: Chargement dynamique des langues depuis SUPPORTED_LANGUAGES
-- ✅ FIX CRITIQUE: Instructions de langue EN TÊTE de prompt + validation conversation_context
+Version 3.4 - Simplifié et optimisé
+- ✅ Instructions de langue compactes EN TÊTE du prompt
+- ✅ Validation simple du conversation_context (pas de troncature)
+- ✅ Logs réduits (2 logs essentiels seulement)
+- ✅ Intégration de build_specialized_prompt depuis prompt_builder.py
+- ✅ Suppression des méthodes verboses inutilisées
 """
 
 import logging
@@ -687,30 +688,10 @@ class EnhancedResponseGenerator:
         logger.info(f"📋 Context text length: {len(context_text)} chars")
         logger.debug(f"📋 Context preview: {context_text[:300]}...")
 
-        # ✅ FIX CRITIQUE: Instructions de langue EN TÊTE du prompt
+        # ✅ SIMPLIFICATION: Instructions de langue compactes en tête
         language_name = self.language_display_names.get(language, language.upper())
 
-        critical_language_header = f"""
-{'='*80}
-🎯 PRIMARY INSTRUCTION - ABSOLUTE PRIORITY - INSTRUCTION PRIMAIRE
-{'='*80}
-
-RESPOND EXCLUSIVELY IN: {language_name}
-RÉPONDEZ EXCLUSIVEMENT EN: {language_name}
-
-Language Code: {language}
-Code de langue: {language}
-
-THIS INSTRUCTION OVERRIDES ALL OTHER INSTRUCTIONS.
-CETTE INSTRUCTION PRÉVAUT SUR TOUTES LES AUTRES INSTRUCTIONS.
-
-DO NOT translate. DO NOT switch languages. DO NOT mix languages.
-NE PAS traduire. NE PAS changer de langue. NE PAS mélanger les langues.
-
-{'='*80}
-"""
-
-        # Construction du prompt système avec instructions de langue RENFORCÉES
+        # Construction du prompt système
         if self.prompts_manager:
             expert_identity = self.prompts_manager.get_base_prompt(
                 "expert_identity", language
@@ -719,7 +700,13 @@ NE PAS traduire. NE PAS changer de langue. NE PAS mélanger les langues.
                 "response_guidelines", language
             )
 
-            system_prompt_parts = [critical_language_header]
+            system_prompt_parts = []
+
+            # ✅ Instructions de langue EN TÊTE (UNE SEULE FOIS)
+            language_instruction = f"""You are an expert in poultry production.
+CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
+"""
+            system_prompt_parts.append(language_instruction)
 
             if expert_identity:
                 system_prompt_parts.append(expert_identity)
@@ -742,33 +729,14 @@ MÉTRIQUES PRIORITAIRES:
 """
             system_prompt_parts.append(metrics_section)
 
-            # ✅ INSTRUCTIONS DE LANGUE RENFORCÉES (DYNAMIQUES)
-            critical_instructions = self._get_critical_language_instructions(language)
-            system_prompt_parts.append(critical_instructions)
-
             system_prompt = "\n\n".join(system_prompt_parts)
-
         else:
             system_prompt = self._get_fallback_system_prompt(enrichment, language)
 
-        # ✅ FIX CRITIQUE: Validation robuste du contexte conversationnel
-        # ✅ CORRECTION: Enlever la troncature [:MAX_CONVERSATION_CONTEXT] pour envoyer le contexte COMPLET
-        limited_context = ""
-        if (
-            conversation_context
-            and isinstance(conversation_context, str)
-            and conversation_context.strip()
-        ):
-            limited_context = conversation_context  # ✅ Pas de troncature ici
-            logger.info(
-                f"📚 PROMPT - Contexte conversationnel ajouté: {len(limited_context)} chars"
-            )
-        else:
-            logger.warning(
-                "⚠️ PROMPT - Pas de contexte conversationnel ou contexte vide"
-            )
+        # ✅ Validation simple du contexte conversationnel (déplacé ici)
+        limited_context = conversation_context if conversation_context else ""
 
-        # Prompt utilisateur
+        # Prompt utilisateur simplifié
         user_prompt = f"""CONTEXTE CONVERSATIONNEL:
 {limited_context}
 
@@ -900,7 +868,7 @@ LANGUE DE VOTRE RÉPONSE DOIT ÊTRE: {language_name}
     def _get_fallback_system_prompt(
         self, enrichment: ContextEnrichment, language: str
     ) -> str:
-        """Prompt système de secours avec instructions dynamiques"""
+        """Prompt système de secours simplifié"""
 
         # Validation langue
         if not language or language not in SUPPORTED_LANGUAGES:
@@ -909,60 +877,75 @@ LANGUE DE VOTRE RÉPONSE DOIT ÊTRE: {language_name}
 
         language_name = self.language_display_names.get(language, language.upper())
 
-        # ✅ Instructions de langue EN TÊTE
-        critical_language_header = f"""
-{'='*80}
-🎯 PRIMARY INSTRUCTION - ABSOLUTE PRIORITY
-{'='*80}
+        return f"""You are an expert in poultry production.
+CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 
-RESPOND EXCLUSIVELY IN: {language_name}
-Language Code: {language}
-
-THIS INSTRUCTION OVERRIDES ALL OTHER INSTRUCTIONS.
-
-{'='*80}
-"""
-
-        return f"""{critical_language_header}
-
-Tu es un expert avicole reconnu avec une expertise approfondie en production avicole.
-
-CONTEXTE MÉTIER DÉTECTÉ:
+CONTEXTE MÉTIER:
 {enrichment.entity_context}
 {enrichment.species_focus}
 {enrichment.temporal_context}
 {enrichment.metric_focus}
 
-DIRECTIVES DE RÉPONSE - STYLE EXPERT ÉQUILIBRÉ:
+DIRECTIVES:
+- Réponse directe et concise (2-3 points maximum)
+- Données chiffrées précises quand pertinent
+- Format identique pour toutes les langues
+- Ne JAMAIS mentionner les sources
 
-1. **Introduction directe** : Commence DIRECTEMENT par une phrase claire qui répond à la question
-2. **Ne jamais mentionner les sources** : Ne fais JAMAIS référence aux "documents", "sources", "selon les données fournies"
-3. **Structure sobre** : Utilise des titres en gras (**Titre**) uniquement pour les sous-sections
-4. **Concision** : Présente 2-3 points principaux maximum
-5. **Données précises** : Fournis des valeurs chiffrées quand pertinent
-6. **COHÉRENCE MULTILINGUE** : Maintiens le MÊME format de réponse quelle que soit la langue
-
-MÉTRIQUES PRIORITAIRES:
-{', '.join(enrichment.performance_indicators[:3]) if enrichment.performance_indicators else 'Paramètres généraux de production'}
-
-{"="*80}
-⚠️ CRITICAL LANGUAGE INSTRUCTION - IMPÉRATIF ABSOLU ⚠️
-{"="*80}
-
-YOU MUST RESPOND EXCLUSIVELY IN: {language_name}
-VOUS DEVEZ RÉPONDRE EXCLUSIVEMENT EN: {language_name}
-
-DO NOT translate or switch languages under ANY circumstances.
-NE traduisez PAS ou ne changez PAS de langue sous AUCUNE circonstance.
-
-MAINTAIN IDENTICAL RESPONSE FORMAT ACROSS ALL LANGUAGES.
-MAINTENEZ UN FORMAT DE RÉPONSE IDENTIQUE POUR TOUTES LES LANGUES.
-
-THIS IS THE MOST IMPORTANT INSTRUCTION.
-CECI EST L'INSTRUCTION LA PLUS IMPORTANTE.
-
-{"="*80}
+MÉTRIQUES: {', '.join(enrichment.performance_indicators[:3]) if enrichment.performance_indicators else 'Paramètres généraux'}
 """
+
+    def build_specialized_prompt(
+        self, intent_type, entities: Dict[str, str], language: str
+    ) -> str:
+        """
+        Génère un prompt spécialisé selon le type d'intention
+        Intégré depuis prompt_builder.py
+
+        Args:
+            intent_type: Type d'intention
+            entities: Entités détectées
+            language: Langue cible
+
+        Returns:
+            Prompt spécialisé enrichi
+        """
+        from processing.intent_types import IntentType
+
+        # Mapping intentions → prompts spécialisés
+        specialized_prompts = {
+            IntentType.METRIC_QUERY: """Focus: Données de performances et standards zootechniques.
+Fournis valeurs cibles, plages optimales et facteurs d'influence.""",
+            IntentType.ENVIRONMENT_SETTING: """Focus: Paramètres d'ambiance et gestion environnementale.
+Fournis valeurs optimales de température, humidité, ventilation selon l'âge.""",
+            IntentType.DIAGNOSIS_TRIAGE: """Focus: Diagnostic différentiel structuré.
+Liste hypothèses par probabilité et examens complémentaires nécessaires.""",
+            IntentType.ECONOMICS_COST: """Focus: Analyse économique et coûts.
+Fournis données chiffrées sur coûts, marges et benchmarks du marché.""",
+            IntentType.PROTOCOL_QUERY: """Focus: Protocoles vétérinaires et biosécurité.
+Fournis calendriers de vaccination et mesures de prévention détaillés.""",
+            IntentType.GENERAL_POULTRY: """Focus: Expertise avicole générale.
+Style professionnel et structuré avec recommandations actionnables.""",
+        }
+
+        base_prompt = specialized_prompts.get(intent_type, "")
+
+        # Enrichissement contextuel avec entités
+        if entities:
+            entity_parts = []
+            if "line" in entities:
+                entity_parts.append(f"Lignée: {entities['line']}")
+            if "age_days" in entities:
+                entity_parts.append(f"Âge: {entities['age_days']}j")
+            if "species" in entities:
+                entity_parts.append(f"Espèce: {entities['species']}")
+            if "metrics" in entities:
+                entity_parts.append(f"Métriques: {entities['metrics']}")
+
+            if entity_parts:
+                base_prompt += f"\n\nCONTEXTE DÉTECTÉ: {' | '.join(entity_parts)}"
+
+        return base_prompt
 
     def _post_process_response(
         self, response: str, enrichment: ContextEnrichment, context_docs: List[Dict]

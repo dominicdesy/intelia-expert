@@ -38,7 +38,13 @@ class ConversationMemory:
         )  # Source unique de vérité depuis env
 
     async def get_contextual_memory(self, tenant_id: str, current_query: str) -> str:
-        """Récupère le contexte conversationnel enrichi"""
+        """
+        Récupère le contexte conversationnel enrichi
+
+        Returns:
+            String formatée pour rétrocompatibilité (les autres modules attendent une string)
+            Le query_enricher extraira les entités de cette string
+        """
 
         # 🔍 DEBUG CRITIQUE - Logs d'entrée
         logger.info("🔍 MEMORY - get_contextual_memory appelée")
@@ -62,24 +68,34 @@ class ConversationMemory:
             return ""
 
         try:
-            # Retourner les 2-3 derniers échanges selon la longueur
+            # Prendre les N derniers échanges
+            recent_exchanges = history[-self.max_exchanges :]
+
             context_parts = []
             total_length = 0
 
             # 🔍 DEBUG - Traitement des échanges
             logger.info(
-                f"🔍 MEMORY - Traitement des {len(history[-3:])} derniers échanges"
+                f"🔍 MEMORY - Traitement de {len(recent_exchanges)} échanges récents"
             )
 
-            for i, exchange in enumerate(reversed(history[-3:])):  # 3 derniers max
-                logger.info(
-                    f"🔍 MEMORY - Échange {i}: Q={exchange['question'][:50]}... R={exchange['answer'][:50]}..."
-                )
+            for i, exchange in enumerate(reversed(recent_exchanges)):
+                question = exchange.get("question", "")
+                answer = exchange.get("answer", "")
 
-                exchange_text = f"Q: {exchange['question'][:150]}... R: {exchange['answer'][:200]}..."
+                if not question or not answer:
+                    logger.info(
+                        f"🔍 MEMORY - Échange {i} ignoré (question ou réponse vide)"
+                    )
+                    continue
+
+                # Format: Q: ... R: ...
+                exchange_text = f"Q: {question[:200]}... R: {answer[:200]}..."
                 exchange_length = len(exchange_text)
 
-                # 🔍 DEBUG - Vérification avant limite
+                logger.info(
+                    f"🔍 MEMORY - Échange {i}: Q={question[:50]}... R={answer[:50]}..."
+                )
                 logger.info(
                     f"🔍 MEMORY - Longueur échange {i}: {exchange_length} caractères"
                 )
@@ -90,19 +106,27 @@ class ConversationMemory:
                     f"🔍 MEMORY - Limite MAX_CONVERSATION_CONTEXT: {MAX_CONVERSATION_CONTEXT} caractères"
                 )
 
-                if total_length + exchange_length <= MAX_CONVERSATION_CONTEXT:
-                    context_parts.insert(0, exchange_text)
-                    total_length += exchange_length
+                if total_length + exchange_length > MAX_CONVERSATION_CONTEXT:
                     logger.info(
-                        f"🔍 MEMORY - Échange {i} ajouté, total_length: {total_length}"
-                    )
-                else:
-                    logger.info(
-                        f"🔍 MEMORY - Échange {i} ignoré (dépassement limite: {total_length + exchange_length} > {MAX_CONVERSATION_CONTEXT})"
+                        f"🔍 MEMORY - Limite atteinte, stop à {i} échanges (dépassement: {total_length + exchange_length} > {MAX_CONVERSATION_CONTEXT})"
                     )
                     break
 
-            formatted_context = " | ".join(context_parts)
+                context_parts.insert(0, exchange_text)
+                total_length += exchange_length
+
+                logger.info(
+                    f"🔍 MEMORY - Échange {i} ajouté, total_length: {total_length}"
+                )
+
+            if not context_parts:
+                logger.info("🔍 MEMORY - Aucun échange valide à retourner")
+                return ""
+
+            # Formater avec header pour que query_enricher puisse parser
+            formatted_context = "Q: previous_conversation\nR: " + "\n".join(
+                context_parts
+            )
 
             # 🔍 DEBUG - Résultat final
             logger.info(
@@ -111,9 +135,7 @@ class ConversationMemory:
             logger.info(
                 f"🔍 MEMORY - Contexte preview: {formatted_context[:200] if formatted_context else 'VIDE'}..."
             )
-            logger.info(
-                f"🔍 MEMORY - MAX_CONVERSATION_CONTEXT utilisé: {MAX_CONVERSATION_CONTEXT}"
-            )
+            logger.info(f"🔍 MEMORY - Nombre d'échanges inclus: {len(context_parts)}")
 
             return formatted_context
 

@@ -41,6 +41,7 @@ from .rag_engine_handlers import (
 # NOUVEAUX IMPORTS - QueryRouter remplace plusieurs modules
 from .query_router import QueryRouter
 from .entity_extractor import EntityExtractor
+from .query_enricher import ConversationalQueryEnricher  # ✅ NOUVEAU
 
 # ✅ NOUVEAU: Import de ConversationMemory pour l'historique
 try:
@@ -175,6 +176,7 @@ class InteliaRAGEngine:
             "errors_count": 0,
             "preextracted_entities_queries": 0,
             "contextual_memory_queries": 0,
+            "queries_enriched": 0,  # ✅ NOUVEAU
         }
 
     async def initialize(self):
@@ -404,9 +406,26 @@ class InteliaRAGEngine:
                 "⚠️ GENERATE - conversation_memory est None, impossible de récupérer l'historique"
             )
 
+        # ✅ NOUVEAU : Enrichissement conversationnel
+        original_query = query
+        if contextual_history:
+            try:
+                enricher = ConversationalQueryEnricher()
+                query = enricher.enrich(query, contextual_history, effective_language)
+
+                if query != original_query:
+                    logger.info(f"🔄 Query enrichie: '{original_query}' → '{query}'")
+                    self.optimization_stats["queries_enriched"] = (
+                        self.optimization_stats.get("queries_enriched", 0) + 1
+                    )
+            except Exception as e:
+                logger.warning(f"⚠️ Échec enrichissement query: {e}")
+                # En cas d'erreur, on garde la query originale
+                query = original_query
+
         try:
             return await self._process_query(
-                query,
+                query,  # ← Query possiblement enrichie
                 effective_language,
                 tenant_id,
                 start_time,
@@ -499,9 +518,26 @@ class InteliaRAGEngine:
             except Exception as e:
                 logger.warning(f"⚠️ Échec récupération historique: {e}")
 
+        # ✅ NOUVEAU : Enrichissement conversationnel
+        original_query = query
+        if contextual_history:
+            try:
+                enricher = ConversationalQueryEnricher()
+                query = enricher.enrich(query, contextual_history, effective_language)
+
+                if query != original_query:
+                    logger.info(f"🔄 Query enrichie: '{original_query}' → '{query}'")
+                    self.optimization_stats["queries_enriched"] = (
+                        self.optimization_stats.get("queries_enriched", 0) + 1
+                    )
+            except Exception as e:
+                logger.warning(f"⚠️ Échec enrichissement query: {e}")
+                # En cas d'erreur, on garde la query originale
+                query = original_query
+
         try:
             return await self._process_query_with_entities(
-                query,
+                query,  # ← Query possiblement enrichie
                 entities,
                 effective_language,
                 tenant_id,
@@ -995,8 +1031,8 @@ class InteliaRAGEngine:
             "rag_enabled": RAG_ENABLED,
             "initialized": self.is_initialized,
             "degraded_mode": self.degraded_mode,
-            "version": "v4.8.1_conversation_memory",
-            "architecture": "modular_query_router_with_memory",
+            "version": "v4.8.2_query_enrichment",
+            "architecture": "modular_query_router_with_memory_and_enrichment",
             "modules": {
                 "core": True,
                 "rag_engine": True,

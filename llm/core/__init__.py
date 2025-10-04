@@ -18,10 +18,14 @@ Core module - Modules centraux du système RAG
 
 from .data_models import RAGResult, RAGSource, Document
 from .memory import ConversationMemory
+from .query_enricher import (
+    ConversationalQueryEnricher,
+)  # ✅ NOUVEAU - Enrichissement conversationnel
 
 __all__ = [
     "RAGResult",
     "RAGSource",
     "Document",
     "ConversationMemory",
+    "ConversationalQueryEnricher",  # ✅ NOUVEAU
 ]

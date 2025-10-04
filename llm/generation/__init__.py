@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 Generation module - Génération et construction des réponses
-Version corrigée sans doublons
+Version 3.4 - Simplifié et consolidé
 """
 
 from .generators import EnhancedResponseGenerator, create_enhanced_generator
-from .prompt_builder import PromptBuilder
 
+# Note: prompt_builder.py supprimé - fonctionnalité intégrée dans generators.py
 # Note: enhanced_response_generator.py supprimé (doublon)
-# Toutes les fonctionnalités sont maintenant dans generators.py
 
-__all__ = ["EnhancedResponseGenerator", "create_enhanced_generator", "PromptBuilder"]
+__all__ = ["EnhancedResponseGenerator", "create_enhanced_generator"]
