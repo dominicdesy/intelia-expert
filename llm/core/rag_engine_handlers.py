@@ -892,6 +892,15 @@ class StandardQueryHandler(BaseQueryHandler):
             logger.info(
                 f"📚 Recherche Weaviate (top_k={top_k}, langue={language}, filters={filters})"
             )
+
+            # ✅ DEBUG: Vérifier contextual_history avant appel
+            logger.info(
+                f"🔍 AVANT WEAVIATE CALL #3 (FALLBACK) - contextual_history présent: {bool(contextual_history)}"
+            )
+            logger.info(
+                f"🔍 AVANT WEAVIATE CALL #3 (FALLBACK) - contextual_history length: {len(contextual_history)}"
+            )
+
             # ✅ CORRECTION: Passer preprocessed_data complet
             return await self._search_weaviate_direct(
                 query,
