@@ -16,7 +16,6 @@ import json
 from core.data_models import Document
 from config.config import (
     ENTITY_CONTEXTS,
-    MAX_CONVERSATION_CONTEXT,
     SUPPORTED_LANGUAGES,
     FALLBACK_LANGUAGE,
 )
@@ -753,13 +752,14 @@ MÉTRIQUES PRIORITAIRES:
             system_prompt = self._get_fallback_system_prompt(enrichment, language)
 
         # ✅ FIX CRITIQUE: Validation robuste du contexte conversationnel
+        # ✅ CORRECTION: Enlever la troncature [:MAX_CONVERSATION_CONTEXT] pour envoyer le contexte COMPLET
         limited_context = ""
         if (
             conversation_context
             and isinstance(conversation_context, str)
             and conversation_context.strip()
         ):
-            limited_context = conversation_context[:MAX_CONVERSATION_CONTEXT]
+            limited_context = conversation_context  # ✅ Pas de troncature ici
             logger.info(
                 f"📚 PROMPT - Contexte conversationnel ajouté: {len(limited_context)} chars"
             )
