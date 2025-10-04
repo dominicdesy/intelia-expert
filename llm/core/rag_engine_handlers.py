@@ -1074,17 +1074,40 @@ class StandardQueryHandler(BaseQueryHandler):
             # ✅ NOUVEAU: Extraire et convertir contextual_history pour Weaviate
             contextual_history = preprocessed_data.get("contextual_history", "")
 
-            # ✅ CONVERSION SIMPLE: String → List[Dict]
+            # ✅ CORRECTION
             conversation_context_list = []
             if contextual_history:
-                # Passer le contexte formaté comme un seul "échange"
-                conversation_context_list = [
-                    {"question": "previous_conversation", "answer": contextual_history}
-                ]
+                # Parser le contexte pour extraire les vrais Q/R
+                # Format du contexte: "Q: ... R: ...\nQ: ... R: ..."
+                conversation_context_list = []
 
-            logger.info(
-                f"📝 Contexte transmis à Weaviate: {len(conversation_context_list)} éléments ({len(contextual_history)} chars)"
-            )
+                # Split sur les sauts de ligne pour récupérer chaque échange
+                exchanges = contextual_history.split("\n")
+
+                for exchange in exchanges:
+                    exchange = exchange.strip()
+                    if not exchange:
+                        continue
+
+                    # Extraire Q et R de chaque ligne
+                    if "Q:" in exchange and "R:" in exchange:
+                        try:
+                            q_part = exchange.split("R:")[0].replace("Q:", "").strip()
+                            r_part = exchange.split("R:")[1].strip()
+
+                            if q_part and r_part:
+                                conversation_context_list.append(
+                                    {"question": q_part, "answer": r_part}
+                                )
+                        except IndexError:
+                            logger.warning(
+                                f"Impossible de parser l'échange: {exchange[:50]}..."
+                            )
+                            continue
+
+                logger.info(
+                    f"📝 Contexte parsé: {len(conversation_context_list)} échanges extraits"
+                )
 
             result = await self.weaviate_core.search(
                 query=query,
