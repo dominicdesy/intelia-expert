@@ -33,16 +33,16 @@ from .chat_models import (
     IngestionRequest,
     ExpertQueryRequest,
 )
-
-from core.memory import ConversationMemory
-
+from .conversation_context import (
+    ConversationContextManager,
+)
 from .chat_handlers import ChatHandlers
 
 logger = logging.getLogger(__name__)
 
 
 # Instance globale du gestionnaire
-context_manager = ConversationMemory(client=None)
+context_manager = ConversationContextManager()
 
 
 def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
@@ -381,7 +381,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             )
 
             # Vérifier si on est en contexte de clarification
-            pending_context = context_manager.get_pending_clarification(tenant_id)
+            pending_context = context_manager.get_pending(tenant_id)
             if pending_context:
                 original_language = pending_context.get("original_language")
                 if original_language:
