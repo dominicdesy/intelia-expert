@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 api/chat_handlers.py - Logique de traitement des requêtes de chat
-Version 4.5.0 - SIMPLIFICATION - Le router gère le contexte
+Version 5.0.0 - INTÉGRATION QUERY ROUTER
+Le contexte conversationnel est maintenant géré par QueryRouter dans RAGEngine
 """
 
 import time
@@ -21,16 +22,30 @@ from .endpoints_utils import (
     safe_serialize_for_json,
     add_to_conversation_memory,
 )
-from core.memory import ConversationMemory
 
 logger = logging.getLogger(__name__)
 
 
 class ChatHandlers:
-    """Gestionnaires de logique métier pour les endpoints de chat"""
+    """
+    Gestionnaires de logique métier pour les endpoints de chat
 
-    def __init__(self, context_manager: ConversationMemory, services: Dict[str, Any]):
-        self.context_manager = context_manager
+    VERSION 5.0.0 - SIMPLIFICATION MAJEURE:
+    - Plus de gestion de contexte conversationnel ici
+    - Plus de gestion de clarification ici
+    - QueryRouter dans RAGEngine gère TOUT
+    - Cette classe fait juste l'interface entre endpoints et RAG
+    """
+
+    def __init__(self, services: Dict[str, Any]):
+        """
+        Initialisation simplifiée
+
+        Args:
+            services: Services disponibles (health_monitor, etc.)
+
+        Note: context_manager supprimé - le router gère le contexte
+        """
         self.services = services
 
     def get_rag_engine(self):
@@ -51,27 +66,42 @@ class ChatHandlers:
     ):
         """
         Génère une réponse via le RAG Engine
-        Retourne le résultat ou None si erreur
 
-        ✅ VERSION 4.5.0: Simplifié - pas de gestion de contexte
-        - Le router gère maintenant tout le contexte conversationnel
-        - Cette méthode se concentre uniquement sur l'appel RAG
+        VERSION 5.0.0:
+        - Appel direct au RAG sans pré-traitement
+        - Le QueryRouter dans RAGEngine gère:
+          * Extraction d'entités
+          * Contexte conversationnel
+          * Validation
+          * Routing
+
+        Args:
+            query: Requête utilisateur
+            tenant_id: ID utilisateur (passé au router pour contexte)
+            language: Langue détectée
+            use_json_search: Activer recherche JSON
+            genetic_line_filter: Filtre lignée génétique
+            performance_context: Contexte performance
+
+        Returns:
+            RAGResult ou None si erreur
         """
         rag_engine = self.get_rag_engine()
 
         if not rag_engine or not safe_get_attribute(
             rag_engine, "is_initialized", False
         ):
+            logger.error("RAG Engine non disponible ou non initialisé")
             return None
 
         try:
             if not hasattr(rag_engine, "generate_response"):
+                logger.error("RAG Engine sans méthode generate_response")
                 return None
 
-            # Le contexte conversationnel est géré par le router
-            # Ici on fait juste l'appel RAG basique
-            logger.info(f"🎯 Appel RAG avec performance_context: {performance_context}")
+            logger.info(f"🎯 Appel RAG pour tenant={tenant_id}, lang={language}")
 
+            # Appel RAG - tenant_id est utilisé par le router pour le contexte
             rag_result = await rag_engine.generate_response(
                 query=query,
                 tenant_id=tenant_id,
@@ -82,10 +112,19 @@ class ChatHandlers:
                 enable_preprocessing=True,
             )
 
+            # Le router a géré la validation et le contexte
+            # Vérifier si clarification nécessaire
+            if hasattr(rag_result, "metadata"):
+                metadata = rag_result.metadata or {}
+                if metadata.get("needs_clarification"):
+                    logger.info("⚠️ Clarification nécessaire détectée par le router")
+                    # Le message de clarification est dans rag_result.answer
+                    return rag_result
+
             return rag_result
 
         except Exception as e:
-            logger.error(f"Erreur generate_response: {e}")
+            logger.error(f"Erreur generate_response: {e}", exc_info=True)
             return None
 
     def create_fallback_result(
@@ -97,7 +136,20 @@ class ChatHandlers:
         use_json_search: bool = True,
         genetic_line_filter: Optional[str] = None,
     ):
-        """Crée un résultat de fallback avec réponse aviculture"""
+        """
+        Crée un résultat de fallback avec réponse aviculture générique
+
+        Args:
+            message: Message original
+            language: Langue
+            fallback_reason: Raison du fallback
+            total_start_time: Timestamp de début
+            use_json_search: Flag JSON search
+            genetic_line_filter: Filtre lignée
+
+        Returns:
+            FallbackResult avec réponse générique
+        """
         aviculture_response = get_aviculture_response(message, language)
 
         class FallbackResult:
@@ -113,6 +165,7 @@ class ChatHandlers:
                     "json_system_attempted": use_json_search,
                     "genetic_line_filter": genetic_line_filter,
                     "preprocessing_enabled": True,
+                    "router_version": "5.0.0",
                 }
                 self.context_docs = []
 
@@ -127,30 +180,49 @@ class ChatHandlers:
         total_processing_time: float,
     ):
         """
-        Génère un flux de réponse SSE
+        Génère un flux de réponse SSE (Server-Sent Events)
 
-        ✅ VERSION 4.5.0: Simplifié - métadonnées de base uniquement
+        VERSION 5.0.0:
+        - Métadonnées simplifiées
+        - Plus de gestion de clarification ici
+        - Le router a déjà géré tout le contexte
+
+        Args:
+            rag_result: Résultat du RAG Engine
+            message: Message original
+            tenant_id: ID utilisateur
+            language: Langue
+            total_processing_time: Temps total de traitement
+
+        Yields:
+            Events SSE formatés
         """
         try:
+            # Extraction métadonnées
             metadata = safe_get_attribute(rag_result, "metadata", {}) or {}
             source = safe_get_attribute(rag_result, "source", "unknown")
             confidence = safe_get_attribute(rag_result, "confidence", 0.5)
             processing_time = safe_get_attribute(rag_result, "processing_time", 0)
 
+            # Normaliser source (peut être un enum)
             if hasattr(source, "value"):
                 source = source.value
             else:
                 source = str(source)
 
+            # Event START
             start_data = {
                 "type": "start",
                 "source": source,
                 "confidence": float(confidence),
                 "processing_time": float(processing_time),
                 "fallback_used": safe_dict_get(metadata, "fallback_used", False),
-                "architecture": "modular-endpoints-simplified",
+                "architecture": "query-router-v5",
                 "serialization_version": "optimized_cached",
                 "preprocessing_enabled": True,
+                "router_managed": True,  # Nouveau flag
+                "needs_clarification": metadata.get("needs_clarification", False),
+                "missing_fields": metadata.get("missing_fields", []),
                 "json_system_used": metadata.get("json_system", {}).get("used", False),
                 "json_results_count": metadata.get("json_system", {}).get(
                     "results_count", 0
@@ -162,22 +234,26 @@ class ChatHandlers:
 
             yield sse_event(safe_serialize_for_json(start_data))
 
+            # Extraction de la réponse (avec fallbacks)
             answer = safe_get_attribute(rag_result, "answer", "")
             if not answer:
                 answer = safe_get_attribute(rag_result, "response", "")
                 if not answer:
                     answer = safe_get_attribute(rag_result, "text", "")
                     if not answer:
+                        # Dernier fallback: réponse aviculture
                         answer = get_aviculture_response(message, language)
 
+            # Streaming de la réponse par chunks
             if answer:
                 chunks = smart_chunk_text(str(answer), STREAM_CHUNK_LEN)
                 for i, chunk in enumerate(chunks):
                     yield sse_event(
                         {"type": "chunk", "content": chunk, "chunk_index": i}
                     )
-                    await asyncio.sleep(0.01)
+                    await asyncio.sleep(0.01)  # Petit délai pour fluidité
 
+            # Extraction documents utilisés
             context_docs = safe_get_attribute(rag_result, "context_docs", [])
             if not isinstance(context_docs, list):
                 context_docs = []
@@ -189,14 +265,18 @@ class ChatHandlers:
             if documents_used == 0:
                 documents_used = len(context_docs)
 
+            # Event END
             end_data = {
                 "type": "end",
                 "total_time": total_processing_time,
                 "confidence": float(confidence),
                 "documents_used": documents_used,
                 "source": source,
-                "architecture": "modular-endpoints-simplified",
+                "architecture": "query-router-v5",
                 "preprocessing_enabled": True,
+                "router_managed": True,
+                "needs_clarification": metadata.get("needs_clarification", False),
+                "is_contextual": metadata.get("is_contextual", False),
                 "json_system_used": metadata.get("json_system", {}).get("used", False),
                 "json_results_count": metadata.get("json_system", {}).get(
                     "results_count", 0
@@ -204,17 +284,43 @@ class ChatHandlers:
                 "genetic_lines_detected": metadata.get("json_system", {}).get(
                     "genetic_lines_detected", []
                 ),
-                "detection_version": "4.5.0_simplified",
+                "detection_version": "5.0.0_query_router",
             }
 
             yield sse_event(safe_serialize_for_json(end_data))
 
-            # Sauvegarder dans la mémoire conversationnelle si pas de clarification
+            # Sauvegarder dans la mémoire conversationnelle
+            # (en plus du contexte géré par le router)
             if answer and source and not metadata.get("needs_clarification"):
-                add_to_conversation_memory(
-                    tenant_id, message, str(answer), "rag_enhanced_json"
-                )
+                try:
+                    add_to_conversation_memory(
+                        tenant_id, message, str(answer), "rag_enhanced_json"
+                    )
+                except Exception as e:
+                    logger.warning(f"Erreur sauvegarde mémoire: {e}")
 
         except Exception as e:
-            logger.error(f"Erreur streaming: {e}")
+            logger.error(f"Erreur streaming: {e}", exc_info=True)
             yield sse_event({"type": "error", "message": str(e)})
+
+    def get_status(self) -> Dict[str, Any]:
+        """
+        Status des handlers
+
+        Returns:
+            Dict avec informations de status
+        """
+        rag_engine = self.get_rag_engine()
+
+        return {
+            "version": "5.0.0",
+            "architecture": "query-router-integrated",
+            "rag_engine_available": rag_engine is not None,
+            "rag_engine_initialized": (
+                safe_get_attribute(rag_engine, "is_initialized", False)
+                if rag_engine
+                else False
+            ),
+            "context_management": "router_managed",
+            "clarification_management": "router_managed",
+        }
