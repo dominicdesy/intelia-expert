@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine_handlers.py - Handlers spécialisés pour différents types de requêtes
-VERSION 4.5 - CORRECTION CRITIQUE PERTINENCE:
-- ✅ NOUVEAU: Vérification de pertinence avant retour résultats PostgreSQL
-- ✅ NOUVEAU: Fallback automatique vers Weaviate si résultats non pertinents
-- ✅ CORRECTION: Validation PostgreSQLValidator AVANT appel search_metrics()
-- ✅ CORRECTION: Retour immédiat sur needs_fallback avec message de clarification
+VERSION 4.6 - AJOUT FILTRAGE SPECIES:
+- ✅ NOUVEAU: Extraction species depuis entities et passage via filters dict
+- ✅ NOUVEAU: Filtrage species dans tous les retrievers (PostgreSQL + Weaviate)
+- ✅ Compatible avec StandardQueryHandler pour queries métrique et qualitatives
+- ✅ Maintien vérification pertinence avant retour résultats PostgreSQL
+- ✅ Fallback automatique vers Weaviate si résultats non pertinents
+- ✅ Validation PostgreSQLValidator AVANT appel search_metrics()
 - Compatible avec la structure harmonisée du comparison_handler
 - Mode optimisation pour tri par pertinence
-- Évite double appel PostgreSQL avant fallback Weaviate
-- Respecte le routage suggéré par OpenAI avec priorité à PostgreSQL routing hint
 """
 
 import re
@@ -63,7 +63,7 @@ class BaseQueryHandler:
         self, query: str, context_docs: List[Dict], entities: Dict[str, Any]
     ) -> bool:
         """
-        ✅ NOUVELLE MÉTHODE: Vérifie si les documents retournés sont pertinents pour la query
+        ✅ MÉTHODE DE PERTINENCE: Vérifie si les documents retournés sont pertinents pour la query
 
         Args:
             query: Question originale
@@ -184,6 +184,36 @@ class BaseQueryHandler:
         logger.debug("✅ PERTINENCE: Query métrique, documents acceptés → PERTINENT")
         return True
 
+    def _extract_filters_from_entities(
+        self, entities: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        ✅ NOUVELLE MÉTHODE: Extrait les filtres depuis les entités détectées
+
+        Args:
+            entities: Dictionnaire des entités extraites par le preprocessing
+
+        Returns:
+            Dict contenant les filtres à appliquer (species, genetic_line, etc.)
+        """
+        filters = {}
+
+        # Extraire species
+        if "species" in entities and entities["species"]:
+            filters["species"] = entities["species"]
+            logger.info(f"🐔 Species filter extracted: {entities['species']}")
+
+        # Extraire genetic_line si présent
+        if "genetic_line" in entities and entities["genetic_line"]:
+            filters["genetic_line"] = entities["genetic_line"]
+            logger.info(f"🧬 Genetic line filter extracted: {entities['genetic_line']}")
+
+        # Vous pouvez ajouter d'autres filtres ici selon vos besoins
+        # if 'country' in entities:
+        #     filters['country'] = entities['country']
+
+        return filters
+
 
 class ComparativeQueryHandler(BaseQueryHandler):
     """Handler pour les requêtes comparatives"""
@@ -296,6 +326,9 @@ class ComparativeQueryHandler(BaseQueryHandler):
 
         logger.info(f"🌍 Fallback comparative avec langue: {language}")
 
+        # ✅ NOUVEAU: Extraire filters depuis entities
+        filters = self._extract_filters_from_entities(entities)
+
         availability_metadata = {
             "postgresql_available": self.postgresql_system is not None,
             "weaviate_available": self.weaviate_core is not None,
@@ -304,13 +337,14 @@ class ComparativeQueryHandler(BaseQueryHandler):
         # 1. Tentative PostgreSQL
         if self.postgresql_system and entities:
             logger.info(
-                f"🔍 Fallback comparative: tentative PostgreSQL (langue={language})"
+                f"🔍 Fallback comparative: tentative PostgreSQL (langue={language}, filters={filters})"
             )
             try:
                 result = await self.postgresql_system.search_metrics(
                     query=query,
                     entities=entities,
                     top_k=RAG_SIMILARITY_TOP_K,
+                    filters=filters,  # ✅ NOUVEAU paramètre
                 )
 
                 if result and result.source != RAGSource.NO_RESULTS:
@@ -320,6 +354,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
                             "fallback_applied": True,
                             "processing_time": time.time() - start_time,
                             "language_used": language,
+                            "filters_applied": filters,  # ✅ NOUVEAU
                             **availability_metadata,
                         }
                     )
@@ -337,13 +372,14 @@ class ComparativeQueryHandler(BaseQueryHandler):
         # 2. Tentative Weaviate
         if self.weaviate_core:
             logger.info(
-                f"🔍 Fallback comparative: tentative Weaviate (langue={language})"
+                f"🔍 Fallback comparative: tentative Weaviate (langue={language}, filters={filters})"
             )
             try:
                 weaviate_result = await self.weaviate_core.search(
                     query=query,
                     top_k=RAG_SIMILARITY_TOP_K,
                     language=language,
+                    filters=filters,  # ✅ NOUVEAU paramètre
                 )
 
                 if weaviate_result and weaviate_result.source == RAGSource.RAG_SUCCESS:
@@ -353,6 +389,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
                             "fallback_applied": True,
                             "processing_time": time.time() - start_time,
                             "language_used": language,
+                            "filters_applied": filters,  # ✅ NOUVEAU
                             **availability_metadata,
                         }
                     )
@@ -379,6 +416,7 @@ class ComparativeQueryHandler(BaseQueryHandler):
                 "is_success": False,
                 "is_error": True,
                 "language_attempted": language,
+                "filters_attempted": filters,  # ✅ NOUVEAU
                 **availability_metadata,
             },
         )
@@ -419,6 +457,9 @@ class TemporalQueryHandler(BaseQueryHandler):
         entities = preprocessed_data["entities"]
         language = preprocessed_data.get("language", "fr")
 
+        # ✅ NOUVEAU: Extraire filters depuis entities
+        filters = self._extract_filters_from_entities(entities)
+
         age_range = self._extract_age_range_from_query(query)
         if not age_range:
             return RAGResult(
@@ -429,7 +470,7 @@ class TemporalQueryHandler(BaseQueryHandler):
 
         try:
             logger.info(
-                f"Traitement plage temporelle: {age_range[0]}-{age_range[1]} jours (langue={language})"
+                f"Traitement plage temporelle: {age_range[0]}-{age_range[1]} jours (langue={language}, filters={filters})"
             )
 
             if hasattr(self.postgresql_system, "search_metrics_range"):
@@ -439,6 +480,7 @@ class TemporalQueryHandler(BaseQueryHandler):
                     age_min=age_range[0],
                     age_max=age_range[1],
                     top_k=RAG_SIMILARITY_TOP_K,
+                    filters=filters,  # ✅ NOUVEAU paramètre
                 )
 
                 if result and result.source != RAGSource.NO_RESULTS:
@@ -449,12 +491,13 @@ class TemporalQueryHandler(BaseQueryHandler):
                             "processing_time": time.time() - start_time,
                             "optimization": "single_query_between",
                             "language_used": language,
+                            "filters_applied": filters,  # ✅ NOUVEAU
                         }
                     )
                     return result
 
             return await self._handle_temporal_fallback(
-                query, entities, age_range, start_time, language
+                query, entities, age_range, start_time, language, filters
             )
 
         except Exception as e:
@@ -493,8 +536,12 @@ class TemporalQueryHandler(BaseQueryHandler):
         age_range: Tuple[int, int],
         start_time: float,
         language: str = "fr",
+        filters: Dict[str, Any] = None,  # ✅ NOUVEAU paramètre
     ) -> RAGResult:
         """Fallback: requêtes multiples pour plage temporelle"""
+
+        if filters is None:
+            filters = {}
 
         age_min, age_max = age_range
         results = []
@@ -507,6 +554,7 @@ class TemporalQueryHandler(BaseQueryHandler):
                 query=query,
                 entities=age_entities,
                 top_k=3,
+                filters=filters,  # ✅ NOUVEAU paramètre
             )
 
             if result and result.context_docs:
@@ -522,13 +570,18 @@ class TemporalQueryHandler(BaseQueryHandler):
                     "queries_executed": age_max - age_min + 1,
                     "processing_time": time.time() - start_time,
                     "language_used": language,
+                    "filters_applied": filters,  # ✅ NOUVEAU
                 },
             )
 
         return RAGResult(
             source=RAGSource.NO_RESULTS,
             answer="Aucune donnée trouvée pour cette plage temporelle.",
-            metadata={"age_range": age_range, "language_attempted": language},
+            metadata={
+                "age_range": age_range,
+                "language_attempted": language,
+                "filters_attempted": filters,  # ✅ NOUVEAU
+            },
         )
 
 
@@ -547,6 +600,7 @@ class StandardQueryHandler(BaseQueryHandler):
     ) -> RAGResult:
         """
         Traite une requête standard avec routage intelligent
+        ✅ VERSION 4.6: Extraction filters depuis entities + passage aux retrievers
         ✅ VERSION 4.5: VÉRIFICATION DE PERTINENCE avant retour
         ✅ VERSION 4.4: Validation AVANT appel search_metrics()
         """
@@ -572,9 +626,13 @@ class StandardQueryHandler(BaseQueryHandler):
         if entities is None:
             entities = {}
 
+        # ✅ NOUVEAU: Extraire filters depuis entities
+        filters = self._extract_filters_from_entities(entities)
+
         logger.info(f"🌍 StandardQueryHandler traite requête en langue: {language}")
         logger.info(f"🎯 ROUTING_HINT REÇU: '{routing_hint}'")
         logger.info(f"📊 ENTITIES REÇUES: {entities}")
+        logger.info(f"🔍 FILTERS EXTRAITS: {filters}")  # ✅ NOUVEAU log
 
         # Configuration top_k selon mode
         if is_optimization:
@@ -630,12 +688,16 @@ class StandardQueryHandler(BaseQueryHandler):
                             "validation_status": "needs_fallback",
                             "processing_time": time.time() - start_time,
                             "language_used": language,
+                            "filters_extracted": filters,  # ✅ NOUVEAU
                         },
                     )
 
                 if "enhanced_entities" in validation_result:
                     entities = validation_result["enhanced_entities"]
+                    # ✅ NOUVEAU: Re-extraire filters après enrichissement
+                    filters = self._extract_filters_from_entities(entities)
                     logger.info(f"✅ Entités enrichies par validation: {entities}")
+                    logger.info(f"✅ Filters mis à jour: {filters}")
 
             else:
                 logger.warning("⚠️ PostgreSQLValidator non disponible - skip validation")
@@ -643,13 +705,14 @@ class StandardQueryHandler(BaseQueryHandler):
             if self.postgresql_system:
                 try:
                     logger.info(
-                        "🔍 Appel PostgreSQL search_metrics() après validation..."
+                        f"🔍 Appel PostgreSQL search_metrics() avec filters={filters}..."
                     )
 
                     pg_result = await self.postgresql_system.search_metrics(
                         query=query,
                         entities=entities,
                         top_k=top_k,
+                        filters=filters,  # ✅ NOUVEAU paramètre
                     )
 
                     if pg_result.source == RAGSource.INSUFFICIENT_CONTEXT:
@@ -662,6 +725,7 @@ class StandardQueryHandler(BaseQueryHandler):
                                 "routing_hint": "postgresql",
                                 "processing_time": time.time() - start_time,
                                 "language_used": language,
+                                "filters_applied": filters,  # ✅ NOUVEAU
                             }
                         )
                         return pg_result
@@ -677,6 +741,7 @@ class StandardQueryHandler(BaseQueryHandler):
                                 "processing_time": time.time() - start_time,
                                 "language_used": language,
                                 "validation_applied": True,
+                                "filters_applied": filters,  # ✅ NOUVEAU
                             }
                         )
                         return pg_result
@@ -702,6 +767,7 @@ class StandardQueryHandler(BaseQueryHandler):
                     is_optimization,
                     start_time,
                     language,
+                    filters,  # ✅ NOUVEAU paramètre
                 )
             else:
                 logger.info("⚠️ Suggestion Weaviate ignorée (présence âge/métrique)")
@@ -719,13 +785,21 @@ class StandardQueryHandler(BaseQueryHandler):
                     is_optimization,
                     start_time,
                     language,
+                    filters,  # ✅ NOUVEAU paramètre
                 )
 
         # PostgreSQL standard (UN SEUL APPEL) - seulement si pas déjà tenté avec routing hint
         if self.postgresql_system and routing_hint != "postgresql":
-            logger.info(f"Recherche PostgreSQL standard (langue={language})")
+            logger.info(
+                f"Recherche PostgreSQL standard (langue={language}, filters={filters})"
+            )
             result = await self._search_postgresql_once(
-                query, entities, top_k, is_optimization, language
+                query,
+                entities,
+                top_k,
+                is_optimization,
+                language,
+                filters,  # ✅ NOUVEAU paramètre
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
@@ -749,7 +823,9 @@ class StandardQueryHandler(BaseQueryHandler):
 
         # 🆕 ÉTAPE 3: Fallback Weaviate (comportement original)
         if self.weaviate_core:
-            logger.info(f"📚 Recherche Weaviate (top_k={top_k}, langue={language})")
+            logger.info(
+                f"📚 Recherche Weaviate (top_k={top_k}, langue={language}, filters={filters})"
+            )
             return await self._search_weaviate_direct(
                 query,
                 entities,
@@ -757,6 +833,7 @@ class StandardQueryHandler(BaseQueryHandler):
                 is_optimization,
                 start_time,
                 language,
+                filters,  # ✅ NOUVEAU paramètre
             )
 
         return RAGResult(
@@ -767,6 +844,7 @@ class StandardQueryHandler(BaseQueryHandler):
                 "optimization_mode": is_optimization,
                 "routing_hint": routing_hint,
                 "language_attempted": language,
+                "filters_attempted": filters,  # ✅ NOUVEAU
             },
         )
 
@@ -777,16 +855,22 @@ class StandardQueryHandler(BaseQueryHandler):
         top_k: int,
         is_optimization: bool,
         language: str = "fr",
+        filters: Dict[str, Any] = None,  # ✅ NOUVEAU paramètre
     ) -> Optional[RAGResult]:
         """
         Effectue UNE SEULE recherche PostgreSQL
         Retourne None si aucun résultat (pas de retry)
+        ✅ VERSION 4.6: Ajout paramètre filters
         """
+        if filters is None:
+            filters = {}
+
         try:
             result = await self.postgresql_system.search_metrics(
                 query=query,
                 entities=entities,
                 top_k=top_k,
+                filters=filters,  # ✅ NOUVEAU paramètre
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
@@ -798,6 +882,7 @@ class StandardQueryHandler(BaseQueryHandler):
 
                 result.metadata["search_attempt"] = "postgresql_single"
                 result.metadata["language_used"] = language
+                result.metadata["filters_applied"] = filters  # ✅ NOUVEAU
                 logger.info(
                     f"✅ PostgreSQL ({language}): {len(result.context_docs)} documents trouvés"
                 )
@@ -815,7 +900,9 @@ class StandardQueryHandler(BaseQueryHandler):
         self, context_docs: List[Dict], target_species: str = "broilers"
     ) -> List[Dict]:
         """
-        ✅ NOUVELLE MÉTHODE: Filtre les documents pour ne garder que l'espèce cible
+        ✅ MÉTHODE DE FILTRAGE: Filtre les documents pour ne garder que l'espèce cible
+        NOTE: Cette méthode est conservée pour compatibilité mais le filtrage
+        devrait maintenant se faire au niveau des retrievers via le paramètre filters
 
         Args:
             context_docs: Liste de documents
@@ -859,22 +946,27 @@ class StandardQueryHandler(BaseQueryHandler):
         is_optimization: bool,
         start_time: float,
         language: str = "fr",
+        filters: Dict[str, Any] = None,  # ✅ NOUVEAU paramètre
     ) -> RAGResult:
         """
         Recherche directe dans Weaviate (fallback ou routage suggéré)
-        ✅ VERSION 4.6: Correction - pas de filtrage post-génération
+        ✅ VERSION 4.6: Ajout paramètre filters
         """
+        if filters is None:
+            filters = {}
+
         try:
             weaviate_top_k = 5 if is_optimization else top_k
 
             logger.info(
-                f"Recherche Weaviate (top_k={weaviate_top_k}, langue={language})"
+                f"Recherche Weaviate (top_k={weaviate_top_k}, langue={language}, filters={filters})"
             )
 
             result = await self.weaviate_core.search(
                 query=query,
                 top_k=weaviate_top_k,
                 language=language,
+                filters=filters,  # ✅ NOUVEAU paramètre
             )
 
             if result and result.source != RAGSource.NO_RESULTS:
@@ -891,6 +983,7 @@ class StandardQueryHandler(BaseQueryHandler):
                 result.metadata["top_k_used"] = weaviate_top_k
                 result.metadata["processing_time"] = time.time() - start_time
                 result.metadata["language_used"] = language
+                result.metadata["filters_applied"] = filters  # ✅ NOUVEAU
 
                 logger.info(f"✅ Weaviate ({language}): {doc_count} documents trouvés")
                 return result
@@ -903,6 +996,7 @@ class StandardQueryHandler(BaseQueryHandler):
                         "source": "weaviate_fallback",
                         "processing_time": time.time() - start_time,
                         "language_attempted": language,
+                        "filters_attempted": filters,  # ✅ NOUVEAU
                     },
                 )
 
@@ -916,5 +1010,6 @@ class StandardQueryHandler(BaseQueryHandler):
                     "error": str(e),
                     "processing_time": time.time() - start_time,
                     "language_attempted": language,
+                    "filters_attempted": filters,  # ✅ NOUVEAU
                 },
             )

@@ -3,7 +3,7 @@
     "language": "en",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 23,
+    "total_domains": 24,
     "description": "Universal terminology for poultry production expert system - English version"
   },
 
@@ -192,6 +192,27 @@
         "canonical": "light",
         "confidence": 0.95,
         "variants": ["light", "lighting", "lux", "light intensity", "photoperiod"]
+      }
+    },
+
+    "species": {
+      "broiler": {
+        "canonical": "broiler",
+        "database_value": "broiler",
+        "confidence": 0.95,
+        "variants": ["broiler", "broilers", "meat chicken", "meat chickens", "chicken for meat", "meat production"]
+      },
+      "layer": {
+        "canonical": "layer",
+        "database_value": "layer",
+        "confidence": 0.95,
+        "variants": ["layer", "layers", "laying hen", "laying hens", "egg layer", "egg layers", "egg production"]
+      },
+      "breeder": {
+        "canonical": "breeder",
+        "database_value": "breeder",
+        "confidence": 0.95,
+        "variants": ["breeder", "breeders", "breeding", "parent stock", "breeding stock", "breeder flock"]
       }
     },
 

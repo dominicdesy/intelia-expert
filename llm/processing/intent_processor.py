@@ -2,6 +2,7 @@
 
 """
 intent_processor.py - Processeur d'intentions robuste avec validation stricte
+Version: 1.1.0 - Ajout détection d'espèce via universal_terms
 """
 
 import os
@@ -426,7 +427,33 @@ class IntentProcessor:
         self.intents_config = config
         self.validation_stats = validation_result.stats
 
+        # ✅ NOUVEAU: Charger universal_terms pour la détection d'espèce
+        try:
+            self._load_universal_terms()
+        except Exception as e:
+            logger.warning(f"Impossible de charger universal_terms: {e}")
+            # Continue sans universal_terms (fallback disponible)
+
         logger.info(f"Configuration validée: {validation_result.stats}")
+
+    def _load_universal_terms(self, language: str = "en"):
+        """
+        Charge les termes universels pour une langue
+        Nécessaire pour la détection d'espèce
+        """
+        config_dir = Path(__file__).parent.parent / "config"
+        terms_file = config_dir / f"universal_terms_{language}.json"
+
+        if terms_file.exists():
+            with open(terms_file, "r", encoding="utf-8") as f:
+                universal_data = json.load(f)
+                # Stocker dans intents_config pour accès facile
+                self.intents_config["universal_terms"] = universal_data.get(
+                    "domains", {}
+                )
+                logger.info(f"✅ Universal terms loaded for language: {language}")
+        else:
+            logger.warning(f"⚠️ Universal terms file not found: {terms_file}")
 
     def _resolve_config_path(self) -> Path:
         """Résolution robuste du chemin de configuration"""
@@ -488,6 +515,93 @@ class IntentProcessor:
         # Convertir en string puis en minuscules
         str_value = str(value).strip()
         return str_value.lower() if str_value else None
+
+    def _detect_species_from_query(self, query: str) -> Optional[str]:
+        """
+        Détecte l'espèce dans la query via universal_terms
+
+        Returns:
+            database_value de l'espèce détectée (ex: "broiler", "layer", "breeder")
+        """
+        # Charger les termes universels depuis intents_config
+        if "universal_terms" not in self.intents_config:
+            # Fallback: détection basique sans universal_terms
+            return self._detect_species_fallback(query)
+
+        query_lower = self._safe_string_lower(query)
+        if not query_lower:
+            return None
+
+        species_terms = self.intents_config.get("universal_terms", {}).get(
+            "species", {}
+        )
+
+        # Chercher la première correspondance
+        for species_key, data in species_terms.items():
+            variants = data.get("variants", [])
+            database_value = data.get("database_value", species_key)
+
+            for variant in variants:
+                variant_lower = self._safe_string_lower(variant)
+                if variant_lower and variant_lower in query_lower:
+                    logger.info(
+                        f"🐔 Species detected: {database_value} (matched: {variant})"
+                    )
+                    return database_value
+
+        return None
+
+    def _detect_species_fallback(self, query: str) -> Optional[str]:
+        """
+        Détection basique d'espèce sans universal_terms (fallback)
+        Utilise des termes hardcodés pour garantir un minimum de fonctionnalité
+        """
+        query_lower = self._safe_string_lower(query) or ""
+
+        # Termes broilers
+        if any(
+            term in query_lower
+            for term in [
+                "broiler",
+                "meat chicken",
+                "poulet de chair",
+                "chair",
+                "meat bird",
+            ]
+        ):
+            logger.info("🐔 Species detected (fallback): broiler")
+            return "broiler"
+
+        # Termes layers
+        if any(
+            term in query_lower
+            for term in [
+                "layer",
+                "laying hen",
+                "pondeuse",
+                "ponte",
+                "egg production",
+                "egg layer",
+            ]
+        ):
+            logger.info("🐔 Species detected (fallback): layer")
+            return "layer"
+
+        # Termes breeders
+        if any(
+            term in query_lower
+            for term in [
+                "breeder",
+                "parent stock",
+                "reproducteur",
+                "reproduction",
+                "breeding",
+            ]
+        ):
+            logger.info("🐔 Species detected (fallback): breeder")
+            return "breeder"
+
+        return None
 
     def process_query(
         self, query: str, explain_score: Optional[float] = None
@@ -560,6 +674,12 @@ class IntentProcessor:
                     if term_lower and term_lower in query_lower:
                         detected_entities[category] = main_term
                         break
+
+        # ✅ NOUVEAU: Détecter l'espèce
+        species = self._detect_species_from_query(query)
+        if species:
+            detected_entities["species"] = species
+            logger.debug(f"🐔 Species added to entities: {species}")
 
         # Détection d'intent basée sur les mots-clés
         query_lower = self._safe_string_lower(query) or ""

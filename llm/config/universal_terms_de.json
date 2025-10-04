@@ -3,7 +3,7 @@
     "language": "de",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 23,
+    "total_domains": 24,
     "description": "Universelle Terminologie für Expertensystem in der Geflügelproduktion - Deutsche Version"
   },
 
@@ -192,6 +192,27 @@
         "canonical": "licht",
         "confidence": 0.95,
         "variants": ["licht", "beleuchtung", "lux", "lichtintensität", "lichtintensitaet", "photoperiode"]
+      }
+    },
+
+    "species": {
+      "broiler": {
+        "canonical": "broiler",
+        "database_value": "broiler",
+        "confidence": 0.95,
+        "variants": ["masthähnchen", "masthahnchen", "broiler", "broilers", "mast", "masthühner", "masthuehner", "fleischproduktion"]
+      },
+      "layer": {
+        "canonical": "layer",
+        "database_value": "layer",
+        "confidence": 0.95,
+        "variants": ["legehenne", "legehennen", "layer", "layers", "legehuhn", "legehühner", "legehuehner", "eierproduktion"]
+      },
+      "breeder": {
+        "canonical": "breeder",
+        "database_value": "breeder",
+        "confidence": 0.95,
+        "variants": ["zuchttier", "zuchttiere", "breeder", "breeders", "zucht", "elterntiere", "zuchtbestand"]
       }
     },
 

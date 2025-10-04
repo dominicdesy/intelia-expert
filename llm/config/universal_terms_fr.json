@@ -3,7 +3,7 @@
     "language": "fr",
     "version": "3.0.0",
     "last_updated": "2025-09-30",
-    "total_domains": 23,
+    "total_domains": 24,
     "description": "Terminologie universelle pour système expert en production avicole - Version française"
   },
 
@@ -192,6 +192,27 @@
         "canonical": "lumiere",
         "confidence": 0.95,
         "variants": ["lumière", "lumiere", "éclairage", "eclairage", "lux", "intensité lumineuse", "intensite lumineuse", "photopériode", "photoperiode"]
+      }
+    },
+
+    "species": {
+      "broiler": {
+        "canonical": "broiler",
+        "database_value": "broiler",
+        "confidence": 0.95,
+        "variants": ["poulet de chair", "poulets de chair", "chair", "broiler", "broilers", "viande", "production de viande"]
+      },
+      "layer": {
+        "canonical": "layer",
+        "database_value": "layer",
+        "confidence": 0.95,
+        "variants": ["pondeuse", "pondeuses", "ponte", "poule pondeuse", "poules pondeuses", "layer", "layers", "production d'œufs", "production d'oeufs"]
+      },
+      "breeder": {
+        "canonical": "breeder",
+        "database_value": "breeder",
+        "confidence": 0.95,
+        "variants": ["reproducteur", "reproducteurs", "reproduction", "souche parentale", "breeder", "breeders", "parquet reproducteur"]
       }
     },
 

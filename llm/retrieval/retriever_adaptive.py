@@ -23,6 +23,7 @@ class AdaptiveMixin:
         context: Dict = None,
         alpha: float = None,
         where_filter: Dict = None,
+        filters: Dict = None,  # ✅ NOUVEAU: Paramètre filters pour Weaviate
         **kwargs,
     ) -> List[Document]:
         """Recherche adaptative qui ajuste automatiquement les paramètres selon le contexte"""
@@ -47,12 +48,25 @@ class AdaptiveMixin:
 
                 where_filter = build_where_filter(intent_result)
 
+            # ✅ NOUVEAU: Construire WHERE filter Weaviate pour species
+            weaviate_where_filter = None
+            if filters and "species" in filters:
+                target_species = filters["species"]
+                weaviate_where_filter = {
+                    "path": ["species"],
+                    "operator": "Equal",
+                    "valueText": target_species,
+                }
+                logger.info(f"🐔 Weaviate filtering by species: {target_species}")
+
             # Exécuter la recherche hybride avec paramètres adaptés
             documents = await self.hybrid_search(
                 query_vector=query_vector,
                 query_text=query_text,
                 top_k=adjusted_params["top_k"],
-                where_filter=where_filter,
+                where_filter=(
+                    where_filter if where_filter else weaviate_where_filter
+                ),  # ✅ Utiliser le filter approprié
                 alpha=adjusted_params["alpha"],
                 intent_result=intent_result,
             )
@@ -68,6 +82,8 @@ class AdaptiveMixin:
                 "processing_time": processing_time,
                 "alpha_used": adjusted_params["alpha"],
                 "top_k_used": adjusted_params["top_k"],
+                "filters_applied": filters
+                is not None,  # ✅ NOUVEAU: Tracking des filtres
             }
 
             logger.info(

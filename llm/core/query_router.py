@@ -94,6 +94,7 @@ class ConfigManager:
     - Routing keywords (PostgreSQL vs Weaviate)
     - Patterns contextuels multilingues
     - Age ranges et phases
+    - Species mapping (broiler/layer/breeder)
     """
 
     def __init__(self, config_dir: str = "config"):
@@ -222,6 +223,10 @@ class ConfigManager:
         )
         self.routing_keywords["weaviate"] = list(set(self.routing_keywords["weaviate"]))
 
+        # ✅ NOUVEAU: Index des espèces
+        self.species_index = self._build_species_index()
+        logger.info(f"✅ Species index built: {len(self.species_index)} mappings")
+
         logger.info(
             f"✅ Index construits: {len(self.breed_index)} breeds, "
             f"{len(self.sex_index)} sex variants, "
@@ -229,6 +234,71 @@ class ConfigManager:
             f"{len(self.routing_keywords['postgresql'])} PG keywords, "
             f"{len(self.routing_keywords['weaviate'])} Weaviate keywords"
         )
+
+    def _build_species_index(self) -> Dict[str, str]:
+        """
+        Construit index variant → database_value pour species
+
+        Returns:
+            {"broiler": "broiler", "meat chicken": "broiler",
+             "pondeuse": "layer", ...}
+        """
+        index = {}
+
+        # Charger depuis universal_terms si disponible
+        for lang_code, lang_terms in self.universal_terms.items():
+            species_terms = lang_terms.get("species", {})
+
+            if not species_terms:
+                continue
+
+            for species_key, data in species_terms.items():
+                if not isinstance(data, dict):
+                    continue
+
+                database_value = data.get("database_value", species_key)
+                canonical = data.get("canonical", species_key)
+                variants = data.get("variants", [])
+
+                # Ajouter canonical
+                if canonical:
+                    index[canonical.lower()] = database_value
+
+                # Ajouter toutes les variantes
+                if isinstance(variants, list):
+                    for variant in variants:
+                        if variant:
+                            index[variant.lower()] = database_value
+
+        if not index:
+            logger.warning("⚠️ No species terms found in universal_terms")
+        else:
+            logger.debug(f"Species index: {len(index)} variants mapped")
+
+        return index
+
+    def get_species_from_text(self, text: str) -> Optional[str]:
+        """
+        Détecte l'espèce dans un texte via l'index
+
+        Args:
+            text: Texte à analyser
+
+        Returns:
+            database_value de l'espèce ("broiler", "layer", "breeder") ou None
+        """
+        if not hasattr(self, "species_index"):
+            logger.warning("Species index not initialized")
+            return None
+
+        text_lower = text.lower()
+
+        # Chercher correspondance exacte d'abord
+        for variant, database_value in self.species_index.items():
+            if variant in text_lower:
+                return database_value
+
+        return None
 
     @lru_cache(maxsize=1000)
     def get_breed_canonical(self, breed_text: str) -> Optional[str]:
@@ -481,7 +551,7 @@ class QueryRouter:
                 if canonical:
                     entities["breed"] = canonical
                     entities["has_explicit_breed"] = True
-                    logger.debug(f"🐔 Breed: '{breed_text}' → '{canonical}'")
+                    logger.debug(f"🔍 Breed: '{breed_text}' → '{canonical}'")
 
         # AGE - Vérifier semaines AVANT jours
         if self.weeks_regex:
@@ -656,6 +726,7 @@ class QueryRouter:
             "metrics_categories": len(set(self.config.metric_index.values())),
             "routing_keywords_pg": len(self.config.routing_keywords["postgresql"]),
             "routing_keywords_wv": len(self.config.routing_keywords["weaviate"]),
+            "species_mappings": len(self.config.species_index),
         }
 
 
@@ -679,7 +750,7 @@ def test_query_router():
     router = QueryRouter("config")
 
     # Test 1: Query simple
-    print("\n📝 Test 1: Query simple avec breed + age + sex")
+    print("\n🔍 Test 1: Query simple avec breed + age + sex")
     route = router.route(
         query="Quel est le poids cible pour des mâles Ross 308 à 35 jours ?",
         user_id="test_user_1",
@@ -691,7 +762,7 @@ def test_query_router():
     print("   ✅" if route.destination == "postgresql" else "   ❌ Expected postgresql")
 
     # Test 2: Query contextuelle
-    print("\n📝 Test 2: Query contextuelle (référence 'femelles')")
+    print("\n🔍 Test 2: Query contextuelle (référence 'femelles')")
     route2 = router.route(
         query="Et pour les femelles au même âge ?", user_id="test_user_1", language="fr"
     )
@@ -708,7 +779,7 @@ def test_query_router():
     )
 
     # Test 3: Query incomplète
-    print("\n📝 Test 3: Query incomplète (manque breed)")
+    print("\n🔍 Test 3: Query incomplète (manque breed)")
     route3 = router.route(
         query="Quel est le poids à 28 jours ?", user_id="test_user_2", language="fr"
     )
@@ -721,7 +792,7 @@ def test_query_router():
     )
 
     # Test 4: Conversion semaines
-    print("\n📝 Test 4: Conversion semaines → jours")
+    print("\n🔍 Test 4: Conversion semaines → jours")
     route4 = router.route(
         query="Poids Ross 308 à 5 semaines", user_id="test_user_3", language="fr"
     )
@@ -731,7 +802,7 @@ def test_query_router():
     )
 
     # Test 5: Query santé (Weaviate)
-    print("\n📝 Test 5: Query santé → Weaviate")
+    print("\n🔍 Test 5: Query santé → Weaviate")
     route5 = router.route(
         query="Traitement coccidiose Ross 308 15 jours",
         user_id="test_user_4",
