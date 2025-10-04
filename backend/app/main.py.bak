@@ -285,6 +285,16 @@ async def lifespan(app: FastAPI):
                 except Exception as e:
                     logger.warning(f"Cache statistiques partiellement disponible: {e}")
 
+            # Nettoyage sessions
+            try:
+                from app.api.v1.pipeline.postgres_memory import PostgresMemory
+
+                memory = PostgresMemory()
+                cleaned = memory.cleanup_old_sessions(days_old=7)
+                if cleaned > 0:
+                    logger.info(f"{cleaned} anciennes sessions nettoyees")
+            except Exception as e:
+                logger.warning(f"Nettoyage sessions echoue: {e}")
         else:
             logger.warning("DATABASE_URL manquante - services analytics desactives")
     except Exception as e:
