@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 
 from config.config import BASE_PATH
 from utils.utilities import safe_get_attribute
-from .endpoints import safe_serialize_for_json
+from .endpoints_utils import safe_serialize_for_json
 
 logger = logging.getLogger(__name__)
 

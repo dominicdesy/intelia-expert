@@ -22,10 +22,12 @@ from utils.utilities import (
     get_out_of_domain_message,
     detect_language_enhanced,
 )
-from .endpoints_utils import (
+
+from .endpoints import (
     safe_serialize_for_json,
     metrics_collector,
 )
+
 
 from .chat_models import (
     JSONValidationRequest,

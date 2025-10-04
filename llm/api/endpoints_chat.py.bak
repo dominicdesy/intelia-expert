@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_chat.py - Endpoints de chat et streaming avec Système RAG JSON
-Gestion des conversations, streaming SSE, validation JSON, ingestion avicole
-Version 4.3.0 - FUSION D'ENTITÉS POUR MÉMOIRE CONVERSATIONNELLE
+Version 5.0.0 - SIMPLIFIÉ AVEC QUERY ROUTER
+Le contexte conversationnel est maintenant géré par QueryRouter dans RAGEngine
 """
 
 import time
@@ -27,22 +27,15 @@ from .endpoints_utils import (
     metrics_collector,
 )
 
-# Imports des nouveaux modules
 from .chat_models import (
     JSONValidationRequest,
     IngestionRequest,
     ExpertQueryRequest,
 )
 
-from core.memory import ConversationMemory
-
 from .chat_handlers import ChatHandlers
 
 logger = logging.getLogger(__name__)
-
-
-# Instance globale du gestionnaire
-context_manager = ConversationMemory(client=None)
 
 
 def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
@@ -50,7 +43,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
 
     router = APIRouter()
 
-    # Initialiser les handlers
+    # Initialiser les handlers (version simplifiée sans context_manager)
     chat_handlers = ChatHandlers(services)
 
     def get_service(name: str) -> Any:
@@ -91,7 +84,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 **result,
                 "processing_time": time.time() - start_time,
                 "timestamp": time.time(),
-                "version": "4.3.0_entity_fusion",
+                "version": "5.0.0_query_router",
             }
 
             return JSONResponse(content=safe_serialize_for_json(response))
@@ -341,28 +334,39 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             )
 
     # ========================================================================
-    # ENDPOINT CHAT PRINCIPAL AVEC FUSION D'ENTITÉS
+    # ENDPOINT CHAT PRINCIPAL - SIMPLIFIÉ
     # ========================================================================
 
     @router.post(f"{BASE_PATH}/chat")
     async def chat(request: Request):
-        """Chat endpoint avec contextualisation intelligente et fusion d'entités"""
+        """
+        Chat endpoint simplifié
+
+        VERSION 5.0.0:
+        - Le QueryRouter dans RAGEngine gère TOUT:
+          * Extraction d'entités
+          * Contexte conversationnel
+          * Validation complétude
+          * Messages de clarification
+          * Routing vers PostgreSQL/Weaviate
+        - Ce endpoint fait juste l'appel et le streaming
+        """
         total_start_time = time.time()
 
         try:
+            # Parsing requête
             try:
                 body = await request.json()
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"JSON invalide: {e}")
 
             message = body.get("message", "").strip()
-            language = body.get("language", "").strip()
             tenant_id = body.get("tenant_id", str(uuid.uuid4())[:8])
-
             genetic_line_filter = body.get("genetic_line_filter")
             use_json_search = body.get("use_json_search", True)
             performance_context = body.get("performance_context")
 
+            # Validation basique
             if not message:
                 raise HTTPException(status_code=400, detail="Message vide")
 
@@ -380,133 +384,38 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                 else language_result
             )
 
-            # Vérifier si on est en contexte de clarification
-            pending_context = context_manager.get_pending_clarification(tenant_id)
-            if pending_context:
-                original_language = pending_context.get("original_language")
-                if original_language:
-                    logger.info(
-                        f"Langue préservée du contexte: {original_language} "
-                        f"(détection actuelle ignorée: {detected_language})"
-                    )
-                    detected_language = original_language
-
             logger.info(
                 f"Langue détectée: {detected_language} "
                 f"(confiance: {getattr(language_result, 'confidence', 'N/A')})"
             )
 
-            language = detected_language
-
+            # Normaliser tenant_id
             if not tenant_id or len(tenant_id) > 50:
                 tenant_id = str(uuid.uuid4())[:8]
 
-            # ✅ GESTION DU CONTEXTE DE CLARIFICATION (Tests 4, 8, 11)
-            clarification_result = await chat_handlers.handle_clarification_context(
-                message, tenant_id, language, total_start_time
+            # APPEL RAG DIRECT
+            # Le router gère: contexte + extraction + validation + clarification
+            rag_result = await chat_handlers.generate_rag_response(
+                query=message,
+                tenant_id=tenant_id,
+                language=detected_language,
+                use_json_search=use_json_search,
+                genetic_line_filter=genetic_line_filter,
+                performance_context=performance_context,
             )
 
-            # Si c'est un résultat de clarification (abandon, ambiguïté, etc.)
-            if clarification_result and not isinstance(clarification_result, dict):
-                rag_result = clarification_result
-
-            # ✅ NOUVELLE SECTION: Si c'est une continuation avec requête accumulée ET entités fusionnées
-            elif clarification_result and clarification_result.get(
-                "continue_processing"
-            ):
-                message = clarification_result["accumulated_query"]
-                language = clarification_result["language"]
-                merged_entities = clarification_result.get("merged_entities", {})
-
-                logger.info(
-                    f"🔄 Continuation avec entités fusionnées: {merged_entities}"
-                )
-
-                rag_engine = get_rag_engine()
-                if rag_engine and merged_entities:
-                    try:
-                        # ✅ NOUVEAU: Utiliser generate_response_with_entities si disponible
-                        if hasattr(rag_engine, "generate_response_with_entities"):
-                            logger.info(
-                                "✅ Utilisation de generate_response_with_entities()"
-                            )
-
-                            rag_result = (
-                                await rag_engine.generate_response_with_entities(
-                                    query=message,
-                                    entities=merged_entities,
-                                    tenant_id=tenant_id,
-                                    language=language,
-                                )
-                            )
-                        else:
-                            # ✅ FALLBACK: Créer preprocessed_data avec contexte conversationnel
-                            logger.info(
-                                "⚠️ Méthode _with_entities non disponible, injection du contexte"
-                            )
-
-                            # Créer un contexte conversationnel pour le validator
-                            conversation_context = {
-                                "entities": merged_entities,
-                                "accumulated_query": message,
-                                "language": language,
-                            }
-
-                            # Passer via generate_response normal mais avec contexte
-                            # Note: Le contexte sera propagé au validator via preprocessed_data
-                            rag_result = await rag_engine.generate_response(
-                                query=message,
-                                tenant_id=tenant_id,
-                                language=language,
-                                use_json_search=use_json_search,
-                                genetic_line_filter=genetic_line_filter,
-                                performance_context=performance_context,
-                                enable_preprocessing=True,
-                                # ✅ Ajouter le contexte conversationnel
-                                conversation_context=conversation_context,
-                            )
-
-                    except Exception as e:
-                        logger.error(f"Erreur génération avec entités fusionnées: {e}")
-                        rag_result = None
-                else:
-                    rag_result = None
-
-            # Sinon, flux normal
-            else:
-                rag_result = None
-
-            # Si aucun résultat n'a été défini, générer via RAG
-            if rag_result is None:
-                rag_result = await chat_handlers.generate_rag_response(
-                    query=message,
-                    tenant_id=tenant_id,
-                    language=language,
+            # Fallback si RAG indisponible
+            if not rag_result:
+                rag_result = chat_handlers.create_fallback_result(
+                    message=message,
+                    language=detected_language,
+                    fallback_reason="rag_not_available",
+                    total_start_time=total_start_time,
                     use_json_search=use_json_search,
                     genetic_line_filter=genetic_line_filter,
-                    performance_context=performance_context,
                 )
 
-                # ✅ VÉRIFIER SI CONTEXTE INSUFFISANT (demande de clarification)
-                if rag_result:
-                    validation_check = await chat_handlers.handle_validation_status(
-                        rag_result, message, tenant_id, language, total_start_time
-                    )
-
-                    if validation_check:
-                        rag_result = validation_check
-
-                # Si toujours pas de résultat, utiliser fallback
-                if not rag_result:
-                    rag_result = chat_handlers.create_fallback_result(
-                        message=message,
-                        language=language,
-                        fallback_reason="rag_not_available",
-                        total_start_time=total_start_time,
-                        use_json_search=use_json_search,
-                        genetic_line_filter=genetic_line_filter,
-                    )
-
+            # Métriques
             total_processing_time = time.time() - total_start_time
             metrics_collector.record_query(
                 rag_result, "rag_enhanced_json", total_processing_time
@@ -515,7 +424,11 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             # Streaming de la réponse
             return StreamingResponse(
                 chat_handlers.generate_streaming_response(
-                    rag_result, message, tenant_id, language, total_processing_time
+                    rag_result,
+                    message,
+                    tenant_id,
+                    detected_language,
+                    total_processing_time,
                 ),
                 media_type="text/plain",
             )
@@ -523,7 +436,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Erreur chat endpoint: {e}")
+            logger.error(f"Erreur chat endpoint: {e}", exc_info=True)
             metrics_collector.record_query(
                 {"source": "error"}, "error", time.time() - total_start_time
             )
@@ -570,11 +483,12 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         "response_format": request.response_format,
                         "json_search_used": request.use_json_search,
                         "preprocessing_enabled": True,
+                        "router_managed": True,
                         "confidence": float(
                             safe_get_attribute(rag_result, "confidence", 0.5)
                         ),
                         "json_system": metadata.get("json_system", {}),
-                        "architecture": "expert_chat_entity_fusion",
+                        "architecture": "query-router-v5",
                     }
 
                     yield sse_event(safe_serialize_for_json(expert_metadata))
@@ -618,6 +532,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                         ),
                         "response_format_applied": request.response_format,
                         "preprocessing_enabled": True,
+                        "router_managed": True,
                     }
 
                     yield sse_event(safe_serialize_for_json(end_metadata))
@@ -656,7 +571,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     {
                         "type": "start",
                         "reason": "out_of_domain",
-                        "architecture": "modular-endpoints-entity-fusion",
+                        "architecture": "query-router-v5",
                     }
                 )
 
@@ -669,7 +584,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     {
                         "type": "end",
                         "confidence": 1.0,
-                        "architecture": "modular-endpoints-entity-fusion",
+                        "architecture": "query-router-v5",
                     }
                 )
 
@@ -693,6 +608,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             if not rag_engine:
                 return {"error": "RAG Engine non disponible"}
 
+            # Test validation
             try:
                 test_json = {
                     "title": "Test Ross 308 Performance",
@@ -718,6 +634,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             except Exception as e:
                 test_results["json_validation"] = {"success": False, "error": str(e)}
 
+            # Test search
             try:
                 if hasattr(rag_engine, "search_json_enhanced"):
                     search_results = await rag_engine.search_json_enhanced(
@@ -736,6 +653,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             except Exception as e:
                 test_results["json_search"] = {"success": False, "error": str(e)}
 
+            # Test génération
             try:
                 generation_result = await chat_handlers.generate_rag_response(
                     query="Quel est le poids cible Ross 308 à 35 jours ?",
@@ -759,17 +677,6 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
             except Exception as e:
                 test_results["json_generation"] = {"success": False, "error": str(e)}
 
-            try:
-                status = rag_engine.get_status()
-                json_system_status = status.get("json_system", {})
-                test_results["json_system_status"] = {
-                    "available": json_system_status.get("available", False),
-                    "components": json_system_status.get("components", {}),
-                    "stats": json_system_status.get("stats", {}),
-                }
-            except Exception as e:
-                test_results["json_system_status"] = {"success": False, "error": str(e)}
-
             successful_tests = sum(
                 1 for result in test_results.values() if result.get("success", False)
             )
@@ -788,158 +695,13 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
                     if successful_tests == total_tests
                     else "DEGRADED" if successful_tests > 0 else "FAILED"
                 ),
-                "version": "4.3.0_entity_fusion",
+                "version": "5.0.0_query_router",
             }
 
             return safe_serialize_for_json(analysis)
 
         except Exception as e:
             logger.error(f"Erreur test_json_system: {e}")
-            return {"error": str(e), "timestamp": time.time()}
-
-    @router.post(f"{BASE_PATH}/chat/test-ross308")
-    async def test_ross308_query():
-        """Endpoint de test spécifique pour les requêtes Ross 308 avec JSON"""
-        try:
-            test_queries = [
-                "Quel est le poids d'un poulet Ross 308 de 17 jours ?",
-                "Ross 308 female performance weight table day 17",
-                "broiler performance objectives Ross 308",
-                "RossxRoss308 BroilerPerformanceObjectives weight",
-            ]
-
-            results = {}
-            rag_engine = get_rag_engine()
-
-            if not rag_engine:
-                return {"error": "RAG Engine non disponible"}
-
-            for query in test_queries:
-                try:
-                    start_time = time.time()
-
-                    result = await chat_handlers.generate_rag_response(
-                        query=query,
-                        tenant_id="test_ross308",
-                        language="fr",
-                        use_json_search=True,
-                        genetic_line_filter="ross308",
-                    )
-
-                    processing_time = time.time() - start_time
-
-                    source = getattr(result, "source", None)
-                    source_value = (
-                        source.value if hasattr(source, "value") else str(source)
-                    )
-
-                    metadata = getattr(result, "metadata", {}) or {}
-                    json_system_info = metadata.get("json_system", {})
-                    docs_used = metadata.get("documents_used", 0)
-                    docs_found = metadata.get("documents_found", 0)
-                    confidence = getattr(result, "confidence", 0)
-
-                    response_text = getattr(result, "answer", "") or getattr(
-                        result, "response", ""
-                    )
-
-                    has_specific_data = any(
-                        term in response_text.lower()
-                        for term in ["gramme", "kg", "g)", "poids", "weight", "17"]
-                    )
-
-                    has_generic_response = any(
-                        pattern in response_text.lower()
-                        for pattern in [
-                            "documents fournis ne contiennent pas",
-                            "information spécifique",
-                            "données générales",
-                        ]
-                    )
-
-                    results[query] = {
-                        "source": source_value,
-                        "confidence": float(confidence),
-                        "processing_time": processing_time,
-                        "documents_used": docs_used,
-                        "documents_found": docs_found,
-                        "json_system_used": json_system_info.get("used", False),
-                        "json_results_count": json_system_info.get("results_count", 0),
-                        "genetic_lines_detected": json_system_info.get(
-                            "genetic_lines_detected", []
-                        ),
-                        "has_specific_data": has_specific_data,
-                        "has_generic_response": has_generic_response,
-                        "preprocessing_enabled": True,
-                        "response_preview": (
-                            response_text[:200] + "..."
-                            if len(response_text) > 200
-                            else response_text
-                        ),
-                    }
-
-                except Exception as e:
-                    results[query] = {"error": str(e), "success": False}
-
-            total_docs_used = sum(
-                r.get("documents_used", 0)
-                for r in results.values()
-                if isinstance(r, dict)
-            )
-            total_json_results = sum(
-                r.get("json_results_count", 0)
-                for r in results.values()
-                if isinstance(r, dict)
-            )
-            queries_with_json = sum(
-                1 for r in results.values() if r.get("json_system_used", False)
-            )
-            queries_with_specific_data = sum(
-                1 for r in results.values() if r.get("has_specific_data", False)
-            )
-            queries_with_generic_response = sum(
-                1 for r in results.values() if r.get("has_generic_response", False)
-            )
-
-            analysis = {
-                "timestamp": time.time(),
-                "test_queries": test_queries,
-                "results": results,
-                "analysis": {
-                    "total_documents_used": total_docs_used,
-                    "total_json_results": total_json_results,
-                    "avg_docs_per_query": total_docs_used / len(test_queries),
-                    "queries_using_json_system": queries_with_json,
-                    "queries_with_specific_data": queries_with_specific_data,
-                    "queries_with_generic_response": queries_with_generic_response,
-                    "success_rate": queries_with_specific_data / len(test_queries),
-                    "json_system_effectiveness": queries_with_json / len(test_queries),
-                },
-                "recommendations": [],
-                "version": "4.3.0_entity_fusion",
-            }
-
-            if total_json_results == 0 and queries_with_json == 0:
-                analysis["recommendations"].append(
-                    "CRITIQUE: Système JSON non utilisé - vérifier l'intégration"
-                )
-            elif total_docs_used == 0:
-                analysis["recommendations"].append(
-                    "CRITIQUE: Aucun document utilisé - problème de récupération"
-                )
-            elif queries_with_specific_data == 0:
-                analysis["recommendations"].append(
-                    "PROBLÈME: Aucune réponse spécifique - document Ross 308 non indexé"
-                )
-            elif queries_with_generic_response > len(test_queries) // 2:
-                analysis["recommendations"].append(
-                    "ATTENTION: Majorité de réponses génériques - optimiser l'indexation JSON"
-                )
-
-            return safe_serialize_for_json(analysis)
-
-        except Exception as e:
-            logger.error(f"Erreur test_ross308_query: {e}")
             return {"error": str(e), "timestamp": time.time()}
 
     @router.get(f"{BASE_PATH}/chat/conversation-stats")
