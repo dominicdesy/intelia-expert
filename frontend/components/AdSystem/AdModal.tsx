@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, ExternalLink, Star, Users, Clock } from "lucide-react";
+import { X, ExternalLink, Star, Users, Clock, ArrowRight, Zap, TrendingUp, Brain } from "lucide-react";
 
 interface AdData {
   id: string;
@@ -30,7 +30,7 @@ export const AdModal: React.FC<AdModalProps> = ({
   adData,
   onAdClick,
 }) => {
-  const [timeLeft, setTimeLeft] = useState(15); // 15 secondes minimum
+  const [timeLeft, setTimeLeft] = useState(15);
   const [canClose, setCanClose] = useState(false);
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export const AdModal: React.FC<AdModalProps> = ({
 
   const handleAdClick = () => {
     onAdClick(adData.id);
-    window.open(adData.ctaUrl, "_blank");
+    window.open("https://zurl.co/xfmd9", "_blank");
   };
 
   const handleClose = () => {
@@ -70,25 +70,25 @@ export const AdModal: React.FC<AdModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-      <div className="relative bg-white rounded-lg shadow-2xl max-w-2xl w-full mx-4 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 overflow-hidden">
         {/* Header avec timer */}
-        <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+        <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white">
           <div className="flex items-center space-x-2">
-            <Star className="w-5 h-5 text-yellow-300" />
-            <span className="font-semibold">Recommandation Personnalisée</span>
+            <Brain className="w-6 h-6 text-blue-200 animate-pulse" />
+            <span className="font-bold text-lg">AI Innovation for Poultry Industry</span>
           </div>
 
           <div className="flex items-center space-x-3">
             {!canClose ? (
-              <div className="flex items-center space-x-2 bg-white bg-opacity-20 px-3 py-1 rounded-full">
+              <div className="flex items-center space-x-2 bg-white bg-opacity-20 px-4 py-2 rounded-full">
                 <Clock className="w-4 h-4" />
                 <span className="text-sm font-medium">{timeLeft}s</span>
               </div>
             ) : (
               <button
                 onClick={handleClose}
-                className="p-1 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -96,86 +96,65 @@ export const AdModal: React.FC<AdModalProps> = ({
           </div>
         </div>
 
-        {/* Contenu de la publicité */}
-        <div className="p-6">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Image/Logo */}
-            <div className="lg:w-1/3">
+        {/* Contenu principal */}
+        <div className="p-8">
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Image principale */}
+            <div className="lg:w-1/2">
               <img
-                src={adData.imageUrl}
-                alt={adData.title}
-                className="w-full h-40 lg:h-full object-cover rounded-lg shadow-md"
+                src="/images/poultry-ai-ad.jpg"
+                alt="AI in Poultry Industry"
+                className="w-full h-full object-cover rounded-xl shadow-lg"
               />
             </div>
 
-            {/* Contenu */}
-            <div className="lg:w-2/3 space-y-4">
+            {/* Contenu texte */}
+            <div className="lg:w-1/2 space-y-6">
               <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                  {adData.title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed">
-                  {adData.description}
+                <h2 className="text-3xl font-bold text-gray-900 mb-4 leading-tight">
+                  Why should the poultry industry embrace AI — now?
+                </h2>
+                <p className="text-gray-700 text-lg leading-relaxed">
+                  From early issue detection to better productivity and decision-making, discover <span className="font-bold text-blue-600">10 compelling reasons</span> to accelerate digital adoption.
                 </p>
               </div>
 
-              {/* Statistiques */}
-              <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                {adData.rating && (
-                  <div className="flex items-center space-x-1">
-                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                    <span>{adData.rating}/5</span>
-                  </div>
-                )}
-                {adData.users && (
-                  <div className="flex items-center space-x-1">
-                    <Users className="w-4 h-4" />
-                    <span>{adData.users} utilisateurs</span>
-                  </div>
-                )}
-                {adData.duration && (
-                  <div className="flex items-center space-x-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{adData.duration}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Fonctionnalités */}
-              <div className="space-y-2">
-                <h4 className="font-semibold text-gray-900">
-                  Fonctionnalités clés :
-                </h4>
-                <ul className="grid grid-cols-1 md:grid-cols-2 gap-1">
-                  {adData.features.map((feature, index) => (
-                    <li
-                      key={index}
-                      className="flex items-center space-x-2 text-sm text-gray-600"
-                    >
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+              {/* Points clés avec icônes */}
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3">
+                  <Zap className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-1" />
+                  <p className="text-gray-600">Early disease detection & prevention</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <TrendingUp className="w-5 h-5 text-green-500 flex-shrink-0 mt-1" />
+                  <p className="text-gray-600">Enhanced productivity & efficiency</p>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <Brain className="w-5 h-5 text-blue-500 flex-shrink-0 mt-1" />
+                  <p className="text-gray-600">Data-driven decision making</p>
+                </div>
               </div>
 
               {/* CTA Button */}
               <button
                 onClick={handleAdClick}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 px-8 rounded-xl font-bold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 flex items-center justify-center space-x-3 shadow-xl hover:shadow-2xl transform hover:scale-105"
               >
-                <span>{adData.ctaText}</span>
-                <ExternalLink className="w-4 h-4" />
+                <span>Read the Full Article</span>
+                <ArrowRight className="w-5 h-5" />
               </button>
+
+              <p className="text-center text-sm text-gray-500">
+                📖 Discover all 10 reasons in the complete guide
+              </p>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-gray-50 border-t text-center">
-          <p className="text-xs text-gray-500">
-            Publicité • {adData.company} • Basée sur votre utilisation d'Intelia
-            Expert
+        <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-blue-50 border-t text-center">
+          <p className="text-xs text-gray-600">
+            Sponsored Content • Based on your interests in poultry farming technology
           </p>
         </div>
       </div>
