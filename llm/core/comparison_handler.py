@@ -10,7 +10,7 @@ CHANGEMENTS:
 """
 
 import logging
-from typing import Dict, List, Any
+from utils.types import Dict, List, Any
 
 # Import du nouveau moteur unifié
 from .comparison_engine import ComparisonEngine, ComparisonResult

@@ -15,6 +15,9 @@ anyio>=4.0.0
 # === OPENAI API - Version LTS stable ===
 openai==1.42.0
 
+# === ANTHROPIC CLAUDE API - Multi-LLM Router ===
+anthropic>=0.40.0
+
 # === WEAVIATE CLIENT - Version corrigée pour dimensions ===
 weaviate-client==4.16.10
 
@@ -87,6 +90,12 @@ unidecode==1.3.8
 # === RERANKING ET SIMILARITÉ ===
 sentence-transformers==3.1.1
 voyageai==0.2.3
+cohere>=5.0.0
+
+# === ÉVALUATION RAG (RAGAS) ===
+# Framework d'évaluation pour systèmes RAG
+ragas==0.1.19
+datasets>=2.14.0
 
 # === RECHERCHE HYBRIDE ===
 rank-bm25==0.2.2
@@ -100,6 +109,10 @@ pingouin==0.5.4
 # === LANGSMITH MONITORING ===
 langchain-core==0.1.16
 langsmith>=0.0.83,<0.1.0
+
+# === LANGCHAIN POUR RAGAS ===
+# LangChain OpenAI pour évaluateur RAGAS
+langchain-openai>=0.0.5
 
 # === UTILITAIRES BASE ===
 numpy>=1.24.0,<2.0.0

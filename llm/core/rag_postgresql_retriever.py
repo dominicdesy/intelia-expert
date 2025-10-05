@@ -13,12 +13,21 @@ Version 3.4: Support du filtrage par species + mode strict/souple
 
 import logging
 import re
-from typing import Dict, List, Any, Tuple, Optional
+from utils.types import Dict, List, Any, Tuple, Optional
 
 from .rag_postgresql_config import ASYNCPG_AVAILABLE
 from .rag_postgresql_models import MetricResult
 from .rag_postgresql_normalizer import SQLQueryNormalizer
 from .data_models import RAGResult, RAGSource
+from .base import InitializableMixin
+
+# Cohere Reranker
+try:
+    from retrieval.reranker import CohereReranker
+
+    RERANKER_AVAILABLE = True
+except ImportError:
+    RERANKER_AVAILABLE = False
 
 
 if ASYNCPG_AVAILABLE:
@@ -27,16 +36,16 @@ if ASYNCPG_AVAILABLE:
 logger = logging.getLogger(__name__)
 
 
-class PostgreSQLRetriever:
+class PostgreSQLRetriever(InitializableMixin):
     """Récupérateur de données PostgreSQL avec normalisation et mapping breeds"""
 
     def __init__(
         self, config: Dict[str, Any], intents_file_path: str = "llm/config/intents.json"
     ):
+        super().__init__()
         self.config = config
         self.pool = None
         self.query_normalizer = SQLQueryNormalizer()
-        self.is_initialized = False
 
         # Charger le breeds registry pour mapping vers noms PostgreSQL
         self.breeds_registry = None
@@ -52,6 +61,17 @@ class PostgreSQLRetriever:
                 f"Breeds registry not available: {e}. Will use fallback LIKE queries."
             )
             self.breeds_registry = None
+
+        # Cohere Reranker
+        self.reranker = None
+        if RERANKER_AVAILABLE:
+            try:
+                self.reranker = CohereReranker()
+                if self.reranker.is_enabled():
+                    logger.info("Cohere Reranker enabled for PostgreSQL retriever")
+            except Exception as e:
+                logger.warning(f"Reranker initialization error: {e}")
+                self.reranker = None
 
     async def initialize(self):
         """Initialise la connexion PostgreSQL"""
@@ -78,13 +98,12 @@ class PostgreSQLRetriever:
             async with self.pool.acquire() as conn:
                 await conn.execute("SELECT 1")
 
-            self.is_initialized = True
+            await super().initialize()
             logger.info("PostgreSQL Retriever initialized")
 
         except Exception as e:
             logger.error(f"PostgreSQL initialization error: {e}")
             self.pool = None
-            self.is_initialized = False
             raise
 
     def _get_db_breed_name(self, canonical_breed: str) -> Optional[str]:
@@ -315,6 +334,31 @@ class PostgreSQLRetriever:
                     }
                 )
 
+            # NOUVEAU: Reranking Cohere si plus de 3 résultats
+            if self.reranker and self.reranker.is_enabled() and len(formatted_docs) > 3:
+                try:
+                    logger.info(
+                        f"🔄 Applying Cohere reranking on {len(formatted_docs)} PostgreSQL results"
+                    )
+
+                    reranked_docs = await self.reranker.rerank(
+                        query=query,
+                        documents=formatted_docs,
+                        top_n=min(5, len(formatted_docs)),  # Top 5 après rerank
+                    )
+
+                    logger.info(
+                        f"✅ PostgreSQL reranking: {len(formatted_docs)} -> {len(reranked_docs)} docs "
+                        f"(top score: {reranked_docs[0]['score']:.3f})"
+                    )
+
+                    formatted_docs = reranked_docs
+
+                except Exception as rerank_error:
+                    logger.error(
+                        f"PostgreSQL reranking error: {rerank_error}, using original results"
+                    )
+
             # Retourner un RAGResult structuré avec documents formatés
             if len(formatted_docs) > 0:
                 return RAGResult(
@@ -327,6 +371,11 @@ class PostgreSQLRetriever:
                         "strict_sex_match": strict_sex_match,
                         "has_explicit_sex": entities.get("has_explicit_sex", False),
                         "filters": filters,
+                        "reranked": bool(
+                            self.reranker
+                            and self.reranker.is_enabled()
+                            and len(formatted_docs) > 0
+                        ),
                     },
                 )
             else:
@@ -824,7 +873,8 @@ class PostgreSQLRetriever:
                 logger.error(f"PostgreSQL close error: {e}")
             finally:
                 self.pool = None
-                self.is_initialized = False
+
+        await super().close()
 
 
 # Tests unitaires

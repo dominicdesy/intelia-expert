@@ -11,9 +11,10 @@ import logging
 import asyncio
 import pickle
 import zlib
-from typing import Dict, Optional, Any
+from utils.types import Dict, Optional, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
+from core.base import InitializableMixin
 
 # Redis imports avec gestion d'erreurs
 try:
@@ -129,10 +130,11 @@ class CacheStats:
         return 0.0
 
 
-class RedisCacheCore:
+class RedisCacheCore(InitializableMixin):
     """Module central robuste pour la gestion du cache Redis"""
 
     def __init__(self, config: Optional[CacheConfig] = None):
+        super().__init__()
         self.config = config or CacheConfig.from_env()
         self.client: Optional[redis.Redis] = None
         self.status = CacheStatus.DISABLED
@@ -140,7 +142,6 @@ class RedisCacheCore:
         self.enabled = (
             REDIS_AVAILABLE and os.getenv("CACHE_ENABLED", "true").lower() == "true"
         )
-        self.initialized = False
 
         # CORRECTION: Ajout protection_stats manquant
         self.protection_stats = {
@@ -228,13 +229,13 @@ class RedisCacheCore:
             # Initialisation des statistiques
             await self._initialize_stats()
 
-            self.initialized = True
             self.status = CacheStatus.HEALTHY
             self.consecutive_errors = 0
 
             logger.info(f"Cache Redis initialisé avec succès: {self.config.redis_url}")
             logger.info(f"Configuration: {self._get_config_summary()}")
 
+            await super().initialize()
             return True
 
         except asyncio.TimeoutError:
@@ -278,7 +279,7 @@ class RedisCacheCore:
     def _disable_cache(self):
         """Désactive le cache en cas d'erreur"""
         self.enabled = False
-        self.initialized = False
+        self.is_initialized = False
         if self.client:
             try:
                 asyncio.create_task(self.client.close())
@@ -290,7 +291,7 @@ class RedisCacheCore:
     # CORRECTION: Méthode _is_operational pour compatibilité
     def _is_operational(self) -> bool:
         """Vérifie si le cache est opérationnel"""
-        if not (self.enabled and self.initialized and self.client):
+        if not (self.enabled and self.is_initialized and self.client):
             return False
 
         # Vérification du backoff en cas d'erreurs
@@ -489,7 +490,7 @@ class RedisCacheCore:
 
     async def get_cache_stats(self) -> Dict[str, Any]:
         """Récupère les statistiques complètes du cache"""
-        if not self.initialized:
+        if not self.is_initialized:
             return {"enabled": False, "status": self.status.value}
 
         try:
@@ -745,8 +746,9 @@ class RedisCacheCore:
                 logger.warning(f"Erreur fermeture Redis: {e}")
             finally:
                 self.client = None
-                self.initialized = False
                 self.status = CacheStatus.DISABLED
+
+        await super().close()
 
 
 # Factory function pour créer une instance de cache

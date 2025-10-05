@@ -9,7 +9,7 @@ import asyncio
 import logging
 import time
 import numpy as np
-from typing import Dict, List, Optional, Any
+from utils.types import Dict, List, Optional, Any
 from collections import defaultdict
 
 # Imports Weaviate
@@ -23,6 +23,7 @@ except ImportError:
 # Imports composants existants
 from .data_models import RAGResult, RAGSource, Document
 from .memory import ConversationMemory
+from .base import InitializableMixin
 from config.config import (
     DEFAULT_ALPHA,
     RAG_SIMILARITY_TOP_K,
@@ -52,6 +53,14 @@ except ImportError as e:
     logger = logging.getLogger(__name__)
     logger.warning(f"Composants retrieval non disponibles: {e}")
 
+# Cohere Reranker
+try:
+    from retrieval.reranker import CohereReranker
+
+    RERANKER_AVAILABLE = True
+except ImportError:
+    RERANKER_AVAILABLE = False
+
 # RRF Intelligent
 try:
     from retrieval.enhanced_rrf_fusion import IntelligentRRFFusion
@@ -79,10 +88,11 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class WeaviateCore:
+class WeaviateCore(InitializableMixin):
     """Logique Weaviate core avec composants RAG avancés"""
 
     def __init__(self, openai_client):
+        super().__init__()
         self.openai_client = openai_client
 
         # Composants principaux
@@ -99,8 +109,8 @@ class WeaviateCore:
         # RRF Intelligent
         self.intelligent_rrf = None
 
-        # État
-        self.is_initialized = False
+        # Cohere Reranker
+        self.reranker = None
 
         # Statistiques
         self.optimization_stats = {
@@ -109,6 +119,7 @@ class WeaviateCore:
             "cache_sets": 0,
             "hybrid_searches": 0,
             "intelligent_rrf_used": 0,
+            "cohere_reranking_used": 0,
             "ood_detections": 0,
             "intent_coverage_stats": defaultdict(int),
             "weaviate_capabilities": {},
@@ -145,7 +156,11 @@ class WeaviateCore:
             if GUARDRAILS_AVAILABLE:
                 await self._initialize_guardrails()
 
-            self.is_initialized = True
+            # Cohere Reranker
+            if RERANKER_AVAILABLE:
+                await self._initialize_reranker()
+
+            await super().initialize()
             logger.info("✅ Weaviate Core initialisé")
 
         except Exception as e:
@@ -407,6 +422,23 @@ class WeaviateCore:
             logger.info("✅ Guardrails initialisés")
         except Exception as e:
             logger.warning(f"Guardrails échoué: {e}")
+
+    async def _initialize_reranker(self):
+        """Initialise le Cohere Reranker"""
+
+        try:
+            self.reranker = CohereReranker()
+            if self.reranker.is_enabled():
+                logger.info(
+                    f"✅ Cohere Reranker initialisé (model: {self.reranker.model})"
+                )
+            else:
+                logger.info(
+                    "ℹ️ Cohere Reranker disponible mais désactivé (COHERE_API_KEY manquante)"
+                )
+        except Exception as e:
+            logger.warning(f"Erreur initialisation Reranker: {e}")
+            self.reranker = None
 
     async def search(
         self,
@@ -755,6 +787,59 @@ class WeaviateCore:
                     logger.warning(f"Erreur conversion document: {doc_error}")
                     continue
 
+            # NOUVEAU: Reranking Cohere APRÈS RRF
+            if (
+                self.reranker
+                and self.reranker.is_enabled()
+                and len(final_documents) > 1
+            ):
+                try:
+                    logger.info(
+                        f"🔄 Applying Cohere reranking on {len(final_documents)} RRF results"
+                    )
+
+                    # Convertir Documents en dicts pour reranker
+                    docs_for_rerank = [
+                        {
+                            "content": doc.content,
+                            "metadata": doc.metadata,
+                            "score": doc.score,
+                        }
+                        for doc in final_documents
+                    ]
+
+                    # Reranker retourne top 3 par défaut
+                    reranked_dicts = await self.reranker.rerank(
+                        query=original_query,
+                        documents=docs_for_rerank,
+                        top_n=top_k,  # Respecter le top_k demandé
+                    )
+
+                    # Reconvertir en Documents
+                    final_documents = []
+                    for reranked_dict in reranked_dicts:
+                        doc = Document(
+                            content=reranked_dict["content"],
+                            metadata=reranked_dict["metadata"],
+                            score=reranked_dict["score"],  # Score reranké
+                            explain_score=reranked_dict.get("explain_score"),
+                        )
+                        final_documents.append(doc)
+
+                    logger.info(
+                        f"✅ Cohere reranking applied: {len(final_documents)} docs "
+                        f"(top score: {final_documents[0].score:.3f})"
+                    )
+
+                    # Mettre à jour les statistiques
+                    self.optimization_stats["cohere_reranking_used"] += 1
+
+                except Exception as rerank_error:
+                    logger.error(
+                        f"Reranking error (using original results): {rerank_error}"
+                    )
+                    # Fallback: garder les documents RRF originaux
+
             return final_documents
 
         except Exception as e:
@@ -956,7 +1041,7 @@ class WeaviateCore:
     def get_stats(self) -> Dict[str, Any]:
         """Statistiques Weaviate Core"""
 
-        return {
+        stats = {
             "weaviate_core_initialized": self.is_initialized,
             "weaviate_connected": bool(self.weaviate_client),
             "components_loaded": {
@@ -968,9 +1053,16 @@ class WeaviateCore:
                 "ood_detector": bool(self.ood_detector),
                 "guardrails": bool(self.guardrails),
                 "intelligent_rrf": bool(self.intelligent_rrf),
+                "cohere_reranker": bool(self.reranker and self.reranker.is_enabled()),
             },
             "optimization_stats": self.optimization_stats.copy(),
         }
+
+        # Ajouter les stats du reranker si disponible
+        if self.reranker:
+            stats["reranker_stats"] = self.reranker.get_stats()
+
+        return stats
 
     async def close(self):
         """Fermeture propre Weaviate Core"""
@@ -982,4 +1074,5 @@ class WeaviateCore:
             except Exception as e:
                 logger.warning(f"Erreur fermeture Weaviate: {e}")
 
+        await super().close()
         logger.info("Weaviate Core fermé")

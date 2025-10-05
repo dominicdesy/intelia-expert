@@ -9,7 +9,7 @@ import json
 import time
 import logging
 from pathlib import Path
-from typing import Optional, Dict
+from utils.types import Optional, Dict
 
 from utils.data_classes import ValidationReport, ProcessingResult
 

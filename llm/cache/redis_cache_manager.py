@@ -6,8 +6,9 @@ VERSION PERFECTIONNÉE: Interface complète pour compatibilité rag_engine.py
 """
 
 import logging
-from typing import Dict, List, Optional, Any
+from utils.types import Dict, List, Optional, Any
 import json
+from core.base import InitializableMixin
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ except ImportError as e:
     STATS_AVAILABLE = False
 
 
-class RAGCacheManager:
+class RAGCacheManager(InitializableMixin):
     """
     Gestionnaire de cache Redis principal - Interface unifiée
     Délègue les fonctionnalités aux modules spécialisés
@@ -51,6 +52,7 @@ class RAGCacheManager:
 
     def __init__(self, redis_url: str = None, default_ttl: int = None):
         """Initialise le gestionnaire de cache avec modules spécialisés"""
+        super().__init__()
         if not CACHE_CORE_AVAILABLE:
             raise ImportError(
                 "Cannot initialize RAGCacheManager: Redis dependencies not available"
@@ -97,7 +99,6 @@ class RAGCacheManager:
             # Exposer les propriétés importantes pour compatibilité
             self.enabled = getattr(self.core, "enabled", False)
             self.client = None  # Sera défini lors de l'initialisation
-            self.initialized = False
 
             logger.info("RAGCacheManager modules initialisés avec succès")
 
@@ -117,11 +118,12 @@ class RAGCacheManager:
             success = await self.core.initialize()
             if success:
                 self.client = self.core.client
-                self.initialized = self.core.initialized
                 self.enabled = self.core.enabled
                 logger.info("RAGCacheManager connexion Redis établie")
             else:
                 logger.warning("RAGCacheManager connexion Redis échouée")
+
+            await super().initialize()
             return success
 
         except Exception as e:
@@ -137,7 +139,7 @@ class RAGCacheManager:
             return self.core._is_operational()
         # Fallback sur les attributs de base
         return (
-            getattr(self.core, "initialized", False)
+            getattr(self.core, "is_initialized", False)
             and getattr(self.core, "client", None) is not None
             and getattr(self.core, "enabled", False)
         )
@@ -424,7 +426,7 @@ class RAGCacheManager:
         """Récupère les statistiques complètes"""
         base_stats = {
             "enabled": self.enabled,
-            "initialized": self.initialized,
+            "initialized": self.is_initialized,
             "core_available": CACHE_CORE_AVAILABLE,
             "semantic_available": SEMANTIC_AVAILABLE,
             "stats_available": STATS_AVAILABLE,
@@ -461,7 +463,10 @@ class RAGCacheManager:
             "timestamp": __import__("time").time(),
             "overall_status": "unknown",
             "components": {
-                "core": {"available": bool(self.core), "initialized": self.initialized},
+                "core": {
+                    "available": bool(self.core),
+                    "initialized": self.is_initialized,
+                },
                 "semantic": {"available": bool(self.semantic)},
                 "stats": {"available": bool(self.stats)},
             },
@@ -494,9 +499,9 @@ class RAGCacheManager:
                 )
 
             # Déterminer le statut global
-            if health["connectivity"]["redis"] and self.initialized:
+            if health["connectivity"]["redis"] and self.is_initialized:
                 health["overall_status"] = "healthy"
-            elif self.initialized:
+            elif self.is_initialized:
                 health["overall_status"] = "degraded"
             else:
                 health["overall_status"] = "unhealthy"
@@ -532,25 +537,24 @@ class RAGCacheManager:
                 logger.warning(f"Erreur fermeture cache: {e}")
 
         self.client = None
-        self.initialized = False
+
+        await super().close()
 
     # ===== MÉTHODES MAGIQUES POUR COMPATIBILITÉ =====
     def __bool__(self) -> bool:
         """Permet d'utiliser if cache_manager: ..."""
-        return self.enabled and self.initialized
+        return self.enabled and self.is_initialized
 
     def __str__(self) -> str:
         """Représentation string pour debugging"""
-        return (
-            f"RAGCacheManager(enabled={self.enabled}, initialized={self.initialized})"
-        )
+        return f"RAGCacheManager(enabled={self.enabled}, initialized={self.is_initialized})"
 
     def __repr__(self) -> str:
         """Représentation détaillée"""
         return (
             f"RAGCacheManager("
             f"enabled={self.enabled}, "
-            f"initialized={self.initialized}, "
+            f"initialized={self.is_initialized}, "
             f"semantic={'available' if self.semantic else 'unavailable'}, "
             f"stats={'available' if self.stats else 'unavailable'}"
             f")"

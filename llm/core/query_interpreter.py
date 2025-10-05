@@ -4,7 +4,7 @@ query_interpreter.py - Interprétation intelligente des requêtes via OpenAI
 """
 
 import logging
-from typing import Dict
+from utils.types import Dict
 from openai import AsyncOpenAI
 import os
 

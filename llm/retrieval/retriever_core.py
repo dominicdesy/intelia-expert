@@ -5,7 +5,7 @@ retriever_core.py - Classe principale HybridWeaviateRetriever avec héritage mod
 
 import logging
 import re
-from typing import Dict, List, Any
+from utils.types import Dict, List, Any
 from utils.utilities import METRICS
 from utils.imports_and_dependencies import (
     WEAVIATE_V4,

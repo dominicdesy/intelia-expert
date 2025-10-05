@@ -1,0 +1,394 @@
+{
+  "metadata": {
+    "description": "Enhanced breed information with suppliers, types, and performance characteristics",
+    "version": "1.0.0",
+    "last_updated": "2025-10-05",
+    "total_breeds": 51,
+    "source": "Enriched from core/intents.json breed_registry"
+  },
+
+  "broilers": {
+    "ross_308": {
+      "canonical_name": "Ross 308",
+      "aliases": ["ross308", "ross-308", "r308", "ross", "ross 308 broiler", "ross308 ap", "ross 308 ap", "308/308 FF", "308/308ff", "308 ff"],
+      "supplier": "Aviagen",
+      "type": "fast_growing",
+      "typical_market_age_days": 35,
+      "db_name": "308/308 FF",
+      "description": "High-performance fast-growing broiler with excellent feed conversion"
+    },
+    "ross_708": {
+      "canonical_name": "Ross 708",
+      "aliases": ["ross708", "ross-708", "r708", "Ross 708", "708"],
+      "supplier": "Aviagen",
+      "type": "fast_growing",
+      "typical_market_age_days": 42,
+      "db_name": "708",
+      "description": "Robust broiler with excellent leg health and livability"
+    },
+    "cobb_500": {
+      "canonical_name": "Cobb 500",
+      "aliases": ["cobb500", "cobb-500", "c500", "cobb", "cobb 500 broiler", "500"],
+      "supplier": "Cobb-Vantress",
+      "type": "fast_growing",
+      "typical_market_age_days": 42,
+      "db_name": "500",
+      "description": "Industry-leading broiler with exceptional growth and feed efficiency"
+    },
+    "cobb_700": {
+      "canonical_name": "Cobb 700",
+      "aliases": ["cobb700", "cobb-700", "c700"],
+      "supplier": "Cobb-Vantress",
+      "type": "fast_growing",
+      "typical_market_age_days": 49,
+      "db_name": "700",
+      "description": "Optimized for higher live weight markets with superior breast yield"
+    },
+    "cobb_400": {
+      "canonical_name": "Cobb 400",
+      "aliases": ["cobb400", "cobb-400", "c400"],
+      "supplier": "Cobb-Vantress",
+      "type": "medium_growing",
+      "typical_market_age_days": 56,
+      "db_name": "400",
+      "description": "Medium-growing broiler for diverse markets"
+    },
+    "hubbard_ja87": {
+      "canonical_name": "Hubbard JA87",
+      "aliases": ["Hubbard JA87", "JA87", "hubbard", "ja87", "hubbard-ja87", "ja 87", "ja-87"],
+      "supplier": "Hubbard",
+      "type": "fast_growing",
+      "typical_market_age_days": 45,
+      "db_name": "JA87",
+      "description": "High-performance Hubbard line with excellent uniformity"
+    },
+    "hubbard_ja757": {
+      "canonical_name": "Hubbard JA757",
+      "aliases": ["ja757", "hubbard-ja757", "ja 757", "ja-757"],
+      "supplier": "Hubbard",
+      "type": "fast_growing",
+      "typical_market_age_days": 42,
+      "db_name": "JA757",
+      "description": "Optimized for efficiency and breast meat yield"
+    },
+    "hubbard_ja787": {
+      "canonical_name": "Hubbard JA787",
+      "aliases": ["ja787", "hubbard-ja787", "ja 787", "ja-787"],
+      "supplier": "Hubbard",
+      "type": "fast_growing",
+      "typical_market_age_days": 42,
+      "db_name": "JA787",
+      "description": "Balanced genetics for optimal performance"
+    },
+    "hubbard_ja957": {
+      "canonical_name": "Hubbard JA957",
+      "aliases": ["ja957", "hubbard-ja957", "ja 957", "ja-957"],
+      "supplier": "Hubbard",
+      "type": "fast_growing",
+      "typical_market_age_days": 42,
+      "db_name": "JA957",
+      "description": "High-yielding broiler with superior uniformity"
+    },
+    "hubbard_classic": {
+      "canonical_name": "Hubbard Classic",
+      "aliases": ["classic", "hubbard-classic", "hclassic"],
+      "supplier": "Hubbard",
+      "type": "robust",
+      "typical_market_age_days": 56,
+      "db_name": "Classic",
+      "description": "Robust slower-growing broiler for premium markets"
+    },
+    "hubbard_flex": {
+      "canonical_name": "Hubbard Flex",
+      "aliases": ["flex", "hubbard-flex", "hflex"],
+      "supplier": "Hubbard",
+      "type": "flexible",
+      "typical_market_age_days": 49,
+      "db_name": "Flex",
+      "description": "Flexible genetics for variable market weights"
+    },
+    "hubbard_color": {
+      "canonical_name": "Hubbard Color",
+      "aliases": ["color", "hubbard-color", "hcolor", "color broiler"],
+      "supplier": "Hubbard",
+      "type": "colored",
+      "typical_market_age_days": 56,
+      "db_name": "Color",
+      "description": "Colored feather broiler for traditional markets"
+    },
+    "arbor_acres": {
+      "canonical_name": "Arbor Acres",
+      "aliases": ["Arbor Acres", "AA+", "arbor", "acres", "arbor-acres", "arbor acres plus"],
+      "supplier": "Aviagen",
+      "type": "fast_growing",
+      "typical_market_age_days": 42,
+      "db_name": "AA+",
+      "description": "Premium broiler with excellent uniformity and performance"
+    },
+    "cobb_vantress": {
+      "canonical_name": "Cobb-Vantress",
+      "aliases": ["Cobb-Vantress", "Cobb Vantress", "vantress", "cobb vantress"],
+      "supplier": "Cobb-Vantress",
+      "type": "fast_growing",
+      "typical_market_age_days": 42,
+      "db_name": "500",
+      "description": "Generic Cobb genetics line"
+    },
+    "ranger_classic": {
+      "canonical_name": "Ranger Classic",
+      "aliases": ["ranger-classic", "rangerclassic"],
+      "supplier": "Hubbard",
+      "type": "slow_growing",
+      "typical_market_age_days": 63,
+      "db_name": "Ranger Classic",
+      "description": "Slow-growing broiler for free-range and organic production"
+    },
+    "ranger_gold": {
+      "canonical_name": "Ranger Gold",
+      "aliases": ["ranger-gold", "rangergold"],
+      "supplier": "Hubbard",
+      "type": "slow_growing",
+      "typical_market_age_days": 63,
+      "db_name": "Ranger Gold",
+      "description": "Yellow-skinned slow-growing broiler"
+    },
+    "ranger_premium": {
+      "canonical_name": "Ranger Premium",
+      "aliases": ["ranger-premium", "rangerpremium"],
+      "supplier": "Hubbard",
+      "type": "slow_growing",
+      "typical_market_age_days": 70,
+      "db_name": "Ranger Premium",
+      "description": "Premium slow-growing genetics for quality markets"
+    },
+    "freedom_ranger": {
+      "canonical_name": "Freedom Ranger",
+      "aliases": ["freedom-ranger", "freedom", "redbro"],
+      "supplier": "Various",
+      "type": "slow_growing",
+      "typical_market_age_days": 63,
+      "db_name": "Freedom Ranger",
+      "description": "Popular slow-growing broiler for pasture-raised production"
+    },
+    "sasso_x44": {
+      "canonical_name": "Sasso X44",
+      "aliases": ["x44", "sasso-x44", "sasso x 44"],
+      "supplier": "Sasso",
+      "type": "colored",
+      "typical_market_age_days": 56,
+      "db_name": "X44",
+      "description": "Colored broiler for traditional markets"
+    },
+    "sasso_t44": {
+      "canonical_name": "Sasso T44",
+      "aliases": ["t44", "sasso-t44", "sasso t 44"],
+      "supplier": "Sasso",
+      "type": "colored",
+      "typical_market_age_days": 56,
+      "db_name": "T44",
+      "description": "Colored broiler with excellent meat quality"
+    },
+    "sasso_pla": {
+      "canonical_name": "Sasso PLA",
+      "aliases": ["pla", "sasso-pla"],
+      "supplier": "Sasso",
+      "type": "colored",
+      "typical_market_age_days": 63,
+      "db_name": "PLA",
+      "description": "Rustic colored broiler"
+    },
+    "rowan_range": {
+      "canonical_name": "Rowan Range",
+      "aliases": ["rowan-range", "rowanrange"],
+      "supplier": "Aviagen",
+      "type": "slow_growing",
+      "typical_market_age_days": 63,
+      "db_name": "Rowan Range",
+      "description": "Slow-growing broiler for extensive systems"
+    }
+  },
+
+  "layers": {
+    "isa_brown": {
+      "canonical_name": "ISA Brown",
+      "aliases": ["isa", "isa-brown", "isa brown layer", "isa brown pondeuse"],
+      "supplier": "Hendrix Genetics",
+      "type": "brown_egg",
+      "egg_color": "brown",
+      "db_name": "Brown",
+      "description": "World's most popular brown egg layer"
+    },
+    "isa_white": {
+      "canonical_name": "ISA White",
+      "aliases": ["isa-white", "isa w"],
+      "supplier": "Hendrix Genetics",
+      "type": "white_egg",
+      "egg_color": "white",
+      "db_name": "White",
+      "description": "High-performance white egg layer"
+    },
+    "lohmann_brown": {
+      "canonical_name": "Lohmann Brown",
+      "aliases": ["lohmann", "lohmann-brown", "lb", "lohmann brown layer"],
+      "supplier": "Lohmann",
+      "type": "brown_egg",
+      "egg_color": "brown",
+      "db_name": "Brown",
+      "description": "Robust brown egg layer with excellent persistency"
+    },
+    "lohmann_white": {
+      "canonical_name": "Lohmann White",
+      "aliases": ["lohmann-white", "lw", "lsl", "lohmann lsl"],
+      "supplier": "Lohmann",
+      "type": "white_egg",
+      "egg_color": "white",
+      "db_name": "White",
+      "description": "Efficient white egg layer (LSL line)"
+    },
+    "hy-line_brown": {
+      "canonical_name": "Hy-Line Brown",
+      "aliases": ["hyline", "hy-line", "hyline-brown", "hy line brown"],
+      "supplier": "Hy-Line",
+      "type": "brown_egg",
+      "egg_color": "brown",
+      "db_name": "Brown",
+      "description": "Premium brown egg layer with excellent egg quality"
+    },
+    "hy-line_w-36": {
+      "canonical_name": "Hy-Line W-36",
+      "aliases": ["hyline w36", "w-36", "w36"],
+      "supplier": "Hy-Line",
+      "type": "white_egg",
+      "egg_color": "white",
+      "db_name": "W-36",
+      "description": "Efficient white egg layer for commercial production"
+    },
+    "hy-line_w-80": {
+      "canonical_name": "Hy-Line W-80",
+      "aliases": ["hyline w80", "w-80", "w80"],
+      "supplier": "Hy-Line",
+      "type": "white_egg",
+      "egg_color": "white",
+      "db_name": "W-80",
+      "description": "High-performance white egg layer"
+    },
+    "dekalb_white": {
+      "canonical_name": "Dekalb White",
+      "aliases": ["dekalb-white", "dw"],
+      "supplier": "Hendrix Genetics",
+      "type": "white_egg",
+      "egg_color": "white",
+      "db_name": "White",
+      "description": "Classic white egg layer genetics"
+    },
+    "dekalb_brown": {
+      "canonical_name": "Dekalb Brown",
+      "aliases": ["dekalb-brown", "db"],
+      "supplier": "Hendrix Genetics",
+      "type": "brown_egg",
+      "egg_color": "brown",
+      "db_name": "Brown",
+      "description": "Robust brown egg layer"
+    },
+    "bovans_brown": {
+      "canonical_name": "Bovans Brown",
+      "aliases": ["bovans-brown", "bb"],
+      "supplier": "Hendrix Genetics",
+      "type": "brown_egg",
+      "egg_color": "brown",
+      "db_name": "Brown",
+      "description": "High-yielding brown egg layer"
+    },
+    "bovans_white": {
+      "canonical_name": "Bovans White",
+      "aliases": ["bovans-white", "bw"],
+      "supplier": "Hendrix Genetics",
+      "type": "white_egg",
+      "egg_color": "white",
+      "db_name": "White",
+      "description": "Efficient white egg layer"
+    },
+    "shaver_brown": {
+      "canonical_name": "Shaver Brown",
+      "aliases": ["shaver-brown", "sb"],
+      "supplier": "Hendrix Genetics",
+      "type": "brown_egg",
+      "egg_color": "brown",
+      "db_name": "Brown",
+      "description": "Versatile brown egg layer"
+    },
+    "shaver_white": {
+      "canonical_name": "Shaver White",
+      "aliases": ["shaver-white", "sw"],
+      "supplier": "Hendrix Genetics",
+      "type": "white_egg",
+      "egg_color": "white",
+      "db_name": "White",
+      "description": "High-performance white egg layer"
+    },
+    "novogen_brown": {
+      "canonical_name": "Novogen Brown",
+      "aliases": ["novogen-brown", "nb"],
+      "supplier": "Hendrix Genetics",
+      "type": "brown_egg",
+      "egg_color": "brown",
+      "db_name": "Brown",
+      "description": "Premium brown egg layer"
+    },
+    "novogen_white": {
+      "canonical_name": "Novogen White",
+      "aliases": ["novogen-white", "nw"],
+      "supplier": "Hendrix Genetics",
+      "type": "white_egg",
+      "egg_color": "white",
+      "db_name": "White",
+      "description": "Efficient white egg layer"
+    },
+    "hisex_brown": {
+      "canonical_name": "Hisex Brown",
+      "aliases": ["hisex-brown", "hb"],
+      "supplier": "Hendrix Genetics",
+      "type": "brown_egg",
+      "egg_color": "brown",
+      "db_name": "Brown",
+      "description": "Robust brown egg layer"
+    },
+    "hisex_white": {
+      "canonical_name": "Hisex White",
+      "aliases": ["hisex-white", "hw"],
+      "supplier": "Hendrix Genetics",
+      "type": "white_egg",
+      "egg_color": "white",
+      "db_name": "White",
+      "description": "High-performance white egg layer"
+    },
+    "nick_chick": {
+      "canonical_name": "Nick Chick",
+      "aliases": ["nick-chick", "nickchick"],
+      "supplier": "Hendrix Genetics",
+      "type": "brown_egg",
+      "egg_color": "brown",
+      "db_name": "Nick Chick",
+      "description": "Traditional brown egg layer"
+    }
+  },
+
+  "breeders": {
+    "ross_308_ps": {
+      "canonical_name": "Ross 308 PS",
+      "aliases": ["ross 308 parent stock", "ross ps 308", "ross308 ps"],
+      "supplier": "Aviagen",
+      "type": "parent_stock",
+      "db_name": "308 PS",
+      "description": "Parent stock for Ross 308 production"
+    },
+    "cobb_500_ps": {
+      "canonical_name": "Cobb 500 PS",
+      "aliases": ["cobb 500 parent stock", "cobb ps 500", "cobb500 ps"],
+      "supplier": "Cobb-Vantress",
+      "type": "parent_stock",
+      "db_name": "500 PS",
+      "description": "Parent stock for Cobb 500 production"
+    }
+  }
+}

@@ -5,7 +5,7 @@ Trouve l'âge correspondant à une valeur cible de métrique
 """
 
 import logging
-from typing import Dict
+from utils.types import Dict
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)

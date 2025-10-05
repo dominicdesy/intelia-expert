@@ -8,7 +8,7 @@ import logging
 import json
 import os
 import re
-from typing import Dict, List, Tuple, Set, Optional
+from utils.types import Dict, List, Tuple, Set, Optional
 from dataclasses import dataclass
 from enum import Enum
 

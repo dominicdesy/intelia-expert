@@ -8,7 +8,7 @@ Le contexte conversationnel est maintenant géré par QueryRouter + Conversation
 import time
 import asyncio
 import logging
-from typing import Dict, Any, Optional
+from utils.types import Dict, Any, Optional
 
 from config.config import STREAM_CHUNK_LEN
 from utils.utilities import (

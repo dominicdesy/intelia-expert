@@ -5,7 +5,7 @@ Décompose et exécute des requêtes nécessitant plusieurs étapes
 """
 
 import logging
-from typing import Dict, List
+from utils.types import Dict, List
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)

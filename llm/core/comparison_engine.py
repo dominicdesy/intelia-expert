@@ -7,11 +7,12 @@ Version 1.1 - Ajout validation compatibilité species
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+from utils.types import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
 from utils.breeds_registry import get_breeds_registry
+from utils.mixins import SerializableMixin
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class ComparisonDimension(Enum):
 
 
 @dataclass
-class ComparisonResult:
+class ComparisonResult(SerializableMixin):
     """Résultat structuré d'une comparaison"""
 
     success: bool
@@ -61,21 +62,12 @@ class ComparisonResult:
     fallback_used: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convertit en dictionnaire"""
-        return {
-            "success": self.success,
-            "status": self.status.value,
-            "comparison": self.comparison_data,
-            "entities_compared": self.entities_compared,
-            "dimension": self.dimension.value if self.dimension else None,
-            "metric_name": self.metric_name,
-            "unit": self.unit,
-            "better_entity": self.better_entity,
-            "error": self.error,
-            "warnings": self.warnings,
-            "metadata": self.metadata,
-            "fallback_used": self.fallback_used,
-        }
+        """Override to rename comparison_data -> comparison"""
+        result = super().to_dict()
+        # Rename for backward compatibility
+        if "comparison_data" in result:
+            result["comparison"] = result.pop("comparison_data")
+        return result
 
 
 class ComparisonEngine:

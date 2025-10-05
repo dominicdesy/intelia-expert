@@ -6,7 +6,7 @@ Extrait de utilities.py pour modularisation
 
 import json
 import logging
-from typing import Any
+from utils.types import Any
 
 from utils.data_classes import safe_serialize_for_json
 

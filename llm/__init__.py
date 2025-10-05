@@ -7,7 +7,7 @@ Version architecture modulaire - Imports sécurisés
 from __future__ import annotations
 import logging
 import os
-from typing import Optional
+from utils.types import Optional
 
 # Version
 __version__ = "2.3.0-modular"

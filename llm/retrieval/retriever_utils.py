@@ -5,7 +5,7 @@ retriever_utils.py - Fonctions utilitaires et diagnostics pour le retriever
 
 import logging
 import time
-from typing import Dict, Any, List
+from utils.types import Dict, Any, List
 from core.data_models import Document
 from utils.utilities import METRICS
 

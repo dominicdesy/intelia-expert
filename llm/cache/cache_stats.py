@@ -6,7 +6,7 @@ CORRIGÉ: Utilisation de self.core.config au lieu d'attributs directs inexistant
 """
 
 import logging
-from typing import Dict, Any
+from utils.types import Dict, Any
 
 logger = logging.getLogger(__name__)
 

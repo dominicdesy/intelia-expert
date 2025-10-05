@@ -5,7 +5,7 @@ Trouve les âges/paramètres optimaux selon contraintes
 """
 
 import logging
-from typing import Dict, List
+from utils.types import Dict, List
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)

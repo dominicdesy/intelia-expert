@@ -5,7 +5,7 @@ CORRIGÉ: Imports modulaires + logique sexe/as-hatched pour recherche élargie
 """
 
 import logging
-from typing import Dict, List, Any
+from utils.types import Dict, List, Any
 from functools import lru_cache
 import re
 

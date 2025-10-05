@@ -7,7 +7,7 @@ Version corrigée: Gestion correcte de la structure JSON avec domains
 import os
 import json
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+from utils.types import Dict, List, Optional, Any, Tuple
 
 logger = logging.getLogger(__name__)
 

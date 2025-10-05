@@ -7,7 +7,8 @@ Extrait du fichier principal pour modularité
 import logging
 import time
 import re
-from typing import Dict, List, Optional, Any
+from utils.types import Dict, List, Optional, Any
+from core.base import InitializableMixin
 
 try:
     from langsmith import Client
@@ -22,12 +23,12 @@ from config.config import LANGSMITH_API_KEY, LANGSMITH_PROJECT, LANGSMITH_ENVIRO
 logger = logging.getLogger(__name__)
 
 
-class LangSmithIntegration:
+class LangSmithIntegration(InitializableMixin):
     """Intégration LangSmith pour monitoring avancé"""
 
     def __init__(self):
+        super().__init__()
         self.langsmith_client = None
-        self.is_initialized = False
 
         # Statistiques LangSmith
         self.langsmith_stats = {
@@ -54,8 +55,9 @@ class LangSmithIntegration:
             # Test de connexion
             await self._test_connection()
 
-            self.is_initialized = True
             logger.info(f"✅ LangSmith initialisé - Projet: {LANGSMITH_PROJECT}")
+
+            await super().initialize()
 
         except Exception as e:
             logger.error(f"❌ Erreur initialisation LangSmith: {e}")
@@ -428,3 +430,5 @@ class LangSmithIntegration:
                 logger.warning(f"Erreur fermeture LangSmith: {e}")
 
         logger.info("LangSmith Integration fermée")
+
+        await super().close()

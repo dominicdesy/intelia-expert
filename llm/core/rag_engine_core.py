@@ -4,7 +4,8 @@ rag_engine_core.py - Core fonctionnalités du RAG Engine
 """
 
 import logging
-from typing import Optional
+from utils.types import Optional
+from .base import InitializableMixin
 
 try:
     from utils.imports_and_dependencies import OPENAI_AVAILABLE, AsyncOpenAI
@@ -17,11 +18,12 @@ from config.config import OPENAI_API_KEY
 logger = logging.getLogger(__name__)
 
 
-class RAGEngineCore:
+class RAGEngineCore(InitializableMixin):
     """Core du RAG Engine avec gestion OpenAI et générateur de réponses"""
 
     def __init__(self, openai_client: AsyncOpenAI = None):
         """Initialisation du core avec tous les composants nécessaires"""
+        super().__init__()
 
         # Client OpenAI - DOIT être initialisé en premier
         try:
@@ -86,6 +88,7 @@ class RAGEngineCore:
         else:
             logger.info("✅ Tous les composants critiques disponibles")
 
+        await super().initialize()
         return self
 
     async def close(self):
@@ -97,4 +100,5 @@ class RAGEngineCore:
             except Exception as e:
                 logger.warning(f"Erreur fermeture OpenAI client: {e}")
 
+        await super().close()
         logger.info("RAG Engine Core fermé")

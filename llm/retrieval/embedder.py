@@ -5,7 +5,7 @@ embedder.py - Embedder OpenAI avec cache Redis externe optimisé - CORRIGÉ
 
 import logging
 import os
-from typing import List
+from utils.types import List
 from utils.utilities import METRICS
 from utils.imports_and_dependencies import AsyncOpenAI
 
@@ -28,8 +28,16 @@ class OpenAIEmbedder:
             "OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"
         )
 
-        # Log du modèle utilisé pour diagnostic
-        logger.info(f"Embedder initialisé avec le modèle: {self.model}")
+        # Support dimensions réduites pour text-embedding-3-large/small
+        # Réduit storage de 50% avec -2% quality (3072 → 1536)
+        self.dimensions = None
+        if "text-embedding-3" in self.model:
+            self.dimensions = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
+            logger.info(
+                f"Embedder initialisé avec {self.model} (dimensions: {self.dimensions})"
+            )
+        else:
+            logger.info(f"Embedder initialisé avec {self.model}")
 
     async def get_embedding(self, text: str) -> List[float]:
         """CORRECTION: Méthode manquante appelée par rag_engine.py"""
@@ -65,9 +73,12 @@ class OpenAIEmbedder:
                 return []
 
             # Appel API OpenAI avec gestion d'erreurs détaillée
-            response = await self.client.embeddings.create(
-                model=self.model, input=text, encoding_format="float"
-            )
+            # Support dimensions réduites pour text-embedding-3-*
+            params = {"model": self.model, "input": text, "encoding_format": "float"}
+            if self.dimensions:
+                params["dimensions"] = self.dimensions
+
+            response = await self.client.embeddings.create(**params)
 
             if not response or not response.data or len(response.data) == 0:
                 logger.error("Réponse OpenAI vide ou malformée")
@@ -144,9 +155,16 @@ class OpenAIEmbedder:
                     logger.error("Client OpenAI non initialisé pour batch")
                     return []
 
-                response = await self.client.embeddings.create(
-                    model=self.model, input=uncached_texts, encoding_format="float"
-                )
+                # Support dimensions réduites pour batch
+                params = {
+                    "model": self.model,
+                    "input": uncached_texts,
+                    "encoding_format": "float",
+                }
+                if self.dimensions:
+                    params["dimensions"] = self.dimensions
+
+                response = await self.client.embeddings.create(**params)
 
                 if not response or not response.data:
                     logger.error("Réponse batch OpenAI vide")

@@ -4,7 +4,7 @@ retriever_rrf.py - Support pour RRF (Reciprocal Rank Fusion) intelligent
 """
 
 import logging
-from typing import List
+from utils.types import List
 from core.data_models import Document
 from utils.imports_and_dependencies import wvc
 

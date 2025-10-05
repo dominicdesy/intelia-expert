@@ -3,6 +3,7 @@
 cache_semantic.py - Module de cache sémantique intelligent
 Gestion de l'extraction de mots-clés, normalisation et cache sémantique
 VERSION CORRIGÉE: Sérialisation JSON pour LanguageDetectionResult
+REFACTORED: Utilise utils/serialization.py pour éviter duplication
 """
 
 import os
@@ -11,43 +12,15 @@ import json
 import hashlib
 import logging
 import pickle
-from typing import Dict, List, Optional, Any, Set
+from utils.types import Dict, List, Optional, Any, Set
+
+# Import centralized serialization utility
+from utils.serialization import safe_serialize
 
 logger = logging.getLogger(__name__)
 
-
-def safe_serialize_for_json(obj: Any) -> Any:
-    """Convertit récursivement les objets en types JSON-safe"""
-    if obj is None:
-        return None
-    elif isinstance(obj, (str, int, float, bool)):
-        return obj
-    elif hasattr(obj, "__dict__") and hasattr(obj, "to_dict"):
-        # Utiliser la méthode to_dict si disponible
-        return obj.to_dict()
-    elif (
-        hasattr(obj, "language")
-        and hasattr(obj, "confidence")
-        and hasattr(obj, "source")
-    ):
-        # Gestion spéciale pour LanguageDetectionResult
-        return {
-            "language": obj.language,
-            "confidence": float(obj.confidence),
-            "source": obj.source,
-            "processing_time_ms": getattr(obj, "processing_time_ms", 0),
-        }
-    elif isinstance(obj, dict):
-        return {k: safe_serialize_for_json(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [safe_serialize_for_json(item) for item in obj]
-    else:
-        # Fallback pour autres types
-        try:
-            json.dumps(obj)  # Test de sérialisation
-            return obj
-        except (TypeError, ValueError):
-            return str(obj)
+# Backward compatibility alias
+safe_serialize_for_json = safe_serialize
 
 
 class SemanticCacheManager:

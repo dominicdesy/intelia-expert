@@ -7,7 +7,7 @@ Version: 4.2.0 - Support contextualisation et clarifications
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Optional, List
+from utils.types import Dict, Optional, List
 
 logger = logging.getLogger(__name__)
 

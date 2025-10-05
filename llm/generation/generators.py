@@ -10,18 +10,16 @@ Version 3.4 - Simplifié et optimisé
 """
 
 import logging
-from typing import List, Tuple, Dict, Optional, Union
-from dataclasses import dataclass
-from pathlib import Path
-import json
+from utils.types import List, Tuple, Dict, Optional, Union
 import re
 from core.data_models import Document
 from config.config import (
-    ENTITY_CONTEXTS,
     SUPPORTED_LANGUAGES,
     FALLBACK_LANGUAGE,
 )
 from utils.utilities import METRICS
+from .entity_manager import EntityEnrichmentBuilder
+from .models import ContextEnrichment
 
 # Import du gestionnaire de messages pour disclaimers vétérinaires
 try:
@@ -47,143 +45,6 @@ except ImportError as e:
     PROMPTS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ContextEnrichment:
-    """Enrichissement du contexte basé sur les entités détectées"""
-
-    entity_context: str
-    metric_focus: str
-    temporal_context: str
-    species_focus: str
-    performance_indicators: List[str]
-    confidence_boosters: List[str]
-
-
-class EntityDescriptionsManager:
-    """
-    Gestionnaire centralisé des descriptions d'entités pour enrichissement contextuel
-    """
-
-    def __init__(self, descriptions_path: Optional[str] = None):
-        """
-        Charge les descriptions d'entités depuis entity_descriptions.json
-
-        Args:
-            descriptions_path: Chemin custom vers entity_descriptions.json
-        """
-        self.descriptions = {}
-        self.performance_metrics = {}
-
-        # Déterminer le chemin du fichier
-        if descriptions_path:
-            config_path = Path(descriptions_path)
-        else:
-            # Chemin par défaut: llm/config/entity_descriptions.json
-            config_path = (
-                Path(__file__).parent.parent / "config" / "entity_descriptions.json"
-            )
-
-        # Charger les descriptions
-        try:
-            if config_path.exists():
-                with open(config_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    self.descriptions = data.get("entity_contexts", {})
-                    self.performance_metrics = data.get("performance_metrics", {})
-                logger.info(f"✅ Descriptions d'entités chargées depuis {config_path}")
-            else:
-                logger.warning(
-                    f"⚠️ Fichier {config_path} introuvable, utilisation fallback"
-                )
-                self._load_fallback_descriptions()
-        except Exception as e:
-            logger.error(f"❌ Erreur chargement entity_descriptions.json: {e}")
-            self._load_fallback_descriptions()
-
-    def _load_fallback_descriptions(self):
-        """Descriptions de secours si le fichier JSON n'est pas disponible"""
-        self.descriptions = {
-            "line": {
-                "ross": "lignée à croissance rapide, optimisée pour le rendement carcasse",
-                "cobb": "lignée équilibrée performance/robustesse, bonne conversion alimentaire",
-                "hubbard": "lignée rustique, adaptée à l'élevage extensif et labels qualité",
-                "isa": "lignée ponte, optimisée pour la production d'œufs",
-                "lohmann": "lignée ponte, excellence en persistance de ponte",
-            },
-            "species": {
-                "broiler": "poulet de chair, objectifs: poids vif, FCR, rendement carcasse",
-                "layer": "poule pondeuse, objectifs: intensité de ponte, qualité œuf, persistance",
-                "breeder": "reproducteur, objectifs: fertilité, éclosabilité, viabilité descendance",
-            },
-            "phase": {
-                "starter": "phase démarrage (0-10j), croissance critique, thermorégulation",
-                "grower": "phase croissance (11-24j), développement squelettique et musculaire",
-                "finisher": "phase finition (25j+), optimisation du poids final et FCR",
-                "laying": "phase ponte, maintien de la production et qualité œuf",
-                "breeding": "phase reproduction, optimisation fertilité et éclosabilité",
-            },
-        }
-
-        self.performance_metrics = {
-            "weight": [
-                "poids vif",
-                "gain de poids",
-                "homogénéité",
-                "courbe de croissance",
-            ],
-            "fcr": [
-                "indice de consommation",
-                "efficacité alimentaire",
-                "coût alimentaire",
-            ],
-            "mortality": [
-                "mortalité",
-                "viabilité",
-                "causes de mortalité",
-                "prévention",
-            ],
-            "production": [
-                "intensité de ponte",
-                "pic de ponte",
-                "persistance",
-                "qualité œuf",
-            ],
-            "feed": ["consommation", "appétence", "digestibilité", "conversion"],
-        }
-
-    def get_entity_description(
-        self, entity_type: str, entity_value: str
-    ) -> Optional[str]:
-        """
-        Récupère la description d'une entité
-
-        Args:
-            entity_type: Type d'entité (line, species, phase, etc.)
-            entity_value: Valeur de l'entité
-
-        Returns:
-            Description ou None si non trouvée
-        """
-        entity_value_lower = entity_value.lower()
-        return self.descriptions.get(entity_type, {}).get(entity_value_lower)
-
-    def get_metric_keywords(self, metric: str) -> List[str]:
-        """
-        Récupère les mots-clés associés à une métrique
-
-        Args:
-            metric: Nom de la métrique
-
-        Returns:
-            Liste de mots-clés
-        """
-        return self.performance_metrics.get(metric, [])
-
-    def get_all_metrics(self) -> Dict[str, List[str]]:
-        """Retourne toutes les métriques de performance"""
-        return self.performance_metrics.copy()
 
 
 class EnhancedResponseGenerator:
@@ -231,15 +92,8 @@ class EnhancedResponseGenerator:
             self.prompts_manager = None
             logger.warning("⚠️ EnhancedResponseGenerator en mode fallback")
 
-        # Charger le gestionnaire de descriptions d'entités
-        self.entity_descriptions = EntityDescriptionsManager(descriptions_path)
-
-        # Garder compatibilité avec ENTITY_CONTEXTS de config
-        if ENTITY_CONTEXTS:
-            for entity_type, contexts in ENTITY_CONTEXTS.items():
-                if entity_type not in self.entity_descriptions.descriptions:
-                    self.entity_descriptions.descriptions[entity_type] = {}
-                self.entity_descriptions.descriptions[entity_type].update(contexts)
+        # Charger le gestionnaire d'enrichissement d'entités
+        self.entity_enrichment_builder = EntityEnrichmentBuilder(descriptions_path)
 
         # ✅ NOUVEAU: Charger les noms de langues dynamiquement
         self.language_display_names = self._load_language_names()
@@ -561,7 +415,7 @@ class EnhancedResponseGenerator:
 
             # Construire enrichissement avancé
             enrichment = (
-                self._build_entity_enrichment(intent_result)
+                self.entity_enrichment_builder.build_enrichment(intent_result)
                 if intent_result
                 else ContextEnrichment("", "", "", "", [], [])
             )
@@ -638,122 +492,6 @@ class EnhancedResponseGenerator:
         if doc.explain_score:
             result["explain_score"] = doc.explain_score
         return result
-
-    def _build_entity_enrichment(self, intent_result) -> ContextEnrichment:
-        """Construit l'enrichissement basé sur les entités détectées"""
-        try:
-            entities = getattr(intent_result, "detected_entities", {})
-
-            # Contexte des entités via EntityDescriptionsManager
-            entity_contexts = []
-
-            if "line" in entities:
-                description = self.entity_descriptions.get_entity_description(
-                    "line", entities["line"]
-                )
-                if description:
-                    entity_contexts.append(f"Lignée {entities['line']}: {description}")
-
-            if "species" in entities:
-                description = self.entity_descriptions.get_entity_description(
-                    "species", entities["species"]
-                )
-                if description:
-                    entity_contexts.append(f"Type {entities['species']}: {description}")
-
-            if "phase" in entities:
-                description = self.entity_descriptions.get_entity_description(
-                    "phase", entities["phase"]
-                )
-                if description:
-                    entity_contexts.append(f"Phase {entities['phase']}: {description}")
-
-            # Focus métrique
-            metric_focus = ""
-            detected_metrics = []
-            expanded_query = getattr(intent_result, "expanded_query", "")
-
-            all_metrics = self.entity_descriptions.get_all_metrics()
-            for metric, keywords in all_metrics.items():
-                metric_in_entities = metric in entities
-                metric_in_query = (
-                    any(kw in expanded_query.lower() for kw in keywords)
-                    if expanded_query
-                    else False
-                )
-
-                if metric_in_entities or metric_in_query:
-                    detected_metrics.extend(keywords)
-
-            if detected_metrics:
-                metric_focus = f"Focus métriques: {', '.join(detected_metrics[:3])}"
-
-            # Contexte temporel
-            temporal_context = ""
-            if "age_days" in entities:
-                age = entities["age_days"]
-                if isinstance(age, (int, float)):
-                    if age <= 7:
-                        temporal_context = "Période critique première semaine - Focus thermorégulation et démarrage"
-                    elif age <= 21:
-                        temporal_context = "Phase de croissance rapide - Développement osseux et musculaire"
-                    elif age <= 35:
-                        temporal_context = (
-                            "Phase d'optimisation - Maximisation du gain de poids"
-                        )
-                    else:
-                        temporal_context = (
-                            "Phase de finition - Optimisation FCR et qualité carcasse"
-                        )
-
-            # Focus espèce
-            species_focus = ""
-            if "species" in entities:
-                species = entities["species"].lower()
-                if "broiler" in species or "chair" in species:
-                    species_focus = (
-                        "Objectifs chair: poids vif, FCR, rendement, qualité carcasse"
-                    )
-                elif "layer" in species or "ponte" in species:
-                    species_focus = "Objectifs ponte: intensité, persistance, qualité œuf, viabilité"
-
-            # Indicateurs de performance
-            performance_indicators = []
-            if "weight" in entities or (
-                "poids" in expanded_query.lower() if expanded_query else False
-            ):
-                performance_indicators.extend(
-                    ["poids vif", "gain quotidien", "homogénéité du lot"]
-                )
-            if "fcr" in entities or any(
-                term in expanded_query.lower() if expanded_query else False
-                for term in ["conversion", "indice"]
-            ):
-                performance_indicators.extend(
-                    ["FCR", "consommation", "efficacité alimentaire"]
-                )
-
-            # Éléments de confiance
-            confidence_boosters = []
-            if entity_contexts:
-                confidence_boosters.append("Contexte lignée/espèce identifié")
-            if temporal_context:
-                confidence_boosters.append("Phase d'élevage précisée")
-            if metric_focus:
-                confidence_boosters.append("Métriques cibles identifiées")
-
-            return ContextEnrichment(
-                entity_context="; ".join(entity_contexts),
-                metric_focus=metric_focus,
-                temporal_context=temporal_context,
-                species_focus=species_focus,
-                performance_indicators=performance_indicators,
-                confidence_boosters=confidence_boosters,
-            )
-
-        except Exception as e:
-            logger.warning(f"Erreur construction enrichissement: {e}")
-            return ContextEnrichment("", "", "", "", [], [])
 
     def _build_enhanced_prompt(
         self,

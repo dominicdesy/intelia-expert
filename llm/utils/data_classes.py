@@ -2,11 +2,18 @@
 """
 utils/data_classes.py - Classes de données et utilitaires de sérialisation
 Extrait de utilities.py pour modularisation
+REFACTORED: Utilise utils/serialization.py pour éviter duplication
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
-from enum import Enum
+from utils.types import Dict, List, Optional, Any
+
+# Import centralized serialization utility
+from utils.serialization import safe_serialize
+from utils.mixins import SerializableMixin
+
+# Backward compatibility alias
+safe_serialize_for_json = safe_serialize
 
 # ============================================================================
 # CLASSES DE DONNÉES - VERSION CORRIGÉE AVEC SÉRIALISATION JSON
@@ -14,7 +21,7 @@ from enum import Enum
 
 
 @dataclass
-class ValidationReport:
+class ValidationReport(SerializableMixin):
     """Rapport de validation détaillé - CORRIGÉ pour sérialisation JSON"""
 
     is_valid: bool
@@ -23,15 +30,7 @@ class ValidationReport:
     stats: Dict[str, Any]
     recommendations: List[str]
 
-    def to_dict(self) -> dict:
-        """Conversion en dictionnaire pour sérialisation JSON"""
-        return {
-            "is_valid": self.is_valid,
-            "errors": self.errors,
-            "warnings": self.warnings,
-            "stats": self.stats,
-            "recommendations": self.recommendations,
-        }
+    # to_dict() now inherited from SerializableMixin (removed 9 lines)
 
     def __hash__(self):
         """Rendre hashable pour utilisation comme clé de cache"""
@@ -83,37 +82,7 @@ class ProcessingResult:
 
 
 # ============================================================================
-# FONCTION DE SÉRIALISATION CORRIGÉE - SUPPORT DATACLASSES
+# FONCTION DE SÉRIALISATION - MIGRÉ VERS utils/serialization.py
 # ============================================================================
-
-
-def safe_serialize_for_json(obj: Any) -> Any:
-    """Convertit récursivement les objets en types JSON-safe"""
-    if obj is None:
-        return None
-    elif isinstance(obj, (str, int, float, bool)):
-        return obj
-    elif isinstance(obj, Enum):
-        return obj.value
-
-    # NOUVEAU: Gestion spéciale pour LanguageDetectionResult
-    elif (
-        hasattr(obj, "language")
-        and hasattr(obj, "confidence")
-        and hasattr(obj, "source")
-    ):
-        return {
-            "language": obj.language,
-            "confidence": float(obj.confidence),
-            "source": obj.source,
-            "processing_time_ms": getattr(obj, "processing_time_ms", 0),
-        }
-
-    elif isinstance(obj, dict):
-        return {k: safe_serialize_for_json(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [safe_serialize_for_json(item) for item in obj]
-    elif hasattr(obj, "__dict__"):
-        return safe_serialize_for_json(obj.__dict__)
-    else:
-        return str(obj)
+# La fonction safe_serialize_for_json() est maintenant importée depuis utils/serialization.py
+# pour éviter la duplication de code (voir ligne 13 ci-dessus)

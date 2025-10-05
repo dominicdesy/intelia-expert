@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(python:*)",
+      "Bash(tee:*)",
+      "Bash(test:*)",
+      "Bash(python3:*)",
+      "Bash(awk:*)",
+      "Bash(echo:*)",
+      "Read(//c/Users/desy.dominic/**)",
+      "Read(//c/Users/**)",
+      "WebSearch",
+      "Bash(findstr:*)",
+      "WebFetch(domain:docs.ragas.io)",
+      "Bash(ruff check:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

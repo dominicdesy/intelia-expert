@@ -6,7 +6,7 @@ Charge les messages depuis languages.json avec cache et fallbacks
 
 import json
 import logging
-from typing import Dict, Optional
+from utils.types import Dict, Optional
 from pathlib import Path
 
 logger = logging.getLogger(__name__)

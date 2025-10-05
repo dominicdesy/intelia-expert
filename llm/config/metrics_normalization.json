@@ -1,0 +1,372 @@
+{
+  "metadata": {
+    "description": "Multilingual metrics normalization for performance indicators",
+    "version": "1.0.0",
+    "last_updated": "2025-10-05",
+    "total_metrics": 15,
+    "languages_supported": ["fr", "en", "es", "de", "it", "pt", "nl", "pl", "id", "hi", "th", "zh"],
+    "source": "Enriched from universal_terms and rag_postgresql_normalizer"
+  },
+
+  "body_weight": {
+    "canonical": "body_weight",
+    "category": "performance",
+    "unit": "grams",
+    "unit_alternatives": ["kg", "pounds", "lbs"],
+    "typical_range": {
+      "broiler_day_35": [1800, 2500],
+      "layer_adult": [1600, 2000]
+    },
+    "translations": {
+      "fr": ["poids", "poids corporel", "poids vif", "pv", "masse corporelle", "masse"],
+      "en": ["weight", "body weight", "live weight", "bw", "mass", "body mass"],
+      "es": ["peso", "peso corporal", "peso vivo", "masa corporal"],
+      "de": ["gewicht", "körpergewicht", "lebendgewicht", "masse"],
+      "it": ["peso", "peso corporeo", "peso vivo", "massa"],
+      "pt": ["peso", "peso corporal", "peso vivo"],
+      "nl": ["gewicht", "lichaamsgewicht", "levend gewicht"],
+      "pl": ["waga", "masa ciała", "waga żywa"],
+      "id": ["berat", "berat badan", "berat hidup"],
+      "hi": ["वजन", "शरीर का वजन", "जीवित वजन"],
+      "th": ["น้ำหนัก", "น้ำหนักตัว", "น้ำหนักมีชีวิต"],
+      "zh": ["体重", "活重", "体质量"]
+    }
+  },
+
+  "feed_conversion_ratio": {
+    "canonical": "feed_conversion_ratio",
+    "category": "performance",
+    "unit": "ratio",
+    "typical_range": {
+      "broiler": [1.4, 2.0],
+      "layer": [1.8, 2.5]
+    },
+    "translations": {
+      "fr": ["fcr", "ic", "indice de consommation", "taux de conversion", "efficacité alimentaire", "conversion alimentaire"],
+      "en": ["fcr", "feed conversion ratio", "feed conversion", "feed efficiency", "conversion ratio"],
+      "es": ["ic", "índice de conversión", "conversión alimenticia", "eficiencia alimentaria"],
+      "de": ["fvw", "futterverwertung", "futterkonversion", "futtereffizienz"],
+      "it": ["ic", "indice di conversione", "conversione alimentare"],
+      "pt": ["ca", "conversão alimentar", "índice de conversão"],
+      "nl": ["voederconversie", "voederefficiëntie"],
+      "pl": ["współczynnik konwersji paszy", "fcr", "wskaźnik konwersji"],
+      "id": ["rasio konversi pakan", "fcr", "efisiensi pakan"],
+      "hi": ["एफसीआर", "फ़ीड रूपांतरण अनुपात"],
+      "th": ["อัตราการแปลงอาหาร", "fcr"],
+      "zh": ["料肉比", "饲料转化率", "料蛋比"]
+    }
+  },
+
+  "daily_weight_gain": {
+    "canonical": "daily_weight_gain",
+    "category": "performance",
+    "unit": "grams_per_day",
+    "typical_range": {
+      "broiler": [40, 70],
+      "layer_rearing": [10, 20]
+    },
+    "translations": {
+      "fr": ["gmd", "gain moyen quotidien", "gain journalier", "croissance journalière", "croissance quotidienne", "gain quotidien"],
+      "en": ["dwg", "adg", "daily weight gain", "average daily gain", "daily gain", "growth rate"],
+      "es": ["gdp", "ganancia diaria", "ganancia diaria promedio", "crecimiento diario"],
+      "de": ["tägliche gewichtszunahme", "täglicher zuwachs", "tageszunahme"],
+      "it": ["incremento giornaliero", "guadagno giornaliero"],
+      "pt": ["ganho diário", "ganho médio diário"],
+      "nl": ["dagelijkse groei", "dagelijkse gewichtstoename"],
+      "pl": ["dzienny przyrost", "przyrost dzienny"],
+      "id": ["pertambahan berat harian", "pertumbuhan harian"],
+      "hi": ["दैनिक वजन वृद्धि", "रोज़ाना वृद्धि"],
+      "th": ["การเพิ่มน้ำหนักรายวัน", "การเจริญเติบโตรายวัน"],
+      "zh": ["日增重", "日增长", "每日增重"]
+    }
+  },
+
+  "mortality": {
+    "canonical": "mortality",
+    "category": "health",
+    "unit": "percentage",
+    "typical_range": {
+      "broiler": [0.5, 5.0],
+      "layer": [0.3, 2.0]
+    },
+    "translations": {
+      "fr": ["mortalité", "taux de mortalité", "mort", "décès", "perte"],
+      "en": ["mortality", "mortality rate", "death rate", "deaths", "loss"],
+      "es": ["mortalidad", "tasa de mortalidad", "muerte", "pérdida"],
+      "de": ["mortalität", "sterblichkeit", "todesrate", "verlust"],
+      "it": ["mortalità", "tasso di mortalità", "morte"],
+      "pt": ["mortalidade", "taxa de mortalidade", "morte"],
+      "nl": ["sterfte", "mortaliteit", "sterftepercentage"],
+      "pl": ["śmiertelność", "wskaźnik śmiertelności"],
+      "id": ["mortalitas", "tingkat kematian", "kematian"],
+      "hi": ["मृत्यु दर", "मृत्यु"],
+      "th": ["อัตราการตาย", "การตาย"],
+      "zh": ["死亡率", "死亡", "淘汰率"]
+    }
+  },
+
+  "feed_intake": {
+    "canonical": "feed_intake",
+    "category": "nutrition",
+    "unit": "grams",
+    "unit_alternatives": ["kg", "kg_per_day"],
+    "typical_range": {
+      "broiler_day_35": [3000, 4500],
+      "layer_per_day": [110, 130]
+    },
+    "translations": {
+      "fr": ["consommation", "consommation alimentaire", "ingestion", "aliment consommé", "prise alimentaire"],
+      "en": ["feed intake", "feed consumption", "food intake", "consumption", "feed eaten"],
+      "es": ["consumo de alimento", "ingesta", "consumo alimenticio"],
+      "de": ["futteraufnahme", "futterverbrauch", "futterverzehr"],
+      "it": ["consumo di mangime", "assunzione", "ingestione"],
+      "pt": ["consumo de ração", "ingestão", "consumo alimentar"],
+      "nl": ["voederopname", "voederverbruik"],
+      "pl": ["spożycie paszy", "konsumpcja paszy"],
+      "id": ["asupan pakan", "konsumsi pakan"],
+      "hi": ["फ़ीड का सेवन", "खाद्य उपभोग"],
+      "th": ["การบริโภคอาหาร", "ปริมาณอาหาร"],
+      "zh": ["采食量", "饲料摄入", "饲料消耗"]
+    }
+  },
+
+  "egg_production": {
+    "canonical": "egg_production",
+    "category": "performance",
+    "unit": "percentage",
+    "typical_range": {
+      "layer_peak": [90, 98],
+      "layer_average": [75, 88]
+    },
+    "translations": {
+      "fr": ["ponte", "taux de ponte", "production d'œufs", "production d'oeufs", "pourcentage de ponte"],
+      "en": ["egg production", "lay rate", "laying rate", "production rate", "laying percentage"],
+      "es": ["producción de huevos", "tasa de puesta", "porcentaje de puesta"],
+      "de": ["legeleistung", "eierproduktion", "legerate"],
+      "it": ["produzione di uova", "tasso di deposizione", "percentuale di deposizione"],
+      "pt": ["produção de ovos", "taxa de postura", "percentagem de postura"],
+      "nl": ["legpercentage", "eierproductie", "legprestatie"],
+      "pl": ["produkcja jaj", "wskaźnik nieśności"],
+      "id": ["produksi telur", "tingkat peneluran"],
+      "hi": ["अंडा उत्पादन", "अंडा देने की दर"],
+      "th": ["การผลิตไข่", "อัตราการออกไข่"],
+      "zh": ["产蛋率", "产蛋量", "产蛋百分比"]
+    }
+  },
+
+  "egg_weight": {
+    "canonical": "egg_weight",
+    "category": "performance",
+    "unit": "grams",
+    "typical_range": {
+      "layer_young": [50, 56],
+      "layer_mature": [60, 67]
+    },
+    "translations": {
+      "fr": ["poids d'œuf", "poids des œufs", "masse de l'œuf", "poids de l'oeuf"],
+      "en": ["egg weight", "egg mass", "weight of egg"],
+      "es": ["peso del huevo", "masa del huevo"],
+      "de": ["eigewicht", "eimasse"],
+      "it": ["peso dell'uovo", "massa dell'uovo"],
+      "pt": ["peso do ovo", "massa do ovo"],
+      "nl": ["eigewicht", "eimassa"],
+      "pl": ["masa jaja", "waga jaja"],
+      "id": ["berat telur", "massa telur"],
+      "hi": ["अंडे का वजन", "अंडे का द्रव्यमान"],
+      "th": ["น้ำหนักไข่", "มวลไข่"],
+      "zh": ["蛋重", "鸡蛋重量"]
+    }
+  },
+
+  "egg_mass": {
+    "canonical": "egg_mass",
+    "category": "performance",
+    "unit": "grams_per_day",
+    "typical_range": {
+      "layer": [50, 60]
+    },
+    "translations": {
+      "fr": ["masse d'œufs", "masse d'oeufs", "production massique", "masse totale d'oeufs"],
+      "en": ["egg mass", "total egg mass", "cumulative egg mass"],
+      "es": ["masa de huevos", "masa total de huevos"],
+      "de": ["eimasse", "gesamteimasse"],
+      "it": ["massa di uova", "massa totale uova"],
+      "pt": ["massa de ovos", "massa total de ovos"],
+      "nl": ["eimassa", "totale eimassa"],
+      "pl": ["masa jaj", "całkowita masa jaj"],
+      "id": ["massa telur", "massa total telur"],
+      "hi": ["अंडे का द्रव्यमान"],
+      "th": ["มวลไข่รวม"],
+      "zh": ["蛋量", "总蛋重"]
+    }
+  },
+
+  "temperature": {
+    "canonical": "temperature",
+    "category": "environment",
+    "unit": "celsius",
+    "unit_alternatives": ["fahrenheit"],
+    "typical_range": {
+      "broiler_optimal": [18, 24],
+      "layer_optimal": [18, 22]
+    },
+    "translations": {
+      "fr": ["température", "temp", "chaleur", "degré"],
+      "en": ["temperature", "temp", "heat", "degrees"],
+      "es": ["temperatura", "calor", "grados"],
+      "de": ["temperatur", "wärme", "grad"],
+      "it": ["temperatura", "calore", "gradi"],
+      "pt": ["temperatura", "calor"],
+      "nl": ["temperatuur", "warmte"],
+      "pl": ["temperatura", "ciepło"],
+      "id": ["suhu", "temperatur", "panas"],
+      "hi": ["तापमान", "गर्मी"],
+      "th": ["อุณหภูมิ", "ความร้อน"],
+      "zh": ["温度", "气温", "热度"]
+    }
+  },
+
+  "humidity": {
+    "canonical": "humidity",
+    "category": "environment",
+    "unit": "percentage",
+    "typical_range": {
+      "broiler_optimal": [50, 70],
+      "layer_optimal": [50, 65]
+    },
+    "translations": {
+      "fr": ["humidité", "taux d'humidité", "hygrométrie"],
+      "en": ["humidity", "moisture", "moisture level", "relative humidity"],
+      "es": ["humedad", "humedad relativa"],
+      "de": ["feuchtigkeit", "luftfeuchtigkeit", "relative feuchtigkeit"],
+      "it": ["umidità", "umidità relativa"],
+      "pt": ["umidade", "humidade relativa"],
+      "nl": ["vochtigheid", "luchtvochtigheid", "relatieve vochtigheid"],
+      "pl": ["wilgotność", "wilgotność względna"],
+      "id": ["kelembaban", "kelembaban relatif"],
+      "hi": ["नमी", "आर्द्रता"],
+      "th": ["ความชื้น", "ความชื้นสัมพัทธ์"],
+      "zh": ["湿度", "相对湿度"]
+    }
+  },
+
+  "water_consumption": {
+    "canonical": "water_consumption",
+    "category": "nutrition",
+    "unit": "liters",
+    "unit_alternatives": ["ml", "gallons"],
+    "typical_range": {
+      "broiler_per_day": [0.15, 0.25],
+      "layer_per_day": [0.20, 0.30]
+    },
+    "translations": {
+      "fr": ["consommation d'eau", "eau consommée", "prise d'eau", "ingestion d'eau"],
+      "en": ["water consumption", "water intake", "water drunk", "drinking water"],
+      "es": ["consumo de agua", "ingesta de agua"],
+      "de": ["wasserverbrauch", "wasseraufnahme"],
+      "it": ["consumo di acqua", "assunzione di acqua"],
+      "pt": ["consumo de água", "ingestão de água"],
+      "nl": ["waterverbruik", "wateropname"],
+      "pl": ["spożycie wody", "konsumpcja wody"],
+      "id": ["konsumsi air", "asupan air"],
+      "hi": ["पानी की खपत", "जल सेवन"],
+      "th": ["การบริโภคน้ำ", "ปริมาณน้ำ"],
+      "zh": ["饮水量", "水消耗"]
+    }
+  },
+
+  "uniformity": {
+    "canonical": "uniformity",
+    "category": "performance",
+    "unit": "percentage",
+    "typical_range": {
+      "broiler_good": [80, 95],
+      "layer_good": [85, 95]
+    },
+    "translations": {
+      "fr": ["uniformité", "homogénéité", "régularité"],
+      "en": ["uniformity", "homogeneity", "consistency", "evenness"],
+      "es": ["uniformidad", "homogeneidad"],
+      "de": ["uniformität", "gleichmäßigkeit", "homogenität"],
+      "it": ["uniformità", "omogeneità"],
+      "pt": ["uniformidade", "homogeneidade"],
+      "nl": ["uniformiteit", "gelijkmatigheid"],
+      "pl": ["jednolitość", "jednorodność"],
+      "id": ["keseragaman", "homogenitas"],
+      "hi": ["एकरूपता", "समानता"],
+      "th": ["ความสม่ำเสมอ", "ความเท่าเทียม"],
+      "zh": ["均匀度", "整齐度"]
+    }
+  },
+
+  "viability": {
+    "canonical": "viability",
+    "category": "health",
+    "unit": "percentage",
+    "typical_range": {
+      "broiler": [95, 99.5],
+      "layer": [97, 99.8]
+    },
+    "translations": {
+      "fr": ["viabilité", "taux de survie", "survie"],
+      "en": ["viability", "survival rate", "livability", "survival"],
+      "es": ["viabilidad", "tasa de supervivencia", "supervivencia"],
+      "de": ["lebensfähigkeit", "überlebensrate"],
+      "it": ["vitalità", "tasso di sopravvivenza"],
+      "pt": ["viabilidade", "taxa de sobrevivência"],
+      "nl": ["levensvatbaarheid", "overlevingspercentage"],
+      "pl": ["żywotność", "wskaźnik przeżycia"],
+      "id": ["viabilitas", "tingkat kelangsungan hidup"],
+      "hi": ["व्यवहार्यता", "जीवित रहने की दर"],
+      "th": ["ความสามารถในการอยู่รอด", "อัตราการรอดชีวิต"],
+      "zh": ["成活率", "存活率"]
+    }
+  },
+
+  "european_production_index": {
+    "canonical": "european_production_index",
+    "category": "performance",
+    "unit": "index",
+    "typical_range": {
+      "broiler_good": [350, 450],
+      "broiler_excellent": [450, 550]
+    },
+    "translations": {
+      "fr": ["ipe", "indice de production européen", "indice européen"],
+      "en": ["epi", "european production index", "european efficiency factor", "eef"],
+      "es": ["ipe", "índice de producción europeo"],
+      "de": ["europäischer produktionsindex", "epi"],
+      "it": ["indice di produzione europeo"],
+      "pt": ["índice de produção europeu"],
+      "nl": ["europese productie-index"],
+      "pl": ["europejski wskaźnik produkcji"],
+      "id": ["indeks produksi eropa"],
+      "hi": ["यूरोपीय उत्पादन सूचकांक"],
+      "th": ["ดัชนีการผลิตยุโรป"],
+      "zh": ["欧洲生产指数"]
+    }
+  },
+
+  "breast_yield": {
+    "canonical": "breast_yield",
+    "category": "carcass",
+    "unit": "percentage",
+    "typical_range": {
+      "broiler": [20, 28]
+    },
+    "translations": {
+      "fr": ["rendement en blanc", "rendement poitrine", "filet", "blanc"],
+      "en": ["breast yield", "breast meat yield", "breast percentage", "fillet yield"],
+      "es": ["rendimiento de pechuga", "porcentaje de pechuga"],
+      "de": ["brustfleischanteil", "brustausbeute"],
+      "it": ["resa del petto", "percentuale di petto"],
+      "pt": ["rendimento de peito", "percentagem de peito"],
+      "nl": ["borstopbrengst", "borstpercentage"],
+      "pl": ["wydajność piersi", "procentowa zawartość piersi"],
+      "id": ["hasil dada", "persentase dada"],
+      "hi": ["छाती की उपज"],
+      "th": ["ผลผลิตเนื้ออก"],
+      "zh": ["胸肉率", "胸肉产量"]
+    }
+  }
+}

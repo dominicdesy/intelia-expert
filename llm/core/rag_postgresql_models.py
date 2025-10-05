@@ -5,7 +5,7 @@ rag_postgresql_models.py - Modèles de données pour PostgreSQL
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from utils.types import Optional
 
 
 class QueryType(Enum):

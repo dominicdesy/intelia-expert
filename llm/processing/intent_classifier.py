@@ -9,7 +9,7 @@ import re
 import logging
 import os
 import json
-from typing import Dict, Set, Tuple, Optional, List
+from utils.types import Dict, Set, Tuple, Optional, List
 from pathlib import Path
 
 # Imports configuration multilingue

@@ -5,7 +5,7 @@ Gère les calculs complexes, projections et planification de troupeaux
 """
 
 import logging
-from typing import Dict
+from utils.types import Dict
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)

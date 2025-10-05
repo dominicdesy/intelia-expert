@@ -4,7 +4,7 @@ api/chat_models.py - Modèles Pydantic pour les endpoints de chat
 Version 4.2.3 - DÉTECTION AMÉLIORÉE + GESTION AMBIGUÏTÉ + ABANDON
 """
 
-from typing import Dict, Any, List, Optional
+from utils.types import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 

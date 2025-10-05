@@ -9,7 +9,7 @@ import logging
 import re
 import asyncio
 import hashlib
-from typing import Dict, List, Tuple, Any, Optional
+from utils.types import Dict, List, Tuple, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 import time

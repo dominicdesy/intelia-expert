@@ -24,9 +24,10 @@ import json
 import time
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List, Set, Any
+from utils.types import Dict, Optional, Tuple, List, Set, Any
 from dataclasses import dataclass, field
 from functools import lru_cache
+from utils.mixins import SerializableMixin
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class QueryRoute:
+class QueryRoute(SerializableMixin):
     """Résultat du routing avec toutes les informations nécessaires"""
 
     destination: str  # 'postgresql' | 'weaviate' | 'hybrid' | 'needs_clarification'
@@ -49,18 +50,7 @@ class QueryRoute:
     missing_fields: List[str] = field(default_factory=list)
     validation_details: Dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict:
-        """Conversion en dict pour compatibilité"""
-        return {
-            "destination": self.destination,
-            "entities": self.entities,
-            "route_reason": self.route_reason,
-            "needs_calculation": self.needs_calculation,
-            "is_contextual": self.is_contextual,
-            "confidence": self.confidence,
-            "missing_fields": self.missing_fields,
-            "validation_details": self.validation_details,
-        }
+    # to_dict() now inherited from SerializableMixin (removed 12 lines)
 
 
 @dataclass

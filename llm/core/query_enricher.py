@@ -6,7 +6,7 @@ Version 1.0 - Reformule les questions de suivi avec le contexte précédent
 
 import logging
 import re
-from typing import Dict, Set
+from utils.types import Dict, Set
 
 logger = logging.getLogger(__name__)
 

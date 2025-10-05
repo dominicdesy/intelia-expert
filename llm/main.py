@@ -428,6 +428,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Rate limiting middleware (10 requêtes/minute/utilisateur)
+logger.info("Initialisation du rate limiting...")
+try:
+    from api.middleware.rate_limiter import RateLimiter
+
+    # Essayer de récupérer le client Redis si disponible
+    redis_client = None
+    try:
+        from cache.cache_core import RedisCacheCore
+
+        cache = RedisCacheCore()
+        if hasattr(cache, "client") and cache.client:
+            redis_client = cache.client
+            logger.info("✅ Rate limiting avec Redis activé")
+        else:
+            logger.info("⚠️ Rate limiting en mémoire (Redis indisponible)")
+    except Exception as redis_err:
+        logger.warning(f"⚠️ Redis non disponible pour rate limiting: {redis_err}")
+        logger.info("⚠️ Rate limiting en mémoire activé (fallback)")
+
+    app.add_middleware(RateLimiter, redis_client=redis_client)
+    logger.info("✅ Rate limiting middleware activé (10 req/min/user)")
+except Exception as e:
+    logger.error(f"❌ Erreur lors de l'activation du rate limiting: {e}")
+    logger.warning("⚠️ Application démarrée sans rate limiting")
+
 # ARCHITECTURE FINALE: Router initial vide, sera mis à jour dans lifespan
 initial_router = create_router({})  # Router vide au démarrage
 app.include_router(initial_router)

@@ -7,7 +7,7 @@ Version REFACTORISÉE - Utilisation de BreedsRegistry au lieu de mappings hardco
 import logging
 import re
 import json
-from typing import Dict, List, Tuple, Optional, Any
+from utils.types import Dict, List, Tuple, Optional, Any
 from pathlib import Path
 
 from llm.utils.breeds_registry import get_breeds_registry

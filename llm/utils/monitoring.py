@@ -8,7 +8,7 @@ VERSION CORRIGÉE: Gestion robuste du cache et des erreurs de connectivité Weav
 import time
 import asyncio
 import logging
-from typing import Dict, Any
+from utils.types import Dict, Any
 
 # CORRECTION: Imports modulaires absolus au lieu d'imports relatifs
 from config.config import (

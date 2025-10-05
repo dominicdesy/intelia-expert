@@ -14,14 +14,15 @@ VERSION 4.2: Fusion OpenAI + Contextualisation intelligente + Async Initialize
 
 import re
 import logging
-from typing import Dict, List, Optional, Any
+from utils.types import Dict, List, Optional, Any
 
 from utils.breeds_registry import get_breeds_registry
+from .base import InitializableMixin
 
 logger = logging.getLogger(__name__)
 
 
-class PostgreSQLValidator:
+class PostgreSQLValidator(InitializableMixin):
     """Validateur intelligent avec auto-détection, alternatives et contextualisation"""
 
     def __init__(self, intents_config_path: str = "llm/config/intents.json"):
@@ -31,6 +32,7 @@ class PostgreSQLValidator:
         Args:
             intents_config_path: Chemin vers intents.json
         """
+        super().__init__()
         self.logger = logger
         self.breeds_registry = get_breeds_registry(intents_config_path)
 
@@ -44,6 +46,7 @@ class PostgreSQLValidator:
         ✅ NOUVEAU: Initialisation asynchrone du PostgreSQLValidator
         Requis pour compatibilité avec le pattern async du RAG Engine
         """
+        await super().initialize()
         logger.info("✅ PostgreSQLValidator: Initialisation asynchrone complétée")
         # Pas de setup async nécessaire pour l'instant, mais gardé pour cohérence
         return True

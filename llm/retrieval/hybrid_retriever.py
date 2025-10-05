@@ -7,7 +7,7 @@ CORRIGÉ: Ajout fonction hybrid_search globale pour import depuis rag_engine.py
 
 import asyncio
 import logging
-from typing import Dict, List
+from utils.types import Dict, List
 import anyio
 
 # === NOUVEAU: Import RRF Intelligent ===

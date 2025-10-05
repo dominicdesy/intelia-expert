@@ -6,7 +6,7 @@ CORRIGÉ: Imports modulaires selon nouvelle architecture
 
 import re
 import logging
-from typing import Dict, List, Set, Tuple, Any
+from utils.types import Dict, List, Set, Tuple, Any
 from functools import lru_cache
 
 # Imports modulaires corrigés

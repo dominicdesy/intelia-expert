@@ -5,7 +5,7 @@ Vérifie la cohérence mathématique et logique des données retournées
 """
 
 import logging
-from typing import Dict, List, Optional
+from utils.types import Dict, List, Optional
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)

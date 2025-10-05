@@ -8,6 +8,7 @@ import re
 import time
 import logging
 from dataclasses import dataclass
+from utils.mixins import SerializableMixin
 
 # Imports conditionnels pour détection de langue
 try:
@@ -63,7 +64,7 @@ _model_download_attempted = False
 
 
 @dataclass
-class LanguageDetectionResult:
+class LanguageDetectionResult(SerializableMixin):
     """Résultat de détection de langue avec confiance - CORRIGÉ pour sérialisation JSON"""
 
     language: str
@@ -71,14 +72,7 @@ class LanguageDetectionResult:
     source: str  # "fasttext", "fast-langdetect", "universal_patterns", "fallback"
     processing_time_ms: int = 0
 
-    def to_dict(self) -> dict:
-        """Conversion en dictionnaire pour sérialisation JSON"""
-        return {
-            "language": self.language,
-            "confidence": self.confidence,
-            "source": self.source,
-            "processing_time_ms": self.processing_time_ms,
-        }
+    # to_dict() now inherited from SerializableMixin (removed 8 lines)
 
     def __hash__(self):
         """Rendre hashable pour utilisation comme clé de cache"""

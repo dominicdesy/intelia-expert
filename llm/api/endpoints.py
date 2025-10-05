@@ -6,7 +6,7 @@ Importe et combine tous les endpoints depuis les modules séparés
 
 import time
 import logging
-from typing import Dict, Any, Optional
+from utils.types import Dict, Any, Optional
 from fastapi import APIRouter
 from config.config import BASE_PATH
 

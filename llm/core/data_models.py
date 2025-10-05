@@ -4,7 +4,7 @@ data_models.py - Classes et structures de données pour RAG Engine
 VERSION 4.2 - Support contextualisation + tous les RAGSource nécessaires
 """
 
-from typing import Dict, List, Optional, Any
+from utils.types import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
 import time

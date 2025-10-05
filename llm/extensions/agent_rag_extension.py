@@ -10,9 +10,11 @@ VERSION CORRIGÉE: Utilise composition au lieu d'héritage pour éviter import c
 import asyncio
 import time
 import logging
-from typing import Dict, List, Any, Optional, TYPE_CHECKING
+from utils.types import Dict, List, Any, Optional
+from typing import TYPE_CHECKING
 from dataclasses import dataclass, field
 from enum import Enum
+from core.base import InitializableMixin
 
 # Import conditionnel pour éviter l'import circulaire
 if TYPE_CHECKING:
@@ -63,10 +65,11 @@ class AgentResult:
     agent_decisions: List[str] = field(default_factory=list)  # Log des décisions
 
 
-class QueryDecomposer:
+class QueryDecomposer(InitializableMixin):
     """Décompose les requêtes complexes en sous-requêtes"""
 
     def __init__(self, intent_processor: IntentProcessor):
+        super().__init__()
         self.intent_processor = intent_processor
 
         # Patterns de complexité basés sur votre domaine avicole
@@ -290,10 +293,11 @@ class QueryDecomposer:
         return sub_queries
 
 
-class MultiDocumentSynthesizer:
+class MultiDocumentSynthesizer(InitializableMixin):
     """Synthétise les réponses de plusieurs documents"""
 
     def __init__(self, openai_client):
+        super().__init__()
         self.client = openai_client
 
     async def synthesize_results(
@@ -510,7 +514,7 @@ RÉPONSE:"""
         return "\n\n".join(response_parts)
 
 
-class InteliaAgentRAG:
+class InteliaAgentRAG(InitializableMixin):
     """
     Agent RAG intelligent pour Intelia Expert
 
@@ -524,6 +528,7 @@ class InteliaAgentRAG:
         Args:
             rag_engine: Instance de InteliaRAGEngine (composition, pas héritage)
         """
+        super().__init__()
         self.rag_engine = rag_engine
         self.decomposer = None
         self.synthesizer = None
@@ -575,6 +580,8 @@ class InteliaAgentRAG:
         self.synthesizer = MultiDocumentSynthesizer(openai_client)
 
         logger.info("Agent RAG Intelia initialisé avec décomposition et synthèse")
+
+        await super().initialize()
 
     async def process_query_agent(
         self, query: str, language: str = "fr", tenant_id: str = ""

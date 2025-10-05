@@ -8,7 +8,7 @@ Version: 1.0.1 - Ajout méthode get_breed()
 import json
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple, Set
+from utils.types import Optional, List, Dict, Tuple, Set
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)

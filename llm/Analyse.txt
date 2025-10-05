@@ -1,0 +1,117 @@
+J’aimerais que tu analyses l’ensemble des fichiers du LLM pour comprendre le data flow à partir du moment où une question est posée jusqu’à la réponse à l’utilisateur. Il faut que tu saches qu’il est important de pouvoir gérer des questions en plusieurs langues. Aussi, il faut un système de contextualisation. Si une personne pose une question qui manque de contexte, le système demande des précisions avant de fournir une réponse finale. Un système de mémoire est en place pour pouvoir se souvenir des messages du fil de discussion et ainsi bien répondre. Quand une question est posée, le système consulte la base de données PostgreSQL. Ensuite, il consulte Weaviate. Si les réponses ne sont pas présentes, il utilise OpenAI pour fournir une réponse. Les questions sont limitées au domaine agricole/avicole. 
+
+Le système est un expert mais si une question qui relève de professionnels, comme un vétérinaire, est posée, le système donne une réponse mais ajoute que l’utilisateur doit consulter un vétérinaire. Il est important de ne pas engager la responsabilité professionnelle d’Intelia. 
+
+Il faut comprendre que les questions qui peuvent être posées par un utilisateur sont très variées. Il ne faut donc pas un système rigide. Il faut un système qui est assez intelligent pour bien interpréter une question, comprendre le contexte, comprendre s’il manque des informations, obtenir les informations manquantes auprès de l’utilisateur et, ensuite, fournir une réponse. 
+
+La variété des utilisateurs est aussi très grande et le système ne connait pas qui pose la question. Ça peut être un vétérinaire, un fermier, un employé de ferme, un généticien.
+
+Le système doit être capable d’effectuer des opérations mathématiques de base. Par exemple, si un utilisateur lui demande combien de moulées il aura besoin pour élever ses oiseaux entre les jours de production 20 et 30, le système doit retrouver l’information dans la base de données mais ensuite réaliser certaines opérations mathématiques.
+
+Il doit aussi être capable de comparer des données (chiffres). 
+
+Je ne veux pas hardcoder des termes de référence dans les différents fichiers. Il faut centraliser l’ensemble de ces termes. 
+
+Voici des exemples de questions que le système doit être en mesure de traiter : 
+Quel est le poids cible pour des mâles Ross 308 à 35 jours ?
+FCR optimal pour des femelles Ross 308 en phase finisher (36-42 jours) ?
+Consommation d'eau quotidienne pour 1000 Ross 308 à 21 jours ?
+Taux de protéine requis dans l'aliment starter pour Ross 308 de 0-10 jours ?
+Gain de poids journalier normal pour des mâles Cobb 500 à 28 jours ?
+Conversion alimentaire attendue pour Cobb 500 mixte à 42 jours ?
+Densité énergétique recommandée en kcal/kg pour grower Cobb 500 ?
+Température ambiante optimale pour poussins Ross 308 jour 1 en élevage tunnel ?
+Espace mangeoire requis en cm par poulet Cobb 500 à 35 jours ?
+Taux d'humidité optimal dans bâtiment broiler semaine 4 ?
+Durée d'éclairage recommandée pour Ross 308 en phase de croissance ?
+Nombre d'œufs par jour pour 1000 poules ISA Brown à 28 semaines ?
+Consommation d'aliment quotidienne pour pondeuse ISA Brown en pic de ponte ?
+Poids corporel cible pour poulette ISA Brown à 16 semaines ?
+Âge de maturité sexuelle moyen pour Lohmann Brown ?
+Poids moyen d'œuf pour Lohmann Brown à 35 semaines ?
+Taux de calcium requis dans aliment pondeuse Lohmann à 50 semaines ?
+Traitement coccidiose Eimeria tenella chez poulets Ross 308 de 15 jours ?
+Protocole vaccination Newcastle pour pondeuses Hy-Line à 12 semaines ?
+Mortalité 3% jour 14 chez Ross 308 avec diarrhée hémorragique, diagnostic ?
+Baisse ponte 15% pondeuses ISA Brown 45 semaines avec coquilles molles ?
+Ventilation minimale requise pour 10000 broilers semaine 3 en hiver ?
+Concentration NH3 maximale acceptable dans poulailler pondeuses ?
+Débit d'eau aux abreuvoirs pour 5000 Ross 308 à 28 jours ?
+IEP (Indice d'Efficacité Production) moyen pour Ross 308 abattage 35 jours ?
+Taux de mortalité acceptable pour Cobb 500 première semaine ?
+Quel aliment donner à mes poussins ?
+Mes poulets ne grossissent pas bien
+Ma production d'œufs baisse
+Quand mes poulettes vont-elles pondre ?
+Mes poulets sont malades
+Il y a de la mortalité dans mon élevage
+Quelle température dans mon poulailler ?
+Mes poulets semblent stressés
+Comment améliorer ma rentabilité ?
+Mes résultats ne sont pas bons
+FCR de mes Ross 308 à 35 jours trop élevé 
+Pondeuses 40 semaines produisent 85%, c'est normal ? 
+Mortalité 2% par semaine chez mes broilers 3 semaines 
+Ventilation insuffisante, que faire avec mes Cobb 500 ? 
+Mes ISA Brown mangent trop, comment réduire ? 
+Je viens d'acheter 1000 poussins, que dois-je faire ?
+Combien coûte nourrir un poulet jusqu'à l'abattage ?
+Quand savoir si mes poules sont prêtes à pondre ?
+Diagnostic différentiel ascite chez broilers 5 semaines avec dyspnée ?
+Protocole antibiogramme E.coli résistante élevage pondeuses bio ?
+Interprétation sérologie ELISA IBV chez poulettes 18 semaines ?
+Formulation starter 3000 kcal/kg Ross 308 avec contrainte pas de farine poisson ?
+Impact réduction 0.5% calcium sur qualité coquille Hy-Line 60 semaines ?
+Optimisation phosphore digestible finisher économique Cobb 500 ?
+Réglage abreuvoirs nipples pour démarrage poussins day-old ?
+Calibrage chaîne d'alimentation 15000 broilers phase grower ?
+Maintenance extracteurs tunnel-ventilé pondeuses 50000 places ?
+Gestion condensation poulailler broilers hiver avec ventilation minimale ?
+Coût chauffage Ross 308 démarrage température extérieure -5°C ?
+Prévention stress thermique pondeuses 35°C extérieur sans cooling ?
+Adaptation densité broilers canicule 38°C région méditerranée ?
+Qualité litière élevage sol forte pluviométrie automne ?
+Maîtrise ammoniaque période humide ventilation naturelle ?
+Densité maximale autorisée broilers Label Rouge abattage 81 jours ?
+Enrichissements obligatoires pondeuses plein air cahier charges ?
+Obtenir œufs catégorie A+ avec ISA Brown élevage alternatif ?
+Critères poulet fermier jaune patte race Hubbard JA757 ?
+Temps d'attente Tylosine injection broilers avant abattage ?
+Alternatives antibiotiques prévention entérite nécrotiquepondeuses ?
+Quel est le gain de poids cumulé attendu pour des mâles Cobb 500 à 42 jours ?
+Quel taux de protéines et de lysine est recommandé dans un aliment finisher pour des femelles Ross 308 ?
+Quel est le poids moyen d'un poulet Ross 708 à 49 jours ?
+Quel est l'indice de consommation (FCR) pour un lot de poulets Cobb 500 mixte à l'abattage (35 jours) ?
+Quel est le poids vif cible pour des poulets Ross 308 à 28 jours ?
+Normes de performance et nutrition (Pondeuses)
+Quel pourcentage de ponte est considéré comme normal pour des poules Lohmann Brown à 30 semaines ?
+Quelle est la consommation d'aliment journalière moyenne pour des poules pondeuses Hy-Line Brown en fin de cycle (70 semaines) ?
+Quel est le poids d'œuf idéal pour des poules ISA Brown à 40 semaines ?
+Quel est le taux de mortalité cumulé acceptable pour des pondeuses Lohmann White jusqu'à 80 semaines ?
+Quel est l'apport en calcium et en phosphore requis pour un aliment pondeuse en pic de ponte ?
+Quel est le traitement préventif de la coccidiose chez les poussins d'un jour ?
+Quelles sont les symptômes de la maladie de Gumboro chez les poulets ?
+Quel est le protocole de vaccination pour la bronchite infectieuse (BI) chez les pondeuses ?
+Quel est le dosage de l'Amoxicilline pour une infection respiratoire chez des poulets de 1,5 kg ?
+Quels sont les signes cliniques de l'entérite nécrotique chez les poulets de chair ?
+Quel est le débit d'air minimal en m³/h par kg de poulet pour une ventilation tunnel en été ?
+Quelle est la température et le taux d'humidité recommandés pour la phase de démarrage (0-7 jours) des poussins ?
+Quelle est la concentration maximale de dioxyde de carbone (CO2) acceptable dans un poulailler de pondeuses ?
+Comment gérer l'excès d'ammoniac dans un bâtiment d'élevage avec ventilation naturelle ?
+Combien de lumens sont nécessaires pour un éclairage optimal dans un poulailler de pondeuses ?
+J'observe des poulets Ross 308 qui se picorent les uns les autres, que faire ?
+Mes poules pondeuses ISA Brown ont des coquilles d'œufs très minces, quelle pourrait être la cause ?
+J'ai une mortalité anormale de mes poussins dans la première semaine, comment puis-je diagnostiquer le problème ?
+Mes poulets Cobb 500 ont un FCR qui se dégrade, quelles sont les causes possibles ?
+Mes poules Lohmann Brown pondent moins d'œufs que prévu. Qu'est-ce qui peut expliquer cette baisse de production ?
+Comment réduire mes coûts d'alimentation sans compromettre la production ?
+
+
+Lorsque tu auras complété ton analyse, je veux savoir si on peut optimiser les différents fichiers pour rendre le système encore plus efficace et encore plus précis dans ses réponses. L’important est de fournir des réponses de très haute qualité aux utilisateurs. Le temps de traitement peut prendre du temps tant que la réponse n'est pas irréprochable.
+
+En ce moment, les informations présentes dans la base de données PostgreSQL et Weaviate sont limitées. Je veux m’assurer que la fondation du LLM est très solide avant d’ajouter des centaines de documents.
+
+Je veux que le LLM soit reconnu comme le meilleur au monde en production avicole. Pour ce faire, il faut analyser les outils qui sont présentement utilisés et déterminer si on doit utiliser d’autres outils pour être encore meilleur.
+
+Dans l’analyse, il faut s’assurer de comprendre le rôle de tous les fichiers pour déterminer ce qui peut être optimisé. Il faut aussi valider s’il existe des doublons de code qui peuvent être optimisés.
+

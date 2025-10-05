@@ -6,7 +6,7 @@ rag_postgresql_temporal.py - Processeur de requêtes temporelles optimisées
 import re
 import time
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+from utils.types import Dict, List, Optional, Any, Tuple
 
 from .data_models import RAGResult, RAGSource
 from .rag_postgresql_models import MetricResult

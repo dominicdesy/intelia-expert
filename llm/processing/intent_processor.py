@@ -9,7 +9,7 @@ import os
 import json
 import time
 import logging
-from typing import Dict, List, Optional, Any
+from utils.types import Dict, List, Optional, Any
 from pathlib import Path
 from dataclasses import dataclass
 

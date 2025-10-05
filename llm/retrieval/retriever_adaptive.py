@@ -5,7 +5,7 @@ retriever_adaptive.py - Recherche adaptative avec stratégies intelligentes
 
 import logging
 import time
-from typing import Dict, List
+from utils.types import Dict, List
 from core.data_models import Document
 
 logger = logging.getLogger(__name__)

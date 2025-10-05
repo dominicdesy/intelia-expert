@@ -3,7 +3,7 @@
 intent_types.py - Types et structures de données pour le processeur d'intentions
 """
 
-from typing import Dict, List, Any, Optional
+from utils.types import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 

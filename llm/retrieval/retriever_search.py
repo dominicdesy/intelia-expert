@@ -6,7 +6,7 @@ VERSION AMÉLIORÉE avec gestion d'erreur robuste
 
 import logging
 import time
-from typing import Dict, List
+from utils.types import Dict, List
 from core.data_models import Document
 from utils.utilities import METRICS
 from utils.imports_and_dependencies import wvc

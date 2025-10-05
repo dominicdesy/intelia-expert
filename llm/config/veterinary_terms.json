@@ -1,0 +1,218 @@
+{
+  "metadata": {
+    "description": "Centralized veterinary terminology for disease, symptom, and treatment detection",
+    "version": "1.0.0",
+    "last_updated": "2025-10-05",
+    "total_terms": 132,
+    "languages_supported": ["fr", "en", "de", "es", "it", "nl"],
+    "source": "Extracted from generation/veterinary_handler.py"
+  },
+
+  "diseases": {
+    "fr": [
+      "maladie",
+      "coccidiose",
+      "ascite",
+      "infection",
+      "syndrome"
+    ],
+    "en": [
+      "disease",
+      "coccidiosis",
+      "ascites",
+      "infection",
+      "syndrome"
+    ],
+    "de": [
+      "krankheit",
+      "infektion"
+    ],
+    "es": [
+      "enfermedad",
+      "infección"
+    ],
+    "it": [
+      "malattia",
+      "infezione"
+    ],
+    "nl": []
+  },
+
+  "symptoms": {
+    "fr": [
+      "symptôme",
+      "malade",
+      "mortalité",
+      "mort"
+    ],
+    "en": [
+      "symptom",
+      "sick",
+      "mortality",
+      "death"
+    ],
+    "de": [
+      "symptom",
+      "krank",
+      "mortalität"
+    ],
+    "es": [
+      "síntoma",
+      "enfermo",
+      "mortalidad"
+    ],
+    "it": [
+      "sintomo",
+      "malato",
+      "mortalità"
+    ],
+    "nl": []
+  },
+
+  "treatments": {
+    "fr": [
+      "traitement",
+      "soigner",
+      "guérir",
+      "antibiotique",
+      "vaccin",
+      "médicament",
+      "cure"
+    ],
+    "en": [
+      "treatment",
+      "cure",
+      "heal",
+      "antibiotic",
+      "vaccine",
+      "medication"
+    ],
+    "de": [
+      "behandlung",
+      "antibiotikum",
+      "impfstoff",
+      "medikament"
+    ],
+    "es": [
+      "tratamiento",
+      "antibiótico",
+      "vacuna",
+      "medicación"
+    ],
+    "it": [
+      "trattamento",
+      "antibiotico",
+      "vaccino"
+    ],
+    "nl": [
+      "genezing"
+    ]
+  },
+
+  "pathogens": {
+    "fr": [
+      "virus",
+      "bactérie",
+      "parasite"
+    ],
+    "en": [
+      "virus",
+      "bacteria",
+      "parasite"
+    ],
+    "de": [
+      "virus",
+      "bakterie",
+      "parasit"
+    ],
+    "es": [
+      "virus",
+      "bacteria",
+      "parásito"
+    ],
+    "it": [
+      "virus",
+      "batterio",
+      "parassita"
+    ],
+    "nl": []
+  },
+
+  "diagnosis": {
+    "fr": [
+      "diagnostic",
+      "diagnostique"
+    ],
+    "en": [
+      "diagnosis",
+      "diagnostic"
+    ],
+    "de": [
+      "diagnose"
+    ],
+    "es": [
+      "diagnóstico"
+    ],
+    "it": [
+      "diagnosi"
+    ],
+    "nl": []
+  },
+
+  "veterinary_questions": {
+    "fr": [
+      "que dois-je faire",
+      "comment traiter",
+      "j'ai",
+      "mes poulets"
+    ],
+    "en": [
+      "what should i do",
+      "how to treat",
+      "i have",
+      "my chickens"
+    ],
+    "de": [
+      "was soll ich tun",
+      "wie behandeln",
+      "ich habe"
+    ],
+    "es": [
+      "qué debo hacer",
+      "cómo tratar",
+      "tengo"
+    ],
+    "it": [
+      "cosa dovrei fare",
+      "come trattare",
+      "ho"
+    ],
+    "nl": []
+  },
+
+  "health_issues": {
+    "fr": [
+      "santé",
+      "problème",
+      "souci"
+    ],
+    "en": [
+      "health",
+      "problem",
+      "issue"
+    ],
+    "de": [
+      "gesundheit",
+      "problem"
+    ],
+    "es": [
+      "salud",
+      "problema"
+    ],
+    "it": [
+      "salute",
+      "problema"
+    ],
+    "nl": []
+  }
+}

@@ -8,7 +8,7 @@ VERSION CORRIGÉE :
 """
 
 import logging
-from typing import Dict, List, Optional, Any
+from utils.types import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)

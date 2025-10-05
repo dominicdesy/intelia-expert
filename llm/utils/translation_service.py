@@ -10,7 +10,7 @@ import json
 import logging
 import time
 import re
-from typing import Dict, List, Optional, Set, Any, Tuple
+from utils.types import Dict, List, Optional, Set, Any, Tuple
 from dataclasses import dataclass
 from pathlib import Path
 from cachetools import TTLCache

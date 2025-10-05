@@ -6,7 +6,7 @@ Extrait du fichier principal pour modularité
 
 import logging
 import time
-from typing import Dict, List, Optional, Any
+from utils.types import Dict, List, Optional, Any
 
 try:
     from rag.extractors.json_extractor import JSONExtractor
@@ -24,14 +24,17 @@ except ImportError:
 
 from .data_models import RAGResult, RAGSource, Document
 from config.config import RAG_SIMILARITY_TOP_K
+from .base import InitializableMixin
 
 logger = logging.getLogger(__name__)
 
 
-class JSONSystem:
+class JSONSystem(InitializableMixin):
     """Système de recherche JSON avicole"""
 
     def __init__(self):
+        super().__init__()
+
         # Extracteurs spécialisés
         self.json_extractor = None
         self.table_extractor = None
@@ -45,9 +48,6 @@ class JSONSystem:
         self.hybrid_search_engine = None
         self.document_processor = None
         self.enhanced_cache_manager = None
-
-        # État
-        self.is_initialized = False
 
         # Statistiques
         self.json_stats = {
@@ -102,7 +102,7 @@ class JSONSystem:
                 }
             )
 
-            self.is_initialized = True
+            await super().initialize()
             logger.info("✅ Système RAG JSON initialisé")
 
         except Exception as e:
@@ -342,4 +342,5 @@ class JSONSystem:
             except Exception as e:
                 logger.warning(f"Erreur fermeture cache JSON: {e}")
 
+        await super().close()
         logger.info("Système JSON fermé")

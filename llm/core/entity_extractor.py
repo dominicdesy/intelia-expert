@@ -7,7 +7,7 @@ Version 3.0 - Améliorations robustesse + support breeds_registry complet
 
 import re
 import logging
-from typing import Dict, Any, List, Optional, Set, Tuple
+from utils.types import Dict, Any, List, Optional, Set, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 

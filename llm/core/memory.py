@@ -7,7 +7,7 @@ Version 4.2 - Gestion des clarifications en attente
 import logging
 import time
 import os
-from typing import Dict, List, Optional, Any
+from utils.types import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
 
