@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(git checkout:*)",
+      "Read(//c/intelia_gpt/intelia-expert/**)"
     ],
     "deny": [],
     "ask": []

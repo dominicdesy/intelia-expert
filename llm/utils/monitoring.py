@@ -375,7 +375,9 @@ class SystemHealthMonitor:
                     errors.append("Cache Core: Timeout initialisation")
 
                 except Exception as init_e:
-                    logger.warning(f"Warning: Error initialisation Cache Core: {init_e}")
+                    logger.warning(
+                        f"Warning: Error initialisation Cache Core: {init_e}"
+                    )
                     errors.append(f"Cache Core: Erreur initialisation - {init_e}")
 
             except ImportError as e:

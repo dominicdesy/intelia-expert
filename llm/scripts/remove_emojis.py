@@ -89,7 +89,7 @@ def remove_emojis_from_file(file_path: Path):
     """Remove emojis from a single file"""
     print(f"Processing {file_path}")
 
-    content = file_path.read_text(encoding='utf-8')
+    content = file_path.read_text(encoding="utf-8")
     original_content = content
 
     # Replace complete messages first
@@ -101,16 +101,20 @@ def remove_emojis_from_file(file_path: Path):
         content = content.replace(emoji, replacement)
 
     # Clean up double spaces
-    content = re.sub(r'  +', ' ', content)
-    content = re.sub(r'logger\.(info|warning|error|critical)\("  ', r'logger.\1("', content)
-    content = re.sub(r'logger\.(info|warning|error|critical)\(" ', r'logger.\1("', content)
+    content = re.sub(r"  +", " ", content)
+    content = re.sub(
+        r'logger\.(info|warning|error|critical)\("  ', r'logger.\1("', content
+    )
+    content = re.sub(
+        r'logger\.(info|warning|error|critical)\(" ', r'logger.\1("', content
+    )
 
     if content != original_content:
-        file_path.write_text(content, encoding='utf-8')
+        file_path.write_text(content, encoding="utf-8")
         print(f"  ✓ Updated {file_path}")
         return True
     else:
-        print(f"  - No changes needed")
+        print("  - No changes needed")
         return False
 
 

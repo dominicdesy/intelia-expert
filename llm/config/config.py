@@ -66,8 +66,7 @@ TRANSLATION_CONFIDENCE_THRESHOLD = float(
 GOOGLE_TRANSLATE_MAX_RETRIES = int(os.getenv("GOOGLE_TRANSLATE_MAX_RETRIES", "3"))
 GOOGLE_TRANSLATE_TIMEOUT = int(os.getenv("GOOGLE_TRANSLATE_TIMEOUT", "10"))
 
-# FastText pour détection langue (remplace langdetect)
-FASTTEXT_MODEL_PATH = os.getenv("FASTTEXT_MODEL_PATH", "models/lid.176.ftz")
+# Language detection configuration (using fasttext-langdetect + langdetect)
 LANG_DETECTION_MIN_LENGTH = int(os.getenv("LANG_DETECTION_MIN_LENGTH", "15"))
 LANG_DETECTION_CONFIDENCE_THRESHOLD = float(
     os.getenv("LANG_DETECTION_CONFIDENCE_THRESHOLD", "0.8")
@@ -359,7 +358,7 @@ def get_supported_languages_info() -> dict:
         "default": DEFAULT_LANGUAGE,
         "fallback": FALLBACK_LANGUAGE,
         "google_translate_enabled": ENABLE_GOOGLE_TRANSLATE_FALLBACK,
-        "fasttext_enabled": bool(FASTTEXT_MODEL_PATH),
+        "fasttext_langdetect_enabled": True,  # Using fasttext-langdetect package
     }
 
 
@@ -384,8 +383,9 @@ def get_config_status() -> dict:
                 "configured": bool(GOOGLE_TRANSLATE_API_KEY),
                 "confidence_threshold": TRANSLATION_CONFIDENCE_THRESHOLD,
             },
-            "fasttext": {
-                "model_path": FASTTEXT_MODEL_PATH,
+            "language_detection": {
+                "library": "fasttext-langdetect",
+                "fallback": "langdetect",
                 "min_length": LANG_DETECTION_MIN_LENGTH,
                 "confidence_threshold": LANG_DETECTION_CONFIDENCE_THRESHOLD,
             },
@@ -442,7 +442,6 @@ __all__ = [
     "TRANSLATION_CONFIDENCE_THRESHOLD",
     "GOOGLE_TRANSLATE_MAX_RETRIES",
     "GOOGLE_TRANSLATE_TIMEOUT",
-    "FASTTEXT_MODEL_PATH",
     "LANG_DETECTION_MIN_LENGTH",
     "LANG_DETECTION_CONFIDENCE_THRESHOLD",
     "TRANSLATION_CACHE_SIZE",
