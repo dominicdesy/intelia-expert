@@ -14,10 +14,10 @@ from typing import List, Tuple, Dict, Optional, Union
 from dataclasses import dataclass
 from pathlib import Path
 import json
-import re
 from core.data_models import Document
 from config.config import (
     ENTITY_CONTEXTS,
+    MAX_CONVERSATION_CONTEXT,
     SUPPORTED_LANGUAGES,
     FALLBACK_LANGUAGE,
 )
@@ -26,7 +26,6 @@ from utils.utilities import METRICS
 # Import du gestionnaire de messages pour disclaimers vétérinaires
 try:
     from config.messages import get_message
-
     MESSAGES_AVAILABLE = True
     logger = logging.getLogger(__name__)
     logger.info("✅ config.messages disponible pour disclaimers vétérinaires")
@@ -310,113 +309,63 @@ class EnhancedResponseGenerator:
     def _is_veterinary_query(self, query: str, context_docs: List) -> bool:
         """
         Détecte si la question concerne un sujet vétérinaire
-
+        
         Args:
             query: Question de l'utilisateur
             context_docs: Documents de contexte récupérés
-
+            
         Returns:
             True si c'est une question vétérinaire nécessitant un disclaimer
         """
         query_lower = query.lower()
-
+        
         # Mots-clés vétérinaires cross-language (maladies, traitements, symptômes)
         veterinary_keywords = [
             # Maladies communes
-            "ascites",
-            "ascite",
-            "coccidiosis",
-            "coccidiose",
-            "disease",
-            "maladie",
-            "krankheit",
-            "enfermedad",
-            "malattia",
-            "infection",
-            "infektion",
-            "infección",
-            "infezione",
+            "ascites", "ascite", "coccidiosis", "coccidiose",
+            "disease", "maladie", "krankheit", "enfermedad", "malattia",
+            "infection", "infektion", "infección", "infezione",
+            
             # Symptômes
-            "symptom",
-            "symptôme",
-            "symptom",
-            "síntoma",
-            "sintomo",
-            "sick",
-            "malade",
-            "krank",
-            "enfermo",
-            "malato",
-            "mortality",
-            "mortalité",
-            "mortalidad",
-            "mortalità",
+            "symptom", "symptôme", "symptom", "síntoma", "sintomo",
+            "sick", "malade", "krank", "enfermo", "malato",
+            "mortality", "mortalité", "mortalidad", "mortalità",
+            
             # Traitements
-            "treatment",
-            "traitement",
-            "behandlung",
-            "tratamiento",
-            "trattamento",
-            "cure",
-            "soigner",
-            "heal",
-            "guérir",
-            "genezing",
-            "antibiotic",
-            "antibiotique",
-            "antibiotikum",
-            "antibiótico",
-            "vaccine",
-            "vaccin",
-            "impfstoff",
-            "vacuna",
-            "vaccino",
-            "medication",
-            "médicament",
-            "medikament",
-            "medicación",
+            "treatment", "traitement", "behandlung", "tratamiento", "trattamento",
+            "cure", "soigner", "heal", "guérir", "genezing",
+            "antibiotic", "antibiotique", "antibiotikum", "antibiótico",
+            "vaccine", "vaccin", "impfstoff", "vacuna", "vaccino",
+            "medication", "médicament", "medikament", "medicación",
+            
             # Agents pathogènes
-            "virus",
-            "bacteria",
-            "bactérie",
-            "bakterie",
-            "parasite",
-            "parasit",
+            "virus", "bacteria", "bactérie", "bakterie",
+            "parasite", "parasit",
+            
             # Diagnostic
-            "diagnosis",
-            "diagnostic",
-            "diagnose",
-            "diagnóstico",
+            "diagnosis", "diagnostic", "diagnose", "diagnóstico",
+            
             # Questions typiques nécessitant conseil vétérinaire
-            "what should i do",
-            "que dois-je faire",
-            "was soll ich tun",
-            "how to treat",
-            "comment traiter",
-            "wie behandeln",
-            "i have",
-            "j'ai",
-            "ich habe",
-            "tengo",
-            "ho",
+            "what should i do", "que dois-je faire", "was soll ich tun",
+            "how to treat", "comment traiter", "wie behandeln",
+            "i have", "j'ai", "ich habe", "tengo", "ho",
         ]
-
+        
         # Vérifier dans la query
-        has_vet_keywords = any(
-            keyword in query_lower for keyword in veterinary_keywords
-        )
-
+        has_vet_keywords = any(keyword in query_lower for keyword in veterinary_keywords)
+        
         # Si pas de mots-clés dans la query, vérifier dans les documents
         if not has_vet_keywords and context_docs:
             try:
                 # Examiner les 3 premiers documents (500 chars chacun)
-                doc_content = " ".join(
-                    [str(self._get_doc_content(doc))[:500] for doc in context_docs[:3]]
-                ).lower()
-
+                doc_content = " ".join([
+                    str(self._get_doc_content(doc))[:500] 
+                    for doc in context_docs[:3]
+                ]).lower()
+                
                 # Vérifier présence de termes vétérinaires dans les docs
                 has_vet_content = any(
-                    keyword in doc_content
+                    keyword in doc_content 
                     for keyword in veterinary_keywords[:20]  # Top 20 keywords
                 )
             except Exception as e:
@@ -424,36 +373,34 @@ class EnhancedResponseGenerator:
                 has_vet_content = False
         else:
             has_vet_content = False
-
+        
         result = has_vet_keywords or has_vet_content
-
+        
         if result:
             logger.info(f"🏥 Question vétérinaire détectée: '{query[:50]}...'")
-
+        
         return result
 
     def _get_veterinary_disclaimer(self, language: str = "fr") -> str:
         """
         Retourne l'avertissement vétérinaire depuis languages.json
-
+        
         Args:
             language: Code langue (fr, en, es, de, it, pt, nl, pl, hi, id, th, zh)
-
+            
         Returns:
             Texte de l'avertissement avec saut de ligne, ou string vide si non disponible
         """
         if not MESSAGES_AVAILABLE:
             logger.warning("⚠️ Messages non disponibles, pas de disclaimer vétérinaire")
             return ""
-
+        
         try:
             disclaimer = get_message("veterinary_disclaimer", language)
             # Ajouter double saut de ligne avant le disclaimer
             return f"\n\n{disclaimer}"
         except Exception as e:
-            logger.warning(
-                f"⚠️ Erreur récupération veterinary_disclaimer pour {language}: {e}"
-            )
+            logger.warning(f"⚠️ Erreur récupération veterinary_disclaimer pour {language}: {e}")
             # Fallback minimal en anglais
             return "\n\n**Important**: This information is provided for educational purposes. For health concerns, consult a qualified veterinarian."
 
@@ -771,18 +718,10 @@ class EnhancedResponseGenerator:
         """
 
         # 🔍 DEBUG CRITIQUE - Validation conversation_context
-        logger.info(
-            f"🔍 PROMPT - conversation_context type: {type(conversation_context)}"
-        )
-        logger.info(
-            f"🔍 PROMPT - conversation_context length: {len(conversation_context) if conversation_context else 0}"
-        )
-        logger.info(
-            f"🔍 PROMPT - conversation_context preview: {conversation_context[:200] if conversation_context else 'VIDE'}"
-        )
-        logger.info(
-            f"🔍 PROMPT - conversation_context is truthy: {bool(conversation_context)}"
-        )
+        logger.info(f"🔍 PROMPT - conversation_context type: {type(conversation_context)}")
+        logger.info(f"🔍 PROMPT - conversation_context length: {len(conversation_context) if conversation_context else 0}")
+        logger.info(f"🔍 PROMPT - conversation_context preview: {conversation_context[:200] if conversation_context else 'VIDE'}")
+        logger.info(f"🔍 PROMPT - conversation_context is truthy: {bool(conversation_context)}")
 
         # DEBUG CRITIQUE : Logger la langue reçue
         logger.info(
@@ -855,7 +794,7 @@ class EnhancedResponseGenerator:
 
         # ✅ SIMPLIFICATION: Instructions de langue compactes en tête
         language_name = self.language_display_names.get(language, language.upper())
-
+        
         # Construction du prompt système
         if self.prompts_manager:
             expert_identity = self.prompts_manager.get_base_prompt(
@@ -1074,35 +1013,40 @@ MÉTRIQUES: {', '.join(enrichment.performance_indicators[:3]) if enrichment.perf
         """
         Génère un prompt spécialisé selon le type d'intention
         Intégré depuis prompt_builder.py
-
+        
         Args:
             intent_type: Type d'intention
             entities: Entités détectées
             language: Langue cible
-
+            
         Returns:
             Prompt spécialisé enrichi
         """
         from processing.intent_types import IntentType
-
+        
         # Mapping intentions → prompts spécialisés
         specialized_prompts = {
             IntentType.METRIC_QUERY: """Focus: Données de performances et standards zootechniques.
 Fournis valeurs cibles, plages optimales et facteurs d'influence.""",
+            
             IntentType.ENVIRONMENT_SETTING: """Focus: Paramètres d'ambiance et gestion environnementale.
 Fournis valeurs optimales de température, humidité, ventilation selon l'âge.""",
+            
             IntentType.DIAGNOSIS_TRIAGE: """Focus: Diagnostic différentiel structuré.
 Liste hypothèses par probabilité et examens complémentaires nécessaires.""",
+            
             IntentType.ECONOMICS_COST: """Focus: Analyse économique et coûts.
 Fournis données chiffrées sur coûts, marges et benchmarks du marché.""",
+            
             IntentType.PROTOCOL_QUERY: """Focus: Protocoles vétérinaires et biosécurité.
 Fournis calendriers de vaccination et mesures de prévention détaillés.""",
+            
             IntentType.GENERAL_POULTRY: """Focus: Expertise avicole générale.
 Style professionnel et structuré avec recommandations actionnables.""",
         }
-
+        
         base_prompt = specialized_prompts.get(intent_type, "")
-
+        
         # Enrichissement contextuel avec entités
         if entities:
             entity_parts = []
@@ -1114,10 +1058,10 @@ Style professionnel et structuré avec recommandations actionnables.""",
                 entity_parts.append(f"Espèce: {entities['species']}")
             if "metrics" in entities:
                 entity_parts.append(f"Métriques: {entities['metrics']}")
-
+                
             if entity_parts:
                 base_prompt += f"\n\nCONTEXTE DÉTECTÉ: {' | '.join(entity_parts)}"
-
+        
         return base_prompt
 
     def _post_process_response(
@@ -1130,51 +1074,161 @@ Style professionnel et structuré avec recommandations actionnables.""",
     ) -> str:
         """
         Post-traitement avec ajout automatique d'avertissement vétérinaire
-
+        
         Args:
             response: Réponse générée par le LLM
             enrichment: Enrichissement du contexte
             context_docs: Documents de contexte utilisés
             query: Question originale de l'utilisateur
             language: Langue de la réponse
-
+            
         Returns:
             Réponse post-traitée avec disclaimer vétérinaire si nécessaire
         """
+        import re
+        
         response = response.strip()
-
+        
         # ✅ NETTOYAGE AMÉLIORÉ DU FORMATAGE
-
+        
         # 1. Supprimer les numéros de liste (1., 2., etc.)
-        response = re.sub(r"^\d+\.\s+", "", response, flags=re.MULTILINE)
-
+        response = re.sub(r'^\d+\.\s+', '', response, flags=re.MULTILINE)
+        
         # 2. Nettoyer les astérisques orphelins (lignes avec juste ** ou **)
-        response = re.sub(r"^\*\*\s*$", "", response, flags=re.MULTILINE)
-
-        # 3. SUPPRIMER COMPLÈTEMENT les headers en gras (**Titre:** ou **Titre**)
-        # Cette règle remplace les anciennes règles 3-5 qui essayaient de "corriger" les headers
-        response = re.sub(r"\*\*([^*]+?):\*\*\s*", "", response)
-        response = re.sub(r"\*\*([^*]+?)\*\*\s*:", "", response)
-
-        # 4. Nettoyer les deux-points orphelins sur des lignes isolées
-        response = re.sub(r"^\s*:\s*$", "", response, flags=re.MULTILINE)
-
-        # 5. Nettoyer les lignes vides multiples (3+ → 2)
-        response = re.sub(r"\n{3,}", "\n\n", response)
-
-        # 6. Supprimer les espaces en fin de ligne
-        response = re.sub(r" +$", "", response, flags=re.MULTILINE)
-
-        # 7. S'assurer qu'il y a un espace après les bullet points
-        response = re.sub(r"^-([^ ])", r"- \1", response, flags=re.MULTILINE)
-
+        response = re.sub(r'^\*\*\s*
+        
         # Ajouter avertissement vétérinaire si la question concerne la santé/maladie
         if query and self._is_veterinary_query(query, context_docs):
             disclaimer = self._get_veterinary_disclaimer(language)
             if disclaimer:  # Seulement si disclaimer non vide
                 response = response + disclaimer
                 logger.info(f"🏥 Disclaimer vétérinaire ajouté (langue: {language})")
+        
+        return response
 
+
+# Factory function
+def create_enhanced_generator(
+    openai_client,
+    cache_manager=None,
+    language: str = "fr",
+    prompts_path: Optional[str] = None,
+    descriptions_path: Optional[str] = None,
+):
+    """
+    Factory pour créer le générateur enrichi
+
+    Args:
+        openai_client: Client OpenAI
+        cache_manager: Gestionnaire de cache (optionnel)
+        language: Langue par défaut
+        prompts_path: Chemin custom vers system_prompts.json
+        descriptions_path: Chemin custom vers entity_descriptions.json
+
+    Returns:
+        Instance EnhancedResponseGenerator
+    """
+    return EnhancedResponseGenerator(
+        openai_client, cache_manager, language, prompts_path, descriptions_path
+    )
+, '', response, flags=re.MULTILINE)
+        
+        # 3. SUPPRIMER COMPLÈTEMENT les headers en gras (**Titre:** ou **Titre**)
+        # Cette règle remplace les anciennes règles 3-5 qui essayaient de "corriger" les headers
+        response = re.sub(r'\*\*([^*]+?):\*\*\s*', '', response)
+        response = re.sub(r'\*\*([^*]+?)\*\*\s*:', '', response)
+        
+        # 4. Nettoyer les deux-points orphelins sur des lignes isolées
+        response = re.sub(r'^\s*:\s*
+        
+        # Ajouter avertissement vétérinaire si la question concerne la santé/maladie
+        if query and self._is_veterinary_query(query, context_docs):
+            disclaimer = self._get_veterinary_disclaimer(language)
+            if disclaimer:  # Seulement si disclaimer non vide
+                response = response + disclaimer
+                logger.info(f"🏥 Disclaimer vétérinaire ajouté (langue: {language})")
+        
+        return response
+
+
+# Factory function
+def create_enhanced_generator(
+    openai_client,
+    cache_manager=None,
+    language: str = "fr",
+    prompts_path: Optional[str] = None,
+    descriptions_path: Optional[str] = None,
+):
+    """
+    Factory pour créer le générateur enrichi
+
+    Args:
+        openai_client: Client OpenAI
+        cache_manager: Gestionnaire de cache (optionnel)
+        language: Langue par défaut
+        prompts_path: Chemin custom vers system_prompts.json
+        descriptions_path: Chemin custom vers entity_descriptions.json
+
+    Returns:
+        Instance EnhancedResponseGenerator
+    """
+    return EnhancedResponseGenerator(
+        openai_client, cache_manager, language, prompts_path, descriptions_path
+    )
+, '', response, flags=re.MULTILINE)
+        
+        # 5. Nettoyer les lignes vides multiples (3+ → 2)
+        response = re.sub(r'\n{3,}', '\n\n', response)
+        
+        # 6. Supprimer les espaces en fin de ligne
+        response = re.sub(r' +
+        
+        # Ajouter avertissement vétérinaire si la question concerne la santé/maladie
+        if query and self._is_veterinary_query(query, context_docs):
+            disclaimer = self._get_veterinary_disclaimer(language)
+            if disclaimer:  # Seulement si disclaimer non vide
+                response = response + disclaimer
+                logger.info(f"🏥 Disclaimer vétérinaire ajouté (langue: {language})")
+        
+        return response
+
+
+# Factory function
+def create_enhanced_generator(
+    openai_client,
+    cache_manager=None,
+    language: str = "fr",
+    prompts_path: Optional[str] = None,
+    descriptions_path: Optional[str] = None,
+):
+    """
+    Factory pour créer le générateur enrichi
+
+    Args:
+        openai_client: Client OpenAI
+        cache_manager: Gestionnaire de cache (optionnel)
+        language: Langue par défaut
+        prompts_path: Chemin custom vers system_prompts.json
+        descriptions_path: Chemin custom vers entity_descriptions.json
+
+    Returns:
+        Instance EnhancedResponseGenerator
+    """
+    return EnhancedResponseGenerator(
+        openai_client, cache_manager, language, prompts_path, descriptions_path
+    )
+, '', response, flags=re.MULTILINE)
+        
+        # 7. S'assurer qu'il y a un espace après les bullet points
+        response = re.sub(r'^-([^ ])', r'- \1', response, flags=re.MULTILINE)
+        
+        # Ajouter avertissement vétérinaire si la question concerne la santé/maladie
+        if query and self._is_veterinary_query(query, context_docs):
+            disclaimer = self._get_veterinary_disclaimer(language)
+            if disclaimer:  # Seulement si disclaimer non vide
+                response = response + disclaimer
+                logger.info(f"🏥 Disclaimer vétérinaire ajouté (langue: {language})")
+        
         return response
 
 

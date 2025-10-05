@@ -294,26 +294,6 @@ async def get_current_user(
     """
     token = credentials.credentials
 
-    # === AJOUTEZ CES LIGNES ICI ===
-    logger.critical("=" * 80)
-    logger.critical("[AUTH_DEBUG] ANALYSE DU TOKEN")
-    logger.critical(f"Longueur du token: {len(token)}")
-    logger.critical(f"Premiers 30 caractères: {token[:30]}...")
-
-    try:
-        import jwt as pyjwt
-
-        payload = pyjwt.decode(token, options={"verify_signature": False})
-        logger.critical(f"Token ISS (émetteur): {payload.get('iss')}")
-        logger.critical(f"Token AUD (audience): {payload.get('aud')}")
-        logger.critical(f"Token EMAIL: {payload.get('email')}")
-        logger.critical(f"Token SUB: {payload.get('sub')}")
-        logger.critical("=" * 80)
-    except Exception as e:
-        logger.critical(f"Impossible de décoder le token: {e}")
-        logger.critical("=" * 80)
-    # === FIN DES LIGNES À AJOUTER ===
-
     if not token or not isinstance(token, str):
         logger.warning("Token vide ou invalide")
         raise HTTPException(
