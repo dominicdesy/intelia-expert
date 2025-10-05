@@ -359,11 +359,12 @@ class EnhancedResponseGenerator:
         conversation_context: str = "",
         language: Optional[str] = None,
         intent_result=None,
+        detected_domain: str = None,
     ) -> str:
         """
         Génère une réponse enrichie avec cache externe + ton affirmatif expert
 
-        VERSION 3.3: Accepte maintenant List[Document] OU List[dict]
+        VERSION 3.4: Support détection de domaine pour sélection de prompt spécialisé
         """
 
         lang = language or self.language
@@ -420,9 +421,9 @@ class EnhancedResponseGenerator:
                 else ContextEnrichment("", "", "", "", [], [])
             )
 
-            # Générer le prompt enrichi
+            # Générer le prompt enrichi avec domaine détecté
             system_prompt, user_prompt = self._build_enhanced_prompt(
-                query, context_docs, enrichment, conversation_context, lang
+                query, context_docs, enrichment, conversation_context, lang, detected_domain
             )
 
             # Génération
@@ -500,12 +501,13 @@ class EnhancedResponseGenerator:
         enrichment: ContextEnrichment,
         conversation_context: str,
         language: str,
+        detected_domain: str = None,
     ) -> Tuple[str, str]:
         """
         Construit un prompt enrichi avec instructions de langue renforcées
 
-        VERSION 3.3: Support dict et Document + instructions multilingues dynamiques + détection espèce
-        ✅ FIX CRITIQUE: Instructions de langue EN TÊTE + validation conversation_context
+        VERSION 3.4: Support détection domaine pour prompts spécialisés
+        ✅ NEW: Utilise detected_domain pour sélectionner nutrition_query, health_diagnosis, etc.
         """
 
         # 🔍 DEBUG CRITIQUE - Validation conversation_context
@@ -594,15 +596,8 @@ class EnhancedResponseGenerator:
         # ✅ SIMPLIFICATION: Instructions de langue compactes en tête
         language_name = self.language_display_names.get(language, language.upper())
 
-        # Construction du prompt système
+        # Construction du prompt système avec domaine spécialisé
         if self.prompts_manager:
-            expert_identity = self.prompts_manager.get_base_prompt(
-                "expert_identity", language
-            )
-            response_guidelines = self.prompts_manager.get_base_prompt(
-                "response_guidelines", language
-            )
-
             system_prompt_parts = []
 
             # ✅ Instructions de langue EN TÊTE (UNE SEULE FOIS)
@@ -610,7 +605,7 @@ class EnhancedResponseGenerator:
 CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 
 FORMATTING RULES - CLEAN & MODERN:
-- NO bold headers with asterisks (**Header:**) 
+- NO bold headers with asterisks (**Header:**)
 - Use simple paragraph structure with clear topic sentences
 - Separate ideas with line breaks, not headers
 - Use bullet points (- ) ONLY for lists, NEVER numbered lists (1., 2., 3.)
@@ -619,9 +614,30 @@ FORMATTING RULES - CLEAN & MODERN:
 """
             system_prompt_parts.append(language_instruction)
 
-            if expert_identity:
-                system_prompt_parts.append(expert_identity)
+            # ✅ NOUVEAU: Utiliser le prompt spécialisé si domaine détecté
+            if detected_domain and detected_domain != "general_poultry":
+                specialized_prompt = self.prompts_manager.get_specialized_prompt(
+                    detected_domain, language
+                )
+                if specialized_prompt:
+                    logger.info(f"✅ Utilisation prompt spécialisé: {detected_domain}")
+                    system_prompt_parts.append(specialized_prompt)
+                else:
+                    logger.warning(f"Prompt spécialisé '{detected_domain}' non trouvé, fallback general")
+                    expert_identity = self.prompts_manager.get_base_prompt(
+                        "expert_identity", language
+                    )
+                    if expert_identity:
+                        system_prompt_parts.append(expert_identity)
+            else:
+                # Fallback: prompt général
+                expert_identity = self.prompts_manager.get_base_prompt(
+                    "expert_identity", language
+                )
+                if expert_identity:
+                    system_prompt_parts.append(expert_identity)
 
+            # Contexte métier (toujours inclus)
             context_section = f"""
 CONTEXTE MÉTIER DÉTECTÉ:
 {enrichment.entity_context}
@@ -631,9 +647,14 @@ CONTEXTE MÉTIER DÉTECTÉ:
 """
             system_prompt_parts.append(context_section)
 
+            # Guidelines générales
+            response_guidelines = self.prompts_manager.get_base_prompt(
+                "response_guidelines", language
+            )
             if response_guidelines:
                 system_prompt_parts.append(response_guidelines)
 
+            # Métriques prioritaires
             metrics_section = f"""
 MÉTRIQUES PRIORITAIRES:
 {', '.join(enrichment.performance_indicators[:3]) if enrichment.performance_indicators else 'Paramètres généraux de production'}

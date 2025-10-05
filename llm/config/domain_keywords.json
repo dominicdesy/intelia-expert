@@ -1,0 +1,273 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Keywords de détection de domaines pour routing intelligent des prompts",
+    "last_updated": "2025-01-15",
+    "languages": ["fr", "en"]
+  },
+
+  "domains": {
+    "nutrition": {
+      "keywords": {
+        "fr": [
+          "aliment", "ration", "formule", "nutritionnel", "nutrition",
+          "protéine", "énergie", "kcal", "em", "pb",
+          "acides aminés", "lysine", "méthionine", "aa",
+          "additif", "prémix", "enzyme", "probiotique",
+          "démarrage", "croissance", "finition",
+          "calcium", "phosphore", "vitamines", "minéraux",
+          "composition", "formulation", "recette"
+        ],
+        "en": [
+          "feed", "diet", "ration", "formula", "nutritional", "nutrition",
+          "protein", "energy", "kcal", "me", "cp",
+          "amino acid", "lysine", "methionine", "aa",
+          "additive", "premix", "enzyme", "probiotic",
+          "starter", "grower", "finisher",
+          "calcium", "phosphorus", "vitamins", "minerals",
+          "composition", "formulation", "recipe"
+        ]
+      },
+      "prompt_key": "nutrition_query"
+    },
+
+    "health": {
+      "keywords": {
+        "fr": [
+          "maladie", "pathologie", "infection", "virus", "bactérie",
+          "symptôme", "signe clinique", "lésion",
+          "mortalité", "mort", "perte",
+          "vaccin", "vaccination", "protocole vaccinal",
+          "traitement", "médicament", "antibiotique", "anticoccidien",
+          "diagnostic", "autopsie", "nécropsie",
+          "prévention", "biosécurité", "hygiène",
+          "coccidiose", "newcastle", "gumboro", "bronchite",
+          "ascite", "entérite", "colibacillose",
+          "fèces", "diarrhée", "sang", "respiratoire"
+        ],
+        "en": [
+          "disease", "pathology", "infection", "virus", "bacteria",
+          "symptom", "clinical sign", "lesion",
+          "mortality", "death", "loss",
+          "vaccine", "vaccination", "vaccination protocol",
+          "treatment", "medication", "antibiotic", "anticoccidial",
+          "diagnosis", "autopsy", "necropsy",
+          "prevention", "biosecurity", "hygiene",
+          "coccidiosis", "newcastle", "gumboro", "bronchitis",
+          "ascites", "enteritis", "colibacillosis",
+          "feces", "diarrhea", "blood", "respiratory"
+        ]
+      },
+      "prompt_key": "health_diagnosis"
+    },
+
+    "genetics": {
+      "keywords": {
+        "fr": [
+          "génétique", "lignée", "souche", "race",
+          "sélection", "amélioration génétique",
+          "potentiel génétique", "standard", "objectif de performance",
+          "croisement", "hybride", "hérédité",
+          "ross", "cobb", "hubbard", "hy-line", "isa", "lohmann",
+          "performance génétique", "courbe de croissance",
+          "uniformité", "cv%", "variabilité",
+          "comparaison", "vs", "versus", "différence entre",
+          "meilleur", "choisir", "sélectionner"
+        ],
+        "en": [
+          "genetics", "genetic", "line", "strain", "breed",
+          "selection", "genetic improvement",
+          "genetic potential", "standard", "performance objective",
+          "breeding", "cross", "hybrid", "heredity",
+          "ross", "cobb", "hubbard", "hy-line", "isa", "lohmann",
+          "genetic performance", "growth curve",
+          "uniformity", "cv%", "variability",
+          "comparison", "vs", "versus", "difference between",
+          "best", "choose", "select"
+        ]
+      },
+      "prompt_key": "genetics_performance"
+    },
+
+    "management": {
+      "keywords": {
+        "fr": [
+          "gestion", "management", "conduite d'élevage",
+          "bâtiment", "poulailler", "infrastructure",
+          "densité", "surface", "m²", "kg/m²",
+          "main d'œuvre", "personnel", "travail",
+          "coût", "prix", "rentabilité", "marge", "bénéfice",
+          "investissement", "budget", "financement",
+          "équipement", "matériel", "installation",
+          "optimiser", "améliorer", "réduire",
+          "productivité", "efficacité", "performance économique",
+          "roi", "retour sur investissement", "amortissement",
+          "planification", "organisation", "planning"
+        ],
+        "en": [
+          "management", "farm management", "flock management",
+          "housing", "house", "building", "infrastructure",
+          "density", "stocking density", "sq ft", "kg/m²",
+          "labor", "workforce", "personnel", "work",
+          "cost", "price", "profitability", "margin", "profit",
+          "investment", "budget", "financing",
+          "equipment", "material", "installation",
+          "optimize", "improve", "reduce",
+          "productivity", "efficiency", "economic performance",
+          "roi", "return on investment", "payback",
+          "planning", "organization", "schedule"
+        ]
+      },
+      "prompt_key": "farm_management"
+    },
+
+    "environment": {
+      "keywords": {
+        "fr": [
+          "température", "chaleur", "froid", "°c",
+          "ventilation", "aération", "air", "débit",
+          "humidité", "hr", "%", "condensation",
+          "ambiance", "climat", "environnement",
+          "chauffage", "refroidissement", "pad cooling",
+          "tunnel", "statique", "dynamique", "brasseur",
+          "lumière", "éclairage", "photopériode",
+          "litière", "paille", "copeaux", "qualité litière",
+          "poussière", "ammoniac", "nh3", "co2",
+          "stress thermique", "coup de chaleur"
+        ],
+        "en": [
+          "temperature", "heat", "cold", "°c", "°f",
+          "ventilation", "air", "airflow", "cfm",
+          "humidity", "rh", "%", "condensation",
+          "climate", "environment", "housing conditions",
+          "heating", "cooling", "pad cooling", "evaporative cooling",
+          "tunnel", "static", "dynamic", "circulation fan",
+          "light", "lighting", "photoperiod",
+          "litter", "bedding", "shavings", "litter quality",
+          "dust", "ammonia", "nh3", "co2",
+          "heat stress", "thermal stress"
+        ]
+      },
+      "prompt_key": "environment_setting"
+    },
+
+    "metrics": {
+      "keywords": {
+        "fr": [
+          "poids", "poids vif", "gramme", "kg", "g",
+          "fcr", "ic", "indice de conversion", "conversion alimentaire",
+          "gmq", "gain moyen quotidien", "croissance",
+          "mortalité", "%", "taux de mortalité",
+          "uniformité", "homogénéité", "cv%",
+          "ponte", "taux de ponte", "œuf", "production",
+          "rendement carcasse", "découpe", "filet",
+          "consommation", "aliment consommé",
+          "âge", "jour", "semaine", "j", "sem"
+        ],
+        "en": [
+          "weight", "body weight", "bw", "gram", "kg", "g", "lb",
+          "fcr", "feed conversion ratio", "feed efficiency",
+          "adg", "average daily gain", "growth",
+          "mortality", "%", "mortality rate", "livability",
+          "uniformity", "cv%", "coefficient of variation",
+          "egg production", "lay", "laying rate", "hen-day",
+          "carcass yield", "breast yield", "meat yield",
+          "feed intake", "consumption",
+          "age", "day", "week", "d", "wk"
+        ]
+      },
+      "prompt_key": "metric_query"
+    },
+
+    "protocol": {
+      "keywords": {
+        "fr": [
+          "protocole", "programme", "calendrier",
+          "vaccin", "vaccination", "immunisation",
+          "traitement", "thérapie", "cure",
+          "antibiotique", "anticoccidien", "antiparasitaire",
+          "dose", "posologie", "administration",
+          "rappel", "booster", "j1", "jour 1",
+          "eau de boisson", "aliment", "spray", "injection",
+          "biosécurité", "désinfection", "nettoyage",
+          "vide sanitaire", "quarantaine"
+        ],
+        "en": [
+          "protocol", "program", "schedule", "calendar",
+          "vaccine", "vaccination", "immunization",
+          "treatment", "therapy", "cure",
+          "antibiotic", "anticoccidial", "antiparasitic",
+          "dose", "dosage", "administration",
+          "booster", "d1", "day 1",
+          "drinking water", "feed", "spray", "injection",
+          "biosecurity", "disinfection", "cleaning", "sanitation",
+          "downtime", "quarantine"
+        ]
+      },
+      "prompt_key": "protocol_query"
+    },
+
+    "economics": {
+      "keywords": {
+        "fr": [
+          "coût", "prix", "tarif", "valeur",
+          "marge", "bénéfice", "profit", "rentabilité",
+          "budget", "financement", "crédit", "prêt",
+          "investissement", "capex", "opex",
+          "roi", "retour sur investissement", "amortissement",
+          "économie", "économique", "financier",
+          "marché", "vente", "achat", "commercial",
+          "compétitif", "concurrence", "prix de revient"
+        ],
+        "en": [
+          "cost", "price", "rate", "value",
+          "margin", "profit", "profitability",
+          "budget", "financing", "credit", "loan",
+          "investment", "capex", "opex",
+          "roi", "return on investment", "payback", "depreciation",
+          "economy", "economic", "financial",
+          "market", "sale", "purchase", "commercial",
+          "competitive", "competition", "cost of production"
+        ]
+      },
+      "prompt_key": "economics_cost"
+    }
+  },
+
+  "priority_rules": {
+    "description": "Règles de priorité quand plusieurs domaines détectés",
+    "rules": [
+      {
+        "condition": "health + nutrition",
+        "priority": "health",
+        "reason": "Santé prime sur nutrition (ex: 'aliment pour poulet malade')"
+      },
+      {
+        "condition": "genetics + metrics",
+        "priority": "genetics",
+        "reason": "Performance génétique englobe les métriques"
+      },
+      {
+        "condition": "management + economics",
+        "priority": "management",
+        "reason": "Gestion inclut aspects économiques"
+      },
+      {
+        "condition": "protocol + health",
+        "priority": "protocol",
+        "reason": "Protocole plus spécifique que santé générale"
+      }
+    ]
+  },
+
+  "fallback": {
+    "default_prompt_key": "general_poultry",
+    "description": "Utilisé si aucun domaine clair détecté"
+  },
+
+  "usage_notes": {
+    "description": "Charger via QueryRouter pour sélectionner le bon prompt system",
+    "integration": "Ajouter _detect_domain() dans QueryRouter qui retourne le prompt_key approprié",
+    "scoring": "Compter nombre de keywords matchés par domaine, prendre le max"
+  }
+}

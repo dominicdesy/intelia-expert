@@ -6,6 +6,7 @@ Helper functions for StandardQueryHandler
 import logging
 import traceback
 from utils.types import Dict, Any, List
+from core.response_validator import get_response_validator
 
 logger = logging.getLogger(__name__)
 
@@ -81,10 +82,15 @@ async def generate_response_with_generator(
     try:
         conversation_history = preprocessed_data.get("contextual_history", "")
 
+        # Récupérer le domaine détecté depuis metadata
+        metadata = preprocessed_data.get("metadata", {})
+        validation_details = metadata.get("validation_details", {})
+        detected_domain = validation_details.get("detected_domain", None)
+
         logger.info(
             f"Generating response with history "
             f"(docs={len(context_docs)}, language={language}, "
-            f"history={'YES' if conversation_history else 'NO'})"
+            f"history={'YES' if conversation_history else 'NO'}, domain={detected_domain})"
         )
 
         response = await response_generator.generate_response(
@@ -92,7 +98,42 @@ async def generate_response_with_generator(
             context_docs=context_docs,
             language=language,
             conversation_context=conversation_history,
+            detected_domain=detected_domain,
         )
+
+        # Validation qualité de la réponse
+        try:
+            validator = get_response_validator()
+            quality_report = validator.validate_response(
+                response=response,
+                query=query,
+                domain=detected_domain,
+                language=language,
+                context_docs=context_docs,
+            )
+
+            # Logger les issues détectées
+            if quality_report.issues:
+                logger.warning(
+                    f"Qualité réponse: score={quality_report.quality_score:.2f}, "
+                    f"issues={len(quality_report.issues)}"
+                )
+                for issue in quality_report.issues[:3]:  # Top 3 issues
+                    logger.warning(
+                        f"  - [{issue.severity}] {issue.issue_type}: {issue.description}"
+                    )
+            else:
+                logger.info(f"Qualité réponse: score={quality_report.quality_score:.2f}, aucun problème détecté")
+
+            # Si score trop bas, logger en warning
+            if quality_report.quality_score < 0.6:
+                logger.warning(
+                    f"Score qualité faible ({quality_report.quality_score:.2f}), "
+                    f"amélioration recommandée"
+                )
+
+        except Exception as val_err:
+            logger.error(f"Erreur validation qualité: {val_err}")
 
         return response
 

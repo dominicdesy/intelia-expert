@@ -8,6 +8,7 @@ from utils.types import Dict, List, Any, Optional
 
 from .data_models import RAGResult, RAGSource
 from .query_enricher import ConversationalQueryEnricher
+from utils.clarification_helper import get_clarification_helper
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class RAGQueryProcessor:
         self.standard_handler = handlers.get("standard")
         self.conversation_memory = conversation_memory
         self.enricher = ConversationalQueryEnricher()
+        self.clarification_helper = get_clarification_helper()
 
     async def process_query(
         self,
@@ -76,7 +78,7 @@ class RAGQueryProcessor:
 
         # Step 4: Check for clarification needs
         if route.destination == "needs_clarification":
-            return self._build_clarification_result(route, language)
+            return self._build_clarification_result(route, language, query=query)
 
         # Step 5: Build preprocessed data
         preprocessed_data = self._build_preprocessed_data(
@@ -138,13 +140,21 @@ class RAGQueryProcessor:
             logger.warning(f"Query enrichment failed: {e}")
             return query
 
-    def _build_clarification_result(self, route, language: str) -> RAGResult:
-        """Build clarification result"""
+    def _build_clarification_result(self, route, language: str, query: str = "") -> RAGResult:
+        """Build clarification result with intelligent contextual messages"""
         logger.info(f"Clarification needed - missing fields: {route.missing_fields}")
+
+        # Utiliser le clarification helper pour message contextuel
+        clarification_message = self.clarification_helper.build_clarification_message(
+            missing_fields=route.missing_fields,
+            language=language,
+            query=query,
+            entities=route.entities
+        )
 
         return RAGResult(
             source=RAGSource.NEEDS_CLARIFICATION,
-            answer=self._build_clarification_message(route.missing_fields, language),
+            answer=clarification_message,
             metadata={
                 "needs_clarification": True,
                 "missing_fields": route.missing_fields,

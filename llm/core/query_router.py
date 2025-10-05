@@ -94,6 +94,7 @@ class ConfigManager:
         self.system_prompts = {}
         self.languages = {}
         self.universal_terms = {}
+        self.domain_keywords = {}
 
         # Index pour recherche rapide
         self.breed_index = {}
@@ -161,6 +162,15 @@ class ConfigManager:
                     self.universal_terms[lang_code] = json.load(f)
 
         logger.info(f"✅ {len(self.universal_terms)} fichiers universal_terms chargés")
+
+        # 6. DOMAIN_KEYWORDS.JSON (nouveau)
+        domain_path = self.config_dir / "domain_keywords.json"
+        if domain_path.exists():
+            with open(domain_path, "r", encoding="utf-8") as f:
+                self.domain_keywords = json.load(f)
+            logger.info("✅ domain_keywords.json chargé")
+        else:
+            logger.warning(f"domain_keywords.json non trouvé: {domain_path}")
 
     def _build_indexes(self):
         """Construit des index pour recherche rapide O(1)"""
@@ -408,6 +418,86 @@ class QueryRouter:
 
         logger.debug("✅ Patterns regex compilés depuis config")
 
+    def detect_domain(self, query: str, language: str = "fr") -> str:
+        """
+        Détecte le domaine de la query pour sélection du prompt
+
+        Args:
+            query: Question de l'utilisateur
+            language: Langue (fr/en)
+
+        Returns:
+            prompt_key du domaine détecté ou 'general_poultry'
+        """
+        if not self.domain_keywords or "domains" not in self.domain_keywords:
+            return "general_poultry"
+
+        query_lower = query.lower()
+        domain_scores = {}
+
+        # Compter les keywords matchés par domaine
+        for domain_name, domain_data in self.domain_keywords["domains"].items():
+            keywords = domain_data.get("keywords", {}).get(language, [])
+            if not keywords:
+                keywords = domain_data.get("keywords", {}).get("fr", [])
+
+            matches = sum(1 for kw in keywords if kw.lower() in query_lower)
+            if matches > 0:
+                domain_scores[domain_name] = {
+                    "score": matches,
+                    "prompt_key": domain_data.get("prompt_key", "general_poultry"),
+                }
+
+        # Pas de match: fallback
+        if not domain_scores:
+            logger.debug(f"Aucun domaine détecté pour '{query}', fallback general_poultry")
+            return "general_poultry"
+
+        # Prendre le domaine avec le plus de matches
+        best_domain = max(domain_scores.items(), key=lambda x: x[1]["score"])
+        prompt_key = best_domain[1]["prompt_key"]
+
+        logger.info(
+            f"Domaine détecté: {best_domain[0]} (score={best_domain[1]['score']}) → prompt={prompt_key}"
+        )
+
+        # Appliquer règles de priorité si plusieurs domaines
+        if len(domain_scores) > 1:
+            prompt_key = self._apply_priority_rules(domain_scores, prompt_key)
+
+        return prompt_key
+
+    def _apply_priority_rules(
+        self, domain_scores: Dict, current_prompt: str
+    ) -> str:
+        """
+        Applique les règles de priorité entre domaines
+
+        Args:
+            domain_scores: Scores par domaine
+            current_prompt: Prompt actuellement sélectionné
+
+        Returns:
+            Prompt ajusté selon règles de priorité
+        """
+        priority_rules = self.domain_keywords.get("priority_rules", {}).get("rules", [])
+
+        for rule in priority_rules:
+            condition = rule.get("condition", "")
+            domains_in_condition = [d.strip() for d in condition.split("+")]
+
+            # Vérifier si les 2 domaines sont présents
+            if all(d in domain_scores for d in domains_in_condition):
+                priority_domain = rule.get("priority")
+                if priority_domain in domain_scores:
+                    new_prompt = domain_scores[priority_domain]["prompt_key"]
+                    logger.info(
+                        f"Priorité appliquée: {condition} → {priority_domain} ({rule.get('reason')})"
+                    )
+                    return new_prompt
+
+        return current_prompt
+
     def route(self, query: str, user_id: str, language: str = "fr") -> QueryRoute:
         """
         Point d'entrée UNIQUE - fait TOUT en une passe
@@ -466,6 +556,9 @@ class QueryRouter:
         # 6. ROUTING INTELLIGENT
         destination, reason = self._determine_destination(query, entities, language)
 
+        # 6.5. DÉTECTION DOMAINE pour sélection prompt
+        detected_domain = self.detect_domain(query, language)
+
         # 7. STOCKAGE CONTEXTE (si succès)
         self.context_store[user_id] = ConversationContext(
             entities=entities, query=query, timestamp=time.time(), language=language
@@ -474,9 +567,12 @@ class QueryRouter:
         processing_time = time.time() - start_time
 
         logger.info(
-            f"✅ Route: {destination} | Contextuel: {is_contextual} | "
+            f"✅ Route: {destination} | Domain: {detected_domain} | Contextuel: {is_contextual} | "
             f"Temps: {processing_time:.3f}s"
         )
+
+        # Ajouter domain dans validation_details pour utilisation par generators
+        validation_details["detected_domain"] = detected_domain
 
         return QueryRoute(
             destination=destination,
@@ -659,9 +755,16 @@ class QueryRouter:
             validation_details["validation_type"] = "postgresql_metrics"
             validation_details["required_fields"] = ["breed", "age"]
         else:
-            # Requêtes Weaviate/guides: plus flexible
-            validation_details["validation_type"] = "weaviate_flexible"
-            validation_details["required_fields"] = []
+            # Requêtes Weaviate/guides: détecter ambiguïté
+            ambiguity_detected = self._detect_weaviate_ambiguity(query, entities, language)
+
+            if ambiguity_detected:
+                missing.extend(ambiguity_detected)
+                validation_details["validation_type"] = "weaviate_ambiguous"
+                validation_details["required_fields"] = ambiguity_detected
+            else:
+                validation_details["validation_type"] = "weaviate_flexible"
+                validation_details["required_fields"] = []
 
         is_complete = len(missing) == 0
 
@@ -672,6 +775,50 @@ class QueryRouter:
         )
 
         return (is_complete, missing, validation_details)
+
+    def _detect_weaviate_ambiguity(
+        self, query: str, entities: Dict[str, Any], language: str
+    ) -> List[str]:
+        """
+        Détecte si une question Weaviate est trop ambiguë
+
+        Returns:
+            Liste des champs manquants ou []
+        """
+        query_lower = query.lower()
+        missing = []
+
+        # Santé/diagnostic: besoin symptômes + âge
+        health_keywords = ["maladie", "malade", "symptôme", "mort", "mortalité", "disease", "sick", "mortality", "diagnostic"]
+        if any(kw in query_lower for kw in health_keywords):
+            # Question très vague (< 6 mots)
+            if len(query_lower.split()) < 6:
+                if not entities.get("age_days"):
+                    missing.append("age")
+                # Pas besoin de breed obligatoire pour Weaviate, mais mentionner si manque symptôme détaillé
+                if "symptom" not in query_lower and "fèces" not in query_lower and "lésion" not in query_lower:
+                    missing.append("symptom")
+
+        # Nutrition: besoin phase de production
+        nutrition_keywords = ["aliment", "ration", "formule", "nutrition", "feed", "diet"]
+        if any(kw in query_lower for kw in nutrition_keywords):
+            if len(query_lower.split()) < 6:
+                if not entities.get("age_days"):
+                    missing.append("production_phase")
+
+        # Environnement: besoin âge
+        environment_keywords = ["température", "ventilation", "ambiance", "humidité", "temperature", "climate"]
+        if any(kw in query_lower for kw in environment_keywords):
+            if len(query_lower.split()) < 7 and not entities.get("age_days"):
+                missing.append("age")
+
+        # Traitement/protocole: besoin âge
+        protocol_keywords = ["protocole", "vaccin", "traitement", "antibiotique", "protocol", "vaccine", "treatment"]
+        if any(kw in query_lower for kw in protocol_keywords):
+            if not entities.get("age_days"):
+                missing.append("age")
+
+        return missing
 
     def _determine_destination(
         self, query: str, entities: Dict[str, Any], language: str
