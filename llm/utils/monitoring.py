@@ -361,7 +361,7 @@ class SystemHealthMonitor:
                     if initialization_success and getattr(
                         cache_core, "is_initialized", False
                     ):
-                        logger.info("✅ Cache Core initialisé avec succès")
+                        logger.info("Cache Core initialized avec succès")
                     else:
                         logger.warning(
                             "⚠️ Cache Core créé mais non initialisé - mode dégradé"
@@ -371,19 +371,19 @@ class SystemHealthMonitor:
                         )
 
                 except asyncio.TimeoutError:
-                    logger.warning("⚠️ Timeout initialisation Cache Core")
+                    logger.warning("Warning: Timeout initialisation Cache Core")
                     errors.append("Cache Core: Timeout initialisation")
 
                 except Exception as init_e:
-                    logger.warning(f"⚠️ Erreur initialisation Cache Core: {init_e}")
+                    logger.warning(f"Warning: Error initialisation Cache Core: {init_e}")
                     errors.append(f"Cache Core: Erreur initialisation - {init_e}")
 
             except ImportError as e:
-                logger.error(f"❌ Module Cache Core non disponible: {e}")
+                logger.error(f"Error: Module Cache Core non disponible: {e}")
                 errors.append(f"Cache Core: Module non disponible - {e}")
 
             except Exception as e:
-                logger.error(f"❌ Erreur création Cache Core: {e}")
+                logger.error(f"Error: Erreur création Cache Core: {e}")
                 errors.append(f"Cache Core: Erreur création - {e}")
 
             # RAG Engine Enhanced
@@ -397,7 +397,7 @@ class SystemHealthMonitor:
                 self._critical_services["rag_engine_enhanced"] = rag_engine_enhanced
 
                 if rag_engine_enhanced.is_initialized:
-                    logger.info("✅ RAG Engine Enhanced initialisé")
+                    logger.info("RAG Engine Enhanced initialisé")
 
                     # Vérifier intégrations
                     status = rag_engine_enhanced.get_status()
@@ -419,7 +419,7 @@ class SystemHealthMonitor:
                         )
 
                 else:
-                    logger.warning("⚠️ RAG Engine en mode dégradé")
+                    logger.warning("Warning: RAG Engine en mode dégradé")
 
             except Exception as e:
                 errors.append(f"RAG Engine: {e}")
@@ -437,7 +437,7 @@ class SystemHealthMonitor:
                     # Passer le rag_engine au factory + await car c'est async
                     agent_rag_engine = await create_agent_rag_engine(rag_engine)
                     self._critical_services["agent_rag_engine"] = agent_rag_engine
-                    logger.info("✅ Agent RAG disponible")
+                    logger.info("RAG Agent disponible")
                 else:
                     logger.warning("Agent RAG: RAG Engine requis mais non initialisé")
 
