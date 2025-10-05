@@ -15,7 +15,8 @@
       "WebFetch(domain:docs.ragas.io)",
       "Bash(ruff check:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

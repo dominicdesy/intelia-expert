@@ -132,7 +132,7 @@ def create_status_routes(get_service: Callable) -> APIRouter:
                 cache_stats = {"stats_error": str(e)}
 
             enabled = safe_get_attribute(cache_core, "enabled", False)
-            initialized = safe_get_attribute(cache_core, "initialized", False)
+            initialized = safe_get_attribute(cache_core, "is_initialized", False)
 
             # Récupération sécurisée des stats de cache de sérialisation
             try:

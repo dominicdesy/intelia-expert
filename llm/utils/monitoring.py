@@ -359,7 +359,7 @@ class SystemHealthMonitor:
                     )
 
                     if initialization_success and getattr(
-                        cache_core, "initialized", False
+                        cache_core, "is_initialized", False
                     ):
                         logger.info("✅ Cache Core initialisé avec succès")
                     else:
@@ -461,7 +461,7 @@ class SystemHealthMonitor:
 
         # Redis - inchangé
         cache_core = self._critical_services.get("cache_core")
-        if cache_core and getattr(cache_core, "initialized", False):
+        if cache_core and getattr(cache_core, "is_initialized", False):
             redis_client = getattr(cache_core, "client", None)
 
         # CORRECTION WEAVIATE: Accès correct selon la nouvelle architecture
@@ -727,7 +727,7 @@ class SystemHealthMonitor:
             if cache_core:
                 try:
                     # Le cache_core existe, récupérer son statut
-                    cache_initialized = getattr(cache_core, "initialized", False)
+                    cache_initialized = getattr(cache_core, "is_initialized", False)
                     cache_enabled = getattr(cache_core, "enabled", False)
 
                     cache_health_data = {
@@ -821,7 +821,7 @@ class SystemHealthMonitor:
 
         # Vérifications spécifiques par service
         if service_name == "cache_core":
-            return getattr(service, "initialized", False)
+            return getattr(service, "is_initialized", False)
         elif service_name == "rag_engine_enhanced":
             return getattr(service, "is_initialized", False)
         else:

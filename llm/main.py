@@ -253,7 +253,7 @@ async def lifespan(app: FastAPI):
         # Vérification explicite du cache
         cache_core = health_monitor.get_service("cache_core")
         if cache_core:
-            cache_initialized = getattr(cache_core, "initialized", False)
+            cache_initialized = getattr(cache_core, "is_initialized", False)
             cache_enabled = getattr(cache_core, "enabled", False)
 
             if cache_initialized and cache_enabled:

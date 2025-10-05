@@ -73,7 +73,7 @@ class CacheStatsManager:
 
             return {
                 "enabled": True,
-                "initialized": self.core.initialized,
+                "initialized": self.core.is_initialized,
                 "approach": "enhanced_semantic_cache_with_strict_validation_and_fallback_v3.0_modular",
                 "memory": {
                     "used_mb": round(memory_usage_mb, 2),
@@ -228,6 +228,6 @@ class CacheStatsManager:
             logger.warning(f"Erreur stats cache: {e}")
             return {
                 "enabled": True,
-                "initialized": self.core.initialized,
+                "initialized": self.core.is_initialized,
                 "error": str(e),
             }
