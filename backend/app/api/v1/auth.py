@@ -694,6 +694,37 @@ async def logout(
         )
 
 
+# === ENDPOINT REFRESH TOKEN ===
+@router.post("/refresh-token", response_model=TokenResponse)
+async def refresh_token(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Rafraîchit le token lors d'une activité utilisateur
+    """
+    user_id = current_user.get("user_id")
+    email = current_user.get("email")
+    session_id = current_user.get("session_id")
+
+    # Créer un nouveau token avec 60 minutes d'expiration
+    expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    token_data = {
+        "user_id": user_id,
+        "email": email,
+        "sub": user_id,
+        "iss": "intelia-expert",
+        "aud": "authenticated",
+        "session_id": session_id,
+    }
+
+    new_token = create_access_token(token_data, expires)
+    expires_at = datetime.utcnow() + expires
+
+    logger.info(f"[RefreshToken] Token rafraîchi pour: {email}")
+
+    return TokenResponse(
+        access_token=new_token, token_type="bearer", expires_at=expires_at
+    )
+
+
 # === ENDPOINTS OAUTH ===
 
 

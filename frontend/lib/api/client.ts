@@ -45,6 +45,52 @@ export class APIClient {
     return fullUrl;
   }
 
+  // Méthode pour rafraîchir le token si nécessaire
+  private async refreshTokenIfNeeded(): Promise<void> {
+    try {
+      const authData = localStorage.getItem('intelia-expert-auth');
+      if (!authData) return;
+      
+      const parsed = JSON.parse(authData);
+      const expiresAt = new Date(parsed.expires_at || 0).getTime();
+      const now = Date.now();
+      const tenMinutes = 10 * 60 * 1000;
+      
+      // Si le token expire dans moins de 10 minutes, le rafraîchir
+      if (expiresAt - now < tenMinutes) {
+        console.log('[APIClient] Token proche expiration, rafraîchissement...');
+        
+        const url = this.buildURL('auth/refresh-token');
+        const token = await this.getAuthToken();
+        
+        if (!token) return;
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const newAuthData = {
+            access_token: data.access_token,
+            token_type: 'bearer',
+            expires_at: data.expires_at,
+            synced_at: Date.now(),
+          };
+          
+          localStorage.setItem('intelia-expert-auth', JSON.stringify(newAuthData));
+          console.log('[APIClient] Token rafraîchi avec succès');
+        }
+      }
+    } catch (error) {
+      console.error('[APIClient] Erreur rafraîchissement token:', error);
+    }
+  }
+
   // Méthode de base pour les requêtes avec gestion d'erreurs améliorée
   private async request<T>(
     endpoint: string,
@@ -52,6 +98,9 @@ export class APIClient {
     useAuth: boolean = false,
   ): Promise<APIResponse<T>> {
     try {
+      // AJOUT: Rafraîchir le token avant chaque requête si nécessaire
+      await this.refreshTokenIfNeeded();
+      
       const url = this.buildURL(endpoint);
       console.log(`[APIClient] URL construite: ${url}`);
 

@@ -1,5 +1,5 @@
 // lib/stores/auth.ts - SYSTÈME D'AUTH UNIFIÉ - SUPABASE DIRECT + SESSION TRACKING
-// Version avec OAuth direct via auth.intelia.com + tracking temps de connexion
+// Version avec OAuth direct via auth.intelia.com + tracking temps de connexion + refresh automatique token
 
 "use client";
 
@@ -47,6 +47,7 @@ interface AuthState {
   sessionStart: Date | null;
   sessionDuration: number;
   lastHeartbeat: number;
+  heartbeatInterval: NodeJS.Timeout | null;
 
   // Actions existantes
   setHasHydrated: (v: boolean) => void;
@@ -75,6 +76,9 @@ interface AuthState {
   startSessionTracking: () => void;
   endSessionTracking: () => Promise<void>;
   sendHeartbeat: () => Promise<void>;
+
+  // NOUVELLE ACTION POUR REFRESH AUTOMATIQUE
+  refreshTokenIfNeeded: () => Promise<void>;
 }
 
 // Store unifié utilisant Supabase direct + session tracking
@@ -93,6 +97,7 @@ export const useAuthStore = create<AuthState>()(
       sessionStart: null,
       sessionDuration: 0,
       lastHeartbeat: 0,
+      heartbeatInterval: null,
 
       setHasHydrated: (v: boolean) => {
         set({ hasHydrated: v });
@@ -110,23 +115,54 @@ export const useAuthStore = create<AuthState>()(
 
       // NOUVELLES MÉTHODES POUR SESSION TRACKING
       startSessionTracking: () => {
+        // Éviter de créer plusieurs intervals
+        if (get().heartbeatInterval) return;
+        
         const now = new Date();
+        console.log("[AuthStore] Session tracking démarré:", now.toISOString());
+        
+        // Créer un interval unique qui gère heartbeat ET refresh
+        const interval = setInterval(async () => {
+          if (!get().isAuthenticated) {
+            get().endSessionTracking();
+            return;
+          }
+          
+          try {
+            // 1. Heartbeat
+            await apiClient.postSecure('/auth/heartbeat');
+            
+            // 2. Rafraîchir le token (renouvelle automatiquement les 60 min)
+            await get().refreshTokenIfNeeded();
+            
+            set({ lastHeartbeat: Date.now() });
+          } catch (error) {
+            console.error('[SessionTracking] Erreur heartbeat:', error);
+          }
+        }, 30000); // Toutes les 30 secondes
+        
         set({
           sessionStart: now,
           lastHeartbeat: Date.now(),
+          heartbeatInterval: interval,
         });
-        console.log("[AuthStore] Session tracking démarré:", now.toISOString());
       },
 
-      // CORRECTION: Utiliser apiClient au lieu de construire l'URL manuellement
       endSessionTracking: async () => {
-        const { sessionStart } = get();
+        const { sessionStart, heartbeatInterval } = get();
+        
+        // Nettoyer l'interval si il existe
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+        }
+        
         if (sessionStart) {
           const duration = (Date.now() - sessionStart.getTime()) / 1000;
           set({
             sessionDuration: duration,
             sessionStart: null,
             lastHeartbeat: 0,
+            heartbeatInterval: null,
           });
 
           console.log(
@@ -134,7 +170,6 @@ export const useAuthStore = create<AuthState>()(
           );
 
           try {
-            // CORRECTION: Utiliser apiClient qui gère déjà la bonne base URL
             const response = await apiClient.postSecure("/auth/logout", {
               reason: "manual",
             });
@@ -147,20 +182,47 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // CORRECTION: Utiliser apiClient au lieu de construire l'URL manuellement
       sendHeartbeat: async () => {
-        const { isAuthenticated, sessionStart } = get();
-        if (!isAuthenticated || !sessionStart) return;
+        // Cette fonction est maintenant gérée par startSessionTracking
+        // On la garde pour compatibilité mais elle ne fait plus rien
+        console.log("[AuthStore] sendHeartbeat appelé (géré par interval automatique)");
+      },
 
+      // NOUVELLE FONCTION: REFRESH AUTOMATIQUE DU TOKEN
+      refreshTokenIfNeeded: async () => {
+        const authData = localStorage.getItem('intelia-expert-auth');
+        if (!authData) return;
+        
         try {
-          // CORRECTION: Utiliser apiClient qui gère déjà la bonne base URL
-          const response = await apiClient.postSecure("/auth/heartbeat");
-          if (response.success) {
-            set({ lastHeartbeat: Date.now() });
-            console.log("[AuthStore] Heartbeat envoyé");
+          const parsed = JSON.parse(authData);
+          const expiresAt = new Date(parsed.expires_at || 0).getTime();
+          const now = Date.now();
+          const tenMinutes = 10 * 60 * 1000;
+          
+          // Si le token expire dans moins de 10 minutes, le rafraîchir
+          if (expiresAt - now < tenMinutes) {
+            console.log('[AuthStore] Token proche expiration, rafraîchissement...');
+            
+            const response = await apiClient.postSecure<{ 
+              access_token: string; 
+              expires_at: string;
+              token_type: string;
+            }>('/auth/refresh-token');
+            
+            if (response.success && response.data) {
+              const newAuthData = {
+                access_token: response.data.access_token,
+                token_type: response.data.token_type || 'bearer',
+                expires_at: response.data.expires_at,
+                synced_at: Date.now(),
+              };
+              
+              localStorage.setItem('intelia-expert-auth', JSON.stringify(newAuthData));
+              console.log('[AuthStore] Token rafraîchi avec succès');
+            }
           }
         } catch (error) {
-          console.warn("[AuthStore] Erreur heartbeat:", error);
+          console.error('[AuthStore] Erreur rafraîchissement token:', error);
         }
       },
 
@@ -176,6 +238,9 @@ export const useAuthStore = create<AuthState>()(
           const authData = localStorage.getItem("intelia-expert-auth");
 
           if (authData) {
+            // NOUVEAU: Rafraîchir le token si nécessaire avant de vérifier l'auth
+            await get().refreshTokenIfNeeded();
+
             // Si token existe, vérifier l'authentification
             await get().checkAuth();
 
@@ -211,6 +276,9 @@ export const useAuthStore = create<AuthState>()(
       checkAuth: async () => {
         try {
           console.log("[AuthStore] Vérification auth via /auth/me");
+
+          // NOUVEAU: Rafraîchir le token si nécessaire avant de vérifier l'auth
+          await get().refreshTokenIfNeeded();
 
           const response =
             await apiClient.getSecure<BackendUserData>("/auth/me");
@@ -719,6 +787,7 @@ export const useAuthStore = create<AuthState>()(
             sessionStart: null,
             sessionDuration: 0,
             lastHeartbeat: 0,
+            heartbeatInterval: null,
           });
 
           sessionStorage.setItem("recent-logout", Date.now().toString());
@@ -954,28 +1023,15 @@ export const useAuthStore = create<AuthState>()(
   ),
 );
 
-// NOUVEAU: Hook pour gérer les heartbeats automatiques
+// NOUVEAU: Hook simplifié - le tracking est maintenant automatique via startSessionTracking
 export const useSessionHeartbeat = () => {
-  const { isAuthenticated, sendHeartbeat } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    if (!isAuthenticated) return;
-
-    // Envoyer un heartbeat toutes les 2 minutes
-    const heartbeatInterval = setInterval(() => {
-      sendHeartbeat();
-    }, 120000); // 2 minutes
-
-    // Heartbeat initial après 30 secondes
-    const initialHeartbeat = setTimeout(() => {
-      sendHeartbeat();
-    }, 30000);
-
-    return () => {
-      clearInterval(heartbeatInterval);
-      clearTimeout(initialHeartbeat);
-    };
-  }, [isAuthenticated, sendHeartbeat]);
+    // L'interval heartbeat + refresh est maintenant géré automatiquement
+    // par startSessionTracking(), donc ce hook ne fait plus rien
+    console.log("[SessionHeartbeat] Tracking automatique actif");
+  }, [isAuthenticated]);
 };
 
 // Fonction utilitaire exportée
