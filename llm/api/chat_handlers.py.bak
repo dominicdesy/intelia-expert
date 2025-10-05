@@ -224,15 +224,8 @@ class ChatHandlers:
         # 2. Sauvegarder dans l'ancien système (rétrocompatibilité)
         try:
             add_to_conversation_memory(
-                tenant_id,
-                {
-                    "role": "user",
-                    "content": message,
-                    "answer": str(answer),
-                    "source": "rag_enhanced_json",
-                },
+                tenant_id, message, str(answer), "rag_enhanced_json"
             )
-
             logger.debug(f"✅ Sauvegarde ancien système OK pour {tenant_id}")
         except Exception as e:
             logger.warning(f"⚠️ Erreur sauvegarde ancien système: {e}")
