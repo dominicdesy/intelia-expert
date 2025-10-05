@@ -1,0 +1,47 @@
+# ===== REQUIREMENTS-DEV.TXT - INTELIA EXPERT BACKEND =====
+# Development and evaluation tools - NOT needed for production
+# Install with: pip install -r requirements-dev.txt
+
+# First install production dependencies
+-r requirements.txt
+
+# === EVALUATION FRAMEWORKS ===
+# RAG evaluation with RAGAS framework (scripts/run_ragas_evaluation.py)
+ragas==0.1.19
+datasets>=2.14.0
+
+# === OPTIONAL EMBEDDINGS PROVIDERS ===
+# Only needed if evaluating different embedding models
+sentence-transformers==3.1.1
+voyageai==0.2.3
+
+# === HEAVY ML FRAMEWORKS ===
+# Only if you need custom model fine-tuning or evaluation
+# WARNING: These are VERY heavy (~1.3GB total)
+# Uncomment only if absolutely necessary
+# transformers==4.45.2
+# torch>=2.0.0,<2.5.0
+
+# === VECTOR SEARCH (OPTIONAL) ===
+# Only needed for local vector search experiments
+# Production uses Weaviate cloud
+# faiss-cpu==1.7.4
+
+# === STATISTICAL ANALYSIS (OPTIONAL) ===
+# Only for advanced poultry performance analysis scripts
+# NOT needed for production API
+# statsmodels==0.14.1
+# lifelines==0.27.8
+# pingouin==0.5.4
+
+# === DEVELOPMENT TOOLS (ALREADY IN requirements.txt) ===
+# These are already included in main requirements.txt:
+# - pytest, pytest-asyncio, pytest-benchmark
+# - black, flake8, mypy
+# - hypothesis, factory-boy, faker
+
+# === NOTES ===
+# 1. Install production deps first with: pip install -r requirements.txt
+# 2. Then install dev deps with: pip install -r requirements-dev.txt
+# 3. Heavy ML packages (torch, transformers) are commented out by default
+# 4. Uncomment only what you actually need for your development work
