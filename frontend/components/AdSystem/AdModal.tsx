@@ -154,7 +154,7 @@ export const AdModal: React.FC<AdModalProps> = ({
         {/* Footer */}
         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-blue-50 border-t text-center">
           <p className="text-xs text-gray-600">
-            Sponsored Content
+            Intelia Technologies
           </p>
         </div>
       </div>
