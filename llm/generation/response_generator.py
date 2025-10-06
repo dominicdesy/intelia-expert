@@ -34,6 +34,7 @@ from .prompt_builder import PromptBuilder
 from .post_processor import ResponsePostProcessor
 from .document_utils import DocumentUtils
 from .llm_router import get_llm_router
+from .proactive_assistant import get_proactive_assistant
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,9 @@ class ResponseGenerator:
 
         # Initialize Multi-LLM Router for cost optimization
         self.llm_router = get_llm_router()
+
+        # Initialize Proactive Assistant for follow-up questions
+        self.proactive_assistant = get_proactive_assistant(language=language)
 
         # Load prompts manager if available
         try:
@@ -189,6 +193,20 @@ class ResponseGenerator:
                 query=query,
                 language=lang,
             )
+
+            # Generate proactive follow-up question
+            follow_up = self.proactive_assistant.generate_follow_up(
+                query=query,
+                response=enhanced_response,
+                intent_result=intent_result,
+                entities=intent_result.get("entities") if intent_result else None,
+                language=lang,
+            )
+
+            # Append follow-up to response if generated
+            if follow_up:
+                enhanced_response = f"{enhanced_response}\n\n{follow_up}"
+                logger.info(f"✅ Proactive follow-up added: {follow_up[:50]}...")
 
             # Cache response
             if self.cache_manager and self.cache_manager.enabled and cache_key:
