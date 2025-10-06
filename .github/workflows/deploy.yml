@@ -149,18 +149,6 @@ jobs:
           provenance: false
           sbom: false
 
-      - name: Verify latest tag exists
-        run: |
-          echo "Verification du tag 'latest'..."
-          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest && echo "✅ Tag 'latest' existe" || {
-            echo "❌ Tag 'latest' manquant, creation manuelle..."
-            docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
-            docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main \
-                       registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
-            docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
-            echo "✅ Tag 'latest' cree manuellement"
-          }
-
   build-rag:
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -208,68 +196,10 @@ jobs:
         run: |
           doctl registry login --expiry-seconds 3600
 
-      - name: Ensure 'latest' tags exist for all built services
-        run: |
-          echo "Creation/Verification des tags 'latest'..."
-
-          REGISTRY="registry.digitalocean.com/${{ secrets.DOCR_NAME }}"
-
-          # For each service that was built, ensure 'latest' tag exists
-          if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-            echo "Frontend: Tagging 'main' as 'latest'..."
-            docker pull $REGISTRY/intelia-frontend:main
-            docker tag $REGISTRY/intelia-frontend:main $REGISTRY/intelia-frontend:latest
-            docker push $REGISTRY/intelia-frontend:latest
-            echo "✅ Frontend latest tag created"
-          fi
-
-          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-            echo "Backend: Tagging 'main' as 'latest'..."
-            docker pull $REGISTRY/intelia-backend:main
-            docker tag $REGISTRY/intelia-backend:main $REGISTRY/intelia-backend:latest
-            docker push $REGISTRY/intelia-backend:latest
-            echo "✅ Backend latest tag created"
-          fi
-
-          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-            echo "LLM: Tagging 'main' as 'latest'..."
-            docker pull $REGISTRY/intelia-llm:main
-            docker tag $REGISTRY/intelia-llm:main $REGISTRY/intelia-llm:latest
-            docker push $REGISTRY/intelia-llm:latest
-            echo "✅ LLM latest tag created"
-          fi
-
-          if [[ "${{ needs.build-rag.result }}" == "success" ]]; then
-            echo "RAG: Tagging 'main' as 'latest'..."
-            docker pull $REGISTRY/intelia-rag:main
-            docker tag $REGISTRY/intelia-rag:main $REGISTRY/intelia-rag:latest
-            docker push $REGISTRY/intelia-rag:latest
-            echo "✅ RAG latest tag created"
-          fi
-
-          echo "Tous les tags 'latest' sont maintenant crees/verifies"
-
       - name: Wait for registry propagation
         run: |
-          echo "Attente et vérification de la propagation du registry..."
-
-          REGISTRY="registry.digitalocean.com/${{ secrets.DOCR_NAME }}"
-
-          # Wait and verify each built service
-          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-            echo "Vérification de intelia-llm:latest..."
-            for i in {1..12}; do
-              if docker pull $REGISTRY/intelia-llm:latest 2>/dev/null; then
-                echo "✅ intelia-llm:latest disponible"
-                break
-              fi
-              echo "Tentative $i/12 - Attente 10s..."
-              sleep 10
-            done
-          fi
-
-          echo "Attente supplémentaire de 30s pour propagation complète..."
-          sleep 30
+          echo "Attente de 15s pour la propagation du registry..."
+          sleep 15
 
       - name: Verify App Platform spec uses latest tags
         run: |
