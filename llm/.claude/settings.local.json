@@ -13,7 +13,9 @@
       "Bash(git rm:*)",
       "Bash(git mv:*)",
       "Bash(tree:*)",
-      "Bash(ruff check:*)"
+      "Bash(ruff check:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
