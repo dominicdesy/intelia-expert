@@ -830,16 +830,35 @@ class QueryRouter:
 
         # 🆕 DÉTECTION QUESTIONS GÉNÉRALES - Ne requièrent PAS breed/age
         general_question_patterns = [
-            # Questions générales santé
-            r"\b(quelle|quelles)\s+(maladie|pathologie)",
-            r"\b(comment)\s+(prévenir|traiter|éviter|diagnostiquer)",
-            r"\b(quels?)\s+(symptôme|signe|cause)",
+            # === FRANÇAIS ===
+            # Questions générales santé - IMPROVED patterns avec mots intermédiaires
+            r"\b(quelle|quelles)\s+.*?(maladie|pathologie)",
+            r"\b(comment)\s+.*?(prévenir|traiter|éviter|diagnostiquer)",
+            r"\b(quels?|quelles?)\s+.*?(symptôme|signe|cause)",  # ✅ Accepte "quels sont les symptômes"
             r"\b(quelles?)\s+(sont\s+les|causes|solutions)",
+            r"\b(qu'?est-ce\s+que|c'?est\s+quoi)",  # ✅ "Qu'est-ce que X ?"
             # Questions générales management
-            r"\b(comment)\s+(améliorer|optimiser|gérer)",
-            r"\b(quels?)\s+(facteurs?|paramètres?|éléments?)",
+            r"\b(comment)\s+.*?(améliorer|optimiser|gérer)",
+            r"\b(quels?)\s+.*?(facteurs?|paramètres?|éléments?)",
             # Pattern: Questions au pluriel sans mention de race/âge
             r"\b(maladies?|pathologies?)\s+(les\s+plus|fréquent|commun)",
+            # Questions de traitement/prévention spécifiques
+            r"\b(traitement|vaccination|prévention)\s+(de|du|contre)",
+            r"\b(causes?)\s+(de|du)\s+",
+
+            # === ENGLISH ===
+            r"\b(what|which)\s+.*?(disease|pathology)",
+            r"\b(how)\s+.*?(prevent|treat|avoid|diagnose)",
+            r"\b(what)\s+.*?(symptom|sign|cause)",  # ✅ "What are the symptoms"
+            r"\b(what\s+is|what's)",  # ✅ "What is Newcastle disease?"
+            # Questions générales management
+            r"\b(how)\s+.*?(improve|optimize|manage)",
+            r"\b(what)\s+.*?(factor|parameter|element)",
+            # Pattern: Questions au pluriel sans mention de race/âge
+            r"\b(diseases?|patholog(y|ies))\s+(most|common|frequent)",
+            # Questions de traitement/prévention
+            r"\b(treatment|vaccination|prevention)\s+(of|for|against)",
+            r"\b(causes?)\s+of\s+",
         ]
 
         query_lower = query.lower()
