@@ -205,6 +205,8 @@ class ClarificationHelper:
             strategy = self.ambiguity_types[ambiguity_type]
             message = strategy.get(language, strategy.get("fr", ""))
             if message:
+                # Personnaliser le message en fonction des entités déjà connues
+                message = self._customize_message(message, entities, missing_fields, language)
                 logger.info(
                     f"Clarification contextuelle: type={ambiguity_type}, lang={language}"
                 )
@@ -274,6 +276,98 @@ class ClarificationHelper:
             field_messages.append(f"- {field_msg}")
 
         return intro + "\n" + "\n".join(field_messages)
+
+    def _customize_message(
+        self, message: str, entities: Dict, missing_fields: List[str], language: str
+    ) -> str:
+        """
+        Personnalise le message de clarification en ne demandant que ce qui manque vraiment
+
+        Args:
+            message: Message de clarification de base
+            entities: Entités déjà extraites
+            missing_fields: Champs manquants
+            language: Langue
+
+        Returns:
+            Message personnalisé
+        """
+        # Construire les éléments à demander
+        items_to_ask = []
+
+        # Vérifier breed
+        if "breed" in missing_fields and not entities.get("breed"):
+            if language == "fr":
+                items_to_ask.append("**Race**: Ross 308, Cobb 500, autre?")
+            else:
+                items_to_ask.append("**Breed**: Ross 308, Cobb 500, other?")
+
+        # Vérifier age
+        if "age" in missing_fields and not entities.get("age_days"):
+            if language == "fr":
+                items_to_ask.append("**Âge**: en jours ou semaines (ex: 21 jours, 35 jours)?")
+            else:
+                items_to_ask.append("**Age**: in days or weeks (e.g., 21 days, 35 days)?")
+
+        # Vérifier sex
+        if "sex" in missing_fields and not entities.get("sex"):
+            if language == "fr":
+                items_to_ask.append("**Sexe**: mâle, femelle, ou sexes mélangés?")
+            else:
+                items_to_ask.append("**Sex**: male, female, or as-hatched?")
+
+        # Vérifier metric
+        if "metric" in missing_fields and not entities.get("metric_type"):
+            if language == "fr":
+                items_to_ask.append("**Métrique**: poids vif, FCR, mortalité, uniformité?")
+            else:
+                items_to_ask.append("**Metric**: body weight, FCR, mortality, uniformity?")
+
+        # Si aucun item à demander, retourner message original
+        if not items_to_ask:
+            return message
+
+        # Construire le message personnalisé
+        if language == "fr":
+            intro = "Pour analyser la performance"
+            if entities.get("breed"):
+                intro += f" du {entities['breed']}"
+            intro += ", j'ai besoin de préciser:"
+        else:
+            intro = "To analyze performance"
+            if entities.get("breed"):
+                intro += f" of {entities['breed']}"
+            intro += ", I need to know:"
+
+        custom_message = intro + "\n" + "\n".join(f"- {item}" for item in items_to_ask)
+
+        # Ajouter exemple
+        if language == "fr":
+            example = "\n\nPar exemple: \"Quel poids"
+            if entities.get("breed"):
+                example += f" pour {entities['breed']}"
+            else:
+                example += " pour Ross 308"
+
+            if "age" in missing_fields:
+                example += " à 35 jours"
+            if "sex" in missing_fields:
+                example += " mâle"
+            example += "?\""
+        else:
+            example = "\n\nExample: \"What weight"
+            if entities.get("breed"):
+                example += f" for {entities['breed']}"
+            else:
+                example += " for Ross 308"
+
+            if "age" in missing_fields:
+                example += " at 35 days"
+            if "sex" in missing_fields:
+                example += " male"
+            example += "?\""
+
+        return custom_message + example
 
     def _translate_field_name(self, field: str) -> str:
         """Traduit le nom d'un champ en français"""
