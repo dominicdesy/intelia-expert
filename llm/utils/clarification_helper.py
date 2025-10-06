@@ -331,11 +331,33 @@ class ClarificationHelper:
             return message
 
         # Construire le message personnalisé avec traduction par morceaux
-        intro_part1 = self._translate_message("To analyze performance", language)
+        # 🔧 FIX: Détecter le type de question pour adapter l'intro
+        message_lower = message.lower()
+
+        if "treatment" in message_lower or "protocol" in message_lower or "vaccin" in message_lower:
+            # Question de traitement médical
+            intro_part1 = self._translate_message("To recommend a treatment", language)
+        elif "nutrition" in message_lower or "feed" in message_lower or "aliment" in message_lower:
+            # Question de nutrition
+            intro_part1 = self._translate_message("To provide nutritional advice", language)
+        else:
+            # Question de performance générale
+            intro_part1 = self._translate_message("To analyze performance", language)
+
+        # Ajouter le contexte (breed, disease, etc.)
+        context_parts = []
 
         if entities.get("breed"):
             of_label = self._translate_message("of", language)
-            intro_part2 = f" {of_label} {entities['breed']}"
+            context_parts.append(f"{of_label} {entities['breed']}")
+
+        # Si une maladie est mentionnée dans les entités ou le message
+        if entities.get("disease"):
+            for_label = self._translate_message("for", language)
+            context_parts.append(f"{for_label} {entities['disease']}")
+
+        if context_parts:
+            intro_part2 = " " + " ".join(context_parts)
         else:
             intro_part2 = ""
 

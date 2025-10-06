@@ -194,6 +194,33 @@
       "pt": "de",
       "th": "ของ",
       "vi": "của"
+    },
+    "To recommend a treatment": {
+      "fr": "Pour recommander un traitement",
+      "es": "Para recomendar un tratamiento",
+      "de": "Um eine Behandlung zu empfehlen",
+      "it": "Per raccomandare un trattamento",
+      "pt": "Para recomendar um tratamento",
+      "th": "เพื่อแนะนำการรักษา",
+      "vi": "Để đề xuất phương pháp điều trị"
+    },
+    "To provide nutritional advice": {
+      "fr": "Pour une recommandation nutritionnelle",
+      "es": "Para asesoramiento nutricional",
+      "de": "Für Ernährungsberatung",
+      "it": "Per consulenza nutrizionale",
+      "pt": "Para aconselhamento nutricional",
+      "th": "เพื่อให้คำแนะนำด้านโภชนาการ",
+      "vi": "Để tư vấn dinh dưỡng"
+    },
+    "for": {
+      "fr": "pour",
+      "es": "para",
+      "de": "für",
+      "it": "per",
+      "pt": "para",
+      "th": "สำหรับ",
+      "vi": "cho"
     }
   },
 

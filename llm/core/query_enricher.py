@@ -35,10 +35,21 @@ class ConversationalQueryEnricher:
                 "ascite",
                 "ascites",
                 "coccidiosis",
+                "coccidiose",  # 🔧 FIX: Ajout coccidiose FR
                 "newcastle",
                 "gumboro",
                 "bronchite",
                 "colibacillose",
+                "salmonellose",
+                "salmonella",
+                "mycoplasma",
+                "mycoplasmose",
+                "marek",
+                "aviaire",
+                "influenza",
+                "grippe",
+                "enterite",
+                "dermatite",
             ],
             "breeds": ["ross", "cobb", "hubbard", "ross 308", "cobb 500"],
             "species": ["poulet", "broiler", "layer", "chair", "pondeuse"],
@@ -76,6 +87,24 @@ class ConversationalQueryEnricher:
         """Détecte si c'est une question de suivi"""
 
         query_lower = query.lower().strip()
+
+        # 🔧 FIX: Critère spécial pour questions de traitement/protocole sans contexte
+        # Ces questions sont souvent des follow-ups même si elles sont complètes
+        treatment_patterns = [
+            "quel traitement",
+            "quelle traitement",
+            "what treatment",
+            "which treatment",
+            "quel protocole",
+            "what protocol",
+            "quel vaccin",
+            "what vaccine",
+        ]
+
+        for pattern in treatment_patterns:
+            if query_lower.startswith(pattern):
+                logger.debug(f"Treatment question detected as follow-up: {query}")
+                return True
 
         # Critère 1: Très courte (< 6 mots)
         word_count = len(query_lower.split())
@@ -125,18 +154,52 @@ class ConversationalQueryEnricher:
         query_lower = query.lower()
         additions = []
 
+        # 🔧 FIX: Détection améliorée pour questions de traitement/protocole
+        is_treatment_question = any(
+            keyword in query_lower
+            for keyword in [
+                "traitement",
+                "treatment",
+                "protocole",
+                "protocol",
+                "vaccin",
+                "vaccine",
+                "antibiotique",
+                "antibiotic",
+                "médicament",
+                "medication",
+                "utilise",
+                "utilisé",
+                "used",
+                "recommandé",
+                "recommended",
+            ]
+        )
+
         # Cas 1: "Quel traitement ?" + maladie connue
-        if "traitement" in query_lower or "treatment" in query_lower:
+        if is_treatment_question:
+            # Ajouter maladie du contexte si disponible
             if entities["diseases"]:
                 disease = list(entities["diseases"])[0]
-                additions.append(f"pour {disease}")
+                # Ne pas ajouter si déjà dans la query
+                if disease.lower() not in query_lower:
+                    # Format FR: "pour la coccidiose"
+                    if language == "fr":
+                        additions.append(f"pour la {disease}")
+                    else:
+                        additions.append(f"for {disease}")
+
+            # Ajouter espèce si disponible
             if entities["species"]:
                 species = list(entities["species"])[0]
                 if species not in query_lower:
-                    additions.append(f"chez {species}")
+                    if language == "fr":
+                        additions.append(f"chez les {species}s")
+                    else:
+                        additions.append(f"in {species}s")
 
         # Cas 2: "Et pour X ?" → ajouter race/métrique du contexte
-        if query_lower.startswith("et ") or query_lower.startswith("and "):
+        elif query_lower.startswith("et ") or query_lower.startswith("and "):
             if entities["breeds"]:
                 breed = list(entities["breeds"])[0]
                 if breed not in query_lower:
@@ -147,7 +210,7 @@ class ConversationalQueryEnricher:
                     additions.append(metric)
 
         # Cas 3: Question vague → ajouter espèce si disponible
-        if len(query.split()) < 4 and entities["species"]:
+        elif len(query.split()) < 4 and entities["species"]:
             species = list(entities["species"])[0]
             if species not in query_lower:
                 additions.append(f"chez {species}")
@@ -283,6 +346,13 @@ class ConversationalQueryEnricher:
             if keyword in history_lower:
                 entities["metric_type"] = metric_value
                 logger.debug(f"Metric extracted from context: {metric_value}")
+                break
+
+        # 🔧 FIX: Extract disease from context (important for treatment follow-up questions)
+        for disease in self.entity_keywords["diseases"]:
+            if disease in history_lower:
+                entities["disease"] = disease
+                logger.debug(f"Disease extracted from context: {disease}")
                 break
 
         if entities:
