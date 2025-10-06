@@ -281,7 +281,28 @@ async def lifespan(app: FastAPI):
         logger.info("[OK] ROUTER CENTRALISÉ MIS À JOUR AVEC SERVICES INJECTÉS [OK]")
         logger.info("[OK] Router mis à jour avec services injectés")
 
-        # 9. Application prête
+        # 9. Initialiser rate limiting avec Redis maintenant disponible
+        logger.info("Initialisation du rate limiting avec Redis...")
+        try:
+            from api.middleware.rate_limiter import RateLimiter
+
+            # Récupérer le client Redis du cache core déjà initialisé
+            cache_core = health_monitor.get_service("cache_core")
+            redis_client = None
+
+            if cache_core and hasattr(cache_core, "client") and cache_core.client:
+                redis_client = cache_core.client
+                logger.info("[OK] Rate limiting avec Redis activé")
+            else:
+                logger.warning("Warning: Redis non disponible - rate limiting en mémoire")
+
+            app.add_middleware(RateLimiter, redis_client=redis_client)
+            logger.info("[OK] Rate limiting middleware activé (10 req/min/user)")
+        except Exception as e:
+            logger.warning(f"Warning: Erreur rate limiting: {e}")
+            logger.warning("Application continue sans rate limiting")
+
+        # 10. Application prête
         logger.info(f" API disponible sur {BASE_PATH}")
         logger.info(" Services initialisés:")
         for service_name, service in services.items():
@@ -401,31 +422,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rate limiting middleware (10 requêtes/minute/utilisateur)
-logger.info("Initialisation du rate limiting...")
-try:
-    from api.middleware.rate_limiter import RateLimiter
-
-    # Essayer de récupérer le client Redis si disponible
-    redis_client = None
-    try:
-        from cache.cache_core import RedisCacheCore
-
-        cache = RedisCacheCore()
-        if hasattr(cache, "client") and cache.client:
-            redis_client = cache.client
-            logger.info("[OK] Rate limiting avec Redis activé")
-        else:
-            logger.info("Warning: Rate limiting en mémoire (Redis indisponible)")
-    except Exception as redis_err:
-        logger.warning(f"Warning: Redis non disponible pour rate limiting: {redis_err}")
-        logger.info("Warning: Rate limiting en mémoire activé (fallback)")
-
-    app.add_middleware(RateLimiter, redis_client=redis_client)
-    logger.info("[OK] Rate limiting middleware activé (10 req/min/user)")
-except Exception as e:
-    logger.error(f"[ERROR] Erreur lors de l'activation du rate limiting: {e}")
-    logger.warning("Warning: Application démarrée sans rate limiting")
+# Rate limiting middleware will be initialized in lifespan after Redis is ready
+# This ensures Redis client is available for rate limiting
+logger.info("Rate limiting sera initialisé après la connexion Redis (dans lifespan)")
 
 # ARCHITECTURE FINALE: Router initial vide, sera mis à jour dans lifespan
 initial_router = create_router({})  # Router vide au démarrage
