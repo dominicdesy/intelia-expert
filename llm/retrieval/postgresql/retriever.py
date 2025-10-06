@@ -672,15 +672,16 @@ class PostgreSQLRetriever(InitializableMixin):
             except (ValueError, TypeError):
                 logger.warning(f"Invalid age_days: {entities.get('age_days')}")
 
-        # Filtre métrique basé sur interprétation OpenAI
-        if (
-            original_entities
-            and "metric" in original_entities
-            and original_entities["metric"]
-        ):
+        # Filtre métrique basé sur interprétation OpenAI OU metric_type
+        metric_name = None
+        if original_entities and "metric" in original_entities and original_entities["metric"]:
             metric_name = original_entities["metric"]
+        elif original_entities and "metric_type" in original_entities and original_entities["metric_type"]:
+            # 🆕 Support metric_type depuis query_enricher
+            metric_name = original_entities["metric_type"]
 
-            # Mapping métrique OpenAI → pattern base de données
+        if metric_name:
+            # Mapping métrique → pattern base de données
             metric_to_db_pattern = {
                 "feed_conversion_ratio": "feed_conversion_ratio for %",
                 "cumulative_feed_intake": "feed_intake for %",
@@ -688,6 +689,11 @@ class PostgreSQLRetriever(InitializableMixin):
                 "daily_gain": "daily_gain for %",
                 "mortality": "mortality for %",
                 "livability": "livability for %",
+                # 🆕 Aliases from metric_type
+                "weight": "body_weight for %",
+                "fcr": "feed_conversion_ratio for %",
+                "feed": "feed_intake for %",
+                "gain": "daily_gain for %",
             }
 
             db_pattern = metric_to_db_pattern.get(metric_name)
@@ -697,7 +703,7 @@ class PostgreSQLRetriever(InitializableMixin):
                 params.append(db_pattern)
                 logger.info(f"🎯 Filtering by metric: {metric_name} → {db_pattern}")
             else:
-                logger.warning(f"⚠️ Unknown metric type from OpenAI: {metric_name}")
+                logger.warning(f"⚠️ Unknown metric type: {metric_name}")
 
         # ✅ NOUVEAU: Filtrer par species si présent dans filters
         if filters and "species" in filters:
