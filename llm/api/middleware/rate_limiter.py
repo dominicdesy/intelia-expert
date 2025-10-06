@@ -23,7 +23,7 @@ class RateLimiter(BaseHTTPMiddleware):
 
     def __init__(self, app, redis_client=None):
         super().__init__(app)
-        self.redis_client = redis_client
+        self._redis_client = redis_client
 
         # Fallback en mémoire si Redis indisponible
         self.memory_store: Dict[str, Tuple[int, float]] = defaultdict(
@@ -33,6 +33,18 @@ class RateLimiter(BaseHTTPMiddleware):
         # Configuration
         self.max_requests = 10  # Requêtes par fenêtre
         self.window_seconds = 60  # Fenêtre de 1 minute
+
+    @property
+    def redis_client(self):
+        """Get Redis client (may be set after initialization)"""
+        return self._redis_client
+
+    @redis_client.setter
+    def redis_client(self, client):
+        """Set Redis client after initialization"""
+        self._redis_client = client
+        if client:
+            logger.info("✅ Rate limiting Redis client configured")
 
     async def dispatch(self, request: Request, call_next):
         """

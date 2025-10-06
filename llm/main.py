@@ -4,7 +4,7 @@
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
 
-Version: 2.2.1 - Cleanup workflow disabled
+Version: 2.2.2 - Rate limiting middleware timing fixed
 - SQLQueryNormalizer paths corrected
 - Agent RAG uses query_router fallback
 - Autodeploy workflow enabled
@@ -57,6 +57,7 @@ logger.critical(" TIMESTAMP LOGGER: %s", time.time())
 
 # Services globaux (injectés dans les endpoints)
 services = {}
+rate_limiter_instance = None  # Will be initialized after app creation
 
 # ============================================================================
 # GESTION DU CYCLE DE VIE - VERSION FINALE AVEC TRADUCTION
@@ -281,26 +282,25 @@ async def lifespan(app: FastAPI):
         logger.info("[OK] ROUTER CENTRALISÉ MIS À JOUR AVEC SERVICES INJECTÉS [OK]")
         logger.info("[OK] Router mis à jour avec services injectés")
 
-        # 9. Initialiser rate limiting avec Redis maintenant disponible
-        logger.info("Initialisation du rate limiting avec Redis...")
+        # 9. Configurer rate limiting avec Redis maintenant disponible
+        logger.info("Configuration du rate limiting avec Redis...")
         try:
-            from api.middleware.rate_limiter import RateLimiter
-
             # Récupérer le client Redis du cache core déjà initialisé
             cache_core = health_monitor.get_service("cache_core")
-            redis_client = None
 
-            if cache_core and hasattr(cache_core, "client") and cache_core.client:
-                redis_client = cache_core.client
-                logger.info("[OK] Rate limiting avec Redis activé")
+            if rate_limiter_instance:
+                if cache_core and hasattr(cache_core, "client") and cache_core.client:
+                    rate_limiter_instance.redis_client = cache_core.client
+                    logger.info("[OK] Rate limiting avec Redis activé (10 req/min/user)")
+                else:
+                    logger.warning(
+                        "Warning: Redis non disponible - rate limiting en mémoire"
+                    )
             else:
-                logger.warning("Warning: Redis non disponible - rate limiting en mémoire")
-
-            app.add_middleware(RateLimiter, redis_client=redis_client)
-            logger.info("[OK] Rate limiting middleware activé (10 req/min/user)")
+                logger.warning("Warning: Rate limiter instance non disponible")
         except Exception as e:
-            logger.warning(f"Warning: Erreur rate limiting: {e}")
-            logger.warning("Application continue sans rate limiting")
+            logger.warning(f"Warning: Erreur configuration rate limiting: {e}")
+            logger.warning("Rate limiting continue en mode mémoire")
 
         # 10. Application prête
         logger.info(f" API disponible sur {BASE_PATH}")
@@ -407,7 +407,7 @@ logger.info(" CRÉATION FASTAPI APP - VERSION FINALE ")
 app = FastAPI(
     title="Intelia Expert Backend",
     description="API RAG Enhanced avec LangSmith et RRF Intelligent - Architecture Centralisée",
-    version="2.2.1",
+    version="2.2.2",
     lifespan=lifespan,
 )
 
@@ -422,9 +422,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rate limiting middleware will be initialized in lifespan after Redis is ready
-# This ensures Redis client is available for rate limiting
-logger.info("Rate limiting sera initialisé après la connexion Redis (dans lifespan)")
+# Initialize rate limiting middleware (Redis will be configured in lifespan)
+logger.info("Initialisation du rate limiting middleware (Redis sera configuré au démarrage)...")
+try:
+    from api.middleware.rate_limiter import RateLimiter
+
+    # Add middleware with placeholder Redis client (will be configured in lifespan)
+    # Use global variable so lifespan can configure it later
+    rate_limiter_instance = RateLimiter(app, redis_client=None)
+    logger.info("[OK] Rate limiting middleware ajouté (en attente de Redis)")
+except Exception as e:
+    logger.warning(f"Warning: Erreur initialisation rate limiter: {e}")
 
 # ARCHITECTURE FINALE: Router initial vide, sera mis à jour dans lifespan
 initial_router = create_router({})  # Router vide au démarrage
@@ -448,6 +456,6 @@ if __name__ == "__main__":
     logger.info(" Mode dégradé supporté pour cache/Redis")
     logger.info(" Injection des services corrigée")
     logger.info(" Service de traduction initialisé au démarrage")
-    logger.info(" VERSION FINALE: 4.0.4-translation-service-fixed ")
+    logger.info(" VERSION: 2.2.2 - Rate limiting timing fixed ")
 
     uvicorn.run("main:app", host=host, port=port, reload=False, log_level="info")
