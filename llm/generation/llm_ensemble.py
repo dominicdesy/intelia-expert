@@ -137,9 +137,7 @@ class LLMEnsemble:
 
         # OpenAI (GPT-4o)
         openai_key = os.getenv("OPENAI_API_KEY")
-        self.openai_client = (
-            AsyncOpenAI(api_key=openai_key) if openai_key else None
-        )
+        self.openai_client = AsyncOpenAI(api_key=openai_key) if openai_key else None
 
         # Anthropic (Claude 3.5 Sonnet)
         anthropic_key = os.getenv("ANTHROPIC_API_KEY")
@@ -486,7 +484,9 @@ Réponds UNIQUEMENT avec le JSON, sans texte additionnel."""
             import re
 
             # Extract JSON from response (handle markdown code blocks)
-            json_match = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", judge_text, re.DOTALL)
+            json_match = re.search(
+                r"```(?:json)?\s*(\[.*?\])\s*```", judge_text, re.DOTALL
+            )
             if json_match:
                 judge_text = json_match.group(1)
 
@@ -530,7 +530,9 @@ Réponds UNIQUEMENT avec le JSON, sans texte additionnel."""
             ]
 
     def _select_best_response(
-        self, responses: List[Dict[str, str]], quality_assessments: List[ResponseQuality]
+        self,
+        responses: List[Dict[str, str]],
+        quality_assessments: List[ResponseQuality],
     ) -> Dict[str, Any]:
         """
         Select single best response based on quality scores

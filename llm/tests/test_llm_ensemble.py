@@ -85,16 +85,16 @@ async def test_best_of_n_mode():
             query=query, context_docs=context_docs, language="fr"
         )
 
-        print(f"\nResults:")
+        print("\nResults:")
         print(f"  Provider selected: {result['provider']}")
         print(f"  Confidence: {result['confidence']:.2f}")
         print(f"  Responses received: {len(result['all_responses'])}")
         print(f"  Execution time: {result['execution_time_ms']:.0f}ms")
 
-        print(f"\nFinal answer:")
+        print("\nFinal answer:")
         print(f"  {result['final_answer'][:200]}...")
 
-        print(f"\nQuality scores:")
+        print("\nQuality scores:")
         for score in result["quality_scores"]:
             print(
                 f"  - {score['provider']}: {score['overall_score']:.2f} "
@@ -146,12 +146,12 @@ async def test_fusion_mode():
             query=query, context_docs=context_docs, language="fr"
         )
 
-        print(f"\nResults:")
+        print("\nResults:")
         print(f"  Provider: {result['provider']}")
         print(f"  Confidence: {result['confidence']:.2f}")
-        print(f"  Mode: fusion")
+        print("  Mode: fusion")
 
-        print(f"\nFused answer:")
+        print("\nFused answer:")
         print(f"  {result['final_answer'][:200]}...")
 
         assert result["final_answer"], "Réponse fusionnée ne doit pas être vide"
@@ -196,18 +196,20 @@ async def test_ensemble_vs_single():
             query=query, context_docs=context_docs, language="fr"
         )
 
-        print(f"\nEnsemble results:")
+        print("\nEnsemble results:")
         print(f"  Best provider: {ensemble_result['provider']}")
         print(f"  Confidence: {ensemble_result['confidence']:.2f}")
         print(f"  All providers tested: {len(ensemble_result['all_responses'])}")
 
-        print(f"\nAll responses for comparison:")
+        print("\nAll responses for comparison:")
         for i, resp in enumerate(ensemble_result["all_responses"], 1):
             score = ensemble_result["quality_scores"][i - 1]
-            print(f"\n  Response {i} ({resp['provider']}) - Score: {score['overall_score']:.2f}")
+            print(
+                f"\n  Response {i} ({resp['provider']}) - Score: {score['overall_score']:.2f}"
+            )
             print(f"  {resp['text'][:150]}...")
 
-        print(f"\nSelected answer (best quality):")
+        print("\nSelected answer (best quality):")
         print(f"  {ensemble_result['final_answer'][:200]}...")
 
         # Check quality improvement
@@ -216,14 +218,12 @@ async def test_ensemble_vs_single():
         avg_score = sum(scores) / len(scores)
         improvement = ((best_score - avg_score) / avg_score) * 100
 
-        print(f"\nQuality analysis:")
+        print("\nQuality analysis:")
         print(f"  Best score: {best_score:.2f}")
         print(f"  Average score: {avg_score:.2f}")
         print(f"  Improvement: +{improvement:.1f}%")
 
-        assert (
-            best_score >= avg_score
-        ), "Le meilleur score doit être >= à la moyenne"
+        assert best_score >= avg_score, "Le meilleur score doit être >= à la moyenne"
         assert (
             ensemble_result["confidence"] == best_score
         ), "Confidence doit égaler le meilleur score"
@@ -250,7 +250,7 @@ async def test_cost_tracking():
 
     # Get initial stats
     stats_before = ensemble.get_usage_stats()
-    print(f"\nStats before:")
+    print("\nStats before:")
     print(f"  Ensemble queries: {stats_before['ensemble_queries']}")
     print(f"  Total LLM calls: {stats_before['total_llm_calls']}")
 
@@ -265,7 +265,7 @@ async def test_cost_tracking():
 
         # Get updated stats
         stats_after = ensemble.get_usage_stats()
-        print(f"\nStats after:")
+        print("\nStats after:")
         print(f"  Ensemble queries: {stats_after['ensemble_queries']}")
         print(f"  Total LLM calls: {stats_after['total_llm_calls']}")
 
@@ -274,7 +274,7 @@ async def test_cost_tracking():
         )
         calls_diff = stats_after["total_llm_calls"] - stats_before["total_llm_calls"]
 
-        print(f"\nDifference:")
+        print("\nDifference:")
         print(f"  +{queries_diff} ensemble query")
         print(f"  +{calls_diff} LLM calls (3 generations + 1 judge = 4)")
 
@@ -315,9 +315,9 @@ async def test_ensemble_disabled():
             query=query, context_docs=context_docs, language="fr"
         )
 
-        print(f"\nResult:")
+        print("\nResult:")
         print(f"  Provider: {result['provider']}")
-        print(f"  Used ensemble: No (fallback)")
+        print("  Used ensemble: No (fallback)")
 
         # Should have only 1 response (fallback)
         assert len(result.get("all_responses", [])) <= 1, "Doit avoir 1 seule réponse"

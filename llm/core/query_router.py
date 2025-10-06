@@ -406,7 +406,9 @@ class QueryRouter:
         # Initialize hybrid entity extractor
         self.hybrid_extractor = create_hybrid_extractor(config_dir)
 
-        logger.info("✅ QueryRouter initialisé (100% config-driven + hybrid extraction)")
+        logger.info(
+            "✅ QueryRouter initialisé (100% config-driven + hybrid extraction)"
+        )
 
     def _compile_patterns(self):
         """Compile les regex depuis les configs pour performance"""
@@ -569,7 +571,7 @@ class QueryRouter:
             query=query,
             language=language,
             domain=detected_domain,
-            existing_entities=entities
+            existing_entities=entities,
         )
         # Merge hybrid entities (don't override basic entities)
         for key, value in hybrid_entities.items():

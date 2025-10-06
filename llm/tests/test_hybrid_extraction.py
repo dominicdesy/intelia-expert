@@ -33,7 +33,9 @@ def test_regex_numeric_extraction():
     print(f"\nQuery: {query1}")
     print(f"Extracted: {entities1}")
     assert "temperature" in entities1, "Temperature not extracted"
-    assert entities1["temperature"]["value"] == 32.0, f"Wrong temperature value: {entities1['temperature']}"
+    assert (
+        entities1["temperature"]["value"] == 32.0
+    ), f"Wrong temperature value: {entities1['temperature']}"
     print("OK - Temperature extraction: PASS")
 
     # Test 2: Humidity extraction
@@ -43,7 +45,9 @@ def test_regex_numeric_extraction():
     print(f"\nQuery: {query2}")
     print(f"Extracted: {entities2}")
     assert "humidity" in entities2, "Humidity not extracted"
-    assert entities2["humidity"]["value"] == 60.0, f"Wrong humidity value: {entities2['humidity']}"
+    assert (
+        entities2["humidity"]["value"] == 60.0
+    ), f"Wrong humidity value: {entities2['humidity']}"
     print("OK - Humidity extraction: PASS")
 
     # Test 3: Mortality rate extraction
@@ -53,7 +57,9 @@ def test_regex_numeric_extraction():
     print(f"\nQuery: {query3}")
     print(f"Extracted: {entities3}")
     assert "mortality_rate" in entities3, "Mortality rate not extracted"
-    assert entities3["mortality_rate"]["value"] == 5.0, f"Wrong mortality rate: {entities3['mortality_rate']}"
+    assert (
+        entities3["mortality_rate"]["value"] == 5.0
+    ), f"Wrong mortality rate: {entities3['mortality_rate']}"
     print("OK - Mortality rate extraction: PASS")
 
     # Test 4: FCR extraction
@@ -63,7 +69,9 @@ def test_regex_numeric_extraction():
     print(f"\nQuery: {query4}")
     print(f"Extracted: {entities4}")
     assert "target_fcr" in entities4, "FCR not extracted"
-    assert entities4["target_fcr"]["value"] == 1.65, f"Wrong FCR value: {entities4['target_fcr']}"
+    assert (
+        entities4["target_fcr"]["value"] == 1.65
+    ), f"Wrong FCR value: {entities4['target_fcr']}"
     print("OK - FCR extraction: PASS")
 
     # Test 5: Farm size extraction
@@ -73,7 +81,9 @@ def test_regex_numeric_extraction():
     print(f"\nQuery: {query5}")
     print(f"Extracted: {entities5}")
     assert "farm_size" in entities5, "Farm size not extracted"
-    assert entities5["farm_size"]["value"] == 50000, f"Wrong farm size: {entities5['farm_size']}"
+    assert (
+        entities5["farm_size"]["value"] == 50000
+    ), f"Wrong farm size: {entities5['farm_size']}"
     print("OK - Farm size extraction: PASS")
 
     print("\nOK - ALL REGEX TESTS PASSED")
@@ -95,7 +105,9 @@ def test_keyword_extraction():
     print(f"\nQuery: {query1}")
     print(f"Extracted: {entities1}")
     assert "production_phase" in entities1, "Production phase not extracted"
-    assert entities1["production_phase"] == "starter", f"Wrong phase: {entities1['production_phase']}"
+    assert (
+        entities1["production_phase"] == "starter"
+    ), f"Wrong phase: {entities1['production_phase']}"
     print("OK - Production phase extraction: PASS")
 
     # Test 2: Housing type
@@ -129,6 +141,7 @@ def test_llm_ner_extraction():
     print("=" * 70)
 
     import os
+
     if not os.getenv("OPENAI_API_KEY"):
         print("WARNING: OPENAI_API_KEY not found - SKIPPING LLM NER TESTS")
         print("   (This is expected if you haven't configured the API key yet)")
@@ -214,6 +227,7 @@ def test_full_integration():
 
     # Check LLM entities (Tier 3) - only if API key available
     import os
+
     if os.getenv("OPENAI_API_KEY"):
         print("\nOK - Tier 3 (LLM NER): Results shown above")
     else:
@@ -239,9 +253,11 @@ if __name__ == "__main__":
     except AssertionError as e:
         print(f"\nERROR: TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()
 
     except Exception as e:
         print(f"\nERROR: {e}")
         import traceback
+
         traceback.print_exc()
