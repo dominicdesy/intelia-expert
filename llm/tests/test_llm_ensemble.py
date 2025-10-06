@@ -9,6 +9,11 @@ import sys
 import os
 import asyncio
 from pathlib import Path
+import pytest
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -16,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from generation.llm_ensemble import get_llm_ensemble, EnsembleMode
 
 
+@pytest.mark.asyncio
 async def test_ensemble_availability():
     """Test 1: Check which LLM providers are available"""
 
@@ -54,6 +60,7 @@ async def test_ensemble_availability():
     return True
 
 
+@pytest.mark.asyncio
 async def test_best_of_n_mode():
     """Test 2: Best-of-N mode with real query"""
 
@@ -121,6 +128,7 @@ async def test_best_of_n_mode():
         return False
 
 
+@pytest.mark.asyncio
 async def test_fusion_mode():
     """Test 3: Fusion mode"""
 
@@ -170,6 +178,7 @@ async def test_fusion_mode():
         return False
 
 
+@pytest.mark.asyncio
 async def test_ensemble_vs_single():
     """Test 4: Compare ensemble quality vs single LLM"""
 
@@ -239,6 +248,7 @@ async def test_ensemble_vs_single():
         return False
 
 
+@pytest.mark.asyncio
 async def test_cost_tracking():
     """Test 5: Cost tracking"""
 
@@ -294,6 +304,7 @@ async def test_cost_tracking():
         return False
 
 
+@pytest.mark.asyncio
 async def test_ensemble_disabled():
     """Test 6: Ensemble disabled fallback"""
 
