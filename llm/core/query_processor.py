@@ -130,19 +130,18 @@ class RAGQueryProcessor:
                 if not is_in_domain:
                     logger.warning(f"⛔ OUT-OF-DOMAIN query detected (LLM): '{query[:60]}...'")
                     from config.messages import get_message
-                    ood_message = get_message("ood_rejection", language)
+                    ood_message = get_message("out_of_domain", language)
                     return RAGResult(
                         source=RAGSource.OOD_FILTERED,
                         answer=ood_message,
-                        sources=[],
+                        context_docs=[],  # Fixed: was 'sources'
+                        processing_time=(time.time() - start_time),  # Fixed: was 'processing_time_ms'
                         metadata={
                             "ood_score": domain_score,
                             "ood_details": score_details,
                             "query_type": "out_of_domain",
+                            "conversation_id": tenant_id,  # Moved to metadata
                         },
-                        query_type="out_of_domain",
-                        conversation_id=tenant_id,
-                        processing_time_ms=(time.time() - start_time) * 1000,
                     )
                 else:
                     logger.info(f"✅ IN-DOMAIN query (LLM): '{query[:60]}...'")
