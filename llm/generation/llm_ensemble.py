@@ -21,6 +21,8 @@ from enum import Enum
 from openai import AsyncOpenAI
 from anthropic import AsyncAnthropic
 
+from generation.adaptive_length import get_adaptive_length
+
 logger = logging.getLogger(__name__)
 
 
@@ -128,6 +130,9 @@ class LLMEnsemble:
             "total_cost": 0.0,
         }
 
+        # Initialize adaptive length calculator
+        self.adaptive_length = get_adaptive_length()
+
         logger.info(
             f"✅ LLM Ensemble initialized (mode={mode.value}, enabled={self.enabled}, judge={judge_model})"
         )
@@ -174,6 +179,9 @@ class LLMEnsemble:
         context_docs: List[Dict],
         language: str = "fr",
         system_prompt: Optional[str] = None,
+        entities: Optional[Dict] = None,
+        query_type: Optional[str] = None,
+        domain: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Generate response using multi-LLM ensemble
@@ -183,6 +191,9 @@ class LLMEnsemble:
             context_docs: Retrieved context documents
             language: Response language
             system_prompt: Optional system prompt override
+            entities: Extracted entities (for adaptive length)
+            query_type: Type of query (for adaptive length)
+            domain: Query domain (for adaptive length)
 
         Returns:
             {
@@ -202,13 +213,23 @@ class LLMEnsemble:
         if not self.enabled:
             logger.debug("🔀 Ensemble disabled, falling back to single LLM")
             return await self._fallback_single_llm(
-                query, context_docs, language, system_prompt
+                query, context_docs, language, system_prompt, entities, query_type, domain
             )
+
+        # Calculate adaptive max_tokens
+        max_tokens = self.adaptive_length.calculate_max_tokens(
+            query=query,
+            entities=entities or {},
+            query_type=query_type or "standard",
+            context_docs=context_docs,
+            domain=domain,
+        )
+        logger.info(f"📏 Adaptive max_tokens for ensemble: {max_tokens}")
 
         # Step 1: Generate responses from all providers in parallel
         logger.info(f"🔀 Ensemble query started: {query[:50]}...")
         responses = await self._generate_parallel_responses(
-            query, context_docs, language, system_prompt
+            query, context_docs, language, system_prompt, max_tokens
         )
 
         if len(responses) == 0:
@@ -266,9 +287,17 @@ class LLMEnsemble:
         context_docs: List[Dict],
         language: str,
         system_prompt: Optional[str],
+        max_tokens: int,
     ) -> List[Dict[str, str]]:
         """
         Generate responses from all providers in parallel
+
+        Args:
+            query: User query
+            context_docs: Context documents
+            language: Response language
+            system_prompt: System prompt
+            max_tokens: Max tokens for generation (adaptive)
 
         Returns:
             [
@@ -291,19 +320,19 @@ Réponds en {language}."""
 
         if self.claude_client:
             tasks.append(
-                self._generate_claude_response(query, user_message, system_prompt)
+                self._generate_claude_response(query, user_message, system_prompt, max_tokens)
             )
 
         if self.openai_client:
             tasks.append(
                 self._generate_openai_response(
-                    "gpt4o", "gpt-4o", query, user_message, system_prompt
+                    "gpt4o", "gpt-4o", query, user_message, system_prompt, max_tokens
                 )
             )
 
         if self.deepseek_client:
             tasks.append(
-                self._generate_deepseek_response(query, user_message, system_prompt)
+                self._generate_deepseek_response(query, user_message, system_prompt, max_tokens)
             )
 
         # Execute in parallel
@@ -321,13 +350,13 @@ Réponds en {language}."""
         return responses
 
     async def _generate_claude_response(
-        self, query: str, user_message: str, system_prompt: Optional[str]
+        self, query: str, user_message: str, system_prompt: Optional[str], max_tokens: int
     ) -> Dict[str, str]:
         """Generate response from Claude 3.5 Sonnet"""
         try:
             response = await self.claude_client.messages.create(
                 model="claude-3-5-sonnet-20241022",
-                max_tokens=1024,
+                max_tokens=max_tokens,
                 system=system_prompt
                 or "Tu es un expert en production avicole. Réponds de manière factuelle et précise.",
                 messages=[{"role": "user", "content": user_message}],
@@ -346,12 +375,13 @@ Réponds en {language}."""
         query: str,
         user_message: str,
         system_prompt: Optional[str],
+        max_tokens: int,
     ) -> Dict[str, str]:
         """Generate response from OpenAI (GPT-4o)"""
         try:
             response = await self.openai_client.chat.completions.create(
                 model=model,
-                max_tokens=1024,
+                max_tokens=max_tokens,
                 messages=[
                     {
                         "role": "system",
@@ -369,13 +399,13 @@ Réponds en {language}."""
             raise
 
     async def _generate_deepseek_response(
-        self, query: str, user_message: str, system_prompt: Optional[str]
+        self, query: str, user_message: str, system_prompt: Optional[str], max_tokens: int
     ) -> Dict[str, str]:
         """Generate response from DeepSeek"""
         try:
             response = await self.deepseek_client.chat.completions.create(
                 model="deepseek-chat",
-                max_tokens=1024,
+                max_tokens=max_tokens,
                 messages=[
                     {
                         "role": "system",
@@ -648,8 +678,21 @@ Réponds directement en {language}, sans préambule."""
         context_docs: List[Dict],
         language: str,
         system_prompt: Optional[str],
+        entities: Optional[Dict],
+        query_type: Optional[str],
+        domain: Optional[str],
     ) -> Dict[str, Any]:
         """Fallback to single LLM when ensemble is disabled"""
+
+        # Calculate adaptive max_tokens
+        max_tokens = self.adaptive_length.calculate_max_tokens(
+            query=query,
+            entities=entities or {},
+            query_type=query_type or "standard",
+            context_docs=context_docs,
+            domain=domain,
+        )
+        logger.info(f"📏 Adaptive max_tokens for fallback: {max_tokens}")
 
         context_text = self._format_context(context_docs)
         user_message = f"""Contexte:
@@ -662,12 +705,12 @@ Réponds en {language}."""
         # Use Claude if available, else GPT-4o
         if self.claude_client:
             result = await self._generate_claude_response(
-                query, user_message, system_prompt
+                query, user_message, system_prompt, max_tokens
             )
             provider = "claude"
         elif self.openai_client:
             result = await self._generate_openai_response(
-                "gpt4o", "gpt-4o", query, user_message, system_prompt
+                "gpt4o", "gpt-4o", query, user_message, system_prompt, max_tokens
             )
             provider = "gpt4o"
         else:

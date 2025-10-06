@@ -15,6 +15,8 @@ from typing import Dict, Any, Optional, List
 from enum import Enum
 from openai import AsyncOpenAI
 
+from generation.adaptive_length import get_adaptive_length
+
 logger = logging.getLogger(__name__)
 
 
@@ -88,6 +90,9 @@ class LLMRouter:
             LLMProvider.GPT_4O.value: {"calls": 0, "tokens": 0, "cost": 0.0},
         }
 
+        # Initialize adaptive length calculator
+        self.adaptive_length = get_adaptive_length()
+
         logger.info(
             f"✅ Multi-LLM Router initialized (routing_enabled={self.routing_enabled}, "
             f"default={self.default_provider})"
@@ -156,7 +161,12 @@ class LLMRouter:
         provider: LLMProvider,
         messages: List[Dict],
         temperature: float = 0.1,
-        max_tokens: int = 900,
+        max_tokens: Optional[int] = None,
+        query: Optional[str] = None,
+        entities: Optional[Dict] = None,
+        query_type: Optional[str] = None,
+        context_docs: Optional[List[Dict]] = None,
+        domain: Optional[str] = None,
     ) -> str:
         """
         Generate response using specified LLM provider
@@ -165,7 +175,12 @@ class LLMRouter:
             provider: LLM provider to use
             messages: Chat messages (OpenAI format)
             temperature: Generation temperature
-            max_tokens: Max tokens to generate
+            max_tokens: Max tokens to generate (if None, will use adaptive calculation)
+            query: User query (for adaptive length calculation)
+            entities: Extracted entities (for adaptive length)
+            query_type: Type of query (for adaptive length)
+            context_docs: Retrieved context documents (for adaptive length)
+            domain: Query domain (for adaptive length)
 
         Returns:
             Generated response text
@@ -173,6 +188,21 @@ class LLMRouter:
         Raises:
             Exception: If generation fails and fallback also fails
         """
+
+        # Calculate adaptive max_tokens if not explicitly provided
+        if max_tokens is None:
+            if query is not None:
+                max_tokens = self.adaptive_length.calculate_max_tokens(
+                    query=query,
+                    entities=entities or {},
+                    query_type=query_type or "standard",
+                    context_docs=context_docs or [],
+                    domain=domain,
+                )
+                logger.info(f"📏 Adaptive max_tokens: {max_tokens}")
+            else:
+                max_tokens = 900  # Default fallback
+                logger.warning("⚠️ No query provided for adaptive length, using default 900")
 
         try:
             if provider == LLMProvider.DEEPSEEK and self.deepseek_client:
