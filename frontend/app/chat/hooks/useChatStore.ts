@@ -765,8 +765,27 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       msg.id === messageId ? { ...msg, ...updates } : msg,
     );
 
+    // 🆕 FIX: Si updates contient conversation_id et que currentConversation est temporaire,
+    // mettre à jour currentConversation.id avec le conversation_id du backend
+    let effectiveId = state.currentConversation.id;
+
+    if (
+      updates.conversation_id &&
+      (state.currentConversation.id === "welcome" ||
+       state.currentConversation.id.startsWith("temp-"))
+    ) {
+      effectiveId = updates.conversation_id;
+      console.log(
+        "🔄 [ChatStore] ID conversation mis à jour via updateMessage:",
+        state.currentConversation.id,
+        "→",
+        effectiveId,
+      );
+    }
+
     const updatedConversation: ConversationWithMessages = {
       ...state.currentConversation,
+      id: effectiveId,  // 🆕 Utiliser l'ID effectif
       messages: updatedMessages,
       updated_at: new Date().toISOString(),
     };
