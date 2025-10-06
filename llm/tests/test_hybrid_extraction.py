@@ -44,7 +44,7 @@ def test_regex_numeric_extraction():
     print(f"Extracted: {entities2}")
     assert "humidity" in entities2, "Humidity not extracted"
     assert entities2["humidity"]["value"] == 60.0, f"Wrong humidity value: {entities2['humidity']}"
-    print("✅ Humidity extraction: PASS")
+    print("OK - Humidity extraction: PASS")
 
     # Test 3: Mortality rate extraction
     query3 = "Mortalité élevée : 5% sur 7 jours"
@@ -54,7 +54,7 @@ def test_regex_numeric_extraction():
     print(f"Extracted: {entities3}")
     assert "mortality_rate" in entities3, "Mortality rate not extracted"
     assert entities3["mortality_rate"]["value"] == 5.0, f"Wrong mortality rate: {entities3['mortality_rate']}"
-    print("✅ Mortality rate extraction: PASS")
+    print("OK - Mortality rate extraction: PASS")
 
     # Test 4: FCR extraction
     query4 = "FCR actuel 1.65 pour Cobb 500 à 42 jours"
@@ -64,7 +64,7 @@ def test_regex_numeric_extraction():
     print(f"Extracted: {entities4}")
     assert "target_fcr" in entities4, "FCR not extracted"
     assert entities4["target_fcr"]["value"] == 1.65, f"Wrong FCR value: {entities4['target_fcr']}"
-    print("✅ FCR extraction: PASS")
+    print("OK - FCR extraction: PASS")
 
     # Test 5: Farm size extraction
     query5 = "Ferme de 50,000 poulets en croissance"
@@ -74,9 +74,9 @@ def test_regex_numeric_extraction():
     print(f"Extracted: {entities5}")
     assert "farm_size" in entities5, "Farm size not extracted"
     assert entities5["farm_size"]["value"] == 50000, f"Wrong farm size: {entities5['farm_size']}"
-    print("✅ Farm size extraction: PASS")
+    print("OK - Farm size extraction: PASS")
 
-    print("\n✅ ALL REGEX TESTS PASSED")
+    print("\nOK - ALL REGEX TESTS PASSED")
 
 
 def test_keyword_extraction():
@@ -96,7 +96,7 @@ def test_keyword_extraction():
     print(f"Extracted: {entities1}")
     assert "production_phase" in entities1, "Production phase not extracted"
     assert entities1["production_phase"] == "starter", f"Wrong phase: {entities1['production_phase']}"
-    print("✅ Production phase extraction: PASS")
+    print("OK - Production phase extraction: PASS")
 
     # Test 2: Housing type
     query2 = "Poulets élevés au sol avec litière paille"
@@ -106,7 +106,7 @@ def test_keyword_extraction():
     print(f"Extracted: {entities2}")
     assert "housing_type" in entities2, "Housing type not extracted"
     assert "bedding_type" in entities2, "Bedding type not extracted"
-    print("✅ Housing & bedding extraction: PASS")
+    print("OK - Housing & bedding extraction: PASS")
 
     # Test 3: Ventilation mode
     query3 = "Ventilation tunnel activée à 28°C"
@@ -116,9 +116,9 @@ def test_keyword_extraction():
     print(f"Extracted: {entities3}")
     assert "ventilation_mode" in entities3, "Ventilation mode not extracted"
     assert "temperature" in entities3, "Temperature not extracted (numeric)"
-    print("✅ Ventilation + temperature extraction: PASS")
+    print("OK - Ventilation + temperature extraction: PASS")
 
-    print("\n✅ ALL KEYWORD TESTS PASSED")
+    print("\nOK - ALL KEYWORD TESTS PASSED")
 
 
 def test_llm_ner_extraction():
@@ -130,7 +130,7 @@ def test_llm_ner_extraction():
 
     import os
     if not os.getenv("OPENAI_API_KEY"):
-        print("⚠️ OPENAI_API_KEY not found - SKIPPING LLM NER TESTS")
+        print("WARNING: OPENAI_API_KEY not found - SKIPPING LLM NER TESTS")
         print("   (This is expected if you haven't configured the API key yet)")
         return
 
@@ -144,9 +144,9 @@ def test_llm_ner_extraction():
     print(f"Extracted: {entities1}")
 
     if "disease_name" in entities1:
-        print(f"✅ Disease extracted: {entities1['disease_name']}")
+        print(f"OK - Disease extracted: {entities1['disease_name']}")
     else:
-        print("⚠️ Disease name not extracted (LLM may need tuning)")
+        print("WARNING: Disease name not extracted (LLM may need tuning)")
 
     # Test 2: Symptom extraction
     query2 = "Poulets avec diarrhée et sang dans les fèces, mortalité 3%"
@@ -156,12 +156,12 @@ def test_llm_ner_extraction():
     print(f"Extracted: {entities2}")
 
     if "symptom" in entities2:
-        print(f"✅ Symptoms extracted: {entities2['symptom']}")
+        print(f"OK - Symptoms extracted: {entities2['symptom']}")
     else:
-        print("⚠️ Symptoms not extracted (LLM may need tuning)")
+        print("WARNING: Symptoms not extracted (LLM may need tuning)")
 
     if "mortality_rate" in entities2:
-        print(f"✅ Mortality rate extracted: {entities2['mortality_rate']}")
+        print(f"OK - Mortality rate extracted: {entities2['mortality_rate']}")
 
     # Test 3: Vaccine name extraction
     query3 = "Protocole vaccinal Newcastle + Gumboro à J7 et J14"
@@ -171,11 +171,11 @@ def test_llm_ner_extraction():
     print(f"Extracted: {entities3}")
 
     if "vaccine_name" in entities3:
-        print(f"✅ Vaccines extracted: {entities3['vaccine_name']}")
+        print(f"OK - Vaccines extracted: {entities3['vaccine_name']}")
     else:
-        print("⚠️ Vaccine names not extracted (LLM may need tuning)")
+        print("WARNING: Vaccine names not extracted (LLM may need tuning)")
 
-    print("\n✅ LLM NER TESTS COMPLETED (check output above for results)")
+    print("\nOK - LLM NER TESTS COMPLETED (check output above for results)")
 
 
 def test_full_integration():
@@ -197,7 +197,7 @@ def test_full_integration():
     entities = extractor.extract_all(query, language="fr", domain="health")
 
     print(f"\nQuery: {query[:100]}...")
-    print(f"\nAll extracted entities:")
+    print("\nAll extracted entities:")
     for key, value in entities.items():
         print(f"  - {key}: {value}")
 
@@ -206,20 +206,20 @@ def test_full_integration():
     assert "humidity" in entities, "Humidity missing"
     assert "mortality_rate" in entities, "Mortality rate missing"
     assert "farm_size" in entities, "Farm size missing"
-    print("\n✅ Tier 1 (Regex numeric): PASS")
+    print("\nOK - Tier 1 (Regex numeric): PASS")
 
     # Check keyword entities (Tier 2)
     # Note: Production phase might not be extracted if not explicitly mentioned
-    print("✅ Tier 2 (Keywords): PASS")
+    print("OK - Tier 2 (Keywords): PASS")
 
     # Check LLM entities (Tier 3) - only if API key available
     import os
     if os.getenv("OPENAI_API_KEY"):
-        print("\n✅ Tier 3 (LLM NER): Results shown above")
+        print("\nOK - Tier 3 (LLM NER): Results shown above")
     else:
-        print("\n⚠️ Tier 3 (LLM NER): SKIPPED (no API key)")
+        print("\nWARNING: Tier 3 (LLM NER): SKIPPED (no API key)")
 
-    print("\n✅ FULL INTEGRATION TEST COMPLETED")
+    print("\nOK - FULL INTEGRATION TEST COMPLETED")
 
 
 if __name__ == "__main__":
@@ -233,15 +233,15 @@ if __name__ == "__main__":
         test_full_integration()
 
         print("\n" + "=" * 70)
-        print("✅ ALL TESTS COMPLETED SUCCESSFULLY")
+        print("OK - ALL TESTS COMPLETED SUCCESSFULLY")
         print("=" * 70)
 
     except AssertionError as e:
-        print(f"\n❌ TEST FAILED: {e}")
+        print(f"\nERROR: TEST FAILED: {e}")
         import traceback
         traceback.print_exc()
 
     except Exception as e:
-        print(f"\n❌ ERROR: {e}")
+        print(f"\nERROR: {e}")
         import traceback
         traceback.print_exc()

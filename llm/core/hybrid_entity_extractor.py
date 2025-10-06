@@ -41,9 +41,9 @@ class RegexNumericExtractor:
             re.IGNORECASE
         )
 
-        # Mortality rate patterns
+        # Mortality rate patterns (supports both "5% mortalité" and "mortalité élevée : 5%")
         self.mortality_regex = re.compile(
-            r"(\d+(?:[.,]\d+)?)\s*%\s*(?:mortalité|mortalite|mortality|mort|death)",
+            r"(?:(?:mortalité|mortalite|mortality|mort|death)\b.*?(\d+(?:[.,]\d+)?)\s*%)|(?:(\d+(?:[.,]\d+)?)\s*%\s*(?:mortalité|mortalite|mortality|mort|death))",
             re.IGNORECASE
         )
 
@@ -53,9 +53,9 @@ class RegexNumericExtractor:
             re.IGNORECASE
         )
 
-        # FCR patterns
+        # FCR patterns (supports "FCR 1.65" and "FCR actuel 1.65")
         self.fcr_regex = re.compile(
-            r"(?:FCR|IC|indice)\s*(?:de|of)?\s*(?:conversion)?\s*(?::)?\s*(\d+(?:[.,]\d+)?)",
+            r"(?:FCR|IC|indice)\b.*?(\d+(?:[.,]\d+))",
             re.IGNORECASE
         )
 
@@ -89,7 +89,61 @@ class RegexNumericExtractor:
             re.IGNORECASE
         )
 
-        logger.info("✅ RegexNumericExtractor initialized")
+        # Carcass yield patterns
+        self.carcass_yield_regex = re.compile(
+            r"(?:rendement|yield|carcass)\s*(?:carcasse)?\s*(?::)?\s*(\d+(?:[.,]\d+)?)\s*%",
+            re.IGNORECASE
+        )
+
+        # Breast yield patterns
+        self.breast_yield_regex = re.compile(
+            r"(?:filet|breast|blanc)\s*(?:yield)?\s*(?::)?\s*(\d+(?:[.,]\d+)?)\s*%",
+            re.IGNORECASE
+        )
+
+        # Nutrient value patterns (protein, energy, etc.)
+        self.nutrient_value_regex = re.compile(
+            r"(\d+(?:[.,]\d+)?)\s*(?:%|kcal/kg|g/kg|ppm|mg/kg)\s*(?:PB|CP|protéine|protein|lysine|méthionine|methionine|calcium|phosphore|phosphorus|énergie|energy|EM|ME)",
+            re.IGNORECASE
+        )
+
+        # Lighting program patterns
+        self.lighting_regex = re.compile(
+            r"(\d+)\s*(?:L|light|lumière)\s*:\s*(\d+)\s*(?:D|dark|obscurité)|(\d+)\s*(?:heures|hours|h)\s*(?:de\s*)?(?:lumière|light)",
+            re.IGNORECASE
+        )
+
+        # Ammonia level patterns
+        self.ammonia_regex = re.compile(
+            r"(?:NH3|ammoniac|ammonia)\s*(?::)?\s*(\d+(?:[.,]\d+)?)\s*ppm",
+            re.IGNORECASE
+        )
+
+        # Age in weeks patterns (for slaughter age, etc.)
+        self.age_weeks_regex = re.compile(
+            r"(\d+)\s*(?:semaines|weeks|sem|wk|w)\b",
+            re.IGNORECASE
+        )
+
+        # Cost patterns
+        self.cost_regex = re.compile(
+            r"(?:coût|cost|prix|price)\s*(?::)?\s*(\d+(?:[.,]\d+)?)\s*(?:€|EUR|€/kg|\$|USD|\$/lb|CAD)",
+            re.IGNORECASE
+        )
+
+        # Margin/profit patterns
+        self.margin_regex = re.compile(
+            r"(?:marge|margin|profit|bénéfice)\s*(?::)?\s*(\d+(?:[.,]\d+)?)\s*(?:%|€|\$)",
+            re.IGNORECASE
+        )
+
+        # ROI patterns
+        self.roi_regex = re.compile(
+            r"(?:ROI|retour)\s*(?:sur investissement)?\s*(?::)?\s*(\d+(?:[.,]\d+)?)\s*%",
+            re.IGNORECASE
+        )
+
+        logger.info("✅ RegexNumericExtractor initialized with Phase 2 entities")
 
     def extract(self, query: str) -> Dict[str, Any]:
         """Extract all numeric entities from query"""
@@ -106,25 +160,33 @@ class RegexNumericExtractor:
                 "raw": temp_match.group(0)
             }
 
-        # Humidity
-        humidity_match = self.humidity_regex.search(query)
-        if humidity_match:
-            value = float(humidity_match.group(1).replace(',', '.'))
-            entities["humidity"] = {
-                "value": value,
-                "unit": "percent",
-                "raw": humidity_match.group(0)
-            }
-
-        # Mortality rate
+        # Mortality rate (CHECK BEFORE HUMIDITY - more specific pattern)
         mortality_match = self.mortality_regex.search(query)
         if mortality_match:
-            value = float(mortality_match.group(1).replace(',', '.'))
+            # Regex has two alternative patterns, so check which group matched
+            value_str = mortality_match.group(1) or mortality_match.group(2)
+            value = float(value_str.replace(',', '.'))
             entities["mortality_rate"] = {
                 "value": value,
                 "unit": "percent",
                 "raw": mortality_match.group(0)
             }
+
+        # Humidity (CHECK AFTER MORTALITY to avoid conflicts)
+        humidity_match = self.humidity_regex.search(query)
+        if humidity_match:
+            # Only skip if this is the same match as mortality
+            is_same_match = (
+                "mortality_rate" in entities and
+                humidity_match.group(0) == entities["mortality_rate"]["raw"]
+            )
+            if not is_same_match:
+                value = float(humidity_match.group(1).replace(',', '.'))
+                entities["humidity"] = {
+                    "value": value,
+                    "unit": "percent",
+                    "raw": humidity_match.group(0)
+                }
 
         # Weight
         weight_match = self.weight_regex.search(query)
@@ -184,6 +246,96 @@ class RegexNumericExtractor:
                 "value": int(size_str),
                 "unit": "birds",
                 "raw": size_match.group(0)
+            }
+
+        # Carcass yield
+        carcass_match = self.carcass_yield_regex.search(query)
+        if carcass_match:
+            value = float(carcass_match.group(1).replace(',', '.'))
+            entities["carcass_yield"] = {
+                "value": value,
+                "unit": "percent",
+                "raw": carcass_match.group(0)
+            }
+
+        # Breast yield
+        breast_match = self.breast_yield_regex.search(query)
+        if breast_match:
+            value = float(breast_match.group(1).replace(',', '.'))
+            entities["breast_yield"] = {
+                "value": value,
+                "unit": "percent",
+                "raw": breast_match.group(0)
+            }
+
+        # Nutrient value
+        nutrient_match = self.nutrient_value_regex.search(query)
+        if nutrient_match:
+            value = float(nutrient_match.group(1).replace(',', '.'))
+            entities["nutrient_value"] = {
+                "value": value,
+                "raw": nutrient_match.group(0)
+            }
+
+        # Lighting program
+        lighting_match = self.lighting_regex.search(query)
+        if lighting_match:
+            if lighting_match.group(1) and lighting_match.group(2):
+                # Format: "16L:8D"
+                light_hours = int(lighting_match.group(1))
+                dark_hours = int(lighting_match.group(2))
+                entities["lighting_program"] = {
+                    "light_hours": light_hours,
+                    "dark_hours": dark_hours,
+                    "format": f"{light_hours}L:{dark_hours}D",
+                    "raw": lighting_match.group(0)
+                }
+            elif lighting_match.group(3):
+                # Format: "16 heures de lumière"
+                light_hours = int(lighting_match.group(3))
+                entities["lighting_program"] = {
+                    "light_hours": light_hours,
+                    "dark_hours": 24 - light_hours,
+                    "format": f"{light_hours}L:{24-light_hours}D",
+                    "raw": lighting_match.group(0)
+                }
+
+        # Ammonia level
+        ammonia_match = self.ammonia_regex.search(query)
+        if ammonia_match:
+            value = float(ammonia_match.group(1).replace(',', '.'))
+            entities["ammonia_level"] = {
+                "value": value,
+                "unit": "ppm",
+                "raw": ammonia_match.group(0)
+            }
+
+        # Cost
+        cost_match = self.cost_regex.search(query)
+        if cost_match:
+            value = float(cost_match.group(1).replace(',', '.'))
+            entities["cost"] = {
+                "value": value,
+                "raw": cost_match.group(0)
+            }
+
+        # Margin
+        margin_match = self.margin_regex.search(query)
+        if margin_match:
+            value = float(margin_match.group(1).replace(',', '.'))
+            entities["margin"] = {
+                "value": value,
+                "raw": margin_match.group(0)
+            }
+
+        # ROI
+        roi_match = self.roi_regex.search(query)
+        if roi_match:
+            value = float(roi_match.group(1).replace(',', '.'))
+            entities["roi"] = {
+                "value": value,
+                "unit": "percent",
+                "raw": roi_match.group(0)
             }
 
         return entities
@@ -304,14 +456,50 @@ class LLMNERExtractor:
                 "vaccination_route": "Vaccination routes (e.g., spray, drinking water, injection, in ovo)"
             },
             "nutrition": {
-                "nutrient": "Nutrients (e.g., protein, lysine, methionine, calcium, phosphorus)",
-                "ingredient": "Feed ingredients (e.g., corn, soybean, wheat, fish meal)",
-                "additive": "Feed additives (e.g., enzyme, probiotic, organic acid, coccidiostat)",
-                "feed_form": "Feed forms (e.g., mash, crumbles, pellets)"
+                "nutrient": "Nutrients (e.g., protein, lysine, methionine, calcium, phosphorus, energy)",
+                "ingredient": "Feed ingredients (e.g., corn, soybean meal, wheat, fish meal, rapeseed)",
+                "additive": "Feed additives (e.g., enzyme, probiotic, organic acid, coccidiostat, vitamin premix)",
+                "feed_form": "Feed forms (e.g., mash, crumbles, pellets, meal)"
             },
             "environment": {
-                "ammonia_level": "Ammonia levels (e.g., NH3 25 ppm, ammonia 10 ppm)",
-                "co2_level": "CO2 levels (e.g., CO2 3000 ppm)"
+                "co2_level": "CO2 levels (e.g., CO2 3000 ppm, carbon dioxide 2500 ppm)"
+            },
+            "hatchery": {
+                "incubation_day": "Incubation days (e.g., E18, day 18, transfer day 18, J18)",
+                "egg_type": "Egg types (e.g., hatching egg, fertile egg, breeder egg)",
+                "chick_quality": "Chick quality indicators (e.g., quality A, grade 1, Tona score 95)",
+                "sexing_method": "Sexing methods (e.g., mechanical sexing, vent sexing, feather sexing, in-ovo)",
+                "incubator_type": "Incubator types (e.g., setter, hatcher, multi-stage, single-stage)"
+            },
+            "processing": {
+                "slaughter_age": "Slaughter age references (e.g., processing age 42 days, slaughter at 6 weeks)",
+                "live_weight": "Live weight at processing (e.g., live weight 2.5 kg, body weight 2800g)",
+                "meat_quality": "Meat quality indicators (e.g., PSE, DFD, pH 5.8, quality A)",
+                "stunning_method": "Stunning methods (e.g., electrical stunning, gas stunning, controlled atmosphere)"
+            },
+            "economics": {
+                "contract_type": "Contract types (e.g., integration, independent, contract farming)",
+                "payment_term": "Payment terms (e.g., net 30, net 60, upon delivery, 30 days)"
+            },
+            "temporal": {
+                "time_period": "Time periods (e.g., last 7 days, past week, yesterday, this month)",
+                "trend_direction": "Trend directions (e.g., increasing, decreasing, stable, rising, falling)",
+                "comparison_operator": "Comparison operators (e.g., higher than, lower than, versus, compared to)",
+                "date": "Dates (e.g., January 15, 2025-01-15, last Monday, next week)",
+                "season": "Seasons (e.g., summer, winter, hot season, cold period)",
+                "duration": "Durations (e.g., for 3 days, over 2 weeks, during 5 days)"
+            },
+            "geographic": {
+                "region": "Regions (e.g., Quebec, Brittany, Midwest, Southeast Asia)",
+                "country": "Countries (e.g., France, USA, Brazil, Thailand, China)",
+                "climate_zone": "Climate zones (e.g., tropical, temperate, continental, hot humid)",
+                "altitude": "Altitude references (e.g., altitude 500m, 1000m above sea level, high altitude)"
+            },
+            "regulatory": {
+                "certification": "Certifications (e.g., Label Rouge, organic, halal, kosher, GlobalGAP)",
+                "standard": "Standards (e.g., HACCP, ISO 22000, EU regulation, FDA approved)",
+                "welfare_label": "Welfare labels (e.g., animal welfare approved, free range certified)",
+                "regulation": "Regulations (e.g., EU directive, FDA regulation, French norm)"
             }
         }
 
@@ -441,8 +629,11 @@ class HybridEntityExtractor:
         self.llm_extractor = LLMNERExtractor()
 
         # Configuration thresholds
-        self.llm_enabled_domains = ["health", "nutrition", "environment"]
-        self.min_query_length_for_llm = 10  # words
+        self.llm_enabled_domains = [
+            "health", "nutrition", "environment", "hatchery",
+            "processing", "economics", "temporal", "geographic", "regulatory"
+        ]
+        self.min_query_length_for_llm = 8  # words (lowered to catch more queries)
 
         logger.info("✅ HybridEntityExtractor initialized")
 
