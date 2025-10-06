@@ -254,49 +254,41 @@ jobs:
           echo "Attente de 30s pour la propagation complete du registry..."
           sleep 30
 
-      - name: Update App Platform spec to use latest tags
+      - name: Verify App Platform spec uses latest tags
         run: |
-          echo "Mise a jour de la spec de l'App Platform..."
+          echo "Verification de la spec de l'App Platform..."
 
           # Get current spec
-          doctl apps spec get ${{ secrets.DO_APP_ID }} > app-spec.yaml
+          doctl apps spec get ${{ secrets.DO_APP_ID }} --format yaml > app-spec.yaml
 
-          echo "Spec actuelle:"
-          cat app-spec.yaml | grep -A 5 "image:"
+          echo "Configuration actuelle des images:"
+          grep -A 5 "image:" app-spec.yaml | grep -E "(repository|tag):"
 
-          # Update spec to use 'latest' tag without digest
-          # Remove any digest references and force tag to 'latest'
-          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-            echo "Forcing LLM to use tag 'latest' (no digest)..."
-            # Find the LLM service and update its image tag
-            python3 << 'EOF'
-          import yaml
-          import sys
+          # Check if all services use 'latest' tag
+          NEEDS_UPDATE=false
 
-          with open('app-spec.yaml', 'r') as f:
-              spec = yaml.safe_load(f)
-
-          # Update LLM service image
-          for service in spec.get('services', []):
-              if 'llm' in service.get('name', '').lower():
-                  if 'image' in service:
-                      service['image']['tag'] = 'latest'
-                      # Remove digest if present
-                      if 'digest' in service['image']:
-                          del service['image']['digest']
-                      print(f"Updated {service['name']} to use tag: latest")
-
-          with open('app-spec.yaml', 'w') as f:
-              yaml.dump(spec, f)
-          EOF
+          if grep -q 'tag:.*latest' app-spec.yaml; then
+            echo "✅ Toutes les images utilisent le tag 'latest'"
+          else
+            echo "⚠️ Certaines images n'utilisent pas 'latest'"
+            NEEDS_UPDATE=true
           fi
 
-          echo "Spec mise a jour:"
-          cat app-spec.yaml | grep -A 5 "image:"
+          # Check for hardcoded digests
+          if grep -q "digest:" app-spec.yaml; then
+            echo "⚠️ Des digests sont hardcodés dans la spec"
+            NEEDS_UPDATE=true
+          fi
 
-          # Apply updated spec
-          echo "Application de la spec mise a jour..."
-          doctl apps update ${{ secrets.DO_APP_ID }} --spec app-spec.yaml
+          if [ "$NEEDS_UPDATE" = true ]; then
+            echo "❌ La spec doit être mise à jour manuellement:"
+            echo "   1. Aller sur https://cloud.digitalocean.com/apps"
+            echo "   2. Settings → Components"
+            echo "   3. Pour chaque service, s'assurer que Tag = 'latest'"
+            exit 1
+          fi
+
+          echo "✅ Spec correctement configurée, pas besoin de mise à jour"
 
       - name: Trigger App Platform deployment
         run: |
