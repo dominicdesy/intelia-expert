@@ -421,8 +421,12 @@ class QueryRouter:
         # Initialize hybrid entity extractor
         self.hybrid_extractor = create_hybrid_extractor(config_dir)
 
+        # Initialize LLM Query Classifier (remplace patterns fragiles)
+        from core.llm_query_classifier import get_llm_query_classifier
+        self.llm_classifier = get_llm_query_classifier()
+
         logger.info(
-            "✅ QueryRouter initialisé (100% config-driven + hybrid extraction)"
+            "✅ QueryRouter initialisé (100% config-driven + hybrid extraction + LLM classification)"
         )
 
     def _compile_patterns(self):
@@ -819,7 +823,7 @@ class QueryRouter:
         self, entities: Dict[str, Any], query: str, language: str
     ) -> Tuple[bool, List[str], Dict]:
         """
-        Validation basée sur intents.json et type de requête
+        Validation basée sur LLM classification (remplace patterns regex fragiles)
 
         Returns:
             (is_complete, missing_fields, validation_details)
@@ -828,75 +832,73 @@ class QueryRouter:
         missing = []
         validation_details = {}
 
-        # 🆕 DÉTECTION QUESTIONS GÉNÉRALES - Ne requièrent PAS breed/age
-        general_question_patterns = [
-            # === FRANÇAIS ===
-            # Questions générales santé - IMPROVED patterns avec mots intermédiaires
-            r"\b(quelle|quelles)\s+.*?(maladie|pathologie)",
-            r"\b(comment)\s+.*?(prévenir|traiter|éviter|diagnostiquer)",
-            r"\b(quels?|quelles?)\s+.*?(symptôme|signe|cause)",  # ✅ Accepte "quels sont les symptômes"
-            r"\b(quelles?)\s+(sont\s+les|causes|solutions)",
-            r"\b(qu'?est-ce\s+que|c'?est\s+quoi)",  # ✅ "Qu'est-ce que X ?"
-            # Questions générales management
-            r"\b(comment)\s+.*?(améliorer|optimiser|gérer)",
-            r"\b(quels?)\s+.*?(facteurs?|paramètres?|éléments?)",
-            # Pattern: Questions au pluriel sans mention de race/âge
-            r"\b(maladies?|pathologies?)\s+(les\s+plus|fréquent|commun)",
-            # Questions de traitement/prévention spécifiques
-            r"\b(traitement|vaccination|prévention)\s+(de|du|contre)",
-            r"\b(causes?)\s+(de|du)\s+",
+        # 🚀 UTILISER LLM CLASSIFIER au lieu de patterns regex
+        try:
+            classification = self.llm_classifier.classify(query, language)
 
-            # === ENGLISH ===
-            r"\b(what|which)\s+.*?(disease|pathology)",
-            r"\b(how)\s+.*?(prevent|treat|avoid|diagnose)",
-            r"\b(what)\s+.*?(symptom|sign|cause)",  # ✅ "What are the symptoms"
-            r"\b(what\s+is|what's)",  # ✅ "What is Newcastle disease?"
-            # Questions générales management
-            r"\b(how)\s+.*?(improve|optimize|manage)",
-            r"\b(what)\s+.*?(factor|parameter|element)",
-            # Pattern: Questions au pluriel sans mention de race/âge
-            r"\b(diseases?|patholog(y|ies))\s+(most|common|frequent)",
-            # Questions de traitement/prévention
-            r"\b(treatment|vaccination|prevention)\s+(of|for|against)",
-            r"\b(causes?)\s+of\s+",
-        ]
+            intent = classification.get("intent", "general_knowledge")
+            requirements = classification.get("requirements", {})
+            routing = classification.get("routing", {})
 
-        query_lower = query.lower()
-        is_general_question = any(
-            re.search(pattern, query_lower) for pattern in general_question_patterns
-        )
-
-        if is_general_question:
-            logger.info(f"📚 Question générale détectée → Weaviate (pas de breed/age requis)")
-            validation_details["validation_type"] = "general_question"
-            validation_details["required_fields"] = []
-            return (True, [], validation_details)
-
-        # Déterminer si requête nécessite données PostgreSQL
-        needs_postgresql = self.config.should_route_to_postgresql(query, language)
-
-        if needs_postgresql:
-            # Requêtes PostgreSQL nécessitent: breed + age
-            if not entities.get("breed"):
-                missing.append("breed")
-            if not entities.get("age_days"):
-                missing.append("age")
-
-            validation_details["validation_type"] = "postgresql_metrics"
-            validation_details["required_fields"] = ["breed", "age"]
-        else:
-            # Requêtes Weaviate/guides: détecter ambiguïté
-            ambiguity_detected = self._detect_weaviate_ambiguity(
-                query, entities, language
+            # Log classification
+            logger.info(
+                f"🤖 LLM Classification: intent={intent}, "
+                f"target={routing.get('target', 'unknown')}, "
+                f"needs_breed={requirements.get('needs_breed', False)}, "
+                f"needs_age={requirements.get('needs_age', False)}"
             )
 
-            if ambiguity_detected:
-                missing.extend(ambiguity_detected)
-                validation_details["validation_type"] = "weaviate_ambiguous"
-                validation_details["required_fields"] = ambiguity_detected
+            # Vérifier les requirements
+            if requirements.get("needs_breed", False) and not entities.get("breed"):
+                missing.append("breed")
+
+            if requirements.get("needs_age", False) and not entities.get("age_days"):
+                missing.append("age")
+
+            if requirements.get("needs_sex", False) and not entities.get("sex"):
+                missing.append("sex")
+
+            # Build validation details
+            validation_details["validation_type"] = f"llm_{intent}"
+            validation_details["required_fields"] = [
+                field for field, needed in requirements.items()
+                if needed and field.startswith("needs_")
+            ]
+            validation_details["llm_routing_target"] = routing.get("target", "weaviate")
+            validation_details["llm_confidence"] = routing.get("confidence", 0.5)
+            validation_details["llm_intent"] = intent
+
+        except Exception as e:
+            logger.error(f"❌ LLM classification failed: {e}")
+
+            # FALLBACK: Use old pattern-based logic
+            logger.warning("⚠️ Falling back to pattern-based validation")
+
+            # Déterminer si requête nécessite données PostgreSQL
+            needs_postgresql = self.config.should_route_to_postgresql(query, language)
+
+            if needs_postgresql:
+                # Requêtes PostgreSQL nécessitent: breed + age
+                if not entities.get("breed"):
+                    missing.append("breed")
+                if not entities.get("age_days"):
+                    missing.append("age")
+
+                validation_details["validation_type"] = "postgresql_metrics"
+                validation_details["required_fields"] = ["breed", "age"]
             else:
-                validation_details["validation_type"] = "weaviate_flexible"
-                validation_details["required_fields"] = []
+                # Requêtes Weaviate/guides: détecter ambiguïté
+                ambiguity_detected = self._detect_weaviate_ambiguity(
+                    query, entities, language
+                )
+
+                if ambiguity_detected:
+                    missing.extend(ambiguity_detected)
+                    validation_details["validation_type"] = "weaviate_ambiguous"
+                    validation_details["required_fields"] = ambiguity_detected
+                else:
+                    validation_details["validation_type"] = "weaviate_flexible"
+                    validation_details["required_fields"] = []
 
         is_complete = len(missing) == 0
 
