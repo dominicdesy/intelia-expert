@@ -28,6 +28,7 @@ from utils.types import Dict, Optional, Tuple, List, Set, Any
 from dataclasses import dataclass, field
 from functools import lru_cache
 from utils.mixins import SerializableMixin
+from .hybrid_entity_extractor import create_hybrid_extractor
 
 logger = logging.getLogger(__name__)
 
@@ -347,7 +348,9 @@ class ConfigManager:
                     patterns.append(rf"\b{escaped}\b")
 
         if patterns:
-            logger.debug(f"✅ Loaded {len(patterns)} contextual patterns for {language}")
+            logger.debug(
+                f"✅ Loaded {len(patterns)} contextual patterns for {language}"
+            )
 
         return patterns
 
@@ -400,7 +403,10 @@ class QueryRouter:
         # Compiler les patterns regex depuis config
         self._compile_patterns()
 
-        logger.info("✅ QueryRouter initialisé (100% config-driven)")
+        # Initialize hybrid entity extractor
+        self.hybrid_extractor = create_hybrid_extractor(config_dir)
+
+        logger.info("✅ QueryRouter initialisé (100% config-driven + hybrid extraction)")
 
     def _compile_patterns(self):
         """Compile les regex depuis les configs pour performance"""
@@ -552,10 +558,25 @@ class QueryRouter:
         # 2. DÉTECTION CONTEXTUELLE
         is_contextual = self._is_contextual(query, language)
 
-        # 3. EXTRACTION ENTITÉS
+        # 2.5. DÉTECTION DOMAINE (needed for hybrid extraction)
+        detected_domain = self.detect_domain(query, language)
+
+        # 3. EXTRACTION ENTITÉS (Basic regex - breed, age, sex)
         entities = self._extract_entities(query, language)
 
-        # 3b. MERGE avec entités pré-extraites si disponibles
+        # 3b. HYBRID EXTRACTION (Advanced entities - numeric, health, etc.)
+        hybrid_entities = self.hybrid_extractor.extract_all(
+            query=query,
+            language=language,
+            domain=detected_domain,
+            existing_entities=entities
+        )
+        # Merge hybrid entities (don't override basic entities)
+        for key, value in hybrid_entities.items():
+            if key not in entities or not entities[key]:
+                entities[key] = value
+
+        # 3c. MERGE avec entités pré-extraites si disponibles
         if preextracted_entities:
             logger.info(
                 f"📦 Merging preextracted entities: {list(preextracted_entities.keys())}"
@@ -592,9 +613,6 @@ class QueryRouter:
 
         # 6. ROUTING INTELLIGENT
         destination, reason = self._determine_destination(query, entities, language)
-
-        # 6.5. DÉTECTION DOMAINE pour sélection prompt
-        detected_domain = self.detect_domain(query, language)
 
         # 7. STOCKAGE CONTEXTE (si succès)
         self.context_store[user_id] = ConversationContext(

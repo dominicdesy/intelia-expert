@@ -72,7 +72,7 @@ class RAGQueryProcessor:
             language=language,
             has_context=conversation_context is not None,
             has_preextracted_entities=preextracted_entities is not None,
-            timestamp=time.time()
+            timestamp=time.time(),
         )
 
         logger.info(f"Processing query with language: {language}")
@@ -133,14 +133,12 @@ class RAGQueryProcessor:
                     structured_logger.info(
                         "entities_extracted",
                         request_id=request_id,
-                        extracted_entities=extracted_entities
+                        extracted_entities=extracted_entities,
                     )
             except Exception as e:
                 logger.warning(f"Failed to extract entities from context: {e}")
                 structured_logger.warning(
-                    "entity_extraction_failed",
-                    request_id=request_id,
-                    error=str(e)
+                    "entity_extraction_failed", request_id=request_id, error=str(e)
                 )
 
         # Step 3: Route query with context-extracted entities
@@ -165,7 +163,7 @@ class RAGQueryProcessor:
             confidence=route.confidence,
             query_type=route.query_type,
             duration_ms=step3_duration * 1000,
-            has_missing_fields=bool(route.missing_fields)
+            has_missing_fields=bool(route.missing_fields),
         )
 
         # Step 4: Check for clarification needs
@@ -186,7 +184,7 @@ class RAGQueryProcessor:
                 "clarification_needed",
                 request_id=request_id,
                 missing_fields=route.missing_fields,
-                total_duration_ms=(time.time() - start_time) * 1000
+                total_duration_ms=(time.time() - start_time) * 1000,
             )
 
             return self._build_clarification_result(
@@ -215,10 +213,10 @@ class RAGQueryProcessor:
             "query_completed",
             request_id=request_id,
             handler_type=route.destination,
-            sources_count=len(result.sources) if hasattr(result, 'sources') else 0,
-            response_length=len(result.answer) if hasattr(result, 'answer') else 0,
+            sources_count=len(result.sources) if hasattr(result, "sources") else 0,
+            response_length=len(result.answer) if hasattr(result, "answer") else 0,
             handler_duration_ms=step6_duration * 1000,
-            total_duration_ms=(time.time() - start_time) * 1000
+            total_duration_ms=(time.time() - start_time) * 1000,
         )
 
         return result
