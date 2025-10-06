@@ -597,10 +597,26 @@ class QueryRouter:
             logger.info(
                 f"📦 Merging preextracted entities: {list(preextracted_entities.keys())}"
             )
-            for key, value in preextracted_entities.items():
-                if key not in entities or not entities[key]:
-                    entities[key] = value
-                    logger.debug(f"   Added {key}={value} from context")
+
+            # VALIDATION: Détecter changement de contexte (breed différente)
+            current_breed = entities.get("breed")
+            context_breed = preextracted_entities.get("breed")
+
+            if current_breed and context_breed and current_breed.lower() != context_breed.lower():
+                logger.warning(
+                    f"⚠️ Breed mismatch detected: current='{current_breed}' vs context='{context_breed}'"
+                )
+                logger.info(
+                    f"🔒 Blocking context merge - different breed detected (new conversation context)"
+                )
+                # Ne merger QUE la breed de la query actuelle, pas les autres entités
+                # Cela force le système à demander clarification pour age/sex
+            else:
+                # Breeds compatibles ou pas de breed dans query → merger contexte
+                for key, value in preextracted_entities.items():
+                    if key not in entities or not entities[key]:
+                        entities[key] = value
+                        logger.debug(f"   Added {key}={value} from context")
 
         # 4. MERGE si contextuel
         if is_contextual and previous_context:
