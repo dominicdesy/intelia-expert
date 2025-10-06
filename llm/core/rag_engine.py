@@ -174,6 +174,7 @@ class InteliaRAGEngine(InitializableMixin):
                     "standard": self.standard_handler,
                 },
                 conversation_memory=self.conversation_memory,
+                ood_detector=self.weaviate_core.ood_detector if self.weaviate_core else None,
             )
 
             self.response_generator = RAGResponseGenerator(

@@ -20,7 +20,7 @@ structured_logger = structlog.get_logger()
 class RAGQueryProcessor:
     """Processes queries through the RAG pipeline"""
 
-    def __init__(self, query_router, handlers, conversation_memory=None):
+    def __init__(self, query_router, handlers, conversation_memory=None, ood_detector=None):
         """
         Initialize query processor
 
@@ -28,12 +28,14 @@ class RAGQueryProcessor:
             query_router: QueryRouter instance
             handlers: Dict of handler instances (temporal, comparative, standard)
             conversation_memory: Optional ConversationMemory instance
+            ood_detector: Optional OOD detector instance
         """
         self.query_router = query_router
         self.temporal_handler = handlers.get("temporal")
         self.comparative_handler = handlers.get("comparative")
         self.standard_handler = handlers.get("standard")
         self.conversation_memory = conversation_memory
+        self.ood_detector = ood_detector
         self.enricher = ConversationalQueryEnricher()
         self.clarification_helper = get_clarification_helper()
 
@@ -115,6 +117,38 @@ class RAGQueryProcessor:
                 else:
                     # Increment attempt counter
                     self.conversation_memory.increment_clarification_attempt(tenant_id)
+
+        # Step 0.5: OOD Detection (before routing)
+        if self.ood_detector:
+            try:
+                is_in_domain, domain_score, score_details = (
+                    self.ood_detector.calculate_ood_score_multilingual(
+                        query, None, language
+                    )
+                )
+
+                if not is_in_domain:
+                    logger.warning(f"⛔ OUT-OF-DOMAIN query detected (LLM): '{query[:60]}...'")
+                    from config.messages import get_message
+                    ood_message = get_message("ood_rejection", language)
+                    return RAGResult(
+                        source=RAGSource.OOD_FILTERED,
+                        answer=ood_message,
+                        sources=[],
+                        metadata={
+                            "ood_score": domain_score,
+                            "ood_details": score_details,
+                            "query_type": "out_of_domain",
+                        },
+                        query_type="out_of_domain",
+                        conversation_id=tenant_id,
+                        processing_time_ms=(time.time() - start_time) * 1000,
+                    )
+                else:
+                    logger.info(f"✅ IN-DOMAIN query (LLM): '{query[:60]}...'")
+            except Exception as e:
+                logger.error(f"❌ OOD detection error: {e}")
+                # Continue processing on error (fail-open)
 
         # Step 1: Retrieve contextual history
         contextual_history = await self._get_contextual_history(tenant_id, query)
