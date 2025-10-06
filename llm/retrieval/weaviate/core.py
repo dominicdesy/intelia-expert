@@ -326,11 +326,21 @@ class WeaviateCore(InitializableMixin):
         try:
             self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
             self.memory = ConversationMemory(self.openai_client)
+            logger.info("✅ Embedder and Memory initialized")
+
             # 🔧 MIGRATION: LLM-based OOD detector (100% coverage, zero maintenance)
-            self.ood_detector = LLMOODDetector(model="gpt-4o-mini")
+            try:
+                self.ood_detector = LLMOODDetector(model="gpt-4o-mini")
+                logger.info("✅ LLMOODDetector initialized successfully")
+            except Exception as ood_error:
+                logger.error(f"❌ Failed to initialize LLMOODDetector: {ood_error}")
+                logger.exception("Full traceback:")
+                self.ood_detector = None
+
             logger.info("✅ Composants de base initialisés (LLM OOD detector)")
         except Exception as e:
             logger.error(f"Erreur composants de base: {e}")
+            logger.exception("Full traceback:")
             raise
 
     async def _initialize_hybrid_retriever(self):
