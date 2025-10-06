@@ -4,10 +4,11 @@
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
 
-Version: 2.2.0 - Fixed degraded mode issues
+Version: 2.2.1 - Cleanup workflow disabled
 - SQLQueryNormalizer paths corrected
 - Agent RAG uses query_router fallback
 - Autodeploy workflow enabled
+- Registry cleanup now weekly only
 """
 
 import os
@@ -385,7 +386,7 @@ logger.info(" CRÉATION FASTAPI APP - VERSION FINALE ")
 app = FastAPI(
     title="Intelia Expert Backend",
     description="API RAG Enhanced avec LangSmith et RRF Intelligent - Architecture Centralisée",
-    version="2.2.0",
+    version="2.2.1",
     lifespan=lifespan,
 )
 
