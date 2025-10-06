@@ -1,107 +1,190 @@
 {
   "metadata": {
-    "version": "1.0.0",
-    "description": "Stratégies de clarification intelligentes pour questions ambiguës",
-    "last_updated": "2025-01-15",
-    "languages": ["fr", "en"]
+    "version": "2.0.0",
+    "description": "English-only clarification strategies with dynamic language translation",
+    "last_updated": "2025-10-06",
+    "languages_supported": ["fr", "en", "es", "de", "it", "pt", "ar", "zh", "ja", "ko", "th", "vi"]
   },
 
   "ambiguity_types": {
-    "nutrition_ambiguity": {
-      "fr": "Pour vous donner une recommandation nutritionnelle précise, j'ai besoin de savoir:\n- **Phase de production**: démarrage (0-10j), croissance (11-24j), ou finition (25j+)?\n- **Objectif recherché**: croissance maximale, optimisation FCR, ou santé intestinale?\n- **Race concernée**: Ross 308, Cobb 500, autre?\n\nPar exemple: \"Quelle formule pour Ross 308 en phase croissance pour optimiser le FCR?\"",
+    "nutrition_ambiguity": "To provide accurate nutritional advice, I need:\n- **Production phase**: starter (0-10d), grower (11-24d), or finisher (25d+)?\n- **Target objective**: maximum growth, FCR optimization, or gut health?\n- **Breed**: Ross 308, Cobb 500, other?\n\nExample: \"What formula for Ross 308 in grower phase to optimize FCR?\"",
 
-      "en": "To provide accurate nutritional advice, I need:\n- **Production phase**: starter (0-10d), grower (11-24d), or finisher (25d+)?\n- **Target objective**: maximum growth, FCR optimization, or gut health?\n- **Breed**: Ross 308, Cobb 500, other?\n\nExample: \"What formula for Ross 308 in grower phase to optimize FCR?\""
-    },
+    "health_symptom_vague": "You mention a health issue. For accurate diagnosis, can you detail:\n- **Observed symptoms**: high mortality, visible lesions, behavior change, diarrhea?\n- **Flock age**: in days (e.g., 18 days, 35 days)?\n- **Breed and size**: which line, how many birds affected?\n- **Evolution**: sudden or progressive onset?\n\nExample: \"Ross 308, 22 days, 3% daily mortality for 2 days, bloody droppings\"",
 
-    "health_symptom_vague": {
-      "fr": "Vous mentionnez un problème de santé. Pour un diagnostic précis, pouvez-vous détailler:\n- **Symptômes observés**: mortalité élevée, lésions visibles, changement de comportement, diarrhée?\n- **Âge du lot**: en jours (ex: 18 jours, 35 jours)?\n- **Race et effectif**: quelle lignée, combien de sujets touchés?\n- **Évolution**: apparition brutale ou progressive?\n\nPar exemple: \"Ross 308, 22 jours, mortalité 3%/jour depuis 2 jours, fèces sanguinolentes\"",
+    "performance_incomplete": "To analyze performance, I need details:\n- **Breed and sex**: Ross 308 male, Cobb 500 female, as-hatched?\n- **Current age**: in days or weeks (e.g., 35 days)?\n- **Metric of interest**: body weight, FCR, mortality, uniformity?\n\nExample: \"What target weight for Ross 308 male at 35 days?\"",
 
-      "en": "You mention a health issue. For accurate diagnosis, can you detail:\n- **Observed symptoms**: high mortality, visible lesions, behavior change, diarrhea?\n- **Flock age**: in days (e.g., 18 days, 35 days)?\n- **Breed and size**: which line, how many birds affected?\n- **Evolution**: sudden or progressive onset?\n\nExample: \"Ross 308, 22 days, 3% daily mortality for 2 days, bloody droppings\""
-    },
+    "environment_vague": "For precise climate recommendations:\n- **Flock age**: starter (0-10d), grower (11-28d), finisher (29d+)?\n- **Season**: summer (>25°C ext), winter (<10°C ext), mid-season?\n- **Observed issue**: condensation, excessive dust, temperature variation?\n- **Ventilation type**: static, dynamic, tunnel?\n\nExample: \"Climate parameters for Ross 308 at 21 days in summer with dynamic ventilation\"",
 
-    "performance_incomplete": {
-      "fr": "Pour analyser la performance, j'ai besoin de précisions:\n- **Race et sexe**: Ross 308 mâle, Cobb 500 femelle, sexes mélangés?\n- **Âge actuel**: en jours ou semaines (ex: 35 jours)?\n- **Métrique concernée**: poids vif, FCR, mortalité, uniformité?\n\nPar exemple: \"Quel poids cible pour Ross 308 mâle à 35 jours?\"",
+    "management_broad": "For adapted management advice:\n- **Farm size**: birds per batch, number of houses?\n- **Priority objective**: improve profitability, reduce mortality, optimize labor?\n- **Available budget**: investment < 10k€, 10-50k€, > 50k€?\n- **Main constraint**: technical, financial, regulatory?\n\nExample: \"How to improve profitability on 40,000 broiler farm, 2 houses, 30k€ budget?\"",
 
-      "en": "To analyze performance, I need details:\n- **Breed and sex**: Ross 308 male, Cobb 500 female, as-hatched?\n- **Current age**: in days or weeks (e.g., 35 days)?\n- **Metric of interest**: body weight, FCR, mortality, uniformity?\n\nExample: \"What target weight for Ross 308 male at 35 days?\""
-    },
+    "genetics_incomplete": "To compare genetic performances:\n- **Lines to compare**: Ross 308 vs Cobb 500? Or other?\n- **Comparison criteria**: growth, FCR, carcass yield, robustness?\n- **Production target**: early slaughter (<35d), standard (38-42d), heavy (>45d)?\n- **Specific constraints**: hot climate, altitude, extensive system?\n\nExample: \"Compare Ross 308 vs Cobb 500 for 42d slaughter in temperate climate\"",
 
-    "environment_vague": {
-      "fr": "Pour des recommandations d'ambiance précises:\n- **Âge du lot**: démarrage (0-10j), croissance (11-28j), finition (29j+)?\n- **Saison**: été (>25°C ext), hiver (<10°C ext), mi-saison?\n- **Problème observé**: condensation, poussière excessive, variation température?\n- **Type de ventilation**: statique, dynamique, tunnel?\n\nPar exemple: \"Paramètres ambiance pour Ross 308 à 21 jours en été avec ventilation dynamique\"",
-
-      "en": "For precise climate recommendations:\n- **Flock age**: starter (0-10d), grower (11-28d), finisher (29d+)?\n- **Season**: summer (>25°C ext), winter (<10°C ext), mid-season?\n- **Observed issue**: condensation, excessive dust, temperature variation?\n- **Ventilation type**: static, dynamic, tunnel?\n\nExample: \"Climate parameters for Ross 308 at 21 days in summer with dynamic ventilation\""
-    },
-
-    "management_broad": {
-      "fr": "Pour une recommandation de gestion adaptée:\n- **Taille d'exploitation**: nombre de sujets par bande, nombre de bâtiments?\n- **Objectif prioritaire**: améliorer rentabilité, réduire mortalité, optimiser main d'œuvre?\n- **Budget disponible**: investissement < 10k€, 10-50k€, > 50k€?\n- **Contrainte principale**: technique, financière, réglementaire?\n\nPar exemple: \"Comment améliorer rentabilité sur ferme 40,000 broilers, 2 bâtiments, budget 30k€?\"",
-
-      "en": "For adapted management advice:\n- **Farm size**: birds per batch, number of houses?\n- **Priority objective**: improve profitability, reduce mortality, optimize labor?\n- **Available budget**: investment < 10k€, 10-50k€, > 50k€?\n- **Main constraint**: technical, financial, regulatory?\n\nExample: \"How to improve profitability on 40,000 broiler farm, 2 houses, 30k€ budget?\""
-    },
-
-    "genetics_incomplete": {
-      "fr": "Pour comparer les performances génétiques:\n- **Lignées à comparer**: Ross 308 vs Cobb 500? Ou autre?\n- **Critère de comparaison**: croissance, FCR, rendement carcasse, rusticité?\n- **Objectif de production**: abattage précoce (<35j), standard (38-42j), lourd (>45j)?\n- **Contraintes spécifiques**: climat chaud, altitude, système extensif?\n\nPar exemple: \"Comparer Ross 308 vs Cobb 500 pour abattage 42j en climat tempéré\"",
-
-      "en": "To compare genetic performances:\n- **Lines to compare**: Ross 308 vs Cobb 500? Or other?\n- **Comparison criteria**: growth, FCR, carcass yield, robustness?\n- **Production target**: early slaughter (<35d), standard (38-42d), heavy (>45d)?\n- **Specific constraints**: hot climate, altitude, extensive system?\n\nExample: \"Compare Ross 308 vs Cobb 500 for 42d slaughter in temperate climate\""
-    },
-
-    "treatment_protocol_vague": {
-      "fr": "Pour recommander un protocole de traitement:\n- **Pathologie ciblée**: maladie spécifique ou prévention générale?\n- **Âge du lot**: vaccination J1, rappel, ou traitement curatif?\n- **Historique sanitaire**: lots précédents touchés par quelles maladies?\n- **Type d'élevage**: conventionnel, label, bio (restrictions antibiotiques)?\n\nPar exemple: \"Protocole vaccination Newcastle + Gumboro pour Ross 308 conventionnel\"",
-
-      "en": "To recommend a treatment protocol:\n- **Target pathology**: specific disease or general prevention?\n- **Flock age**: D1 vaccination, booster, or curative treatment?\n- **Health history**: previous flocks affected by which diseases?\n- **Farming type**: conventional, label, organic (antibiotic restrictions)?\n\nExample: \"Newcastle + Gumboro vaccination protocol for conventional Ross 308\""
-    }
+    "treatment_protocol_vague": "To recommend a treatment protocol:\n- **Target pathology**: specific disease or general prevention?\n- **Flock age**: D1 vaccination, booster, or curative treatment?\n- **Health history**: previous flocks affected by which diseases?\n- **Farming type**: conventional, label, organic (antibiotic restrictions)?\n\nExample: \"Newcastle + Gumboro vaccination protocol for conventional Ross 308\""
   },
 
   "missing_field_templates": {
-    "breed": {
-      "fr": "Veuillez préciser **la race** concernée. Par exemple: Ross 308, Cobb 500, Hubbard JA87, Hy-Line Brown, ISA Brown.",
-      "en": "Please specify **the breed**. For example: Ross 308, Cobb 500, Hubbard JA87, Hy-Line Brown, ISA Brown."
-    },
+    "breed": "Please specify **the breed**. For example: Ross 308, Cobb 500, Hubbard JA87, Hy-Line Brown, ISA Brown.",
+    "age": "Please specify **the age** of the flock. For example: \"21 days\", \"3 weeks\", \"35 days\".",
+    "sex": "Please specify **the sex**: male, female, or as-hatched?",
+    "metric": "Please specify **the metric** of interest. For example: body weight, FCR (feed conversion ratio), mortality, egg production.",
+    "production_phase": "Please specify **the production phase**: starter (0-10d), grower (11-24d), finisher (25d+), or laying?",
+    "symptom": "Please describe **the observed symptoms** in detail: mortality (%), fecal appearance, lesions, abnormal behavior.",
+    "objective": "Please specify **your objective**: maximize growth, optimize FCR, reduce mortality, improve carcass quality?"
+  },
 
-    "age": {
-      "fr": "Veuillez préciser **l'âge** du lot. Par exemple: \"21 jours\", \"3 semaines\", \"35 jours\".",
-      "en": "Please specify **the age** of the flock. For example: \"21 days\", \"3 weeks\", \"35 days\"."
+  "label_translations": {
+    "Production phase": {
+      "fr": "Phase de production",
+      "es": "Fase de producción",
+      "de": "Produktionsphase",
+      "it": "Fase di produzione",
+      "pt": "Fase de produção",
+      "th": "ระยะการผลิต",
+      "vi": "Giai đoạn sản xuất"
     },
-
-    "sex": {
-      "fr": "Veuillez préciser **le sexe**: mâle, femelle, ou sexes mélangés?",
-      "en": "Please specify **the sex**: male, female, or as-hatched?"
+    "Target objective": {
+      "fr": "Objectif recherché",
+      "es": "Objetivo deseado",
+      "de": "Zielobjektiv",
+      "it": "Obiettivo target",
+      "pt": "Objetivo alvo",
+      "th": "เป้าหมาย",
+      "vi": "Mục tiêu"
     },
-
-    "metric": {
-      "fr": "Veuillez préciser **la métrique** recherchée. Par exemple: poids vif, FCR (indice de conversion), mortalité, ponte.",
-      "en": "Please specify **the metric** of interest. For example: body weight, FCR (feed conversion ratio), mortality, egg production."
+    "Breed": {
+      "fr": "Race",
+      "es": "Raza",
+      "de": "Rasse",
+      "it": "Razza",
+      "pt": "Raça",
+      "th": "สายพันธุ์",
+      "vi": "Giống"
     },
-
-    "production_phase": {
-      "fr": "Veuillez préciser **la phase de production**: démarrage (0-10j), croissance (11-24j), finition (25j+), ou ponte?",
-      "en": "Please specify **the production phase**: starter (0-10d), grower (11-24d), finisher (25d+), or laying?"
+    "Observed symptoms": {
+      "fr": "Symptômes observés",
+      "es": "Síntomas observados",
+      "de": "Beobachtete Symptome",
+      "it": "Sintomi osservati",
+      "pt": "Sintomas observados",
+      "th": "อาการที่สังเกต",
+      "vi": "Triệu chứng quan sát"
     },
-
-    "symptom": {
-      "fr": "Veuillez décrire **les symptômes observés** en détail: mortalité (%), aspect des fèces, lésions, comportement anormal.",
-      "en": "Please describe **the observed symptoms** in detail: mortality (%), fecal appearance, lesions, abnormal behavior."
+    "Flock age": {
+      "fr": "Âge du lot",
+      "es": "Edad del lote",
+      "de": "Herdenalter",
+      "it": "Età del gruppo",
+      "pt": "Idade do lote",
+      "th": "อายุของฝูง",
+      "vi": "Tuổi đàn"
     },
-
-    "objective": {
-      "fr": "Veuillez préciser **votre objectif**: maximiser la croissance, optimiser le FCR, réduire la mortalité, améliorer la qualité carcasse?",
-      "en": "Please specify **your objective**: maximize growth, optimize FCR, reduce mortality, improve carcass quality?"
+    "Current age": {
+      "fr": "Âge actuel",
+      "es": "Edad actual",
+      "de": "Aktuelles Alter",
+      "it": "Età attuale",
+      "pt": "Idade atual",
+      "th": "อายุปัจจุบัน",
+      "vi": "Tuổi hiện tại"
+    },
+    "Metric of interest": {
+      "fr": "Métrique concernée",
+      "es": "Métrica de interés",
+      "de": "Interessierende Metrik",
+      "it": "Metrica di interesse",
+      "pt": "Métrica de interesse",
+      "th": "ตัวชี้วัดที่สนใจ",
+      "vi": "Chỉ số quan tâm"
+    },
+    "Farm size": {
+      "fr": "Taille d'exploitation",
+      "es": "Tamaño de granja",
+      "de": "Betriebsgröße",
+      "it": "Dimensione allevamento",
+      "pt": "Tamanho da fazenda",
+      "th": "ขนาดฟาร์ม",
+      "vi": "Quy mô trang trại"
+    },
+    "Priority objective": {
+      "fr": "Objectif prioritaire",
+      "es": "Objetivo prioritario",
+      "de": "Vorrangiges Ziel",
+      "it": "Obiettivo prioritario",
+      "pt": "Objetivo prioritário",
+      "th": "เป้าหมายหลัก",
+      "vi": "Mục tiêu ưu tiên"
+    },
+    "Example": {
+      "fr": "Par exemple",
+      "es": "Ejemplo",
+      "de": "Beispiel",
+      "it": "Esempio",
+      "pt": "Exemplo",
+      "th": "ตัวอย่าง",
+      "vi": "Ví dụ"
+    },
+    "Please specify": {
+      "fr": "Veuillez préciser",
+      "es": "Por favor especifique",
+      "de": "Bitte angeben",
+      "it": "Si prega di specificare",
+      "pt": "Por favor especifique",
+      "th": "โปรดระบุ",
+      "vi": "Vui lòng chỉ rõ"
+    },
+    "For example": {
+      "fr": "Par exemple",
+      "es": "Por ejemplo",
+      "de": "Zum Beispiel",
+      "it": "Per esempio",
+      "pt": "Por exemplo",
+      "th": "ตัวอย่างเช่น",
+      "vi": "Ví dụ"
+    },
+    "To provide accurate nutritional advice, I need": {
+      "fr": "Pour vous donner une recommandation nutritionnelle précise, j'ai besoin de savoir",
+      "es": "Para brindar asesoramiento nutricional preciso, necesito",
+      "de": "Um präzise Ernährungsberatung zu geben, benötige ich",
+      "it": "Per fornire consigli nutrizionali accurati, ho bisogno di",
+      "pt": "Para fornecer aconselhamento nutricional preciso, preciso de",
+      "th": "เพื่อให้คำแนะนำด้านโภชนาการที่แม่นยำ ฉันต้องการ",
+      "vi": "Để cung cấp lời khuyên dinh dưỡng chính xác, tôi cần"
+    },
+    "You mention a health issue. For accurate diagnosis, can you detail": {
+      "fr": "Vous mentionnez un problème de santé. Pour un diagnostic précis, pouvez-vous détailler",
+      "es": "Usted menciona un problema de salud. Para un diagnóstico preciso, ¿puede detallar",
+      "de": "Sie erwähnen ein Gesundheitsproblem. Für eine genaue Diagnose können Sie bitte",
+      "it": "Lei menziona un problema di salute. Per una diagnosi accurata, può dettagliare",
+      "pt": "Você menciona um problema de saúde. Para um diagnóstico preciso, pode detalhar",
+      "th": "คุณกล่าวถึงปัญหาสุขภาพ เพื่อการวินิจฉัยที่แม่นยำ คุณสามารถอธิบาย",
+      "vi": "Bạn đề cập đến vấn đề sức khỏe. Để chẩn đoán chính xác, bạn có thể chi tiết"
+    },
+    "To analyze performance, I need details": {
+      "fr": "Pour analyser la performance, j'ai besoin de précisions",
+      "es": "Para analizar el rendimiento, necesito detalles",
+      "de": "Zur Leistungsanalyse benötige ich Details",
+      "it": "Per analizzare le prestazioni, ho bisogno di dettagli",
+      "pt": "Para analisar o desempenho, preciso de detalhes",
+      "th": "เพื่อวิเคราะห์ประสิทธิภาพ ฉันต้องการรายละเอียด",
+      "vi": "Để phân tích hiệu suất, tôi cần chi tiết"
     }
   },
 
   "contextual_examples": {
-    "good_question_nutrition_fr": "Quelle formule nutritionnelle pour Ross 308 en phase croissance (15-28 jours) pour optimiser le FCR?",
-    "good_question_health_fr": "Ross 308, 22 jours, mortalité 3%/jour depuis 2 jours avec fèces sanguinolentes - diagnostic?",
-    "good_question_performance_fr": "Quel poids cible pour Cobb 500 mâle à 42 jours selon standards génétiques?",
-    "good_question_management_fr": "Comment réduire mortalité de 2 points sur ferme 30,000 sujets avec budget 20k€?",
-
-    "bad_question_nutrition_fr": "Quelle alimentation donner?",
-    "bad_question_health_fr": "Mes poulets sont malades, que faire?",
-    "bad_question_performance_fr": "C'est quoi un bon poids?",
-    "bad_question_management_fr": "Comment améliorer mes résultats?"
+    "good_question_nutrition": "What nutritional formula for Ross 308 in grower phase (15-28 days) to optimize FCR?",
+    "good_question_health": "Ross 308, 22 days, 3% daily mortality for 2 days with bloody droppings - diagnosis?",
+    "good_question_performance": "What target weight for Cobb 500 male at 42 days according to genetic standards?",
+    "good_question_management": "How to reduce mortality by 2 points on 30,000 bird farm with 20k€ budget?",
+    "bad_question_nutrition": "What feed to give?",
+    "bad_question_health": "My chickens are sick, what to do?",
+    "bad_question_performance": "What is a good weight?",
+    "bad_question_management": "How to improve my results?"
   },
 
   "usage_notes": {
-    "description": "Utiliser ces stratégies pour améliorer les messages de clarification",
-    "integration": "Charger via utils/clarification_helper.py et utiliser dans rag_query_processor.py",
-    "fallback": "Si aucune stratégie ne correspond, utiliser missing_field_templates"
+    "description": "Use these strategies to improve clarification messages",
+    "integration": "Load via utils/clarification_helper.py and use in rag_query_processor.py",
+    "fallback": "If no strategy matches, use missing_field_templates",
+    "translation": "Helper should translate labels using label_translations mapping based on detected language"
   }
 }

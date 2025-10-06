@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 clarification_helper.py - Helper pour messages de clarification intelligents
-Charge et utilise clarification_strategies.json pour questions contextuelles
+Version 2.0 - Templates EN avec traduction dynamique
 """
 
 import json
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class ClarificationHelper:
-    """Gère les messages de clarification intelligents"""
+    """Gère les messages de clarification intelligents avec traduction dynamique"""
 
     def __init__(self, config_path: str = "config/clarification_strategies.json"):
         """
@@ -27,6 +27,7 @@ class ClarificationHelper:
         self.missing_field_templates = self.strategies.get(
             "missing_field_templates", {}
         )
+        self.label_translations = self.strategies.get("label_translations", {})
 
     def _load_strategies(self, config_path: str) -> Dict:
         """Charge les stratégies depuis le fichier JSON"""
@@ -49,6 +50,30 @@ class ClarificationHelper:
         except Exception as e:
             logger.error(f"Erreur chargement clarification_strategies.json: {e}")
             return {}
+
+    def _translate_message(self, message_en: str, language: str) -> str:
+        """
+        Traduit un message EN vers la langue cible en utilisant label_translations
+
+        Args:
+            message_en: Message en anglais
+            language: Code langue cible (fr, es, th, etc.)
+
+        Returns:
+            Message traduit (ou EN si langue non supportée)
+        """
+        if language == "en" or not self.label_translations:
+            return message_en
+
+        translated = message_en
+
+        # Traduire chaque label trouvé dans le message
+        for label_en, translations in self.label_translations.items():
+            target_translation = translations.get(language, label_en)
+            # Remplacer le label EN par la traduction
+            translated = translated.replace(label_en, target_translation)
+
+        return translated
 
     def detect_ambiguity_type(
         self, query: str, missing_fields: List[str], entities: Dict
@@ -202,8 +227,9 @@ class ClarificationHelper:
 
         # Si type détecté, utiliser la stratégie spécifique
         if ambiguity_type and ambiguity_type in self.ambiguity_types:
-            strategy = self.ambiguity_types[ambiguity_type]
-            message = strategy.get(language, strategy.get("fr", ""))
+            message_en = self.ambiguity_types[ambiguity_type]
+            # Traduire le template EN vers la langue cible
+            message = self._translate_message(message_en, language)
             if message:
                 # Personnaliser le message en fonction des entités déjà connues
                 message = self._customize_message(message, entities, missing_fields, language)
@@ -219,59 +245,44 @@ class ClarificationHelper:
         self, missing_fields: List[str], language: str
     ) -> str:
         """
-        Construit un message basé sur les champs manquants
+        Construit un message basé sur les champs manquants (avec traduction)
 
         Args:
             missing_fields: Liste des champs manquants
             language: Langue
 
         Returns:
-            Message de clarification
+            Message de clarification traduit
         """
         if not missing_fields:
-            return (
-                "Informations manquantes pour traiter la requête."
-                if language == "fr"
-                else "Missing information to process the query."
-            )
+            message_en = "Missing information to process the query."
+            return self._translate_message(message_en, language)
 
         # Un seul champ manquant: message simple
         if len(missing_fields) == 1:
             field = missing_fields[0]
-            template = self.missing_field_templates.get(field, {})
-            message = template.get(language, template.get("fr", ""))
+            template_en = self.missing_field_templates.get(field, "")
 
-            if message:
-                return message
+            if template_en:
+                return self._translate_message(template_en, language)
 
             # Fallback générique
-            field_fr = self._translate_field_name(field)
-            return (
-                f"Veuillez préciser {field_fr} pour continuer."
-                if language == "fr"
-                else f"Please specify the {field} to continue."
-            )
+            message_en = f"Please specify the {field} to continue."
+            return self._translate_message(message_en, language)
 
         # Plusieurs champs manquants: liste
-        intro = (
-            "Pour vous aider au mieux, j'ai besoin de précisions sur:"
-            if language == "fr"
-            else "To help you best, I need details on:"
-        )
+        intro_en = "To help you best, I need details on:"
+        intro = self._translate_message(intro_en, language)
 
         field_messages = []
         for field in missing_fields:
-            template = self.missing_field_templates.get(field, {})
-            field_msg = template.get(language, template.get("fr", ""))
+            template_en = self.missing_field_templates.get(field, "")
 
-            if not field_msg:
+            if template_en:
+                field_msg = self._translate_message(template_en, language)
+            else:
                 # Fallback
-                field_fr = self._translate_field_name(field)
-                field_msg = (
-                    f"**{field_fr.capitalize()}**"
-                    if language == "fr"
-                    else f"**{field.capitalize()}**"
-                )
+                field_msg = f"**{field.capitalize()}**"
 
             field_messages.append(f"- {field_msg}")
 
@@ -284,85 +295,53 @@ class ClarificationHelper:
         Personnalise le message de clarification en ne demandant que ce qui manque vraiment
 
         Args:
-            message: Message de clarification de base
+            message: Message de clarification de base (déjà traduit)
             entities: Entités déjà extraites
             missing_fields: Champs manquants
             language: Langue
 
         Returns:
-            Message personnalisé
+            Message personnalisé (traduit)
         """
-        # Construire les éléments à demander
+        # Construire les éléments à demander (EN puis traduire)
         items_to_ask = []
 
         # Vérifier breed
         if "breed" in missing_fields and not entities.get("breed"):
-            if language == "fr":
-                items_to_ask.append("**Race**: Ross 308, Cobb 500, autre?")
-            else:
-                items_to_ask.append("**Breed**: Ross 308, Cobb 500, other?")
+            item_en = "**Breed**: Ross 308, Cobb 500, other?"
+            items_to_ask.append(self._translate_message(item_en, language))
 
         # Vérifier age
         if "age" in missing_fields and not entities.get("age_days"):
-            if language == "fr":
-                items_to_ask.append("**Âge**: en jours ou semaines (ex: 21 jours, 35 jours)?")
-            else:
-                items_to_ask.append("**Age**: in days or weeks (e.g., 21 days, 35 days)?")
+            item_en = "**Age**: in days or weeks (e.g., 21 days, 35 days)?"
+            items_to_ask.append(self._translate_message(item_en, language))
 
         # Vérifier sex
         if "sex" in missing_fields and not entities.get("sex"):
-            if language == "fr":
-                items_to_ask.append("**Sexe**: mâle, femelle, ou sexes mélangés?")
-            else:
-                items_to_ask.append("**Sex**: male, female, or as-hatched?")
+            item_en = "**Sex**: male, female, or as-hatched?"
+            items_to_ask.append(self._translate_message(item_en, language))
 
         # Vérifier metric
         if "metric" in missing_fields and not entities.get("metric_type"):
-            if language == "fr":
-                items_to_ask.append("**Métrique**: poids vif, FCR, mortalité, uniformité?")
-            else:
-                items_to_ask.append("**Metric**: body weight, FCR, mortality, uniformity?")
+            item_en = "**Metric**: body weight, FCR, mortality, uniformity?"
+            items_to_ask.append(self._translate_message(item_en, language))
 
         # Si aucun item à demander, retourner message original
         if not items_to_ask:
             return message
 
         # Construire le message personnalisé
-        if language == "fr":
-            intro = "Pour analyser la performance"
-            if entities.get("breed"):
-                intro += f" du {entities['breed']}"
-            intro += ", j'ai besoin de préciser:"
-        else:
-            intro = "To analyze performance"
-            if entities.get("breed"):
-                intro += f" of {entities['breed']}"
-            intro += ", I need to know:"
+        intro_en = "To analyze performance"
+        if entities.get("breed"):
+            intro_en += f" of {entities['breed']}"
+        intro_en += ", I need to know:"
+
+        intro = self._translate_message(intro_en, language)
 
         custom_message = intro + "\n" + "\n".join(f"- {item}" for item in items_to_ask)
 
-        # Ne plus ajouter d'exemple - l'utilisateur doit juste fournir l'info manquante
         return custom_message
 
-    def _translate_field_name(self, field: str) -> str:
-        """Traduit le nom d'un champ en français"""
-        translations = {
-            "breed": "la race",
-            "age": "l'âge",
-            "sex": "le sexe",
-            "gender": "le sexe",
-            "weight": "le poids",
-            "metric": "la métrique",
-            "period": "la période",
-            "date": "la date",
-            "location": "le lieu",
-            "building": "le bâtiment",
-            "batch": "le lot",
-            "production_phase": "la phase de production",
-            "symptom": "les symptômes",
-            "objective": "l'objectif",
-        }
-        return translations.get(field, field)
 
 
 # Factory singleton
