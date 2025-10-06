@@ -90,6 +90,8 @@ class UserProfileResponse(BaseModel):
 class UserProfileData(BaseModel):
     user_id: str
     email: str
+    tenant_id: Optional[str] = None  # 🆕 Pour isolation mémoire conversationnelle
+    organization_id: Optional[str] = None  # 🆕 Fallback pour tenant_id
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     full_name: Optional[str] = None
@@ -175,6 +177,8 @@ async def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_us
         return UserProfileData(
             user_id=current_user["user_id"],
             email=current_user["email"],
+            tenant_id=profile_data.get("tenant_id"),  # 🆕 Pour isolation mémoire
+            organization_id=profile_data.get("organization_id"),  # 🆕 Fallback
             first_name=profile_data.get("first_name"),
             last_name=profile_data.get("last_name"),
             full_name=profile_data.get("full_name"),

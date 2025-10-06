@@ -547,38 +547,41 @@ export const generateAIResponse = async (
   });
 
   try {
-    // ✅ Récupération du tenant_id depuis le profil utilisateur Supabase
+    // ✅ Récupération du tenant_id via endpoint backend (pas de Supabase direct)
     let tenant_id = "ten_demo"; // Fallback par défaut
 
     try {
-      const supabase = getSupabaseClient();
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("tenant_id, organization_id")
-        .eq("id", user.id)
-        .single();
+      // Appel endpoint backend au lieu de Supabase directement
+      const authHeaders = await getAuthHeaders();
+      const profileResponse = await fetch(`${API_BASE_URL}/users/profile`, {
+        method: "GET",
+        headers: authHeaders,
+      });
 
-      if (profileError) {
+      if (!profileResponse.ok) {
         console.warn(
-          "[apiService] Erreur récupération profil:",
-          profileError.message,
+          "[apiService] Erreur récupération profil backend:",
+          profileResponse.status,
         );
-      } else if (profile) {
-        // Prioriser tenant_id, puis organization_id
-        tenant_id =
-          profile.tenant_id || profile.organization_id || `user_${user.id}`;
-        console.log("[apiService] tenant_id récupéré depuis profil:", tenant_id);
-      } else {
-        // Si pas de profil, utiliser user.id comme tenant
         tenant_id = `user_${user.id}`;
+      } else {
+        const profileData = await profileResponse.json();
+        console.log("[apiService] Profil reçu du backend:", profileData);
+
+        // Prioriser tenant_id, puis organization_id, sinon user.id
+        tenant_id =
+          profileData.tenant_id ||
+          profileData.organization_id ||
+          `user_${user.id}`;
+
         console.log(
-          "[apiService] Pas de profil trouvé - tenant_id généré:",
+          "[apiService] tenant_id extrait du backend:",
           tenant_id,
         );
       }
     } catch (error) {
       console.error(
-        "[apiService] Exception récupération tenant_id:",
+        "[apiService] Exception récupération tenant_id via backend:",
         error,
       );
       // Fallback: utiliser user.id comme tenant
