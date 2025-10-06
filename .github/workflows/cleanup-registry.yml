@@ -1,15 +1,15 @@
 name: Container Registry Cleanup
 
 on:
-  # Run after each deployment completes
-  workflow_run:
-    workflows: ["Smart Selective Build and Deploy"]
-    types:
-      - completed
+  # Disabled automatic cleanup after deployment (Autodeploy handles images)
+  # workflow_run:
+  #   workflows: ["Smart Selective Build and Deploy"]
+  #   types:
+  #     - completed
 
-  # Also run on schedule (daily at 2 AM)
+  # Run on schedule (weekly on Sunday at 2 AM)
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * 0'  # Sunday at 2 AM
 
   # Allow manual trigger
   workflow_dispatch:
