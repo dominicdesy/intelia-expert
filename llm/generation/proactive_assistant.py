@@ -432,8 +432,46 @@ class ProactiveAssistant:
 
         Returns:
             Filled template string
+
+        🆕 VALIDATION: Check that all placeholders have values before filling
+        If a placeholder is missing, use generic template without placeholders
         """
         entities = entities or {}
+
+        # 🆕 DETECT PLACEHOLDERS in template
+        import re
+        placeholders = re.findall(r'\{(\w+)\}', template)
+
+        # 🆕 VALIDATE all placeholders have values
+        missing_placeholders = []
+        for placeholder in placeholders:
+            if placeholder == "metric":
+                if not entities.get("metric_type"):
+                    missing_placeholders.append(placeholder)
+            elif placeholder == "disease":
+                if not entities.get("disease_name"):
+                    missing_placeholders.append(placeholder)
+
+        # 🆕 If ANY placeholder is missing, use generic template
+        if missing_placeholders:
+            logger.warning(
+                f"Template placeholders missing: {missing_placeholders} - using generic template"
+            )
+            generic_templates = {
+                "fr": "Puis-je vous aider avec autre chose ?",
+                "en": "Can I help you with anything else?",
+                "es": "¿Puedo ayudarlo con algo más?",
+                "de": "Kann ich Ihnen sonst noch weiterhelfen?",
+                "it": "Posso aiutarla con qualcos'altro?",
+                "pt": "Posso ajudá-lo com mais alguma coisa?",
+                "pl": "Czy mogę Panu/Pani pomóc w czymś innym?",
+                "nl": "Kan ik u nog ergens anders mee helpen?",
+                "id": "Dapatkah saya membantu Anda dengan hal lain?",
+                "hi": "क्या मैं आपकी किसी और चीज़ में मदद कर सकता हूं?",
+                "zh": "我还能帮您什么吗？",
+                "th": "ฉันสามารถช่วยคุณในเรื่องอื่นได้หรือไม่?",
+            }
+            return generic_templates.get(language, generic_templates["fr"])
 
         # Metric name mapping by language
         metric_names = {

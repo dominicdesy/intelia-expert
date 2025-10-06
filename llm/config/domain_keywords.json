@@ -243,6 +243,16 @@
         "reason": "Santé prime sur nutrition (ex: 'aliment pour poulet malade')"
       },
       {
+        "condition": "health + management",
+        "priority": "health",
+        "reason": "Santé prime sur management pour questions médicales (ex: 'maladies dans les élevages')"
+      },
+      {
+        "condition": "health + economics",
+        "priority": "health",
+        "reason": "Santé prime sur economics pour questions médicales"
+      },
+      {
         "condition": "genetics + metrics",
         "priority": "genetics",
         "reason": "Performance génétique englobe les métriques"

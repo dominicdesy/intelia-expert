@@ -828,6 +828,31 @@ class QueryRouter:
         missing = []
         validation_details = {}
 
+        # 🆕 DÉTECTION QUESTIONS GÉNÉRALES - Ne requièrent PAS breed/age
+        general_question_patterns = [
+            # Questions générales santé
+            r"\b(quelle|quelles)\s+(maladie|pathologie)",
+            r"\b(comment)\s+(prévenir|traiter|éviter|diagnostiquer)",
+            r"\b(quels?)\s+(symptôme|signe|cause)",
+            r"\b(quelles?)\s+(sont\s+les|causes|solutions)",
+            # Questions générales management
+            r"\b(comment)\s+(améliorer|optimiser|gérer)",
+            r"\b(quels?)\s+(facteurs?|paramètres?|éléments?)",
+            # Pattern: Questions au pluriel sans mention de race/âge
+            r"\b(maladies?|pathologies?)\s+(les\s+plus|fréquent|commun)",
+        ]
+
+        query_lower = query.lower()
+        is_general_question = any(
+            re.search(pattern, query_lower) for pattern in general_question_patterns
+        )
+
+        if is_general_question:
+            logger.info(f"📚 Question générale détectée → Weaviate (pas de breed/age requis)")
+            validation_details["validation_type"] = "general_question"
+            validation_details["required_fields"] = []
+            return (True, [], validation_details)
+
         # Déterminer si requête nécessite données PostgreSQL
         needs_postgresql = self.config.should_route_to_postgresql(query, language)
 
