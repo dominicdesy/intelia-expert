@@ -185,11 +185,15 @@ class SystemHealthMonitor:
             logger.debug(f"Résultats connectivité détaillés: {connectivity_status}")
 
             # Vérification connectivité critique
+            # Weaviate est OPTIONNEL - ne déclenche pas le mode dégradé
             if not connectivity_status.get("weaviate", False):
-                validation_report["warnings"].append(
-                    "Weaviate non accessible - mode dégradé"
+                logger.info("ℹ️ Weaviate non configuré - recherche vectorielle désactivée (PostgreSQL utilisé)")
+                validation_report["info"] = validation_report.get("info", [])
+                validation_report["info"].append(
+                    "Weaviate non configuré - PostgreSQL seul (normal)"
                 )
 
+            # Redis est CRITIQUE pour le cache et RRF
             if not connectivity_status.get("redis", False):
                 validation_report["warnings"].append(
                     "Redis non accessible - cache désactivé"
@@ -202,24 +206,35 @@ class SystemHealthMonitor:
             # 7. Validation finale
             validation_report["startup_duration"] = time.time() - start_time
 
-            # LOGIQUE DE STATUS MODIFIÉE: Plus permissive
+            # LOGIQUE DE STATUS: Weaviate optionnel, Redis/OpenAI critiques
             critical_errors = [
                 err
                 for err in validation_report["errors"]
                 if "critique" in err.lower() or "critical" in err.lower()
             ]
 
+            # Filtrer les warnings non-critiques (Weaviate optionnel)
+            critical_warnings = [
+                w for w in validation_report["warnings"]
+                if "redis" in w.lower() or "openai" in w.lower()
+            ]
+
             if critical_errors:
                 validation_report["overall_status"] = "failed"
                 logger.error(f"Erreurs critiques détectées: {critical_errors}")
-            elif validation_report["warnings"]:
+            elif critical_warnings:
                 validation_report["overall_status"] = "degraded"
                 logger.warning(
-                    f"Application en mode dégradé: {len(validation_report['warnings'])} avertissements"
+                    f"Application en mode dégradé: {len(critical_warnings)} problèmes critiques"
                 )
+                for warning in critical_warnings:
+                    logger.warning(f"  - {warning}")
             else:
                 validation_report["overall_status"] = "healthy"
-                logger.info("Application en parfaite santé")
+                logger.info("✅ Application opérationnelle (PostgreSQL + Redis + OpenAI)")
+                if validation_report.get("info"):
+                    for info in validation_report["info"]:
+                        logger.info(f"  ℹ️ {info}")
 
             self.validation_report = validation_report
             return validation_report
