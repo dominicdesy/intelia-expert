@@ -312,6 +312,18 @@ class ChatHandlers:
                     )
                     await asyncio.sleep(0.01)  # Petit délai pour fluidité
 
+            # Envoyer follow-up proactif si disponible (message séparé)
+            proactive_followup = metadata.get("proactive_followup")
+            if proactive_followup and isinstance(proactive_followup, str):
+                logger.info(f"📤 Envoi follow-up proactif: {proactive_followup[:80]}...")
+                yield sse_event(
+                    {
+                        "type": "proactive_followup",
+                        "suggestion": proactive_followup,
+                    }
+                )
+                await asyncio.sleep(0.01)
+
             # Extraction documents utilisés
             context_docs = safe_get_attribute(rag_result, "context_docs", [])
             if not isinstance(context_docs, list):

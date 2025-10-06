@@ -152,12 +152,10 @@ class RAGResponseGenerator:
                     language=language,
                 )
 
-                # Append follow-up to answer if generated
+                # Store follow-up in metadata (will be sent as separate SSE event)
                 if follow_up and follow_up.strip():
-                    result.answer = f"{result.answer}\n\n{follow_up}"
-                    result.metadata["proactive_followup_added"] = True
                     result.metadata["proactive_followup"] = follow_up
-                    logger.info(f"✅ Proactive follow-up added: {follow_up[:80]}...")
+                    logger.info(f"✅ Proactive follow-up generated: {follow_up[:80]}...")
                 else:
                     logger.debug("No proactive follow-up generated for this query")
 
