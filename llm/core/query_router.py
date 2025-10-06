@@ -326,10 +326,30 @@ class ConfigManager:
         return None
 
     def get_contextual_patterns(self, language: str) -> List[str]:
-        """Retourne les patterns contextuels pour une langue"""
+        """
+        Retourne les patterns contextuels pour une langue depuis universal_terms
+
+        Extrait tous les variants de contextual_references pour construire
+        les patterns regex de détection contextuelle
+        """
         lang_terms = self.universal_terms.get(language, {})
-        contextual = lang_terms.get("contextual_references", {})
-        return contextual.get("patterns", [])
+        contextual = lang_terms.get("domains", {}).get("contextual_references", {})
+
+        # Extraire tous les variants de toutes les clés (same, and_for, females, etc.)
+        patterns = []
+        for key, term_data in contextual.items():
+            if isinstance(term_data, dict) and "variants" in term_data:
+                variants = term_data["variants"]
+                # Convertir variants en regex patterns avec word boundaries
+                for variant in variants:
+                    # Échapper les caractères spéciaux regex, puis ajouter word boundaries
+                    escaped = re.escape(variant)
+                    patterns.append(rf"\b{escaped}\b")
+
+        if patterns:
+            logger.debug(f"✅ Loaded {len(patterns)} contextual patterns for {language}")
+
+        return patterns
 
     def should_route_to_postgresql(self, query: str, language: str = None) -> bool:
         """Détermine si la query doit aller vers PostgreSQL"""
@@ -601,41 +621,25 @@ class QueryRouter:
         )
 
     def _is_contextual(self, query: str, language: str) -> bool:
-        """Détection de références contextuelles via universal_terms"""
+        """
+        Détection de références contextuelles via universal_terms
 
-        # Récupérer patterns depuis config
+        Charge dynamiquement les patterns depuis universal_terms_XX.json
+        au lieu d'utiliser du texte hardcodé
+        """
+        # Récupérer patterns depuis universal_terms
         patterns = self.config.get_contextual_patterns(language)
 
         if not patterns:
-            # Fallback patterns multilingues si universal_terms incomplet
-            fallback_patterns = {
-                "fr": [
-                    r"\bmême\b",
-                    r"\bau même\b",
-                    r"\bet pour\b",
-                    r"\bfemelles?\b",
-                    r"\bmâles?\b",
-                ],
-                "en": [
-                    r"\bsame\b",
-                    r"\bat the same\b",
-                    r"\bwhat about\b",
-                    r"\bfemales?\b",
-                    r"\bmales?\b",
-                ],
-                "es": [
-                    r"\bmismo\b",
-                    r"\bal mismo\b",
-                    r"\by para\b",
-                    r"\bhembras?\b",
-                    r"\bmachos?\b",
-                ],
-            }
-            patterns = fallback_patterns.get(language, fallback_patterns["en"])
+            logger.warning(
+                f"⚠️ No contextual patterns loaded for language '{language}'. "
+                f"Check config/universal_terms_{language}.json"
+            )
+            return False
 
         query_lower = query.lower()
         for pattern in patterns:
-            if re.search(pattern, query_lower):
+            if re.search(pattern, query_lower, re.IGNORECASE):
                 logger.debug(f"🔗 Référence contextuelle détectée: '{pattern}'")
                 return True
 
