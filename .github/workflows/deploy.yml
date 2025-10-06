@@ -69,16 +69,18 @@ jobs:
         with:
           context: ./frontend
           push: true
+          platforms: linux/amd64
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
+          provenance: false
+          sbom: false
           build-args: |
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-            BUILDKIT_INLINE_CACHE=1
 
   build-backend:
     runs-on: ubuntu-latest
@@ -102,13 +104,15 @@ jobs:
         with:
           context: ./backend
           push: true
+          platforms: linux/amd64
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
-          build-args: BUILDKIT_INLINE_CACHE=1
+          provenance: false
+          sbom: false
 
   build-llm:
     runs-on: ubuntu-latest
@@ -132,13 +136,15 @@ jobs:
         with:
           context: ./llm
           push: true
+          platforms: linux/amd64
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
-          build-args: BUILDKIT_INLINE_CACHE=1
+          provenance: false
+          sbom: false
 
   build-rag:
     runs-on: ubuntu-latest
@@ -162,13 +168,15 @@ jobs:
         with:
           context: ./rag
           push: true
+          platforms: linux/amd64
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-rag:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-rag:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-rag:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-rag:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-rag:buildcache,mode=max
-          build-args: BUILDKIT_INLINE_CACHE=1
+          provenance: false
+          sbom: false
 
   deploy:
     name: Deploy to DigitalOcean App Platform
