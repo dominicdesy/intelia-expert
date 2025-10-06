@@ -160,14 +160,18 @@ class ConversationalQueryEnricher:
         return query
 
     def extract_entities_from_context(
-        self, contextual_history: str, language: str = "fr"
+        self, contextual_history: str, language: str = "fr", current_query: str = ""
     ) -> Dict[str, any]:
         """
         Extract structured entities from conversation history for router
 
+        IMPORTANT: Only extract missing entities to avoid contaminating standalone queries
+        If current query already contains breed + metric, do NOT extract age from context
+
         Args:
             contextual_history: Formatted conversation history
             language: Query language
+            current_query: Current user query (to detect if it's standalone vs follow-up)
 
         Returns:
             Dict with extracted entities (breed, age_days, sex, etc.)
@@ -177,6 +181,31 @@ class ConversationalQueryEnricher:
 
         entities = {}
         history_lower = contextual_history.lower()
+
+        # 🔍 Detect if current query is a standalone complete question
+        current_query_lower = current_query.lower() if current_query else ""
+
+        # Check if current query contains breed + metric (indicates standalone question)
+        has_breed_in_query = any(
+            breed in current_query_lower
+            for breed in ["ross", "cobb", "hubbard", "aviagen", "isa", "lohmann"]
+        )
+        has_metric_in_query = any(
+            metric in current_query_lower
+            for metric in ["poids", "weight", "fcr", "mortalité", "mortality", "ponte", "consommation", "gain"]
+        )
+
+        is_standalone_query = has_breed_in_query and has_metric_in_query
+
+        if is_standalone_query:
+            logger.info(
+                f"🚫 Standalone query detected (breed + metric present) - "
+                f"will NOT extract age from context to avoid contamination"
+            )
+        else:
+            logger.debug(
+                f"✅ Follow-up query detected - will extract all entities from context"
+            )
 
         # Extract breed
         breed_patterns = [
@@ -193,29 +222,35 @@ class ConversationalQueryEnricher:
                 logger.debug(f"Breed extracted from context: {breed_name}")
                 break
 
-        # Extract age in days
-        # First, remove examples from history to avoid extracting from them
-        history_cleaned = re.sub(
-            r'(?:ex:|exemple:|example:).*?(?:\)|$)',  # Remove text after "ex:" until ) or end
-            '',
-            history_lower,
-            flags=re.IGNORECASE | re.DOTALL
-        )
+        # Extract age in days - BUT ONLY if this is a follow-up question
+        # 🔒 PROTECTION: Don't extract age for standalone queries to avoid contamination
+        if not is_standalone_query:
+            # First, remove examples from history to avoid extracting from them
+            history_cleaned = re.sub(
+                r'(?:ex:|exemple:|example:).*?(?:\)|$)',  # Remove text after "ex:" until ) or end
+                '',
+                history_lower,
+                flags=re.IGNORECASE | re.DOTALL
+            )
 
-        age_patterns = [
-            r"(\d+)\s*(?:jour|day)s?",
-            r"(\d+)\s*j\b",
-            r"day\s*(\d+)",
-            r"à\s*(\d+)",
-        ]
+            age_patterns = [
+                r"(\d+)\s*(?:jour|day)s?",
+                r"(\d+)\s*j\b",
+                r"day\s*(\d+)",
+                r"à\s*(\d+)",
+            ]
 
-        for pattern in age_patterns:
-            match = re.search(pattern, history_cleaned)
-            if match:
-                age_days = int(match.group(1))
-                entities["age_days"] = age_days
-                logger.debug(f"Age extracted from context: {age_days} days")
-                break
+            for pattern in age_patterns:
+                match = re.search(pattern, history_cleaned)
+                if match:
+                    age_days = int(match.group(1))
+                    entities["age_days"] = age_days
+                    logger.debug(f"Age extracted from context: {age_days} days")
+                    break
+        else:
+            logger.info(
+                f"🔒 Skipping age extraction from context (standalone query with breed + metric)"
+            )
 
         # Extract sex
         sex_keywords = {

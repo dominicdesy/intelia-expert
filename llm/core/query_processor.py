@@ -126,9 +126,10 @@ class RAGQueryProcessor:
         extracted_entities = None
         if contextual_history and self.conversation_memory:
             # Always try to extract entities from enriched context
+            # 🔒 Pass current query to prevent age contamination in standalone queries
             try:
                 extracted_entities = self.enricher.extract_entities_from_context(
-                    contextual_history, language
+                    contextual_history, language, current_query=query
                 )
                 if extracted_entities:
                     logger.info(
