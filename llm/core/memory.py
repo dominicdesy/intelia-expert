@@ -325,7 +325,7 @@ class ConversationMemory:
                 return True
 
         # Détection d'âge en jours
-        if "age_days" in missing:
+        if "age_days" in missing or "age" in missing:  # 🔧 Support both field names
             import re
 
             # Patterns: "21 jours", "35 days", "42j", "3 semaines"
