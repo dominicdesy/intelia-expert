@@ -82,7 +82,8 @@ class ChatHandlers:
         self,
         query: str,
         tenant_id: str,
-        language: str,
+        conversation_id: Optional[str] = None,  # 🆕 ID de session/conversation
+        language: str = "fr",
         use_json_search: bool = True,
         genetic_line_filter: Optional[str] = None,
         performance_context: Optional[Dict[str, Any]] = None,
@@ -100,7 +101,8 @@ class ChatHandlers:
 
         Args:
             query: Requête utilisateur
-            tenant_id: ID utilisateur (passé au router pour contexte)
+            tenant_id: ID utilisateur/organisation (identifie l'utilisateur)
+            conversation_id: ID de conversation (isole les sessions mémoire)
             language: Langue détectée
             use_json_search: Activer recherche JSON
             genetic_line_filter: Filtre lignée génétique
@@ -122,12 +124,16 @@ class ChatHandlers:
                 logger.error("RAG Engine sans méthode generate_response")
                 return None
 
-            logger.info(f"🎯 Appel RAG pour tenant={tenant_id}, lang={language}")
+            logger.info(
+                f"🎯 Appel RAG pour tenant={tenant_id}, "
+                f"conversation={conversation_id or 'none'}, lang={language}"
+            )
 
-            # Appel RAG - tenant_id est utilisé par le router pour le contexte
+            # Appel RAG - tenant_id identifie l'utilisateur, conversation_id isole la mémoire
             rag_result = await rag_engine.generate_response(
                 query=query,
                 tenant_id=tenant_id,
+                conversation_id=conversation_id,  # 🆕 Passer conversation_id
                 language=language,
                 use_json_search=use_json_search,
                 genetic_line_filter=genetic_line_filter,

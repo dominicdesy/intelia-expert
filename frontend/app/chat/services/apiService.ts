@@ -547,17 +547,43 @@ export const generateAIResponse = async (
   });
 
   try {
-    // Récupération du tenant_id depuis le profil utilisateur
-    let tenant_id = "ten_demo"; // Fallback
+    // ✅ Récupération du tenant_id depuis le profil utilisateur Supabase
+    let tenant_id = "ten_demo"; // Fallback par défaut
 
-    // TODO: Récupérer le vrai tenant_id depuis Supabase
-    // const supabase = getSupabaseClient()
-    // const { data: profile } = await supabase
-    //   .from('profiles')
-    //   .select('tenant_id, organization_id')
-    //   .eq('id', user.id)
-    //   .single()
-    // tenant_id = profile?.tenant_id || profile?.organization_id || 'ten_demo'
+    try {
+      const supabase = getSupabaseClient();
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("tenant_id, organization_id")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError) {
+        console.warn(
+          "[apiService] Erreur récupération profil:",
+          profileError.message,
+        );
+      } else if (profile) {
+        // Prioriser tenant_id, puis organization_id
+        tenant_id =
+          profile.tenant_id || profile.organization_id || `user_${user.id}`;
+        console.log("[apiService] tenant_id récupéré depuis profil:", tenant_id);
+      } else {
+        // Si pas de profil, utiliser user.id comme tenant
+        tenant_id = `user_${user.id}`;
+        console.log(
+          "[apiService] Pas de profil trouvé - tenant_id généré:",
+          tenant_id,
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[apiService] Exception récupération tenant_id:",
+        error,
+      );
+      // Fallback: utiliser user.id comme tenant
+      tenant_id = `user_${user.id}`;
+    }
 
     // Enrichissement clarification (conservé de l'ancien système)
     let finalQuestion = question.trim();

@@ -87,6 +87,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             message = body.get("message", "").strip()
             tenant_id = body.get("tenant_id", str(uuid.uuid4())[:8])
+            conversation_id = body.get("conversation_id")  # 🆕 ID de session/conversation
             genetic_line_filter = body.get("genetic_line_filter")
             use_json_search = body.get("use_json_search", True)
             performance_context = body.get("performance_context")
@@ -120,9 +121,11 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             # APPEL RAG DIRECT
             # Le router gère: contexte + extraction + validation + clarification
+            # 🆕 Passer conversation_id pour isolation mémoire
             rag_result = await chat_handlers.generate_rag_response(
                 query=message,
                 tenant_id=tenant_id,
+                conversation_id=conversation_id,  # 🆕 ID de session
                 language=detected_language,
                 use_json_search=use_json_search,
                 genetic_line_filter=genetic_line_filter,

@@ -274,6 +274,7 @@ class InteliaRAGEngine(InitializableMixin):
         self,
         query: str,
         tenant_id: str = "default",
+        conversation_id: Optional[str] = None,  # 🆕 ID de conversation pour isolation mémoire
         conversation_context: List[Dict] = None,
         language: Optional[str] = None,
         enable_preprocessing: bool = True,
@@ -284,7 +285,8 @@ class InteliaRAGEngine(InitializableMixin):
 
         Args:
             query: User query
-            tenant_id: Tenant identifier
+            tenant_id: Tenant identifier (user/organization)
+            conversation_id: Conversation ID (isolates memory sessions)
             conversation_context: Conversation history (list format)
             language: Query language
             enable_preprocessing: Enable preprocessing (deprecated, always uses QueryRouter)
@@ -325,10 +327,12 @@ class InteliaRAGEngine(InitializableMixin):
 
         try:
             # Process query through processor
+            # 🆕 Utiliser conversation_id comme session_id pour isolation mémoire
+            session_id = conversation_id or tenant_id  # Fallback to tenant_id if no conversation_id
             result = await self.query_processor.process_query(
                 query=query,
                 language=effective_language,
-                tenant_id=tenant_id,
+                tenant_id=session_id,  # Utiliser session_id pour ConversationMemory
                 start_time=start_time,
                 conversation_context=context_dict,
             )
