@@ -221,6 +221,69 @@
       "pt": "para",
       "th": "สำหรับ",
       "vi": "cho"
+    },
+    "Age": {
+      "fr": "Âge",
+      "es": "Edad",
+      "de": "Alter",
+      "it": "Età",
+      "pt": "Idade",
+      "th": "อายุ",
+      "vi": "Tuổi"
+    },
+    "Sex": {
+      "fr": "Sexe",
+      "es": "Sexo",
+      "de": "Geschlecht",
+      "it": "Sesso",
+      "pt": "Sexo",
+      "th": "เพศ",
+      "vi": "Giới tính"
+    },
+    "Metric": {
+      "fr": "Métrique",
+      "es": "Métrica",
+      "de": "Metrik",
+      "it": "Metrica",
+      "pt": "Métrica",
+      "th": "ตัวชี้วัด",
+      "vi": "Chỉ số"
+    },
+    "in days or weeks": {
+      "fr": "en jours ou semaines",
+      "es": "en días o semanas",
+      "de": "in Tagen oder Wochen",
+      "it": "in giorni o settimane",
+      "pt": "em dias ou semanas",
+      "th": "เป็นวันหรือสัปดาห์",
+      "vi": "theo ngày hoặc tuần"
+    },
+    "e.g.": {
+      "fr": "ex:",
+      "es": "ej:",
+      "de": "z.B.:",
+      "it": "es:",
+      "pt": "ex:",
+      "th": "เช่น:",
+      "vi": "vd:"
+    },
+    "male, female, or as-hatched": {
+      "fr": "mâle, femelle, ou mixte",
+      "es": "macho, hembra, o mixto",
+      "de": "männlich, weiblich, oder gemischt",
+      "it": "maschio, femmina, o misto",
+      "pt": "macho, fêmea, ou misto",
+      "th": "ตัวผู้, ตัวเมีย, หรือผสม",
+      "vi": "trống, mái, hoặc hỗn hợp"
+    },
+    "body weight, FCR, mortality, uniformity": {
+      "fr": "poids vif, IC, mortalité, uniformité",
+      "es": "peso vivo, IC, mortalidad, uniformidad",
+      "de": "Lebendgewicht, FVW, Mortalität, Gleichmäßigkeit",
+      "it": "peso vivo, IC, mortalità, uniformità",
+      "pt": "peso vivo, CA, mortalidade, uniformidade",
+      "th": "น้ำหนักตัว, อัตราการเปลี่ยนอาหาร, การตาย, ความสม่ำเสมอ",
+      "vi": "trọng lượng sống, FCR, tỷ lệ chết, đồng đều"
     }
   },
 

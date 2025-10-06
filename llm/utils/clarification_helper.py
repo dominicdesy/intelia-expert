@@ -67,8 +67,16 @@ class ClarificationHelper:
 
         translated = message_en
 
-        # Traduire chaque label trouvé dans le message
-        for label_en, translations in self.label_translations.items():
+        # 🔧 FIX: Trier labels par longueur DÉCROISSANTE pour éviter remplacements partiels
+        # Exemple: "To analyze performance" doit être remplacé AVANT "of" (sinon "perpourmance")
+        sorted_labels = sorted(
+            self.label_translations.items(),
+            key=lambda x: len(x[0]),
+            reverse=True
+        )
+
+        # Traduire chaque label trouvé dans le message (du plus long au plus court)
+        for label_en, translations in sorted_labels:
             target_translation = translations.get(language, label_en)
             # Remplacer le label EN par la traduction
             translated = translated.replace(label_en, target_translation)
@@ -349,7 +357,10 @@ class ClarificationHelper:
 
         if entities.get("breed"):
             of_label = self._translate_message("of", language)
-            context_parts.append(f"{of_label} {entities['breed']}")
+            # 🔧 FIX: Capitaliser le breed (ross 308 → Ross 308)
+            breed = entities['breed']
+            breed_capitalized = breed.title() if breed else breed
+            context_parts.append(f"{of_label} {breed_capitalized}")
 
         # Si une maladie est mentionnée dans les entités ou le message
         if entities.get("disease"):
