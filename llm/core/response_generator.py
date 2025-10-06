@@ -10,18 +10,38 @@ from .data_models import RAGResult
 
 logger = logging.getLogger(__name__)
 
+# Import ProactiveAssistant for follow-up questions
+try:
+    from generation.proactive_assistant import ProactiveAssistant
+    PROACTIVE_ASSISTANT_AVAILABLE = True
+except ImportError:
+    PROACTIVE_ASSISTANT_AVAILABLE = False
+    ProactiveAssistant = None
+    logger.warning("ProactiveAssistant not available")
+
 
 class RAGResponseGenerator:
     """Generates LLM responses from retrieved documents"""
 
-    def __init__(self, llm_generator):
+    def __init__(self, llm_generator, enable_proactive: bool = True):
         """
         Initialize response generator
 
         Args:
             llm_generator: LLM generator instance
+            enable_proactive: Enable proactive follow-up questions (default: True)
         """
         self.generator = llm_generator
+        self.enable_proactive = enable_proactive
+
+        # Initialize ProactiveAssistant if available
+        self.proactive_assistant = None
+        if enable_proactive and PROACTIVE_ASSISTANT_AVAILABLE and ProactiveAssistant:
+            try:
+                self.proactive_assistant = ProactiveAssistant(default_language="fr")
+                logger.info("✅ ProactiveAssistant initialized in RAGResponseGenerator")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to initialize ProactiveAssistant: {e}")
 
     async def ensure_answer_generated(
         self,
@@ -111,5 +131,38 @@ class RAGResponseGenerator:
                 logger.error(f"LLM generation error: {e}", exc_info=True)
                 result.answer = "Unable to generate response from the retrieved data."
                 result.metadata["llm_generation_error"] = str(e)
+
+        # Generate proactive follow-up if enabled and answer exists
+        if self.proactive_assistant and result.answer and result.answer.strip():
+            try:
+                # Extract information for follow-up generation
+                intent_result = {
+                    "domain": result.metadata.get("detected_domain"),
+                    "query_type": result.metadata.get("query_type"),
+                }
+
+                entities = result.metadata.get("entities", {})
+
+                # Generate follow-up
+                follow_up = self.proactive_assistant.generate_follow_up(
+                    query=original_query,
+                    response=result.answer,
+                    intent_result=intent_result,
+                    entities=entities,
+                    language=language,
+                )
+
+                # Append follow-up to answer if generated
+                if follow_up and follow_up.strip():
+                    result.answer = f"{result.answer}\n\n{follow_up}"
+                    result.metadata["proactive_followup_added"] = True
+                    result.metadata["proactive_followup"] = follow_up
+                    logger.info(f"✅ Proactive follow-up added: {follow_up[:80]}...")
+                else:
+                    logger.debug("No proactive follow-up generated for this query")
+
+            except Exception as e:
+                logger.warning(f"⚠️ Error generating proactive follow-up: {e}")
+                # Don't fail the whole response if follow-up generation fails
 
         return result

@@ -294,6 +294,20 @@ class ProactiveAssistant:
         # Determine assistance context
         context = self._identify_context(query, response, intent_result, entities)
 
+        # 🆕 ONLY generate follow-ups for specific contexts (not for simple data lookup)
+        enabled_contexts = [
+            AssistanceContext.PERFORMANCE_ISSUE,
+            AssistanceContext.HEALTH_CONCERN,
+            AssistanceContext.OPTIMIZATION,
+        ]
+
+        if context not in enabled_contexts:
+            logger.debug(
+                f"Follow-up disabled for context={context.value} "
+                f"(only enabled for: {[c.value for c in enabled_contexts]})"
+            )
+            return ""
+
         # Get appropriate template
         templates = self.follow_up_templates.get(context.value, {}).get(lang, [])
 
