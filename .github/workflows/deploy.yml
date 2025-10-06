@@ -251,7 +251,24 @@ jobs:
 
       - name: Wait for registry propagation
         run: |
-          echo "Attente de 30s pour la propagation complete du registry..."
+          echo "Attente et vérification de la propagation du registry..."
+
+          REGISTRY="registry.digitalocean.com/${{ secrets.DOCR_NAME }}"
+
+          # Wait and verify each built service
+          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
+            echo "Vérification de intelia-llm:latest..."
+            for i in {1..12}; do
+              if docker pull $REGISTRY/intelia-llm:latest 2>/dev/null; then
+                echo "✅ intelia-llm:latest disponible"
+                break
+              fi
+              echo "Tentative $i/12 - Attente 10s..."
+              sleep 10
+            done
+          fi
+
+          echo "Attente supplémentaire de 30s pour propagation complète..."
           sleep 30
 
       - name: Verify App Platform spec uses latest tags
