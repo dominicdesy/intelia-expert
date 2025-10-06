@@ -680,6 +680,17 @@ class PostgreSQLRetriever(InitializableMixin):
             # 🆕 Support metric_type depuis query_enricher
             metric_name = original_entities["metric_type"]
 
+        # 🔧 Si metric='performance', détecter type spécifique depuis query
+        if metric_name == "performance":
+            query_lower = query.lower()
+            if any(kw in query_lower for kw in ["poids", "weight", "body weight", "masse"]):
+                metric_name = "weight"
+            elif any(kw in query_lower for kw in ["fcr", "conversion", "indice"]):
+                metric_name = "fcr"
+            elif any(kw in query_lower for kw in ["gain", "croissance", "growth"]):
+                metric_name = "gain"
+            # Sinon garder "performance" qui ne matchera pas (warning)
+
         if metric_name:
             # Mapping métrique → pattern base de données
             metric_to_db_pattern = {
