@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 metric_calculator.py - Calculs mathématiques sur les métriques avicoles
-VERSION CORRIGÉE :
+VERSION 2.0 - English templates with dynamic translation
 - Gestion correcte des métriques où "plus bas = meilleur" (FCR, mortalité)
 - Validation stricte contre division par zéro
 - Contexte enrichi (âge, sexe) dans la réponse
+- Templates EN avec traduction dynamique (FR, ES, DE, IT, PT, TH, VI)
 """
 
 import logging
@@ -12,6 +13,161 @@ from utils.types import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+# Translation mapping for metric formatting
+METRIC_TRANSLATIONS = {
+    "For": {
+        "fr": "Pour la",
+        "es": "Para",
+        "de": "Für",
+        "it": "Per",
+        "pt": "Para",
+        "th": "สำหรับ",
+        "vi": "Cho",
+    },
+    "males": {
+        "fr": "mâles",
+        "es": "machos",
+        "de": "Männchen",
+        "it": "maschi",
+        "pt": "machos",
+        "th": "ตัวผู้",
+        "vi": "trống",
+    },
+    "females": {
+        "fr": "femelles",
+        "es": "hembras",
+        "de": "Weibchen",
+        "it": "femmine",
+        "pt": "fêmeas",
+        "th": "ตัวเมีย",
+        "vi": "mái",
+    },
+    "mixed sexes": {
+        "fr": "sexes mélangés",
+        "es": "sexos mixtos",
+        "de": "gemischte Geschlechter",
+        "it": "sessi misti",
+        "pt": "sexos mistos",
+        "th": "เพศผสม",
+        "vi": "giới tính hỗn hợp",
+    },
+    "at": {
+        "fr": "à",
+        "es": "a",
+        "de": "bei",
+        "it": "a",
+        "pt": "aos",
+        "th": "ที่",
+        "vi": "tại",
+    },
+    "days": {
+        "fr": "jours",
+        "es": "días",
+        "de": "Tage",
+        "it": "giorni",
+        "pt": "dias",
+        "th": "วัน",
+        "vi": "ngày",
+    },
+    "Difference": {
+        "fr": "Différence",
+        "es": "Diferencia",
+        "de": "Unterschied",
+        "it": "Differenza",
+        "pt": "Diferença",
+        "th": "ความแตกต่าง",
+        "vi": "Sự khác biệt",
+    },
+    "shows better performance with a value": {
+        "fr": "présente une meilleure performance avec une valeur",
+        "es": "muestra mejor rendimiento con un valor",
+        "de": "zeigt bessere Leistung mit einem Wert",
+        "it": "mostra prestazioni migliori con un valore",
+        "pt": "apresenta melhor desempenho com um valor",
+        "th": "แสดงประสิทธิภาพที่ดีขึ้นด้วยค่า",
+        "vi": "cho thấy hiệu suất tốt hơn với giá trị",
+    },
+    "lower": {
+        "fr": "inférieure",
+        "es": "menor",
+        "de": "niedriger",
+        "it": "inferiore",
+        "pt": "inferior",
+        "th": "ต่ำกว่า",
+        "vi": "thấp hơn",
+    },
+    "higher": {
+        "fr": "supérieure",
+        "es": "mayor",
+        "de": "höher",
+        "it": "superiore",
+        "pt": "superior",
+        "th": "สูงกว่า",
+        "vi": "cao hơn",
+    },
+    "than": {
+        "fr": "au",
+        "es": "que",
+        "de": "als",
+        "it": "di",
+        "pt": "que",
+        "th": "กว่า",
+        "vi": "so với",
+    },
+    "requires less feed to produce 1 kg of live weight, indicating better feed efficiency.": {
+        "fr": "nécessite moins d'aliment pour produire 1 kg de poids vif, ce qui représente une meilleure efficacité alimentaire.",
+        "es": "requiere menos alimento para producir 1 kg de peso vivo, lo que indica mejor eficiencia alimentaria.",
+        "de": "benötigt weniger Futter zur Produktion von 1 kg Lebendgewicht, was eine bessere Futterverwertung bedeutet.",
+        "it": "richiede meno mangime per produrre 1 kg di peso vivo, indicando una migliore efficienza alimentare.",
+        "pt": "requer menos ração para produzir 1 kg de peso vivo, indicando melhor eficiência alimentar.",
+        "th": "ต้องการอาหารน้อยลงเพื่อผลิต 1 กก. น้ำหนักตัว แสดงถึงประสิทธิภาพการใช้อาหารที่ดีขึ้น",
+        "vi": "cần ít thức ăn hơn để tạo ra 1 kg trọng lượng sống, cho thấy hiệu quả thức ăn tốt hơn.",
+    },
+    "A lower value indicates better performance for this metric.": {
+        "fr": "Une valeur plus basse indique une meilleure performance pour cette métrique.",
+        "es": "Un valor más bajo indica mejor rendimiento para esta métrica.",
+        "de": "Ein niedrigerer Wert zeigt eine bessere Leistung für diese Metrik an.",
+        "it": "Un valore più basso indica prestazioni migliori per questa metrica.",
+        "pt": "Um valor mais baixo indica melhor desempenho para esta métrica.",
+        "th": "ค่าที่ต่ำกว่าแสดงถึงประสิทธิภาพที่ดีขึ้นสำหรับตัวชี้วัดนี้",
+        "vi": "Giá trị thấp hơn cho thấy hiệu suất tốt hơn cho chỉ số này.",
+    },
+    "shows a value": {
+        "fr": "présente une valeur",
+        "es": "muestra un valor",
+        "de": "zeigt einen Wert",
+        "it": "mostra un valore",
+        "pt": "apresenta um valor",
+        "th": "แสดงค่า",
+        "vi": "cho thấy giá trị",
+    },
+}
+
+
+def _translate_metric(text_en: str, language: str) -> str:
+    """
+    Traduit un texte EN vers la langue cible pour metric_calculator
+
+    Args:
+        text_en: Texte en anglais
+        language: Code langue (fr, es, de, etc.)
+
+    Returns:
+        Texte traduit ou EN si langue non supportée
+    """
+    if language == "en" or language not in [
+        "fr",
+        "es",
+        "de",
+        "it",
+        "pt",
+        "th",
+        "vi",
+    ]:
+        return text_en
+
+    return METRIC_TRANSLATIONS.get(text_en, {}).get(language, text_en)
 
 
 @dataclass
@@ -304,152 +460,119 @@ class MetricCalculator:
             comparison.metric_name or metric_name
         )
 
-        if language == "fr":
-            unit_display = f" {comparison.unit}" if comparison.unit else ""
+        # ===== UNIFIED TEMPLATE WITH DYNAMIC TRANSLATION =====
+        unit_display = f" {comparison.unit}" if comparison.unit else ""
 
-            # Construction de l'en-tête avec contexte
-            header = f"Pour la **{display_metric_name}**"
+        # Construction de l'en-tête avec contexte
+        for_label = _translate_metric("For", language)
+        header = f"{for_label} **{display_metric_name}**"
 
-            # Ajouter le contexte s'il est disponible
-            context_parts = []
-            if sex and sex != "as_hatched":
-                sex_display = {"male": "mâles", "female": "femelles"}.get(sex, sex)
-                context_parts.append(f"des {sex_display}")
-            elif sex == "as_hatched":
-                context_parts.append("(sexes mélangés)")
-
-            if age_days:
-                context_parts.append(f"à {age_days} jours")
-
-            if context_parts:
-                header += f" {' '.join(context_parts)}"
-
-            header += " :\n\n"
-
-            text = header
-
-            # Affichage des valeurs
-            text += f"• **{comparison.label1.capitalize()}** : {comparison.value1:.3f}{unit_display}\n"
-            text += f"• **{comparison.label2.capitalize()}** : {comparison.value2:.3f}{unit_display}\n\n"
-            text += f"**Différence** : {abs(comparison.absolute_difference):.3f}{unit_display}"
-
-            if comparison.relative_difference_pct is not None:
-                text += f" ({abs(comparison.relative_difference_pct):.1f}%)"
-
-            text += "\n\n"
-
-            # Interprétation selon le type de métrique
-            if is_lower_better:
-                # Pour FCR, mortalité : plus bas = meilleur
-                if comparison.value1 < comparison.value2:
-                    text += f"Le **{comparison.label1}** présente une **meilleure** performance "
-                    text += f"avec une valeur **{abs(comparison.relative_difference_pct):.1f}% inférieure** "
-                    text += f"au **{comparison.label2}**.\n\n"
-
-                    if (
-                        "fcr" in metric_name.lower()
-                        or "conversion" in metric_name.lower()
-                    ):
-                        text += f"_Le {comparison.label1} nécessite moins d'aliment pour produire 1 kg de poids vif, "
-                        text += (
-                            "ce qui représente une meilleure efficacité alimentaire._"
-                        )
-                    else:
-                        text += "_Une valeur plus basse indique une meilleure performance pour cette métrique._"
-                else:
-                    text += f"Le **{comparison.label2}** présente une **meilleure** performance "
-                    text += f"avec une valeur **{abs(comparison.relative_difference_pct):.1f}% inférieure** "
-                    text += f"au **{comparison.label1}**.\n\n"
-
-                    if (
-                        "fcr" in metric_name.lower()
-                        or "conversion" in metric_name.lower()
-                    ):
-                        text += f"_Le {comparison.label2} nécessite moins d'aliment pour produire 1 kg de poids vif, "
-                        text += (
-                            "ce qui représente une meilleure efficacité alimentaire._"
-                        )
-                    else:
-                        text += "_Une valeur plus basse indique une meilleure performance pour cette métrique._"
+        # Ajouter le contexte s'il est disponible
+        context_parts = []
+        if sex and sex != "as_hatched":
+            if sex == "male":
+                sex_display = _translate_metric("males", language)
+            elif sex == "female":
+                sex_display = _translate_metric("females", language)
             else:
-                # Pour poids, production : plus haut = meilleur
-                if comparison.absolute_difference > 0:
-                    text += f"Le **{comparison.label1}** présente une valeur **{abs(comparison.relative_difference_pct):.1f}% supérieure** "
-                    text += f"au **{comparison.label2}**."
-                else:
-                    text += f"Le **{comparison.label2}** présente une valeur **{abs(comparison.relative_difference_pct):.1f}% supérieure** "
-                    text += f"au **{comparison.label1}**."
+                sex_display = sex
 
-        else:  # English
-            unit_display = f" {comparison.unit}" if comparison.unit else ""
-
-            # Construction de l'en-tête avec contexte
-            header = f"For **{display_metric_name}**"
-
-            # Ajouter le contexte
-            context_parts = []
-            if sex and sex != "as_hatched":
-                sex_display = {"male": "males", "female": "females"}.get(sex, sex)
+            # Format differs by language
+            if language == "fr":
+                context_parts.append(f"des {sex_display}")
+            else:
                 context_parts.append(sex_display)
-            elif sex == "as_hatched":
-                context_parts.append("(mixed sexes)")
+        elif sex == "as_hatched":
+            mixed_sexes = _translate_metric("mixed sexes", language)
+            context_parts.append(f"({mixed_sexes})")
 
-            if age_days:
-                context_parts.append(f"at {age_days} days")
+        if age_days:
+            at_label = _translate_metric("at", language)
+            days_label = _translate_metric("days", language)
+            context_parts.append(f"{at_label} {age_days} {days_label}")
 
-            if context_parts:
+        if context_parts:
+            if language == "fr":
+                header += f" {' '.join(context_parts)}"
+            else:
                 header += f" ({', '.join(context_parts)})"
 
-            header += ":\n\n"
+        header += " :\n\n" if language == "fr" else ":\n\n"
 
-            text = header
+        text = header
 
-            text += f"• **{comparison.label1.capitalize()}**: {comparison.value1:.3f}{unit_display}\n"
-            text += f"• **{comparison.label2.capitalize()}**: {comparison.value2:.3f}{unit_display}\n\n"
-            text += f"**Difference**: {abs(comparison.absolute_difference):.3f}{unit_display}"
+        # Affichage des valeurs
+        separator = " :" if language == "fr" else ":"
+        text += f"• **{comparison.label1.capitalize()}**{separator} {comparison.value1:.3f}{unit_display}\n"
+        text += f"• **{comparison.label2.capitalize()}**{separator} {comparison.value2:.3f}{unit_display}\n\n"
 
-            if comparison.relative_difference_pct is not None:
-                text += f" ({abs(comparison.relative_difference_pct):.1f}%)"
+        diff_label = _translate_metric("Difference", language)
+        text += f"**{diff_label}**{separator} {abs(comparison.absolute_difference):.3f}{unit_display}"
 
-            text += "\n\n"
+        if comparison.relative_difference_pct is not None:
+            text += f" ({abs(comparison.relative_difference_pct):.1f}%)"
 
-            # Correct interpretation based on metric type
-            if is_lower_better:
-                # For FCR, mortality: lower = better
-                if comparison.value1 < comparison.value2:
-                    text += f"**{comparison.label1.capitalize()}** shows **better** performance "
-                    text += f"with a value **{abs(comparison.relative_difference_pct):.1f}% lower** "
-                    text += f"than **{comparison.label2}**.\n\n"
+        text += "\n\n"
 
-                    if (
-                        "fcr" in metric_name.lower()
-                        or "conversion" in metric_name.lower()
-                    ):
-                        text += f"_{comparison.label1.capitalize()} requires less feed to produce 1 kg of live weight, "
-                        text += "indicating better feed efficiency._"
-                    else:
-                        text += "_A lower value indicates better performance for this metric._"
+        # Interprétation selon le type de métrique
+        if is_lower_better:
+            # Pour FCR, mortalité : plus bas = meilleur
+            if comparison.value1 < comparison.value2:
+                better_perf = _translate_metric("shows better performance with a value", language)
+                lower_label = _translate_metric("lower", language)
+                than_label = _translate_metric("than", language)
+
+                text += f"**{comparison.label1.capitalize()}** {better_perf} "
+                text += f"**{abs(comparison.relative_difference_pct):.1f}% {lower_label}** "
+                text += f"{than_label} **{comparison.label2}**.\n\n"
+
+                if "fcr" in metric_name.lower() or "conversion" in metric_name.lower():
+                    fcr_explanation = _translate_metric(
+                        "requires less feed to produce 1 kg of live weight, indicating better feed efficiency.",
+                        language
+                    )
+                    text += f"_{comparison.label1.capitalize()} {fcr_explanation}_"
                 else:
-                    text += f"**{comparison.label2.capitalize()}** shows **better** performance "
-                    text += f"with a value **{abs(comparison.relative_difference_pct):.1f}% lower** "
-                    text += f"than **{comparison.label1}**.\n\n"
-
-                    if (
-                        "fcr" in metric_name.lower()
-                        or "conversion" in metric_name.lower()
-                    ):
-                        text += f"_{comparison.label2.capitalize()} requires less feed to produce 1 kg of live weight, "
-                        text += "indicating better feed efficiency._"
-                    else:
-                        text += "_A lower value indicates better performance for this metric._"
+                    lower_explanation = _translate_metric(
+                        "A lower value indicates better performance for this metric.",
+                        language
+                    )
+                    text += f"_{lower_explanation}_"
             else:
-                # For weight, production: higher = better
-                if comparison.absolute_difference > 0:
-                    text += f"**{comparison.label1.capitalize()}** shows a value **{abs(comparison.relative_difference_pct):.1f}% higher** "
-                    text += f"than **{comparison.label2}**."
+                better_perf = _translate_metric("shows better performance with a value", language)
+                lower_label = _translate_metric("lower", language)
+                than_label = _translate_metric("than", language)
+
+                text += f"**{comparison.label2.capitalize()}** {better_perf} "
+                text += f"**{abs(comparison.relative_difference_pct):.1f}% {lower_label}** "
+                text += f"{than_label} **{comparison.label1}**.\n\n"
+
+                if "fcr" in metric_name.lower() or "conversion" in metric_name.lower():
+                    fcr_explanation = _translate_metric(
+                        "requires less feed to produce 1 kg of live weight, indicating better feed efficiency.",
+                        language
+                    )
+                    text += f"_{comparison.label2.capitalize()} {fcr_explanation}_"
                 else:
-                    text += f"**{comparison.label2.capitalize()}** shows a value **{abs(comparison.relative_difference_pct):.1f}% higher** "
-                    text += f"than **{comparison.label1}**."
+                    lower_explanation = _translate_metric(
+                        "A lower value indicates better performance for this metric.",
+                        language
+                    )
+                    text += f"_{lower_explanation}_"
+        else:
+            # Pour poids, production : plus haut = meilleur
+            shows_value = _translate_metric("shows a value", language)
+            higher_label = _translate_metric("higher", language)
+            than_label = _translate_metric("than", language)
+
+            if comparison.absolute_difference > 0:
+                text += f"**{comparison.label1.capitalize()}** {shows_value} "
+                text += f"**{abs(comparison.relative_difference_pct):.1f}% {higher_label}** "
+                text += f"{than_label} **{comparison.label2}**."
+            else:
+                text += f"**{comparison.label2.capitalize()}** {shows_value} "
+                text += f"**{abs(comparison.relative_difference_pct):.1f}% {higher_label}** "
+                text += f"{than_label} **{comparison.label1}**."
 
         return text
 

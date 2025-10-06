@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 comparison_engine.py - Moteur de comparaison unifié
+Version 2.0 - Templates EN avec traduction dynamique
 Fusionne: comparison_handler + comparison_utils + comparison_response_generator
 Utilise: metric_calculator (conservé pour calculs purs)
-Version 1.1 - Ajout validation compatibilité species
 """
 
 import logging
@@ -15,6 +15,89 @@ from utils.breeds_registry import get_breeds_registry
 from utils.mixins import SerializableMixin
 
 logger = logging.getLogger(__name__)
+
+# Traductions pour les messages de comparaison
+COMPARISON_TRANSLATIONS = {
+    "To answer your question about the comparison between": {
+        "fr": "Pour répondre à votre question sur la comparaison entre",
+        "es": "Para responder a su pregunta sobre la comparación entre",
+        "de": "Um Ihre Frage zum Vergleich zwischen zu beantworten",
+        "it": "Per rispondere alla tua domanda sul confronto tra",
+        "pt": "Para responder à sua pergunta sobre a comparação entre",
+        "th": "เพื่อตอบคำถามของคุณเกี่ยวกับการเปรียบเทียบระหว่าง",
+        "vi": "Để trả lời câu hỏi của bạn về so sánh giữa",
+    },
+    "Difference": {
+        "fr": "Différence",
+        "es": "Diferencia",
+        "de": "Unterschied",
+        "it": "Differenza",
+        "pt": "Diferença",
+        "th": "ความแตกต่าง",
+        "vi": "Sự khác biệt",
+    },
+    "Better performance": {
+        "fr": "Meilleure performance",
+        "es": "Mejor rendimiento",
+        "de": "Bessere Leistung",
+        "it": "Prestazioni migliori",
+        "pt": "Melhor desempenho",
+        "th": "ประสิทธิภาพดีกว่า",
+        "vi": "Hiệu suất tốt hơn",
+    },
+    "Unable to compare: insufficient data.": {
+        "fr": "Impossible de comparer: données insuffisantes.",
+        "es": "No se puede comparar: datos insuficientes.",
+        "de": "Vergleich nicht möglich: unzureichende Daten.",
+        "it": "Impossibile confrontare: dati insufficienti.",
+        "pt": "Não é possível comparar: dados insuficientes.",
+        "th": "ไม่สามารถเปรียบเทียบได้: ข้อมูลไม่เพียงพอ",
+        "vi": "Không thể so sánh: dữ liệu không đủ.",
+    },
+    "Unable to compare: incompatible metrics.": {
+        "fr": "Impossible de comparer: métriques incompatibles.",
+        "es": "No se puede comparar: métricas incompatibles.",
+        "de": "Vergleich nicht möglich: inkompatible Metriken.",
+        "it": "Impossibile confrontare: metriche incompatibili.",
+        "pt": "Não é possível comparar: métricas incompatíveis.",
+        "th": "ไม่สามารถเปรียบเทียบได้: ตัวชี้วัดไม่เข้ากัน",
+        "vi": "Không thể so sánh: chỉ số không tương thích.",
+    },
+    "Unable to compare: different species.": {
+        "fr": "Impossible de comparer: espèces différentes.",
+        "es": "No se puede comparar: especies diferentes.",
+        "de": "Vergleich nicht möglich: verschiedene Arten.",
+        "it": "Impossibile confrontare: specie diverse.",
+        "pt": "Não é possível comparar: espécies diferentes.",
+        "th": "ไม่สามารถเปรียบเทียบได้: สายพันธุ์ต่างกัน",
+        "vi": "Không thể so sánh: các loài khác nhau.",
+    },
+    "Comparison error": {
+        "fr": "Erreur lors de la comparaison",
+        "es": "Error de comparación",
+        "de": "Vergleichsfehler",
+        "it": "Errore di confronto",
+        "pt": "Erro de comparação",
+        "th": "ข้อผิดพลาดในการเปรียบเทียบ",
+        "vi": "Lỗi so sánh",
+    },
+    "Unknown error": {
+        "fr": "Erreur inconnue",
+        "es": "Error desconocido",
+        "de": "Unbekannter Fehler",
+        "it": "Errore sconosciuto",
+        "pt": "Erro desconhecido",
+        "th": "ข้อผิดพลาดที่ไม่ทราบสาเหตุ",
+        "vi": "Lỗi không xác định",
+    },
+}
+
+
+def _translate(text_en: str, language: str) -> str:
+    """Traduit un texte EN vers la langue cible"""
+    if language == "en" or language not in ["fr", "es", "de", "it", "pt", "th", "vi"]:
+        return text_en
+    return COMPARISON_TRANSLATIONS.get(text_en, {}).get(language, text_en)
 
 
 class ComparisonStatus(Enum):
@@ -691,29 +774,22 @@ class ComparisonEngine:
         return self._generate_template_response(data, language)
 
     def _generate_template_response(self, data: Dict[str, Any], language: str) -> str:
-        """Génère réponse basée sur template"""
+        """Génère réponse basée sur template (avec traduction)"""
 
-        if language == "fr":
-            response = f"""Pour répondre à votre question sur la comparaison entre **{data['label1']}** et **{data['label2']}** :
+        # Template EN avec traduction dynamique
+        intro = _translate("To answer your question about the comparison between", language)
+        diff_label = _translate("Difference", language)
+        better_label = _translate("Better performance", language)
+
+        response = f"""{intro} **{data['label1']}** et **{data['label2']}** :
 
 **{data['metric_name']}** :
 - {data['label1']} : {data['value1']:.2f} {data['unit']}
 - {data['label2']} : {data['value2']:.2f} {data['unit']}
 
-**Différence** : {abs(data['difference_absolute']):.2f} {data['unit']} ({abs(data['difference_percent']):.1f}%)
+**{diff_label}** : {abs(data['difference_absolute']):.2f} {data['unit']} ({abs(data['difference_percent']):.1f}%)
 
-**Meilleure performance** : {data['better']}"""
-
-        else:  # English
-            response = f"""To answer your question about the comparison between **{data['label1']}** and **{data['label2']}**:
-
-**{data['metric_name']}**:
-- {data['label1']}: {data['value1']:.2f} {data['unit']}
-- {data['label2']}: {data['value2']:.2f} {data['unit']}
-
-**Difference**: {abs(data['difference_absolute']):.2f} {data['unit']} ({abs(data['difference_percent']):.1f}%)
-
-**Better performance**: {data['better']}"""
+**{better_label}** : {data['better']}"""
 
         return response
 
@@ -775,28 +851,21 @@ Données:
             return None
 
     def _generate_error_response(self, result: ComparisonResult, language: str) -> str:
-        """Génère message d'erreur lisible"""
+        """Génère message d'erreur lisible (avec traduction)"""
 
-        if language == "fr":
-            if result.status == ComparisonStatus.INSUFFICIENT_DATA:
-                return f"Impossible de comparer: données insuffisantes. {result.error or ''}"
-            elif result.status == ComparisonStatus.INCOMPATIBLE_METRICS:
-                return f"Impossible de comparer: métriques incompatibles. {result.error or ''}"
-            elif result.status == ComparisonStatus.INCOMPATIBLE_SPECIES:
-                return (
-                    f"Impossible de comparer: espèces différentes. {result.error or ''}"
-                )
-            else:
-                return f"Erreur lors de la comparaison: {result.error or 'Erreur inconnue'}"
+        if result.status == ComparisonStatus.INSUFFICIENT_DATA:
+            msg = _translate("Unable to compare: insufficient data.", language)
+            return f"{msg} {result.error or ''}"
+        elif result.status == ComparisonStatus.INCOMPATIBLE_METRICS:
+            msg = _translate("Unable to compare: incompatible metrics.", language)
+            return f"{msg} {result.error or ''}"
+        elif result.status == ComparisonStatus.INCOMPATIBLE_SPECIES:
+            msg = _translate("Unable to compare: different species.", language)
+            return f"{msg} {result.error or ''}"
         else:
-            if result.status == ComparisonStatus.INSUFFICIENT_DATA:
-                return f"Cannot compare: insufficient data. {result.error or ''}"
-            elif result.status == ComparisonStatus.INCOMPATIBLE_METRICS:
-                return f"Cannot compare: incompatible metrics. {result.error or ''}"
-            elif result.status == ComparisonStatus.INCOMPATIBLE_SPECIES:
-                return f"Cannot compare: different species. {result.error or ''}"
-            else:
-                return f"Comparison error: {result.error or 'Unknown error'}"
+            error_label = _translate("Comparison error", language)
+            unknown = _translate("Unknown error", language)
+            return f"{error_label}: {result.error or unknown}"
 
 
 # Factory function
