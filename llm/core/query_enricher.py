@@ -159,6 +159,92 @@ class ConversationalQueryEnricher:
 
         return query
 
+    def extract_entities_from_context(self, contextual_history: str, language: str = "fr") -> Dict[str, any]:
+        """
+        Extract structured entities from conversation history for router
+
+        Args:
+            contextual_history: Formatted conversation history
+            language: Query language
+
+        Returns:
+            Dict with extracted entities (breed, age_days, sex, etc.)
+        """
+        if not contextual_history:
+            return {}
+
+        entities = {}
+        history_lower = contextual_history.lower()
+
+        # Extract breed
+        breed_patterns = [
+            (r"ross\s*308", "Ross 308"),
+            (r"cobb\s*500", "Cobb 500"),
+            (r"hubbard\s*(classic|flex)", "Hubbard"),
+            (r"\bross\b", "Ross"),
+            (r"\bcobb\b", "Cobb"),
+        ]
+
+        for pattern, breed_name in breed_patterns:
+            if re.search(pattern, history_lower):
+                entities["breed"] = breed_name
+                logger.debug(f"Breed extracted from context: {breed_name}")
+                break
+
+        # Extract age in days
+        age_patterns = [
+            r"(\d+)\s*(?:jour|day)s?",
+            r"(\d+)\s*j\b",
+            r"day\s*(\d+)",
+            r"à\s*(\d+)",
+        ]
+
+        for pattern in age_patterns:
+            match = re.search(pattern, history_lower)
+            if match:
+                age_days = int(match.group(1))
+                entities["age_days"] = age_days
+                logger.debug(f"Age extracted from context: {age_days} days")
+                break
+
+        # Extract sex
+        sex_keywords = {
+            "mâle": "male",
+            "male": "male",
+            "femelle": "female",
+            "female": "female",
+            "mixte": "mixed",
+            "mixed": "mixed",
+        }
+
+        for keyword, sex_value in sex_keywords.items():
+            if keyword in history_lower:
+                entities["sex"] = sex_value
+                logger.debug(f"Sex extracted from context: {sex_value}")
+                break
+
+        # Extract metric type
+        metric_keywords = {
+            "poids": "weight",
+            "weight": "weight",
+            "fcr": "fcr",
+            "conversion": "fcr",
+            "mortalité": "mortality",
+            "mortality": "mortality",
+            "consommation": "feed_consumption",
+        }
+
+        for keyword, metric_value in metric_keywords.items():
+            if keyword in history_lower:
+                entities["metric_type"] = metric_value
+                logger.debug(f"Metric extracted from context: {metric_value}")
+                break
+
+        if entities:
+            logger.info(f"📦 Extracted {len(entities)} entities from context: {list(entities.keys())}")
+
+        return entities
+
 
 # Factory function
 def create_query_enricher() -> ConversationalQueryEnricher:

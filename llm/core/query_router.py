@@ -498,7 +498,7 @@ class QueryRouter:
 
         return current_prompt
 
-    def route(self, query: str, user_id: str, language: str = "fr") -> QueryRoute:
+    def route(self, query: str, user_id: str, language: str = "fr", preextracted_entities: Dict[str, Any] = None) -> QueryRoute:
         """
         Point d'entrée UNIQUE - fait TOUT en une passe
 
@@ -506,6 +506,7 @@ class QueryRouter:
             query: Requête utilisateur
             user_id: Identifiant utilisateur/tenant
             language: Langue détectée
+            preextracted_entities: Entités déjà extraites du contexte (optionnel)
 
         Returns:
             QueryRoute avec destination + entités complètes
@@ -527,6 +528,14 @@ class QueryRouter:
 
         # 3. EXTRACTION ENTITÉS
         entities = self._extract_entities(query, language)
+
+        # 3b. MERGE avec entités pré-extraites si disponibles
+        if preextracted_entities:
+            logger.info(f"📦 Merging preextracted entities: {list(preextracted_entities.keys())}")
+            for key, value in preextracted_entities.items():
+                if key not in entities or not entities[key]:
+                    entities[key] = value
+                    logger.debug(f"   Added {key}={value} from context")
 
         # 4. MERGE si contextuel
         if is_contextual and previous_context:

@@ -22,7 +22,6 @@ from utils.utilities import (
 # CORRECTION: Import depuis utils au lieu de endpoints_utils
 from .utils import (
     safe_serialize_for_json,
-    add_to_conversation_memory,
 )
 
 logger = logging.getLogger(__name__)
@@ -203,7 +202,7 @@ class ChatHandlers:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Sauvegarde dans les deux systèmes de mémoire
+        Sauvegarde dans ConversationMemory (système unique)
 
         Args:
             tenant_id: ID utilisateur
@@ -211,7 +210,7 @@ class ChatHandlers:
             answer: Réponse générée
             metadata: Métadonnées optionnelles
         """
-        # 1. Sauvegarder dans ConversationMemory (nouveau système)
+        # Sauvegarde dans ConversationMemory
         if self.conversation_memory:
             try:
                 self.conversation_memory.add_exchange(
@@ -219,23 +218,9 @@ class ChatHandlers:
                 )
                 logger.debug(f"✅ Sauvegarde ConversationMemory OK pour {tenant_id}")
             except Exception as e:
-                logger.warning(f"⚠️ Erreur sauvegarde ConversationMemory: {e}")
-
-        # 2. Sauvegarder dans l'ancien système (rétrocompatibilité)
-        try:
-            add_to_conversation_memory(
-                tenant_id,
-                {
-                    "role": "user",
-                    "content": message,
-                    "answer": str(answer),
-                    "source": "rag_enhanced_json",
-                },
-            )
-
-            logger.debug(f"✅ Sauvegarde ancien système OK pour {tenant_id}")
-        except Exception as e:
-            logger.warning(f"⚠️ Erreur sauvegarde ancien système: {e}")
+                logger.error(f"❌ Erreur sauvegarde ConversationMemory: {e}")
+        else:
+            logger.warning(f"⚠️ ConversationMemory non disponible pour {tenant_id}")
 
     async def generate_streaming_response(
         self,

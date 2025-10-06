@@ -43,7 +43,7 @@ class RAGQueryProcessor:
         preextracted_entities: Dict[str, Any] = None,
     ) -> RAGResult:
         """
-        Main query processing pipeline
+        Main query processing pipeline with clarification loop support
 
         Args:
             query: User query
@@ -58,18 +58,58 @@ class RAGQueryProcessor:
         """
         logger.info(f"Processing query with language: {language}")
 
+        # Step 0: Check if this is a clarification response
+        pending_clarification = None
+        if self.conversation_memory:
+            pending_clarification = self.conversation_memory.get_pending_clarification(tenant_id)
+
+            if pending_clarification:
+                # Check if current query is answering the clarification
+                if self.conversation_memory.is_clarification_response(query, tenant_id):
+                    logger.info(f"✅ Clarification response detected for tenant {tenant_id}")
+
+                    # Merge original query with clarification
+                    original_query = pending_clarification.get("original_query", "")
+                    merged_query = self.conversation_memory.merge_query_with_clarification(
+                        original_query, query
+                    )
+
+                    logger.info(f"🔗 Merged query: {merged_query}")
+
+                    # Clear pending clarification
+                    self.conversation_memory.clear_pending_clarification(tenant_id)
+
+                    # Use merged query for processing
+                    query = merged_query
+                else:
+                    # Increment attempt counter
+                    self.conversation_memory.increment_clarification_attempt(tenant_id)
+
         # Step 1: Retrieve contextual history
         contextual_history = await self._get_contextual_history(tenant_id, query)
 
         # Step 2: Enrich query if history available
         enriched_query = self._enrich_query(query, contextual_history, language)
 
-        # Step 3: Route query
+        # Step 2b: Extract entities from enriched query
+        extracted_entities = None
+        if enriched_query != query and self.conversation_memory:
+            # Try to extract entities from enriched context
+            try:
+                extracted_entities = self.enricher.extract_entities_from_context(
+                    contextual_history, language
+                )
+                if extracted_entities:
+                    logger.info(f"📦 Entities extracted from context: {extracted_entities}")
+            except Exception as e:
+                logger.warning(f"Failed to extract entities from context: {e}")
+
+        # Step 3: Route query with context-extracted entities
         route = self.query_router.route(
             query=enriched_query,
             user_id=tenant_id,
             language=language,
-            preextracted_entities=preextracted_entities,
+            preextracted_entities=preextracted_entities or extracted_entities,
         )
 
         logger.info(
@@ -78,7 +118,18 @@ class RAGQueryProcessor:
 
         # Step 4: Check for clarification needs
         if route.destination == "needs_clarification":
-            return self._build_clarification_result(route, language, query=query)
+            # Mark clarification as pending in memory
+            if self.conversation_memory:
+                self.conversation_memory.mark_pending_clarification(
+                    tenant_id=tenant_id,
+                    original_query=query,
+                    missing_fields=route.missing_fields,
+                    suggestions=route.validation_details.get("suggestions"),
+                    language=language,
+                )
+                logger.info(f"🔒 Clarification marked pending for tenant {tenant_id}")
+
+            return self._build_clarification_result(route, language, query=query, tenant_id=tenant_id)
 
         # Step 5: Build preprocessed data
         preprocessed_data = self._build_preprocessed_data(
@@ -140,7 +191,7 @@ class RAGQueryProcessor:
             logger.warning(f"Query enrichment failed: {e}")
             return query
 
-    def _build_clarification_result(self, route, language: str, query: str = "") -> RAGResult:
+    def _build_clarification_result(self, route, language: str, query: str = "", tenant_id: str = None) -> RAGResult:
         """Build clarification result with intelligent contextual messages"""
         logger.info(f"Clarification needed - missing fields: {route.missing_fields}")
 
@@ -161,6 +212,8 @@ class RAGQueryProcessor:
                 "entities": route.entities,
                 "validation_details": route.validation_details,
                 "language": language,
+                "tenant_id": tenant_id,
+                "original_query": query,
             },
         )
 
