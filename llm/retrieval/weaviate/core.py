@@ -45,7 +45,8 @@ try:
     from retrieval.embedder import OpenAIEmbedder
     from retrieval.retriever import HybridWeaviateRetriever
     from generation.generators import EnhancedResponseGenerator
-    from security.ood_detector import EnhancedOODDetector
+    # 🔧 MIGRATION: LLM-based OOD detection au lieu de keyword-based
+    from security.llm_ood_detector import LLMOODDetector
 
     RETRIEVAL_COMPONENTS_AVAILABLE = True
 except ImportError as e:
@@ -325,10 +326,9 @@ class WeaviateCore(InitializableMixin):
         try:
             self.embedder = OpenAIEmbedder(self.openai_client, self.cache_manager)
             self.memory = ConversationMemory(self.openai_client)
-            self.ood_detector = EnhancedOODDetector(
-                blocked_terms_path=None, openai_client=self.openai_client
-            )
-            logger.info("✅ Composants de base initialisés")
+            # 🔧 MIGRATION: LLM-based OOD detector (100% coverage, zero maintenance)
+            self.ood_detector = LLMOODDetector(model="gpt-4o-mini")
+            logger.info("✅ Composants de base initialisés (LLM OOD detector)")
         except Exception as e:
             logger.error(f"Erreur composants de base: {e}")
             raise
