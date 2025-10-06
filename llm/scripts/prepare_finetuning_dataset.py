@@ -33,7 +33,7 @@ from utils.imports_and_dependencies import AsyncOpenAI
 
 # Imports conditionnels
 try:
-    from core.rag_weaviate_core import WeaviateCore
+    from retrieval.weaviate.core import WeaviateCore
 
     WEAVIATE_AVAILABLE = True
 except ImportError:
@@ -41,7 +41,7 @@ except ImportError:
     logging.warning("⚠️ WeaviateCore non disponible")
 
 try:
-    from core.rag_postgresql_retriever import PostgreSQLRetriever
+    from retrieval.postgresql.retriever import PostgreSQLRetriever
 
     POSTGRESQL_AVAILABLE = True
 except ImportError:

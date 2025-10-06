@@ -4,7 +4,7 @@ rag_postgresql_router.py - Routeur intelligent pour types de requêtes
 """
 
 import logging
-from .rag_postgresql_models import QueryType
+from .models import QueryType
 
 logger = logging.getLogger(__name__)
 

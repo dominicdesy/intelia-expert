@@ -35,8 +35,8 @@ from .handlers import (
 )
 from .query_router import QueryRouter
 from .entity_extractor import EntityExtractor
-from .rag_query_processor import RAGQueryProcessor
-from .rag_response_generator import RAGResponseGenerator
+from .query_processor import RAGQueryProcessor
+from .response_generator import RAGResponseGenerator
 from .base import InitializableMixin
 
 # Conversation memory (optional)
@@ -62,7 +62,7 @@ WeaviateCore = None
 
 # Import PostgreSQL Retriever
 try:
-    from .rag_postgresql_retriever import PostgreSQLRetriever
+    from retrieval.postgresql.retriever import PostgreSQLRetriever
 
     POSTGRESQL_RETRIEVER_AVAILABLE = True
     logger.info("PostgreSQL Retriever imported")
@@ -71,7 +71,7 @@ except ImportError as e:
 
 # Import Comparison Handler
 try:
-    from .comparison_handler import ComparisonHandler
+    from .handlers.comparison_handler import ComparisonHandler
 
     COMPARISON_HANDLER_AVAILABLE = True
     logger.info("Comparison Handler imported")
@@ -80,7 +80,7 @@ except ImportError as e:
 
 # Import Weaviate Core
 try:
-    from .rag_weaviate_core import WeaviateCore
+    from retrieval.weaviate.core import WeaviateCore
 
     WEAVIATE_CORE_AVAILABLE = True
     logger.info("Weaviate Core imported")
@@ -214,7 +214,7 @@ class InteliaRAGEngine(InitializableMixin):
         # PostgreSQL Retriever
         if POSTGRESQL_RETRIEVER_AVAILABLE and PostgreSQLRetriever:
             try:
-                from .rag_postgresql_config import POSTGRESQL_CONFIG
+                from retrieval.postgresql.config import POSTGRESQL_CONFIG
 
                 if not POSTGRESQL_CONFIG.get("password"):
                     raise ValueError("PostgreSQL password missing in configuration")

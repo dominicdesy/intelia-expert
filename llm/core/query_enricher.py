@@ -159,7 +159,9 @@ class ConversationalQueryEnricher:
 
         return query
 
-    def extract_entities_from_context(self, contextual_history: str, language: str = "fr") -> Dict[str, any]:
+    def extract_entities_from_context(
+        self, contextual_history: str, language: str = "fr"
+    ) -> Dict[str, any]:
         """
         Extract structured entities from conversation history for router
 
@@ -241,7 +243,9 @@ class ConversationalQueryEnricher:
                 break
 
         if entities:
-            logger.info(f"📦 Extracted {len(entities)} entities from context: {list(entities.keys())}")
+            logger.info(
+                f"📦 Extracted {len(entities)} entities from context: {list(entities.keys())}"
+            )
 
         return entities
 

@@ -61,17 +61,23 @@ class RAGQueryProcessor:
         # Step 0: Check if this is a clarification response
         pending_clarification = None
         if self.conversation_memory:
-            pending_clarification = self.conversation_memory.get_pending_clarification(tenant_id)
+            pending_clarification = self.conversation_memory.get_pending_clarification(
+                tenant_id
+            )
 
             if pending_clarification:
                 # Check if current query is answering the clarification
                 if self.conversation_memory.is_clarification_response(query, tenant_id):
-                    logger.info(f"✅ Clarification response detected for tenant {tenant_id}")
+                    logger.info(
+                        f"✅ Clarification response detected for tenant {tenant_id}"
+                    )
 
                     # Merge original query with clarification
                     original_query = pending_clarification.get("original_query", "")
-                    merged_query = self.conversation_memory.merge_query_with_clarification(
-                        original_query, query
+                    merged_query = (
+                        self.conversation_memory.merge_query_with_clarification(
+                            original_query, query
+                        )
                     )
 
                     logger.info(f"🔗 Merged query: {merged_query}")
@@ -100,7 +106,9 @@ class RAGQueryProcessor:
                     contextual_history, language
                 )
                 if extracted_entities:
-                    logger.info(f"📦 Entities extracted from context: {extracted_entities}")
+                    logger.info(
+                        f"📦 Entities extracted from context: {extracted_entities}"
+                    )
             except Exception as e:
                 logger.warning(f"Failed to extract entities from context: {e}")
 
@@ -129,7 +137,9 @@ class RAGQueryProcessor:
                 )
                 logger.info(f"🔒 Clarification marked pending for tenant {tenant_id}")
 
-            return self._build_clarification_result(route, language, query=query, tenant_id=tenant_id)
+            return self._build_clarification_result(
+                route, language, query=query, tenant_id=tenant_id
+            )
 
         # Step 5: Build preprocessed data
         preprocessed_data = self._build_preprocessed_data(
@@ -191,7 +201,9 @@ class RAGQueryProcessor:
             logger.warning(f"Query enrichment failed: {e}")
             return query
 
-    def _build_clarification_result(self, route, language: str, query: str = "", tenant_id: str = None) -> RAGResult:
+    def _build_clarification_result(
+        self, route, language: str, query: str = "", tenant_id: str = None
+    ) -> RAGResult:
         """Build clarification result with intelligent contextual messages"""
         logger.info(f"Clarification needed - missing fields: {route.missing_fields}")
 
@@ -200,7 +212,7 @@ class RAGQueryProcessor:
             missing_fields=route.missing_fields,
             language=language,
             query=query,
-            entities=route.entities
+            entities=route.entities,
         )
 
         return RAGResult(

@@ -15,11 +15,11 @@ import logging
 import re
 from utils.types import Dict, List, Any, Tuple, Optional
 
-from .rag_postgresql_config import ASYNCPG_AVAILABLE
-from .rag_postgresql_models import MetricResult
-from .rag_postgresql_normalizer import SQLQueryNormalizer
-from .data_models import RAGResult, RAGSource
-from .base import InitializableMixin
+from .config import ASYNCPG_AVAILABLE
+from .models import MetricResult
+from .normalizer import SQLQueryNormalizer
+from core.data_models import RAGResult, RAGSource
+from core.base import InitializableMixin
 
 # Cohere Reranker
 try:

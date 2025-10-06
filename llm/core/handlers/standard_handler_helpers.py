@@ -123,7 +123,9 @@ async def generate_response_with_generator(
                         f"  - [{issue.severity}] {issue.issue_type}: {issue.description}"
                     )
             else:
-                logger.info(f"Qualité réponse: score={quality_report.quality_score:.2f}, aucun problème détecté")
+                logger.info(
+                    f"Qualité réponse: score={quality_report.quality_score:.2f}, aucun problème détecté"
+                )
 
             # Si score trop bas, logger en warning
             if quality_report.quality_score < 0.6:

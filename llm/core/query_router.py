@@ -450,7 +450,9 @@ class QueryRouter:
 
         # Pas de match: fallback
         if not domain_scores:
-            logger.debug(f"Aucun domaine détecté pour '{query}', fallback general_poultry")
+            logger.debug(
+                f"Aucun domaine détecté pour '{query}', fallback general_poultry"
+            )
             return "general_poultry"
 
         # Prendre le domaine avec le plus de matches
@@ -467,9 +469,7 @@ class QueryRouter:
 
         return prompt_key
 
-    def _apply_priority_rules(
-        self, domain_scores: Dict, current_prompt: str
-    ) -> str:
+    def _apply_priority_rules(self, domain_scores: Dict, current_prompt: str) -> str:
         """
         Applique les règles de priorité entre domaines
 
@@ -498,7 +498,13 @@ class QueryRouter:
 
         return current_prompt
 
-    def route(self, query: str, user_id: str, language: str = "fr", preextracted_entities: Dict[str, Any] = None) -> QueryRoute:
+    def route(
+        self,
+        query: str,
+        user_id: str,
+        language: str = "fr",
+        preextracted_entities: Dict[str, Any] = None,
+    ) -> QueryRoute:
         """
         Point d'entrée UNIQUE - fait TOUT en une passe
 
@@ -531,7 +537,9 @@ class QueryRouter:
 
         # 3b. MERGE avec entités pré-extraites si disponibles
         if preextracted_entities:
-            logger.info(f"📦 Merging preextracted entities: {list(preextracted_entities.keys())}")
+            logger.info(
+                f"📦 Merging preextracted entities: {list(preextracted_entities.keys())}"
+            )
             for key, value in preextracted_entities.items():
                 if key not in entities or not entities[key]:
                     entities[key] = value
@@ -765,7 +773,9 @@ class QueryRouter:
             validation_details["required_fields"] = ["breed", "age"]
         else:
             # Requêtes Weaviate/guides: détecter ambiguïté
-            ambiguity_detected = self._detect_weaviate_ambiguity(query, entities, language)
+            ambiguity_detected = self._detect_weaviate_ambiguity(
+                query, entities, language
+            )
 
             if ambiguity_detected:
                 missing.extend(ambiguity_detected)
@@ -798,31 +808,67 @@ class QueryRouter:
         missing = []
 
         # Santé/diagnostic: besoin symptômes + âge
-        health_keywords = ["maladie", "malade", "symptôme", "mort", "mortalité", "disease", "sick", "mortality", "diagnostic"]
+        health_keywords = [
+            "maladie",
+            "malade",
+            "symptôme",
+            "mort",
+            "mortalité",
+            "disease",
+            "sick",
+            "mortality",
+            "diagnostic",
+        ]
         if any(kw in query_lower for kw in health_keywords):
             # Question très vague (< 6 mots)
             if len(query_lower.split()) < 6:
                 if not entities.get("age_days"):
                     missing.append("age")
                 # Pas besoin de breed obligatoire pour Weaviate, mais mentionner si manque symptôme détaillé
-                if "symptom" not in query_lower and "fèces" not in query_lower and "lésion" not in query_lower:
+                if (
+                    "symptom" not in query_lower
+                    and "fèces" not in query_lower
+                    and "lésion" not in query_lower
+                ):
                     missing.append("symptom")
 
         # Nutrition: besoin phase de production
-        nutrition_keywords = ["aliment", "ration", "formule", "nutrition", "feed", "diet"]
+        nutrition_keywords = [
+            "aliment",
+            "ration",
+            "formule",
+            "nutrition",
+            "feed",
+            "diet",
+        ]
         if any(kw in query_lower for kw in nutrition_keywords):
             if len(query_lower.split()) < 6:
                 if not entities.get("age_days"):
                     missing.append("production_phase")
 
         # Environnement: besoin âge
-        environment_keywords = ["température", "ventilation", "ambiance", "humidité", "temperature", "climate"]
+        environment_keywords = [
+            "température",
+            "ventilation",
+            "ambiance",
+            "humidité",
+            "temperature",
+            "climate",
+        ]
         if any(kw in query_lower for kw in environment_keywords):
             if len(query_lower.split()) < 7 and not entities.get("age_days"):
                 missing.append("age")
 
         # Traitement/protocole: besoin âge
-        protocol_keywords = ["protocole", "vaccin", "traitement", "antibiotique", "protocol", "vaccine", "treatment"]
+        protocol_keywords = [
+            "protocole",
+            "vaccin",
+            "traitement",
+            "antibiotique",
+            "protocol",
+            "vaccine",
+            "treatment",
+        ]
         if any(kw in query_lower for kw in protocol_keywords):
             if not entities.get("age_days"):
                 missing.append("age")

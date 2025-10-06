@@ -17,7 +17,7 @@ import logging
 from utils.types import Dict, List, Optional, Any
 
 from utils.breeds_registry import get_breeds_registry
-from .base import InitializableMixin
+from core.base import InitializableMixin
 
 logger = logging.getLogger(__name__)
 

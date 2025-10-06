@@ -6,7 +6,7 @@ Version 1.0 - Détecte problèmes de qualité et calcule score
 
 import logging
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -51,8 +51,26 @@ class ResponseQualityValidator:
 
     # Mots-clés nécessitant des valeurs chiffrées
     NUMERIC_KEYWORDS = {
-        "fr": ["poids", "fcr", "conversion", "température", "densité", "mortalité", "ponte", "âge"],
-        "en": ["weight", "fcr", "conversion", "temperature", "density", "mortality", "production", "age"],
+        "fr": [
+            "poids",
+            "fcr",
+            "conversion",
+            "température",
+            "densité",
+            "mortalité",
+            "ponte",
+            "âge",
+        ],
+        "en": [
+            "weight",
+            "fcr",
+            "conversion",
+            "temperature",
+            "density",
+            "mortality",
+            "production",
+            "age",
+        ],
     }
 
     def validate_response(
@@ -257,11 +275,20 @@ class ResponseQualityValidator:
 
             # Mots-clés indiquant recommandation
             recommendation_keywords = {
-                "fr": ["recommande", "recommandation", "conseil", "préconise", "suggère", "propose"],
+                "fr": [
+                    "recommande",
+                    "recommandation",
+                    "conseil",
+                    "préconise",
+                    "suggère",
+                    "propose",
+                ],
                 "en": ["recommend", "recommendation", "advise", "suggest", "propose"],
             }
 
-            keywords = recommendation_keywords.get(language, recommendation_keywords["fr"])
+            keywords = recommendation_keywords.get(
+                language, recommendation_keywords["fr"]
+            )
             has_recommendation = any(kw in response_lower for kw in keywords)
 
             if not has_recommendation and len(response) > 300:

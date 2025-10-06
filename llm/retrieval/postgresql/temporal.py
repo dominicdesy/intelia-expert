@@ -8,9 +8,9 @@ import time
 import logging
 from utils.types import Dict, List, Optional, Any, Tuple
 
-from .data_models import RAGResult, RAGSource
-from .rag_postgresql_models import MetricResult
-from .rag_postgresql_config import OPENAI_MODEL
+from core.data_models import RAGResult, RAGSource
+from .models import MetricResult
+from .config import OPENAI_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -362,7 +362,7 @@ class TemporalQueryProcessor:
 
     def _convert_metrics_to_documents(self, metric_results: List[MetricResult]) -> List:
         """Convertit les métriques en documents"""
-        from .data_models import Document
+        from core.data_models import Document
 
         documents = []
         for metric in metric_results:

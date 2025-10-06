@@ -3,7 +3,17 @@
     "allow": [
       "Bash(python:*)",
       "Bash(git checkout:*)",
-      "Read(//c/intelia_gpt/intelia-expert/**)"
+      "Read(//c/intelia_gpt/intelia-expert/**)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(dir:*)",
+      "Read(//c/**)",
+      "Bash(powershell:*)",
+      "Bash(git rm:*)",
+      "Bash(git mv:*)",
+      "Bash(tree:*)",
+      "Bash(ruff check:*)"
     ],
     "deny": [],
     "ask": []

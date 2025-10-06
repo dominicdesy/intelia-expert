@@ -423,7 +423,12 @@ class EnhancedResponseGenerator:
 
             # Générer le prompt enrichi avec domaine détecté
             system_prompt, user_prompt = self._build_enhanced_prompt(
-                query, context_docs, enrichment, conversation_context, lang, detected_domain
+                query,
+                context_docs,
+                enrichment,
+                conversation_context,
+                lang,
+                detected_domain,
             )
 
             # Génération
@@ -623,7 +628,9 @@ FORMATTING RULES - CLEAN & MODERN:
                     logger.info(f"✅ Utilisation prompt spécialisé: {detected_domain}")
                     system_prompt_parts.append(specialized_prompt)
                 else:
-                    logger.warning(f"Prompt spécialisé '{detected_domain}' non trouvé, fallback general")
+                    logger.warning(
+                        f"Prompt spécialisé '{detected_domain}' non trouvé, fallback general"
+                    )
                     expert_identity = self.prompts_manager.get_base_prompt(
                         "expert_identity", language
                     )

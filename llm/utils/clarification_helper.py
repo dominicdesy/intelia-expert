@@ -134,7 +134,10 @@ class ClarificationHelper:
             "profitability",
             "improve",
         ]
-        if any(kw in query_lower for kw in management_keywords) and len(query_lower.split()) < 10:
+        if (
+            any(kw in query_lower for kw in management_keywords)
+            and len(query_lower.split()) < 10
+        ):
             return "management_broad"
 
         # Génétique: comparaison sans critères

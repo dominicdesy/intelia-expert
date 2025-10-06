@@ -45,7 +45,7 @@ def test_reranker_initialization():
 def test_weaviate_core_integration():
     """Test 3: Intégration dans WeaviateCore"""
     try:
-        from core.rag_weaviate_core import RERANKER_AVAILABLE
+        from retrieval.weaviate.core import RERANKER_AVAILABLE
 
         logger.info(f"   RERANKER_AVAILABLE = {RERANKER_AVAILABLE}")
 
@@ -65,7 +65,7 @@ def test_weaviate_core_integration():
 def test_postgresql_integration():
     """Test 4: Intégration dans PostgreSQLRetriever"""
     try:
-        from core.rag_postgresql_retriever import RERANKER_AVAILABLE
+        from retrieval.postgresql.retriever import RERANKER_AVAILABLE
 
         logger.info(f"   RERANKER_AVAILABLE = {RERANKER_AVAILABLE}")
 
