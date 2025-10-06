@@ -251,6 +251,50 @@ jobs:
           echo "Attente de 30s pour la propagation complete du registry..."
           sleep 30
 
+      - name: Update App Platform spec to use latest tags
+        run: |
+          echo "Mise a jour de la spec de l'App Platform..."
+
+          # Get current spec
+          doctl apps spec get ${{ secrets.DO_APP_ID }} > app-spec.yaml
+
+          echo "Spec actuelle:"
+          cat app-spec.yaml | grep -A 5 "image:"
+
+          # Update spec to use 'latest' tag without digest
+          # Remove any digest references and force tag to 'latest'
+          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
+            echo "Forcing LLM to use tag 'latest' (no digest)..."
+            # Find the LLM service and update its image tag
+            python3 << 'EOF'
+          import yaml
+          import sys
+
+          with open('app-spec.yaml', 'r') as f:
+              spec = yaml.safe_load(f)
+
+          # Update LLM service image
+          for service in spec.get('services', []):
+              if 'llm' in service.get('name', '').lower():
+                  if 'image' in service:
+                      service['image']['tag'] = 'latest'
+                      # Remove digest if present
+                      if 'digest' in service['image']:
+                          del service['image']['digest']
+                      print(f"Updated {service['name']} to use tag: latest")
+
+          with open('app-spec.yaml', 'w') as f:
+              yaml.dump(spec, f)
+          EOF
+          fi
+
+          echo "Spec mise a jour:"
+          cat app-spec.yaml | grep -A 5 "image:"
+
+          # Apply updated spec
+          echo "Application de la spec mise a jour..."
+          doctl apps update ${{ secrets.DO_APP_ID }} --spec app-spec.yaml
+
       - name: Trigger App Platform deployment
         run: |
           echo "Declenchement du redeploiement..."
