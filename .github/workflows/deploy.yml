@@ -145,6 +145,19 @@ jobs:
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
           provenance: false
           sbom: false
+          outputs: type=image,push=true
+
+      - name: Verify latest tag exists
+        run: |
+          echo "Verification du tag 'latest'..."
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest && echo "✅ Tag 'latest' existe" || {
+            echo "❌ Tag 'latest' manquant, creation manuelle..."
+            docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
+            docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main \
+                       registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
+            docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
+            echo "✅ Tag 'latest' cree manuellement"
+          }
 
   build-rag:
     runs-on: ubuntu-latest

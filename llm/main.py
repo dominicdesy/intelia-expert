@@ -3,7 +3,7 @@
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
 
-Version: 2.1.0 - Multilingual Support + Registry Cleanup
+Version: 2.1.1 - Fix Docker tag 'latest' push issue
 """
 
 import os
