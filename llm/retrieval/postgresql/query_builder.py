@@ -317,10 +317,10 @@ class PostgreSQLQueryBuilder:
             return "", []
 
         if len(valid_breeds) == 1:
-            return "s.strain_name = ${}", valid_breeds
+            return "m.strain = ${}", valid_breeds
         else:
             placeholders = ", ".join("${}" for _ in range(len(valid_breeds)))
-            return f"s.strain_name IN ({placeholders})", valid_breeds
+            return f"m.strain IN ({placeholders})", valid_breeds
 
     def _handle_out_of_range_age(self, age: int, breed: str) -> str:
         """Gère les âges hors plage de données"""
@@ -474,24 +474,19 @@ class PostgreSQLQueryBuilder:
         )
 
         order_clause = """
-        ORDER BY 
+        ORDER BY
             m.age_min ASC,
-            CASE WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed') THEN 1 ELSE 2 END,
+            CASE WHEN LOWER(COALESCE(m.sex, 'as_hatched')) IN ('as_hatched', 'mixed') THEN 1 ELSE 2 END,
             m.value_numeric DESC NULLS LAST
         """
 
         sql = f"""
         SELECT DISTINCT ON (m.age_min, m.metric_name)
-            c.company_name, b.breed_name, s.strain_name, s.species,
+            m.company, m.breed, m.strain, m.species,
             m.metric_name, m.value_numeric, m.value_text, m.unit,
-            m.age_min, m.age_max, m.sheet_name, dc.category_name,
-            d.sex, d.housing_system, d.data_type, m.metadata
-        FROM companies c
-        JOIN breeds b ON c.id = b.company_id
-        JOIN strains s ON b.id = s.breed_id  
-        JOIN documents d ON s.id = d.strain_id
-        JOIN metrics m ON d.id = m.document_id
-        JOIN data_categories dc ON m.category_id = dc.id
+            m.age_min, m.age_max, m.sheet_name, m.category,
+            m.sex, m.housing_system, m.data_type, m.metadata
+        FROM metrics_enriched m
         WHERE {' AND '.join(conditions)}
         {order_clause}
         LIMIT {limit}
@@ -682,7 +677,7 @@ class PostgreSQLQueryBuilder:
 
         if sex != "as_hatched":
             param_count += 1
-            conditions.append(f"d.sex = ${param_count}")
+            conditions.append(f"m.sex = ${param_count}")
             params.append(sex)
             logger.debug(f"Added strict sex filter: {sex} (param ${param_count})")
 
@@ -699,13 +694,13 @@ class PostgreSQLQueryBuilder:
         return param_count
 
     def _get_base_sql(self) -> str:
-        """Retourne la requête SQL de base"""
+        """Retourne la requête SQL de base (utilise la VIEW metrics_enriched)"""
         return """
-            SELECT 
-                c.company_name,
-                b.breed_name,
-                s.strain_name,
-                s.species,
+            SELECT
+                m.company,
+                m.breed,
+                m.strain,
+                m.species,
                 m.metric_name,
                 m.value_numeric,
                 m.value_text,
@@ -713,17 +708,12 @@ class PostgreSQLQueryBuilder:
                 m.age_min,
                 m.age_max,
                 m.sheet_name,
-                dc.category_name,
-                d.sex,
-                d.housing_system,
-                d.data_type,
+                m.category,
+                m.sex,
+                m.housing_system,
+                m.data_type,
                 m.metadata
-            FROM companies c
-            JOIN breeds b ON c.id = b.company_id
-            JOIN strains s ON b.id = s.breed_id  
-            JOIN documents d ON s.id = d.strain_id
-            JOIN metrics m ON d.id = m.document_id
-            JOIN data_categories dc ON m.category_id = dc.id"""
+            FROM metrics_enriched m"""
 
     def _build_order_clause(
         self, entities: Dict[str, str], strict_sex_match: bool
@@ -735,10 +725,10 @@ class PostgreSQLQueryBuilder:
         if not strict_sex_match:
             order_parts.append(
                 """
-                CASE 
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 1
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = 'male' THEN 2
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = 'female' THEN 3
+                CASE
+                    WHEN LOWER(COALESCE(m.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 1
+                    WHEN LOWER(COALESCE(m.sex, 'as_hatched')) = 'male' THEN 2
+                    WHEN LOWER(COALESCE(m.sex, 'as_hatched')) = 'female' THEN 3
                     ELSE 4
                 END
             """
@@ -828,18 +818,16 @@ class PostgreSQLQueryBuilder:
         db_strain_name = self._normalize_breed_for_db(breed)
 
         query = """
-        SELECT 
+        SELECT
             m.age_min,
             m.value_numeric as value,
             m.unit,
             ABS(m.value_numeric - $1) as difference,
-            s.strain_name,
-            d.sex
-        FROM metrics m
-        JOIN documents d ON m.document_id = d.id
-        JOIN strains s ON d.strain_id = s.id
-        WHERE s.strain_name = $2
-          AND d.sex = $3
+            m.strain,
+            m.sex
+        FROM metrics_enriched m
+        WHERE m.strain = $2
+          AND m.sex = $3
           AND m.metric_name LIKE $4
           AND m.value_numeric IS NOT NULL
         ORDER BY difference ASC
@@ -868,10 +856,10 @@ class PostgreSQLQueryBuilder:
             logger.debug("No specific sex requested, prioritizing as_hatched")
             return (
                 """
-                CASE 
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 1
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = 'male' THEN 2
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = 'female' THEN 3
+                CASE
+                    WHEN LOWER(COALESCE(m.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 1
+                    WHEN LOWER(COALESCE(m.sex, 'as_hatched')) = 'male' THEN 2
+                    WHEN LOWER(COALESCE(m.sex, 'as_hatched')) = 'female' THEN 3
                     ELSE 4
                 END
             """,
@@ -881,13 +869,13 @@ class PostgreSQLQueryBuilder:
         if strict_sex_match:
             logger.debug(f"Strict sex match: {target_sex} only")
             param_index += 1
-            conditions.append(f"LOWER(d.sex) = ${param_index}")
+            conditions.append(f"LOWER(m.sex) = ${param_index}")
             params.append(target_sex.lower())
 
             return (
                 f"""
-                CASE 
-                    WHEN LOWER(d.sex) = ${param_index} THEN 1
+                CASE
+                    WHEN LOWER(m.sex) = ${param_index} THEN 1
                     ELSE 2
                 END
             """,
@@ -898,17 +886,17 @@ class PostgreSQLQueryBuilder:
             param_index += 1
             conditions.append(
                 f"""
-                (LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_index} 
-                 OR LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched', 'straight_run'))
+                (LOWER(COALESCE(m.sex, 'as_hatched')) = ${param_index}
+                 OR LOWER(COALESCE(m.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched', 'straight_run'))
             """
             )
             params.append(target_sex.lower())
 
             return (
                 f"""
-                CASE 
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) = ${param_index} THEN 1
-                    WHEN LOWER(COALESCE(d.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 2
+                CASE
+                    WHEN LOWER(COALESCE(m.sex, 'as_hatched')) = ${param_index} THEN 1
+                    WHEN LOWER(COALESCE(m.sex, 'as_hatched')) IN ('as_hatched', 'mixed', 'as-hatched') THEN 2
                     ELSE 3
                 END
             """,
@@ -951,7 +939,7 @@ class PostgreSQLQueryBuilder:
 
             if db_strain_name:
                 param_index += 1
-                conditions.append(f"s.strain_name = ${param_index}")
+                conditions.append(f"m.strain = ${param_index}")
                 params.append(db_strain_name)
                 logger.debug(
                     f"Adding breed filter: {entities['breed']} -> DB: '{db_strain_name}'"
@@ -962,7 +950,7 @@ class PostgreSQLQueryBuilder:
 
             if db_strain_name:
                 param_index += 1
-                conditions.append(f"s.strain_name = ${param_index}")
+                conditions.append(f"m.strain = ${param_index}")
                 params.append(db_strain_name)
                 logger.debug(
                     f"Adding line filter: {entities['line']} -> DB: '{db_strain_name}'"
