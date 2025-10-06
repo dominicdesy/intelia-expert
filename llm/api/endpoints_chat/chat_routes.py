@@ -176,6 +176,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     tenant_id,
                     detected_language,
                     total_processing_time,
+                    conversation_id,  # 🆕 Passer conversation_id pour mémoire
                 ),
                 media_type="text/plain",
             )

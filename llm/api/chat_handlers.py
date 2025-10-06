@@ -235,6 +235,7 @@ class ChatHandlers:
         tenant_id: str,
         language: str,
         total_processing_time: float,
+        conversation_id: Optional[str] = None,  # 🆕 ID de conversation pour mémoire
     ):
         """
         Génère un flux de réponse SSE (Server-Sent Events)
@@ -251,6 +252,7 @@ class ChatHandlers:
             tenant_id: ID utilisateur
             language: Langue
             total_processing_time: Temps total de traitement
+            conversation_id: ID de conversation (pour isolation mémoire)
 
         Yields:
             Events SSE formatés
@@ -364,8 +366,11 @@ class ChatHandlers:
             # Sauvegarder dans les deux systèmes de mémoire
             # Seulement si c'est une vraie réponse (pas une clarification)
             if answer and source and not metadata.get("needs_clarification"):
+                # 🆕 Utiliser conversation_id comme clé mémoire (fallback to tenant_id)
+                memory_key = conversation_id or tenant_id
+                logger.debug(f"💾 Saving to memory with key: {memory_key}")
                 await self._save_to_memory(
-                    tenant_id=tenant_id,
+                    tenant_id=memory_key,  # Utiliser conversation_id comme clé
                     message=message,
                     answer=str(answer),
                     metadata=metadata,
