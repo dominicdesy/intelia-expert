@@ -714,10 +714,11 @@ class PostgreSQLRetriever(InitializableMixin):
                 params.append(db_pattern)
                 logger.info(f"🎯 Filtering by metric: {metric_name} → {db_pattern}")
 
-                # 🔧 FILTRE: Exclure valeurs impériales mal étiquetées (< 10g pour body_weight)
-                if "body_weight" in db_pattern:
+                # 🔧 FILTRE: Exclure valeurs impériales mal étiquetées
+                # Pour métriques en grammes, valeurs < 10g sont probablement des pounds
+                if "body_weight" in db_pattern or "feed_intake" in db_pattern or "daily_gain" in db_pattern:
                     conditions.append("m.value_numeric >= 10")
-                    logger.info("🔧 Excluding imperial units mislabeled as grams (< 10g)")
+                    logger.info(f"🔧 Excluding imperial units mislabeled as grams (< 10g) for {db_pattern}")
             else:
                 logger.warning(f"⚠️ Unknown metric type: {metric_name}")
 
