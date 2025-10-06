@@ -341,33 +341,8 @@ class ClarificationHelper:
 
         custom_message = intro + "\n" + "\n".join(f"- {item}" for item in items_to_ask)
 
-        # Ajouter exemple
-        if language == "fr":
-            example = "\n\nPar exemple: \"Quel poids"
-            if entities.get("breed"):
-                example += f" pour {entities['breed']}"
-            else:
-                example += " pour Ross 308"
-
-            if "age" in missing_fields:
-                example += " à 35 jours"
-            if "sex" in missing_fields:
-                example += " mâle"
-            example += "?\""
-        else:
-            example = "\n\nExample: \"What weight"
-            if entities.get("breed"):
-                example += f" for {entities['breed']}"
-            else:
-                example += " for Ross 308"
-
-            if "age" in missing_fields:
-                example += " at 35 days"
-            if "sex" in missing_fields:
-                example += " male"
-            example += "?\""
-
-        return custom_message + example
+        # Ne plus ajouter d'exemple - l'utilisateur doit juste fournir l'info manquante
+        return custom_message
 
     def _translate_field_name(self, field: str) -> str:
         """Traduit le nom d'un champ en français"""

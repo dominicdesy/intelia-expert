@@ -168,7 +168,12 @@ class RAGQueryProcessor:
 
         # Step 4: Check for clarification needs
         if route.destination == "needs_clarification":
-            # Mark clarification as pending in memory
+            # Build clarification message
+            clarification_result = self._build_clarification_result(
+                route, language, query=query, tenant_id=tenant_id
+            )
+
+            # Mark clarification as pending in memory AND save exchange immediately
             if self.conversation_memory:
                 self.conversation_memory.mark_pending_clarification(
                     tenant_id=tenant_id,
@@ -179,6 +184,19 @@ class RAGQueryProcessor:
                 )
                 logger.info(f"🔒 Clarification marked pending for tenant {tenant_id}")
 
+                # 💾 SAVE EXCHANGE IMMEDIATELY so next query can use context
+                self.conversation_memory.add_exchange(
+                    tenant_id=tenant_id,
+                    question=query,
+                    answer=clarification_result.answer,
+                    route_info={
+                        "destination": "needs_clarification",
+                        "missing_fields": route.missing_fields,
+                        "entities": route.entities,
+                    }
+                )
+                logger.info(f"💾 Clarification exchange saved immediately for tenant {tenant_id}")
+
             # Structured logging: Clarification needed
             structured_logger.info(
                 "clarification_needed",
@@ -187,9 +205,7 @@ class RAGQueryProcessor:
                 total_duration_ms=(time.time() - start_time) * 1000,
             )
 
-            return self._build_clarification_result(
-                route, language, query=query, tenant_id=tenant_id
-            )
+            return clarification_result
 
         # Step 5: Build preprocessed data
         preprocessed_data = self._build_preprocessed_data(
