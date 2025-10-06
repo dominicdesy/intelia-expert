@@ -10,6 +10,8 @@ Features:
 - Domain-specific assistance offers (production, health, nutrition, etc.)
 - Multilingual support (12 languages: FR, EN, ES, DE, IT, PT, PL, NL, ID, HI, ZH, TH)
 - Configurable tone (helpful, professional, friendly)
+
+Version: 2.0 (Multilingual Release)
 """
 
 import logging
