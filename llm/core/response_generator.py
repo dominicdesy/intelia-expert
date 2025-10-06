@@ -56,6 +56,8 @@ class RAGResponseGenerator:
         Checks if RAGResult contains documents but no answer, and generates
         one using the LLM generator if needed.
 
+        Also adds proactive follow-up questions if enabled.
+
         Args:
             result: RAGResult from handler
             preprocessed_data: Preprocessed data (contains contextual_history)
@@ -63,74 +65,72 @@ class RAGResponseGenerator:
             language: Query language
 
         Returns:
-            RAGResult with generated answer
+            RAGResult with generated answer and optional follow-up
         """
-        # If answer already present, return as-is
-        if result.answer and result.answer.strip():
-            logger.debug("Answer already present, generation not needed")
-            return result
+        # If answer NOT already present, generate via LLM
+        if not (result.answer and result.answer.strip()):
+            # If documents present but no answer, generate via LLM
+            if result.context_docs and len(result.context_docs) > 0:
+                if not self.generator:
+                    logger.warning("LLM generator not available, cannot generate response")
+                    result.answer = "Data retrieved but response generation unavailable."
+                else:
+                    logger.info(
+                        f"Generating LLM response for {len(result.context_docs)} documents"
+                    )
 
-        # If documents present but no answer, generate via LLM
-        if result.context_docs and len(result.context_docs) > 0:
-            if not self.generator:
-                logger.warning("LLM generator not available, cannot generate response")
-                result.answer = "Data retrieved but response generation unavailable."
-                return result
+                    # Retrieve contextual history
+                    contextual_history = preprocessed_data.get("contextual_history", "")
 
-            logger.info(
-                f"Generating LLM response for {len(result.context_docs)} documents"
-            )
+                    logger.debug(
+                        f"Contextual history type: {type(contextual_history)}, "
+                        f"length: {len(contextual_history) if contextual_history else 0}"
+                    )
 
-            # Retrieve contextual history
-            contextual_history = preprocessed_data.get("contextual_history", "")
+                    # Format history for generator
+                    conversation_context = ""
+                    if contextual_history:
+                        conversation_context = str(contextual_history)
+                        logger.info(
+                            f"Conversation context transmitted to generator: {len(conversation_context)} chars"
+                        )
+                    else:
+                        logger.debug("No history in preprocessed_data")
 
-            logger.debug(
-                f"Contextual history type: {type(contextual_history)}, "
-                f"length: {len(contextual_history) if contextual_history else 0}"
-            )
+                    try:
+                        logger.debug(
+                            f"Calling generate_response with conversation_context length: {len(conversation_context)}"
+                        )
 
-            # Format history for generator
-            conversation_context = ""
-            if contextual_history:
-                conversation_context = str(contextual_history)
-                logger.info(
-                    f"Conversation context transmitted to generator: {len(conversation_context)} chars"
-                )
-            else:
-                logger.debug("No history in preprocessed_data")
+                        # Generate answer with retrieved documents and conversation context
+                        generated_answer = await self.generator.generate_response(
+                            query=preprocessed_data.get("original_query", original_query),
+                            context_docs=result.context_docs,
+                            conversation_context=conversation_context,
+                            language=language,
+                            intent_result=None,
+                        )
 
-            try:
-                logger.debug(
-                    f"Calling generate_response with conversation_context length: {len(conversation_context)}"
-                )
+                        result.answer = generated_answer
+                        result.metadata["llm_generation_applied"] = True
+                        result.metadata["llm_input_docs_count"] = len(result.context_docs)
+                        result.metadata["conversation_context_used"] = bool(
+                            conversation_context
+                        )
+                        result.metadata["conversation_context_length"] = len(
+                            conversation_context
+                        )
 
-                # Generate answer with retrieved documents and conversation context
-                generated_answer = await self.generator.generate_response(
-                    query=preprocessed_data.get("original_query", original_query),
-                    context_docs=result.context_docs,
-                    conversation_context=conversation_context,
-                    language=language,
-                    intent_result=None,
-                )
+                        logger.info(
+                            f"LLM response generated ({len(generated_answer)} characters)"
+                        )
 
-                result.answer = generated_answer
-                result.metadata["llm_generation_applied"] = True
-                result.metadata["llm_input_docs_count"] = len(result.context_docs)
-                result.metadata["conversation_context_used"] = bool(
-                    conversation_context
-                )
-                result.metadata["conversation_context_length"] = len(
-                    conversation_context
-                )
-
-                logger.info(
-                    f"LLM response generated ({len(generated_answer)} characters)"
-                )
-
-            except Exception as e:
-                logger.error(f"LLM generation error: {e}", exc_info=True)
-                result.answer = "Unable to generate response from the retrieved data."
-                result.metadata["llm_generation_error"] = str(e)
+                    except Exception as e:
+                        logger.error(f"LLM generation error: {e}", exc_info=True)
+                        result.answer = "Unable to generate response from the retrieved data."
+                        result.metadata["llm_generation_error"] = str(e)
+        else:
+            logger.debug("Answer already present, skipping LLM generation")
 
         # Generate proactive follow-up if enabled and answer exists
         if self.proactive_assistant and result.answer and result.answer.strip():

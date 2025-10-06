@@ -499,7 +499,7 @@ specialized_prompt = prompts_manager.get_specialized_prompt(
 def _select_model_for_query(self, query: str, complexity_score: float) -> str:
     # Complex queries → Claude 3.5 Sonnet (best quality)
     if complexity_score > 0.7:
-        return "claude-3-5-sonnet-20241022"
+        return "claude-3-5-sonnet-20250110"
 
     # Medium complexity → GPT-4o
     elif complexity_score > 0.4:
@@ -619,7 +619,7 @@ OPENAI_MODEL_MINI=gpt-4o-mini-2024-07-18
 
 # Anthropic Claude
 ANTHROPIC_API_KEY=sk-ant-...
-CLAUDE_MODEL=claude-3-5-sonnet-20241022
+CLAUDE_MODEL=claude-3-5-sonnet-20250110
 
 # DeepSeek
 DEEPSEEK_API_KEY=sk-...

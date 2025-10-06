@@ -263,7 +263,7 @@ class LLMRouter:
         ]
 
         response = await self.claude_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-3-5-sonnet-20250110",
             system=system_msg,
             messages=user_messages,
             temperature=temperature,
