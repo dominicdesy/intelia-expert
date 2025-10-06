@@ -274,40 +274,34 @@ jobs:
 
           echo "✅ Spec correctement configurée, pas besoin de mise à jour"
 
-      - name: Trigger App Platform deployment
+      - name: Deployment via Autodeploy
         run: |
-          echo "Declenchement du redeploiement..."
-
-          DEPLOYMENT_ID=$(doctl apps create-deployment ${{ secrets.DO_APP_ID }} --format ID --no-header)
-          echo "Deployment ID: $DEPLOYMENT_ID"
-          
-          echo "Surveillance du deploiement (timeout 10 min)..."
-          for i in {1..60}; do
-            STATUS=$(doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID --format Phase --no-header 2>/dev/null || echo "UNKNOWN")
-            echo "[$i/60] Statut: $STATUS"
-            
-            case $STATUS in
-              "ACTIVE"|"RUNNING")
-                echo "Deploiement reussi !"
-                exit 0
-                ;;
-              "ERROR"|"FAILED")
-                echo "Deploiement echoue"
-                doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
-                exit 1
-                ;;
-              "CANCELED"|"SUPERSEDED")
-                echo "Deploiement annule ou remplace"
-                exit 1
-                ;;
-            esac
-            
-            sleep 10
-          done
-          
-          echo "Timeout atteint"
-          doctl apps get-deployment ${{ secrets.DO_APP_ID }} $DEPLOYMENT_ID || true
-          exit 1
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║  AUTODEPLOY ACTIVÉ - PAS DE DÉPLOIEMENT MANUEL REQUIS    ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "✅ Images pushed avec tag 'latest'"
+          echo "✅ App Platform Autodeploy activé pour tous les services"
+          echo ""
+          echo "App Platform va détecter automatiquement les nouvelles images"
+          echo "et déclencher le déploiement dans les prochaines minutes."
+          echo ""
+          echo "Surveillez le déploiement sur:"
+          echo "https://cloud.digitalocean.com/apps"
+          echo ""
+          echo "Services avec Autodeploy:"
+          if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
+            echo "  ✅ Frontend (intelia-frontend:latest)"
+          fi
+          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
+            echo "  ✅ Backend (intelia-backend:latest)"
+          fi
+          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
+            echo "  ✅ LLM (intelia-llm:latest)"
+          fi
+          if [[ "${{ needs.build-rag.result }}" == "success" ]]; then
+            echo "  ✅ RAG (intelia-rag:latest)"
+          fi
 
   summary:
     runs-on: ubuntu-latest
