@@ -202,21 +202,34 @@ class ConfigManager:
 
         # INDEX ROUTING KEYWORDS depuis universal_terms
         for lang_code, lang_terms in self.universal_terms.items():
+            domains = lang_terms.get("domains", {})
+
             # PostgreSQL keywords (métriques chiffrées)
-            if "metrics" in lang_terms and "keywords" in lang_terms["metrics"]:
-                self.routing_keywords["postgresql"].extend(
-                    lang_terms["metrics"]["keywords"]
-                )
+            metrics_domain = domains.get("metrics", {})
+            if metrics_domain:
+                for metric_key, metric_data in metrics_domain.items():
+                    if isinstance(metric_data, dict) and "variants" in metric_data:
+                        self.routing_keywords["postgresql"].extend(metric_data["variants"])
+
+            # Also check performance_metrics domain
+            perf_metrics = domains.get("performance_metrics", {})
+            if perf_metrics:
+                for metric_key, metric_data in perf_metrics.items():
+                    if isinstance(metric_data, dict) and "variants" in metric_data:
+                        self.routing_keywords["postgresql"].extend(metric_data["variants"])
 
             # Weaviate keywords (santé, environnement)
-            if "health" in lang_terms and "keywords" in lang_terms["health"]:
-                self.routing_keywords["weaviate"].extend(
-                    lang_terms["health"]["keywords"]
-                )
-            if "environment" in lang_terms and "keywords" in lang_terms["environment"]:
-                self.routing_keywords["weaviate"].extend(
-                    lang_terms["environment"]["keywords"]
-                )
+            health_domain = domains.get("health", {})
+            if health_domain:
+                for health_key, health_data in health_domain.items():
+                    if isinstance(health_data, dict) and "variants" in health_data:
+                        self.routing_keywords["weaviate"].extend(health_data["variants"])
+
+            environment_domain = domains.get("environment", {})
+            if environment_domain:
+                for env_key, env_data in environment_domain.items():
+                    if isinstance(env_data, dict) and "variants" in env_data:
+                        self.routing_keywords["weaviate"].extend(env_data["variants"])
 
         # Dédupliquer
         self.routing_keywords["postgresql"] = list(
@@ -457,14 +470,14 @@ class QueryRouter:
         Returns:
             prompt_key du domaine détecté ou 'general_poultry'
         """
-        if not self.domain_keywords or "domains" not in self.domain_keywords:
+        if not self.config.domain_keywords or "domains" not in self.config.domain_keywords:
             return "general_poultry"
 
         query_lower = query.lower()
         domain_scores = {}
 
         # Compter les keywords matchés par domaine
-        for domain_name, domain_data in self.domain_keywords["domains"].items():
+        for domain_name, domain_data in self.config.domain_keywords["domains"].items():
             keywords = domain_data.get("keywords", {}).get(language, [])
             if not keywords:
                 keywords = domain_data.get("keywords", {}).get("fr", [])
@@ -508,7 +521,7 @@ class QueryRouter:
         Returns:
             Prompt ajusté selon règles de priorité
         """
-        priority_rules = self.domain_keywords.get("priority_rules", {}).get("rules", [])
+        priority_rules = self.config.domain_keywords.get("priority_rules", {}).get("rules", [])
 
         for rule in priority_rules:
             condition = rule.get("condition", "")
