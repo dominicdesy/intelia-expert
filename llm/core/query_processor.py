@@ -119,7 +119,22 @@ class RAGQueryProcessor:
                     self.conversation_memory.increment_clarification_attempt(tenant_id)
 
         # Step 0.5: OOD Detection (before routing)
-        if self.ood_detector:
+        # 🆕 SKIP OOD detection si clarification en attente et query courte/numérique
+        skip_ood = False
+        if pending_clarification:
+            # Détecter si query ressemble à une réponse de clarification
+            query_stripped = query.strip()
+            is_short = len(query_stripped) < 50
+            is_numeric = query_stripped.isdigit()
+            is_simple_response = is_short and (is_numeric or len(query_stripped.split()) <= 3)
+
+            if is_simple_response:
+                skip_ood = True
+                logger.info(
+                    f"⏭️ Skipping OOD detection - clarification response likely: '{query[:30]}...'"
+                )
+
+        if self.ood_detector and not skip_ood:
             try:
                 is_in_domain, domain_score, score_details = (
                     self.ood_detector.calculate_ood_score_multilingual(
