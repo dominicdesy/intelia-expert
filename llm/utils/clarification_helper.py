@@ -330,13 +330,17 @@ class ClarificationHelper:
         if not items_to_ask:
             return message
 
-        # Construire le message personnalisé
-        intro_en = "To analyze performance"
-        if entities.get("breed"):
-            intro_en += f" of {entities['breed']}"
-        intro_en += ", I need to know:"
+        # Construire le message personnalisé avec traduction par morceaux
+        intro_part1 = self._translate_message("To analyze performance", language)
 
-        intro = self._translate_message(intro_en, language)
+        if entities.get("breed"):
+            of_label = self._translate_message("of", language)
+            intro_part2 = f" {of_label} {entities['breed']}"
+        else:
+            intro_part2 = ""
+
+        need_to_know = self._translate_message("I need to know", language)
+        intro = f"{intro_part1}{intro_part2}, {need_to_know}:"
 
         custom_message = intro + "\n" + "\n".join(f"- {item}" for item in items_to_ask)
 

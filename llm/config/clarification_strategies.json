@@ -167,6 +167,33 @@
       "pt": "Para analisar o desempenho, preciso de detalhes",
       "th": "เพื่อวิเคราะห์ประสิทธิภาพ ฉันต้องการรายละเอียด",
       "vi": "Để phân tích hiệu suất, tôi cần chi tiết"
+    },
+    "To analyze performance": {
+      "fr": "Pour analyser la performance",
+      "es": "Para analizar el rendimiento",
+      "de": "Zur Leistungsanalyse",
+      "it": "Per analizzare le prestazioni",
+      "pt": "Para analisar o desempenho",
+      "th": "เพื่อวิเคราะห์ประสิทธิภาพ",
+      "vi": "Để phân tích hiệu suất"
+    },
+    "I need to know": {
+      "fr": "j'ai besoin de savoir",
+      "es": "necesito saber",
+      "de": "benötige ich",
+      "it": "ho bisogno di sapere",
+      "pt": "preciso saber",
+      "th": "ฉันต้องการทราบ",
+      "vi": "tôi cần biết"
+    },
+    "of": {
+      "fr": "de",
+      "es": "de",
+      "de": "von",
+      "it": "di",
+      "pt": "de",
+      "th": "ของ",
+      "vi": "của"
     }
   },
 
