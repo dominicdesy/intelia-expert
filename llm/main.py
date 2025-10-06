@@ -3,7 +3,7 @@
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
 
-Version: 2.1.7 - Nuclear reset: Clean registry rebuild
+Version: 2.1.8 - Restored simultaneous tag creation
 """
 
 import os
@@ -381,7 +381,7 @@ logger.info(" CRÉATION FASTAPI APP - VERSION FINALE ")
 app = FastAPI(
     title="Intelia Expert Backend",
     description="API RAG Enhanced avec LangSmith et RRF Intelligent - Architecture Centralisée",
-    version="2.1.7-nuclear-reset",
+    version="2.1.8",
     lifespan=lifespan,
 )
 
