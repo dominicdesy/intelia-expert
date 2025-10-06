@@ -21,9 +21,9 @@ except ImportError:
     WEAVIATE_AVAILABLE = False
 
 # Imports composants existants
-from .data_models import RAGResult, RAGSource, Document
-from .memory import ConversationMemory
-from .base import InitializableMixin
+from core.data_models import RAGResult, RAGSource, Document
+from core.memory import ConversationMemory
+from core.base import InitializableMixin
 from config.config import (
     DEFAULT_ALPHA,
     RAG_SIMILARITY_TOP_K,
