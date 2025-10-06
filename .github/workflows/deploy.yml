@@ -141,13 +141,21 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
           provenance: false
           sbom: false
+
+      - name: Create latest tag explicitly
+        run: |
+          echo "Création explicite du tag 'latest'..."
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
+          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main \
+                     registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
+          echo "✅ Tag 'latest' créé et poussé"
 
   build-rag:
     runs-on: ubuntu-latest
