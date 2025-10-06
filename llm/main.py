@@ -3,7 +3,7 @@
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
 
-Version: 2.1.5 - Update App Platform spec before deployment
+Version: 2.1.6 - Use native docker login for authentication
 """
 
 import os

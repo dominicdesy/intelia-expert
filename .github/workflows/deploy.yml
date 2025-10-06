@@ -123,13 +123,16 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Login to DOCR
-        uses: docker/login-action@v3
         with:
-          registry: registry.digitalocean.com
-          username: ${{ secrets.DOCR_NAME }}
-          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      - name: Login to DOCR (native docker login)
+        run: |
+          echo "Login to DigitalOcean Container Registry..."
+          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u ${{ secrets.DOCR_NAME }} --password-stdin
+          echo "✅ Login successful"
 
       - name: Build & push LLM
         uses: docker/build-push-action@v6
