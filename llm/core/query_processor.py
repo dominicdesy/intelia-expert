@@ -79,6 +79,7 @@ class RAGQueryProcessor:
 
         # Step 0: Check if this is a clarification response
         pending_clarification = None
+        saved_domain = None  # 🆕 Domaine sauvegardé pour réutilisation
         if self.conversation_memory:
             pending_clarification = self.conversation_memory.get_pending_clarification(
                 tenant_id
@@ -90,6 +91,11 @@ class RAGQueryProcessor:
                     logger.info(
                         f"✅ Clarification response detected for tenant {tenant_id}"
                     )
+
+                    # 🆕 Récupérer le domaine sauvegardé pour réutilisation
+                    saved_domain = pending_clarification.get("detected_domain")
+                    if saved_domain:
+                        logger.info(f"♻️ Réutilisation domaine sauvegardé: {saved_domain}")
 
                     # Merge original query with clarification
                     original_query = pending_clarification.get("original_query", "")
@@ -148,6 +154,7 @@ class RAGQueryProcessor:
             user_id=tenant_id,
             language=language,
             preextracted_entities=preextracted_entities or extracted_entities,
+            override_domain=saved_domain,  # 🆕 Forcer domaine sauvegardé si clarification
         )
         step3_duration = time.time() - step3_start
 
@@ -181,8 +188,9 @@ class RAGQueryProcessor:
                     missing_fields=route.missing_fields,
                     suggestions=route.validation_details.get("suggestions"),
                     language=language,
+                    detected_domain=route.detected_domain,  # Save domain for reuse
                 )
-                logger.info(f"🔒 Clarification marked pending for tenant {tenant_id}")
+                logger.info(f"🔒 Clarification marked pending for tenant {tenant_id} (domain: {route.detected_domain})")
 
                 # 💾 SAVE EXCHANGE IMMEDIATELY so next query can use context
                 self.conversation_memory.add_exchange(

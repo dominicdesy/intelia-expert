@@ -194,6 +194,14 @@ class ConversationalQueryEnricher:
                 break
 
         # Extract age in days
+        # First, remove examples from history to avoid extracting from them
+        history_cleaned = re.sub(
+            r'(?:ex:|exemple:|example:).*?(?:\)|$)',  # Remove text after "ex:" until ) or end
+            '',
+            history_lower,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+
         age_patterns = [
             r"(\d+)\s*(?:jour|day)s?",
             r"(\d+)\s*j\b",
@@ -202,7 +210,7 @@ class ConversationalQueryEnricher:
         ]
 
         for pattern in age_patterns:
-            match = re.search(pattern, history_lower)
+            match = re.search(pattern, history_cleaned)
             if match:
                 age_days = int(match.group(1))
                 entities["age_days"] = age_days

@@ -51,6 +51,7 @@ class QueryRoute(SerializableMixin):
     missing_fields: List[str] = field(default_factory=list)
     validation_details: Dict[str, Any] = field(default_factory=dict)
     query_type: str = "standard"  # Type de query pour logging/tracking
+    detected_domain: str = None  # 🆕 Domaine détecté (genetics, metrics, health, etc.)
 
     # to_dict() now inherited from SerializableMixin (removed 12 lines)
 
@@ -546,6 +547,7 @@ class QueryRouter:
         user_id: str,
         language: str = "fr",
         preextracted_entities: Dict[str, Any] = None,
+        override_domain: str = None,
     ) -> QueryRoute:
         """
         Point d'entrée UNIQUE - fait TOUT en une passe
@@ -555,6 +557,7 @@ class QueryRouter:
             user_id: Identifiant utilisateur/tenant
             language: Langue détectée
             preextracted_entities: Entités déjà extraites du contexte (optionnel)
+            override_domain: Domaine forcé (pour réutilisation après clarification)
 
         Returns:
             QueryRoute avec destination + entités complètes
@@ -575,7 +578,12 @@ class QueryRouter:
         is_contextual = self._is_contextual(query, language)
 
         # 2.5. DÉTECTION DOMAINE (needed for hybrid extraction)
-        detected_domain = self.detect_domain(query, language)
+        # 🆕 Réutiliser domaine sauvegardé si clarification response
+        if override_domain:
+            detected_domain = override_domain
+            logger.info(f"♻️ Domaine forcé (clarification): {detected_domain}")
+        else:
+            detected_domain = self.detect_domain(query, language)
 
         # 3. EXTRACTION ENTITÉS (Basic regex - breed, age, sex)
         entities = self._extract_entities(query, language)
@@ -642,6 +650,7 @@ class QueryRouter:
                 is_contextual=is_contextual,
                 confidence=0.5,
                 query_type="clarification_needed",
+                detected_domain=detected_domain,  # 🆕 Inclure domaine dans clarification
             )
 
         # 6. ROUTING INTELLIGENT
@@ -673,6 +682,7 @@ class QueryRouter:
             validation_details=validation_details,
             confidence=1.0,
             query_type=query_type,
+            detected_domain=detected_domain,  # 🆕 Inclure domaine dans route
         )
 
     def _is_contextual(self, query: str, language: str) -> bool:

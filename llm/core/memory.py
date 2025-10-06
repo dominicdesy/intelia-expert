@@ -214,6 +214,7 @@ class ConversationMemory:
         missing_fields: List[str],
         suggestions: Optional[Dict[str, List[str]]] = None,
         language: str = "fr",
+        detected_domain: Optional[str] = None,
     ):
         """
         Marque une conversation comme en attente de clarification
@@ -224,19 +225,21 @@ class ConversationMemory:
             missing_fields: Liste des champs manquants (breed, age_days, etc.)
             suggestions: Suggestions pour chaque champ manquant
             language: Langue de la conversation
+            detected_domain: Domaine détecté (genetics, metrics, health, etc.) pour réutilisation
         """
         self._shared_pending_clarifications[tenant_id] = {
             "original_query": original_query,
             "missing_fields": missing_fields,
             "suggestions": suggestions or {},
             "language": language,
+            "detected_domain": detected_domain,  # 🆕 Sauvegarder le domaine détecté
             "timestamp": time.time(),
             "attempts": 0,  # Nombre de tentatives de clarification
         }
 
         logger.info(
             f"🔒 Clarification marquée en attente pour {tenant_id}: "
-            f"manquant={missing_fields}"
+            f"manquant={missing_fields}, domaine={detected_domain}"
         )
 
     def get_pending_clarification(self, tenant_id: str) -> Optional[Dict[str, Any]]:
