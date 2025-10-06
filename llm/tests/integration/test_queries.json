@@ -1,0 +1,1263 @@
+{
+  "metadata": {
+    "description": "100 realistic test queries covering 12 languages and all system features",
+    "total_queries": 100,
+    "languages": {
+      "fr": 25,
+      "en": 20,
+      "es": 10,
+      "de": 10,
+      "it": 8,
+      "pt": 7,
+      "pl": 5,
+      "nl": 5,
+      "id": 4,
+      "hi": 3,
+      "zh": 2,
+      "th": 1
+    },
+    "domains": {
+      "production": 49,
+      "health": 19,
+      "nutrition": 16,
+      "environment": 10,
+      "management": 6
+    },
+    "version": "2.0",
+    "last_updated": "2025-10-06"
+  },
+  "queries": [
+    {
+      "id": 1,
+      "query": "Quel poids pour Ross 308 à 35 jours ?",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 2,
+      "query": "Indice de consommation Cobb 500 à 42 jours",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days",
+        "metric_type"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 3,
+      "query": "Gain moyen quotidien Ross 308 semaine 5",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 4,
+      "query": "Ross 308 vs Cobb 500 poids à 35 jours",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 5,
+      "query": "Traitement coccidiose poulets",
+      "language": "fr",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 6,
+      "query": "Protocole vaccination Gumboro",
+      "language": "fr",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 7,
+      "query": "Mortalité élevée 5% causes possibles",
+      "language": "fr",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 8,
+      "query": "Énergie métabolisable aliment croissance",
+      "language": "fr",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [
+        "production_phase"
+      ],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 9,
+      "query": "Méthionine + cystine aliment démarrage",
+      "language": "fr",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [
+        "production_phase"
+      ],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 10,
+      "query": "Comment réduire le FCR poulets",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "optimization",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 11,
+      "query": "Optimiser croissance poulets chair",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "optimization",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 12,
+      "query": "Améliorer uniformité troupeau",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "optimization",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 13,
+      "query": "Ventilation minimale poulailler hiver",
+      "language": "fr",
+      "domain": "environment",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 14,
+      "query": "Température idéale démarrage poussins",
+      "language": "fr",
+      "domain": "environment",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 15,
+      "query": "Densité oiseaux au sol m2",
+      "language": "fr",
+      "domain": "environment",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 16,
+      "query": "Planifier bande 20000 poulets",
+      "language": "fr",
+      "domain": "management",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "planning",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 17,
+      "query": "Âge optimal abattage Ross 308",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "planning",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 18,
+      "query": "Uniformité Ross 308 à 42 jours",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 19,
+      "query": "Livabilité Ross 308 28 jours",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 20,
+      "query": "Consommation aliment cumulée Cobb 500 42 jours",
+      "language": "fr",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 21,
+      "query": "Ross 308 vs Cobb 500 rendement carcasse",
+      "language": "fr",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 22,
+      "query": "Bronchite infectieuse prévention",
+      "language": "fr",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 23,
+      "query": "Biosécurité élevage poulets mesures",
+      "language": "fr",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 24,
+      "query": "Formulation aliment 3 phases poulets",
+      "language": "fr",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 25,
+      "query": "Calendrier gestion troupeau 42 jours",
+      "language": "fr",
+      "domain": "management",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "planning",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 26,
+      "query": "Body weight Ross 308 week 6",
+      "language": "en",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 27,
+      "query": "European efficiency factor Cobb 500",
+      "language": "en",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 28,
+      "query": "Cumulative feed intake Ross 308 at 35 days",
+      "language": "en",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 29,
+      "query": "Compare Ross 308 Cobb 500 feed conversion",
+      "language": "en",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 30,
+      "query": "Newcastle disease symptoms broilers",
+      "language": "en",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 31,
+      "query": "Salmonella control in poultry",
+      "language": "en",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 32,
+      "query": "Coccidiosis vaccination program",
+      "language": "en",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 33,
+      "query": "Protein requirements grower phase",
+      "language": "en",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [
+        "production_phase"
+      ],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 34,
+      "query": "Crude fiber maximum broiler feed",
+      "language": "en",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 35,
+      "query": "Vitamin E requirements broilers",
+      "language": "en",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 36,
+      "query": "How to improve daily weight gain",
+      "language": "en",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "optimization",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 37,
+      "query": "Reduce mortality rate broilers",
+      "language": "en",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "optimization",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 38,
+      "query": "How to increase feed efficiency",
+      "language": "en",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "optimization",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 39,
+      "query": "Temperature grower phase broilers",
+      "language": "en",
+      "domain": "environment",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 40,
+      "query": "Lighting program broilers",
+      "language": "en",
+      "domain": "environment",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 41,
+      "query": "Air quality ammonia levels poultry",
+      "language": "en",
+      "domain": "environment",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 42,
+      "query": "How many days to reach 2.8kg Ross 308",
+      "language": "en",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "planning",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 43,
+      "query": "Flock planning 50000 birds",
+      "language": "en",
+      "domain": "management",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "planning",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 44,
+      "query": "Target slaughter weight Cobb 500",
+      "language": "en",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "planning",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 45,
+      "query": "Ross 308 Cobb 500 daily gain comparison",
+      "language": "en",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 46,
+      "query": "Ganancia diaria Cobb 500 día 35",
+      "language": "es",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 47,
+      "query": "Peso corporal Ross 308 21 días",
+      "language": "es",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 48,
+      "query": "Comparar Ross 308 Cobb 500 peso 35 días",
+      "language": "es",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 49,
+      "query": "Síntomas enfermedad Newcastle pollos",
+      "language": "es",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 50,
+      "query": "Calcio fósforo ratio pollitos",
+      "language": "es",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 51,
+      "query": "Mejorar ganancia diaria pollos",
+      "language": "es",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "optimization",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 52,
+      "query": "Humedad relativa óptima pollos",
+      "language": "es",
+      "domain": "environment",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 53,
+      "query": "Planificar lote 30000 pollos",
+      "language": "es",
+      "domain": "management",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "planning",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 54,
+      "query": "Ross 308 vs Cobb 500 conversión alimenticia",
+      "language": "es",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 55,
+      "query": "Protocolo vacunación Gumboro pollos",
+      "language": "es",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 56,
+      "query": "Körpergewicht Ross 308 Tag 35",
+      "language": "de",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 57,
+      "query": "Futterverwertung Cobb 500 Tag 42",
+      "language": "de",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 58,
+      "query": "Ross 308 vs Cobb 500 Gewicht Vergleich",
+      "language": "de",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 59,
+      "query": "Newcastle-Krankheit Symptome Geflügel",
+      "language": "de",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 60,
+      "query": "Proteinbedarf Mastphase Broiler",
+      "language": "de",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [
+        "production_phase"
+      ],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 61,
+      "query": "Futterverwertung verbessern Broiler",
+      "language": "de",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "optimization",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 62,
+      "query": "Temperatur Aufzuchtphase Küken",
+      "language": "de",
+      "domain": "environment",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 63,
+      "query": "Herdengröße planen 40000 Vögel",
+      "language": "de",
+      "domain": "management",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "planning",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 64,
+      "query": "Kokzidiose Behandlung Hühner",
+      "language": "de",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 65,
+      "query": "Energiebedarf Wachstumsphase Futter",
+      "language": "de",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 66,
+      "query": "Peso corporeo Ross 308 a 35 giorni",
+      "language": "it",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 67,
+      "query": "Indice di conversione Cobb 500 42 giorni",
+      "language": "it",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 68,
+      "query": "Confronto Ross 308 Cobb 500 peso",
+      "language": "it",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 69,
+      "query": "Sintomi malattia Newcastle polli",
+      "language": "it",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 70,
+      "query": "Fabbisogno proteico fase crescita",
+      "language": "it",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [
+        "production_phase"
+      ],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 71,
+      "query": "Migliorare efficienza alimentare polli",
+      "language": "it",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "optimization",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 72,
+      "query": "Temperatura ideale fase svezzamento",
+      "language": "it",
+      "domain": "environment",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 73,
+      "query": "Pianificazione lotto 25000 polli",
+      "language": "it",
+      "domain": "management",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "planning",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 74,
+      "query": "Peso corporal Ross 308 aos 35 dias",
+      "language": "pt",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 75,
+      "query": "Conversão alimentar Cobb 500 42 dias",
+      "language": "pt",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 76,
+      "query": "Comparar Ross 308 Cobb 500 ganho peso",
+      "language": "pt",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 77,
+      "query": "Sintomas doença Newcastle frangos",
+      "language": "pt",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 78,
+      "query": "Necessidade proteína fase crescimento",
+      "language": "pt",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [
+        "production_phase"
+      ],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 79,
+      "query": "Melhorar eficiência alimentar frangos",
+      "language": "pt",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "optimization",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 80,
+      "query": "Temperatura ideal fase inicial pintinhos",
+      "language": "pt",
+      "domain": "environment",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 81,
+      "query": "Masa ciała Ross 308 w 35 dniu",
+      "language": "pl",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 82,
+      "query": "Wskaźnik konwersji Cobb 500 42 dni",
+      "language": "pl",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 83,
+      "query": "Porównanie Ross 308 Cobb 500 waga",
+      "language": "pl",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 84,
+      "query": "Objawy choroby Newcastle kurczęta",
+      "language": "pl",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 85,
+      "query": "Zapotrzebowanie białko faza wzrostu",
+      "language": "pl",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [
+        "production_phase"
+      ],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 86,
+      "query": "Lichaamsgewicht Ross 308 dag 35",
+      "language": "nl",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 87,
+      "query": "Voederconversie Cobb 500 42 dagen",
+      "language": "nl",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 88,
+      "query": "Vergelijking Ross 308 Cobb 500 gewicht",
+      "language": "nl",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 89,
+      "query": "Newcastle ziekte symptomen kippen",
+      "language": "nl",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 90,
+      "query": "Eiwitbehoefte groeifase vleeskuikens",
+      "language": "nl",
+      "domain": "nutrition",
+      "query_type": "standard",
+      "expected_entities": [
+        "production_phase"
+      ],
+      "expected_context": "general_info",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 91,
+      "query": "Berat badan Ross 308 hari 35",
+      "language": "id",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 92,
+      "query": "Konversi pakan Cobb 500 42 hari",
+      "language": "id",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 93,
+      "query": "Perbandingan Ross 308 Cobb 500 berat",
+      "language": "id",
+      "domain": "production",
+      "query_type": "comparative",
+      "expected_entities": [
+        "breed"
+      ],
+      "expected_context": "comparison",
+      "min_response_length": 600,
+      "max_response_length": 1200
+    },
+    {
+      "id": 94,
+      "query": "Gejala penyakit Newcastle ayam",
+      "language": "id",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 95,
+      "query": "Ross 308 का वजन 35 दिन में",
+      "language": "hi",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 96,
+      "query": "Cobb 500 फीड रूपांतरण 42 दिन",
+      "language": "hi",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 97,
+      "query": "न्यूकैसल रोग के लक्षण मुर्गियों में",
+      "language": "hi",
+      "domain": "health",
+      "query_type": "standard",
+      "expected_entities": [],
+      "expected_context": "health_concern",
+      "min_response_length": 400,
+      "max_response_length": 900
+    },
+    {
+      "id": 98,
+      "query": "Ross 308 在35天的体重",
+      "language": "zh",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 99,
+      "query": "Cobb 500 饲料转化率 42天",
+      "language": "zh",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    },
+    {
+      "id": 100,
+      "query": "น้ำหนักตัว Ross 308 ที่ 35 วัน",
+      "language": "th",
+      "domain": "production",
+      "query_type": "standard",
+      "expected_entities": [
+        "breed",
+        "age_days"
+      ],
+      "expected_context": "performance_issue",
+      "min_response_length": 200,
+      "max_response_length": 600
+    }
+  ]
+}
