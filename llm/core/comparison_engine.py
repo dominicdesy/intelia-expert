@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 comparison_engine.py - Moteur de comparaison unifié
-Version 2.0 - Templates EN avec traduction dynamique
+Version 3.0 - Templates EN avec traduction LLM robuste
 Fusionne: comparison_handler + comparison_utils + comparison_response_generator
 Utilise: metric_calculator (conservé pour calculs purs)
 """
@@ -13,91 +13,32 @@ from enum import Enum
 
 from utils.breeds_registry import get_breeds_registry
 from utils.mixins import SerializableMixin
+from utils.llm_translator import get_llm_translator
 
 logger = logging.getLogger(__name__)
 
-# Traductions pour les messages de comparaison
-COMPARISON_TRANSLATIONS = {
-    "To answer your question about the comparison between": {
-        "fr": "Pour répondre à votre question sur la comparaison entre",
-        "es": "Para responder a su pregunta sobre la comparación entre",
-        "de": "Um Ihre Frage zum Vergleich zwischen zu beantworten",
-        "it": "Per rispondere alla tua domanda sul confronto tra",
-        "pt": "Para responder à sua pergunta sobre a comparação entre",
-        "th": "เพื่อตอบคำถามของคุณเกี่ยวกับการเปรียบเทียบระหว่าง",
-        "vi": "Để trả lời câu hỏi của bạn về so sánh giữa",
-    },
-    "Difference": {
-        "fr": "Différence",
-        "es": "Diferencia",
-        "de": "Unterschied",
-        "it": "Differenza",
-        "pt": "Diferença",
-        "th": "ความแตกต่าง",
-        "vi": "Sự khác biệt",
-    },
-    "Better performance": {
-        "fr": "Meilleure performance",
-        "es": "Mejor rendimiento",
-        "de": "Bessere Leistung",
-        "it": "Prestazioni migliori",
-        "pt": "Melhor desempenho",
-        "th": "ประสิทธิภาพดีกว่า",
-        "vi": "Hiệu suất tốt hơn",
-    },
-    "Unable to compare: insufficient data.": {
-        "fr": "Impossible de comparer: données insuffisantes.",
-        "es": "No se puede comparar: datos insuficientes.",
-        "de": "Vergleich nicht möglich: unzureichende Daten.",
-        "it": "Impossibile confrontare: dati insufficienti.",
-        "pt": "Não é possível comparar: dados insuficientes.",
-        "th": "ไม่สามารถเปรียบเทียบได้: ข้อมูลไม่เพียงพอ",
-        "vi": "Không thể so sánh: dữ liệu không đủ.",
-    },
-    "Unable to compare: incompatible metrics.": {
-        "fr": "Impossible de comparer: métriques incompatibles.",
-        "es": "No se puede comparar: métricas incompatibles.",
-        "de": "Vergleich nicht möglich: inkompatible Metriken.",
-        "it": "Impossibile confrontare: metriche incompatibili.",
-        "pt": "Não é possível comparar: métricas incompatíveis.",
-        "th": "ไม่สามารถเปรียบเทียบได้: ตัวชี้วัดไม่เข้ากัน",
-        "vi": "Không thể so sánh: chỉ số không tương thích.",
-    },
-    "Unable to compare: different species.": {
-        "fr": "Impossible de comparer: espèces différentes.",
-        "es": "No se puede comparar: especies diferentes.",
-        "de": "Vergleich nicht möglich: verschiedene Arten.",
-        "it": "Impossibile confrontare: specie diverse.",
-        "pt": "Não é possível comparar: espécies diferentes.",
-        "th": "ไม่สามารถเปรียบเทียบได้: สายพันธุ์ต่างกัน",
-        "vi": "Không thể so sánh: các loài khác nhau.",
-    },
-    "Comparison error": {
-        "fr": "Erreur lors de la comparaison",
-        "es": "Error de comparación",
-        "de": "Vergleichsfehler",
-        "it": "Errore di confronto",
-        "pt": "Erro de comparação",
-        "th": "ข้อผิดพลาดในการเปรียบเทียบ",
-        "vi": "Lỗi so sánh",
-    },
-    "Unknown error": {
-        "fr": "Erreur inconnue",
-        "es": "Error desconocido",
-        "de": "Unbekannter Fehler",
-        "it": "Errore sconosciuto",
-        "pt": "Erro desconhecido",
-        "th": "ข้อผิดพลาดที่ไม่ทราบสาเหตุ",
-        "vi": "Lỗi không xác định",
-    },
-}
+# Instance globale du traducteur LLM
+_translator = None
+
+def _get_translator():
+    """Récupère l'instance singleton du traducteur"""
+    global _translator
+    if _translator is None:
+        _translator = get_llm_translator()
+    return _translator
 
 
 def _translate(text_en: str, language: str) -> str:
-    """Traduit un texte EN vers la langue cible"""
-    if language == "en" or language not in ["fr", "es", "de", "it", "pt", "th", "vi"]:
+    """Traduit un texte EN vers la langue cible via LLM"""
+    if language == "en":
         return text_en
-    return COMPARISON_TRANSLATIONS.get(text_en, {}).get(language, text_en)
+
+    translator = _get_translator()
+    return translator.translate(
+        text=text_en,
+        target_language=language,
+        source_language="en"
+    )
 
 
 class ComparisonStatus(Enum):

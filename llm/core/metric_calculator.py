@@ -1,173 +1,55 @@
 # -*- coding: utf-8 -*-
 """
 metric_calculator.py - Calculs mathématiques sur les métriques avicoles
-VERSION 2.0 - English templates with dynamic translation
+VERSION 3.0 - English templates with LLM translation
 - Gestion correcte des métriques où "plus bas = meilleur" (FCR, mortalité)
 - Validation stricte contre division par zéro
 - Contexte enrichi (âge, sexe) dans la réponse
-- Templates EN avec traduction dynamique (FR, ES, DE, IT, PT, TH, VI)
+- Templates EN avec traduction LLM robuste
 """
 
 import logging
 from utils.types import Dict, List, Optional, Any
 from dataclasses import dataclass
 
+from utils.llm_translator import get_llm_translator
+
 logger = logging.getLogger(__name__)
 
-# Translation mapping for metric formatting
-METRIC_TRANSLATIONS = {
-    "For": {
-        "fr": "Pour la",
-        "es": "Para",
-        "de": "Für",
-        "it": "Per",
-        "pt": "Para",
-        "th": "สำหรับ",
-        "vi": "Cho",
-    },
-    "males": {
-        "fr": "mâles",
-        "es": "machos",
-        "de": "Männchen",
-        "it": "maschi",
-        "pt": "machos",
-        "th": "ตัวผู้",
-        "vi": "trống",
-    },
-    "females": {
-        "fr": "femelles",
-        "es": "hembras",
-        "de": "Weibchen",
-        "it": "femmine",
-        "pt": "fêmeas",
-        "th": "ตัวเมีย",
-        "vi": "mái",
-    },
-    "mixed sexes": {
-        "fr": "sexes mélangés",
-        "es": "sexos mixtos",
-        "de": "gemischte Geschlechter",
-        "it": "sessi misti",
-        "pt": "sexos mistos",
-        "th": "เพศผสม",
-        "vi": "giới tính hỗn hợp",
-    },
-    "at": {
-        "fr": "à",
-        "es": "a",
-        "de": "bei",
-        "it": "a",
-        "pt": "aos",
-        "th": "ที่",
-        "vi": "tại",
-    },
-    "days": {
-        "fr": "jours",
-        "es": "días",
-        "de": "Tage",
-        "it": "giorni",
-        "pt": "dias",
-        "th": "วัน",
-        "vi": "ngày",
-    },
-    "Difference": {
-        "fr": "Différence",
-        "es": "Diferencia",
-        "de": "Unterschied",
-        "it": "Differenza",
-        "pt": "Diferença",
-        "th": "ความแตกต่าง",
-        "vi": "Sự khác biệt",
-    },
-    "shows better performance with a value": {
-        "fr": "présente une meilleure performance avec une valeur",
-        "es": "muestra mejor rendimiento con un valor",
-        "de": "zeigt bessere Leistung mit einem Wert",
-        "it": "mostra prestazioni migliori con un valore",
-        "pt": "apresenta melhor desempenho com um valor",
-        "th": "แสดงประสิทธิภาพที่ดีขึ้นด้วยค่า",
-        "vi": "cho thấy hiệu suất tốt hơn với giá trị",
-    },
-    "lower": {
-        "fr": "inférieure",
-        "es": "menor",
-        "de": "niedriger",
-        "it": "inferiore",
-        "pt": "inferior",
-        "th": "ต่ำกว่า",
-        "vi": "thấp hơn",
-    },
-    "higher": {
-        "fr": "supérieure",
-        "es": "mayor",
-        "de": "höher",
-        "it": "superiore",
-        "pt": "superior",
-        "th": "สูงกว่า",
-        "vi": "cao hơn",
-    },
-    "than": {
-        "fr": "au",
-        "es": "que",
-        "de": "als",
-        "it": "di",
-        "pt": "que",
-        "th": "กว่า",
-        "vi": "so với",
-    },
-    "requires less feed to produce 1 kg of live weight, indicating better feed efficiency.": {
-        "fr": "nécessite moins d'aliment pour produire 1 kg de poids vif, ce qui représente une meilleure efficacité alimentaire.",
-        "es": "requiere menos alimento para producir 1 kg de peso vivo, lo que indica mejor eficiencia alimentaria.",
-        "de": "benötigt weniger Futter zur Produktion von 1 kg Lebendgewicht, was eine bessere Futterverwertung bedeutet.",
-        "it": "richiede meno mangime per produrre 1 kg di peso vivo, indicando una migliore efficienza alimentare.",
-        "pt": "requer menos ração para produzir 1 kg de peso vivo, indicando melhor eficiência alimentar.",
-        "th": "ต้องการอาหารน้อยลงเพื่อผลิต 1 กก. น้ำหนักตัว แสดงถึงประสิทธิภาพการใช้อาหารที่ดีขึ้น",
-        "vi": "cần ít thức ăn hơn để tạo ra 1 kg trọng lượng sống, cho thấy hiệu quả thức ăn tốt hơn.",
-    },
-    "A lower value indicates better performance for this metric.": {
-        "fr": "Une valeur plus basse indique une meilleure performance pour cette métrique.",
-        "es": "Un valor más bajo indica mejor rendimiento para esta métrica.",
-        "de": "Ein niedrigerer Wert zeigt eine bessere Leistung für diese Metrik an.",
-        "it": "Un valore più basso indica prestazioni migliori per questa metrica.",
-        "pt": "Um valor mais baixo indica melhor desempenho para esta métrica.",
-        "th": "ค่าที่ต่ำกว่าแสดงถึงประสิทธิภาพที่ดีขึ้นสำหรับตัวชี้วัดนี้",
-        "vi": "Giá trị thấp hơn cho thấy hiệu suất tốt hơn cho chỉ số này.",
-    },
-    "shows a value": {
-        "fr": "présente une valeur",
-        "es": "muestra un valor",
-        "de": "zeigt einen Wert",
-        "it": "mostra un valore",
-        "pt": "apresenta um valor",
-        "th": "แสดงค่า",
-        "vi": "cho thấy giá trị",
-    },
-}
+# Instance globale du traducteur LLM
+_translator = None
+
+def _get_translator():
+    """Récupère l'instance singleton du traducteur"""
+    global _translator
+    if _translator is None:
+        _translator = get_llm_translator()
+    return _translator
+
+
+# Removed METRIC_TRANSLATIONS dictionary - now using LLM translation
 
 
 def _translate_metric(text_en: str, language: str) -> str:
     """
-    Traduit un texte EN vers la langue cible pour metric_calculator
+    Traduit un texte EN vers la langue cible via LLM
 
     Args:
         text_en: Texte en anglais
         language: Code langue (fr, es, de, etc.)
 
     Returns:
-        Texte traduit ou EN si langue non supportée
+        Texte traduit avec qualité native
     """
-    if language == "en" or language not in [
-        "fr",
-        "es",
-        "de",
-        "it",
-        "pt",
-        "th",
-        "vi",
-    ]:
+    if language == "en":
         return text_en
 
-    return METRIC_TRANSLATIONS.get(text_en, {}).get(language, text_en)
+    translator = _get_translator()
+    return translator.translate(
+        text=text_en,
+        target_language=language,
+        source_language="en"
+    )
 
 
 @dataclass

@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 clarification_helper.py - Helper pour messages de clarification intelligents
-Version 2.0 - Templates EN avec traduction dynamique
+Version 3.0 - Templates EN avec traduction LLM robuste
 """
 
 import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from utils.llm_translator import get_llm_translator
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,8 @@ class ClarificationHelper:
         self.missing_field_templates = self.strategies.get(
             "missing_field_templates", {}
         )
-        self.label_translations = self.strategies.get("label_translations", {})
+        # LLM-based translator pour traductions robustes
+        self.translator = get_llm_translator()
 
     def _load_strategies(self, config_path: str) -> Dict:
         """Charge les stratégies depuis le fichier JSON"""
@@ -53,35 +56,24 @@ class ClarificationHelper:
 
     def _translate_message(self, message_en: str, language: str) -> str:
         """
-        Traduit un message EN vers la langue cible en utilisant label_translations
+        Traduit un message EN vers la langue cible via LLM
 
         Args:
             message_en: Message en anglais
             language: Code langue cible (fr, es, th, etc.)
 
         Returns:
-            Message traduit (ou EN si langue non supportée)
+            Message traduit avec qualité native
         """
-        if language == "en" or not self.label_translations:
+        if language == "en":
             return message_en
 
-        translated = message_en
-
-        # 🔧 FIX: Trier labels par longueur DÉCROISSANTE pour éviter remplacements partiels
-        # Exemple: "To analyze performance" doit être remplacé AVANT "of" (sinon "perpourmance")
-        sorted_labels = sorted(
-            self.label_translations.items(),
-            key=lambda x: len(x[0]),
-            reverse=True
+        # Utiliser LLMTranslator pour traduction robuste
+        return self.translator.translate(
+            text=message_en,
+            target_language=language,
+            source_language="en"
         )
-
-        # Traduire chaque label trouvé dans le message (du plus long au plus court)
-        for label_en, translations in sorted_labels:
-            target_translation = translations.get(language, label_en)
-            # Remplacer le label EN par la traduction
-            translated = translated.replace(label_en, target_translation)
-
-        return translated
 
     def detect_ambiguity_type(
         self, query: str, missing_fields: List[str], entities: Dict
