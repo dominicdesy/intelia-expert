@@ -3,7 +3,7 @@
 main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
 
-Version: 2.1.3 - Force latest tag creation in deploy job
+Version: 2.1.4 - Fix DOCR username for authentication
 """
 
 import os
