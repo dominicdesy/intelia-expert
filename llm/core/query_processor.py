@@ -188,12 +188,7 @@ class RAGQueryProcessor:
                 self.conversation_memory.add_exchange(
                     tenant_id=tenant_id,
                     question=query,
-                    answer=clarification_result.answer,
-                    route_info={
-                        "destination": "needs_clarification",
-                        "missing_fields": route.missing_fields,
-                        "entities": route.entities,
-                    }
+                    answer=clarification_result.answer
                 )
                 logger.info(f"💾 Clarification exchange saved immediately for tenant {tenant_id}")
 
