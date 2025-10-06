@@ -403,13 +403,13 @@ class ConversationMemory:
         """
         return self._shared_pending_clarifications.copy()
 
-    def cleanup_old_clarifications(self, max_age_seconds: int = 3600):
+    def cleanup_old_clarifications(self, max_age_seconds: int = 604800):
         """
-        Nettoie les clarifications trop anciennes (> 1h par défaut)
+        Nettoie les clarifications trop anciennes (> 7 jours par défaut)
         Évite l'accumulation de contextes abandonnés
 
         Args:
-            max_age_seconds: Âge maximum en secondes (défaut: 3600 = 1h)
+            max_age_seconds: Âge maximum en secondes (défaut: 604800 = 7 jours)
         """
         current_time = time.time()
         to_remove = []

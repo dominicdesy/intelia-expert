@@ -4,6 +4,9 @@ Query processor - Handles query processing pipeline for RAG engine
 """
 
 import logging
+import structlog
+import time
+import uuid
 from utils.types import Dict, List, Any, Optional
 
 from .data_models import RAGResult, RAGSource
@@ -11,6 +14,7 @@ from .query_enricher import ConversationalQueryEnricher
 from utils.clarification_helper import get_clarification_helper
 
 logger = logging.getLogger(__name__)
+structured_logger = structlog.get_logger()
 
 
 class RAGQueryProcessor:
@@ -56,6 +60,21 @@ class RAGQueryProcessor:
         Returns:
             RAGResult with response
         """
+        # Generate unique request ID for tracking
+        request_id = str(uuid.uuid4())
+
+        # Structured logging: Query started
+        structured_logger.info(
+            "query_started",
+            request_id=request_id,
+            tenant_id=tenant_id,
+            query_length=len(query),
+            language=language,
+            has_context=conversation_context is not None,
+            has_preextracted_entities=preextracted_entities is not None,
+            timestamp=time.time()
+        )
+
         logger.info(f"Processing query with language: {language}")
 
         # Step 0: Check if this is a clarification response
@@ -97,10 +116,10 @@ class RAGQueryProcessor:
         # Step 2: Enrich query if history available
         enriched_query = self._enrich_query(query, contextual_history, language)
 
-        # Step 2b: Extract entities from enriched query
+        # Step 2b: Always extract entities from context if available
         extracted_entities = None
-        if enriched_query != query and self.conversation_memory:
-            # Try to extract entities from enriched context
+        if contextual_history and self.conversation_memory:
+            # Always try to extract entities from enriched context
             try:
                 extracted_entities = self.enricher.extract_entities_from_context(
                     contextual_history, language
@@ -109,19 +128,44 @@ class RAGQueryProcessor:
                     logger.info(
                         f"📦 Entities extracted from context: {extracted_entities}"
                     )
+
+                    # Structured logging: Entity extraction
+                    structured_logger.info(
+                        "entities_extracted",
+                        request_id=request_id,
+                        extracted_entities=extracted_entities
+                    )
             except Exception as e:
                 logger.warning(f"Failed to extract entities from context: {e}")
+                structured_logger.warning(
+                    "entity_extraction_failed",
+                    request_id=request_id,
+                    error=str(e)
+                )
 
         # Step 3: Route query with context-extracted entities
+        step3_start = time.time()
         route = self.query_router.route(
             query=enriched_query,
             user_id=tenant_id,
             language=language,
             preextracted_entities=preextracted_entities or extracted_entities,
         )
+        step3_duration = time.time() - step3_start
 
         logger.info(
             f"QueryRouter → destination: {route.destination}, confidence: {route.confidence:.2%}"
+        )
+
+        # Structured logging: Routing completed
+        structured_logger.info(
+            "routing_completed",
+            request_id=request_id,
+            destination=route.destination,
+            confidence=route.confidence,
+            query_type=route.query_type,
+            duration_ms=step3_duration * 1000,
+            has_missing_fields=bool(route.missing_fields)
         )
 
         # Step 4: Check for clarification needs
@@ -136,6 +180,14 @@ class RAGQueryProcessor:
                     language=language,
                 )
                 logger.info(f"🔒 Clarification marked pending for tenant {tenant_id}")
+
+            # Structured logging: Clarification needed
+            structured_logger.info(
+                "clarification_needed",
+                request_id=request_id,
+                missing_fields=route.missing_fields,
+                total_duration_ms=(time.time() - start_time) * 1000
+            )
 
             return self._build_clarification_result(
                 route, language, query=query, tenant_id=tenant_id
@@ -152,9 +204,24 @@ class RAGQueryProcessor:
         )
 
         # Step 6: Route to appropriate handler
-        return await self._route_to_handler(
+        step6_start = time.time()
+        result = await self._route_to_handler(
             route, preprocessed_data, start_time, language
         )
+        step6_duration = time.time() - step6_start
+
+        # Structured logging: Query completed
+        structured_logger.info(
+            "query_completed",
+            request_id=request_id,
+            handler_type=route.destination,
+            sources_count=len(result.sources) if hasattr(result, 'sources') else 0,
+            response_length=len(result.answer) if hasattr(result, 'answer') else 0,
+            handler_duration_ms=step6_duration * 1000,
+            total_duration_ms=(time.time() - start_time) * 1000
+        )
+
+        return result
 
     async def _get_contextual_history(
         self, tenant_id: str, query: str
