@@ -196,10 +196,39 @@ jobs:
         run: |
           doctl registry login --expiry-seconds 3600
 
-      - name: Wait for registry propagation
+      - name: Wait for registry propagation and verify images
         run: |
-          echo "Attente de 15s pour la propagation du registry..."
-          sleep 15
+          echo "Vérification que les images sont accessibles depuis App Platform..."
+
+          REGISTRY="registry.digitalocean.com/${{ secrets.DOCR_NAME }}"
+
+          # Force a fresh pull to ensure images are really available
+          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
+            echo "Test pull intelia-llm:latest..."
+            docker pull $REGISTRY/intelia-llm:latest
+            echo "✅ intelia-llm:latest confirmed pullable"
+          fi
+
+          if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
+            echo "Test pull intelia-frontend:latest..."
+            docker pull $REGISTRY/intelia-frontend:latest
+            echo "✅ intelia-frontend:latest confirmed pullable"
+          fi
+
+          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
+            echo "Test pull intelia-backend:latest..."
+            docker pull $REGISTRY/intelia-backend:latest
+            echo "✅ intelia-backend:latest confirmed pullable"
+          fi
+
+          if [[ "${{ needs.build-rag.result }}" == "success" ]]; then
+            echo "Test pull intelia-rag:latest..."
+            docker pull $REGISTRY/intelia-rag:latest
+            echo "✅ intelia-rag:latest confirmed pullable"
+          fi
+
+          echo "Attente supplémentaire de 60s pour synchronisation App Platform..."
+          sleep 60
 
       - name: Verify App Platform spec uses latest tags
         run: |
