@@ -133,7 +133,18 @@ class RAGResponseGenerator:
             logger.debug("Answer already present, skipping LLM generation")
 
         # Generate proactive follow-up if enabled and answer exists
-        if self.proactive_assistant and result.answer and result.answer.strip():
+        # 🔧 FIX: Don't generate follow-up for clarifications (user needs to provide info first)
+        is_clarification = (
+            result.metadata.get("query_type") == "clarification_needed"
+            or result.metadata.get("needs_clarification") is True
+        )
+
+        if (
+            self.proactive_assistant
+            and result.answer
+            and result.answer.strip()
+            and not is_clarification
+        ):
             try:
                 # Extract information for follow-up generation
                 intent_result = {
@@ -162,5 +173,9 @@ class RAGResponseGenerator:
             except Exception as e:
                 logger.warning(f"⚠️ Error generating proactive follow-up: {e}")
                 # Don't fail the whole response if follow-up generation fails
+        elif is_clarification:
+            logger.debug(
+                "🔒 Skipping proactive follow-up for clarification (waiting for user input)"
+            )
 
         return result
