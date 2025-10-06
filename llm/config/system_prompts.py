@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 system_prompts.py - Helper pour charger et utiliser les prompts système
-Version: 4.2.0 - Support contextualisation et clarifications
+Version: 5.0.0 - English-only prompts with dynamic language injection
 """
 
 import json
@@ -10,6 +10,22 @@ from pathlib import Path
 from utils.types import Dict, Optional, List
 
 logger = logging.getLogger(__name__)
+
+# Language code to display name mapping
+LANGUAGE_DISPLAY_NAMES = {
+    "fr": "French",
+    "en": "English",
+    "es": "Spanish",
+    "de": "German",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "ar": "Arabic",
+    "zh": "Chinese",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "th": "Thai",
+    "vi": "Vietnamese",
+}
 
 
 class SystemPromptsManager:
@@ -104,91 +120,112 @@ class SystemPromptsManager:
         self, intent_type: str, language: str = "fr"
     ) -> Optional[str]:
         """
-        Récupère un prompt spécialisé par type d'intention
+        Récupère un prompt spécialisé par type d'intention (avec injection de langue)
 
         Args:
             intent_type: "metric_query", "environment_setting", etc.
-            language: "fr" ou "en"
+            language: "fr", "en", "es", etc.
 
         Returns:
-            Prompt string ou None
+            Prompt string avec {language_name} remplacé, ou None
 
         Examples:
             >>> manager = SystemPromptsManager()
             >>> prompt = manager.get_specialized_prompt("metric_query", "fr")
+            >>> "French" in prompt
+            True
         """
         specialized = self.prompts.get("specialized_prompts", {})
-        intent_prompts = specialized.get(intent_type, {})
+        prompt_template = specialized.get(intent_type)
 
-        prompt = intent_prompts.get(language)
-
-        if not prompt:
+        if not prompt_template:
             logger.warning(
-                f"Prompt non trouvé: intent_type={intent_type}, language={language}"
+                f"Prompt template not found: intent_type={intent_type}"
             )
+            return None
 
-        return prompt
+        # Inject language_name dynamically
+        language_name = LANGUAGE_DISPLAY_NAMES.get(language, language.upper())
+
+        try:
+            prompt = prompt_template.format(language_name=language_name)
+            return prompt
+        except KeyError as e:
+            logger.error(f"Missing placeholder in prompt template: {e}")
+            return prompt_template
 
     def get_base_prompt(self, key: str, language: str = "fr") -> Optional[str]:
         """
-        Récupère un prompt de base
+        Récupère un prompt de base (avec injection de langue)
 
         Args:
             key: Clé du prompt (ex: "expert_identity", "response_guidelines")
-            language: "fr" ou "en"
+            language: "fr", "en", "es", etc.
 
         Returns:
-            Prompt string ou None
+            Prompt string avec {language_name} remplacé, ou None
         """
         base_prompts = self.prompts.get("base_prompts", {})
-        prompt_key = f"{key}_{language}"
+        prompt_template = base_prompts.get(key)
 
-        prompt = base_prompts.get(prompt_key)
+        if not prompt_template:
+            logger.warning(f"Base prompt template not found: {key}")
+            return None
 
-        if not prompt:
-            logger.warning(f"Base prompt non trouvé: {prompt_key}")
+        # Inject language_name dynamically
+        language_name = LANGUAGE_DISPLAY_NAMES.get(language, language.upper())
 
-        return prompt
+        try:
+            prompt = prompt_template.format(language_name=language_name)
+            return prompt
+        except KeyError as e:
+            logger.error(f"Missing placeholder in base prompt: {e}")
+            return prompt_template
 
     def get_normalization_prompt(
         self, language: str = "fr", is_comparative: bool = False
     ) -> str:
         """
-        Récupère le prompt de normalisation de requête
+        Récupère le prompt de normalisation de requête (avec injection de langue)
 
         Args:
-            language: "fr" ou "en"
+            language: "fr", "en", "es", etc.
             is_comparative: Si True, inclut les instructions comparatives
 
         Returns:
             Prompt complet de normalisation
         """
         normalization = self.prompts.get("query_normalization", {})
+        language_name = LANGUAGE_DISPLAY_NAMES.get(language, language.upper())
 
         # Récupérer le prompt principal
-        prompt_key = f"normalization_prompt_{language}"
-        base_prompt = normalization.get(prompt_key, "")
+        base_prompt = normalization.get("normalization_prompt", "")
 
         # Ajouter instructions comparatives si nécessaire
         comparative_instructions = ""
         if is_comparative:
-            comp_key = f"comparative_instructions_{language}"
-            comparative_instructions = normalization.get(comp_key, "")
+            comparative_instructions = normalization.get("comparative_instructions", "")
 
-        # Substituer la variable {comparative_instructions}
-        return base_prompt.replace(
-            "{comparative_instructions}", comparative_instructions
-        )
+        # Substituer les variables
+        try:
+            prompt = base_prompt.replace(
+                "{comparative_instructions}", comparative_instructions
+            )
+            prompt = prompt.format(language_name=language_name)
+            return prompt
+        except KeyError as e:
+            logger.error(f"Missing placeholder in normalization prompt: {e}")
+            return base_prompt
 
     def get_synthesis_prompt(
         self, synthesis_type: str, language: str = "fr", **kwargs
     ) -> str:
         """
-        Récupère un prompt de synthèse avec substitution de variables
+        Récupère un prompt de synthèse avec substitution de variables (avec injection de langue)
 
         Args:
             synthesis_type: "multi_metric", "comparative", "diagnostic"
-            language: "fr" ou "en"
+            language: "fr", "en", "es", etc.
             **kwargs: Variables à substituer (query, context_by_metric, etc.)
 
         Returns:
@@ -203,47 +240,49 @@ class SystemPromptsManager:
             ... )
         """
         synthesis_prompts = self.prompts.get("synthesis_prompts", {})
-        prompt_key = f"{synthesis_type}_synthesis_{language}"
-
-        prompt_template = synthesis_prompts.get(prompt_key, "")
+        prompt_template = synthesis_prompts.get(f"{synthesis_type}_synthesis", "")
+        language_name = LANGUAGE_DISPLAY_NAMES.get(language, language.upper())
 
         if not prompt_template:
-            logger.warning(f"Synthesis prompt non trouvé: {prompt_key}")
+            logger.warning(f"Synthesis prompt template not found: {synthesis_type}_synthesis")
             return ""
 
         # Substituer les variables
         try:
-            return prompt_template.format(**kwargs)
+            # Inject language_name first
+            kwargs_with_lang = {**kwargs, "language_name": language_name}
+            return prompt_template.format(**kwargs_with_lang)
         except KeyError as e:
             logger.error(f"Variable manquante dans le prompt: {e}")
             return prompt_template
 
     def get_error_message(self, error_type: str, language: str = "fr", **kwargs) -> str:
         """
-        Récupère un message d'erreur traduit
+        Récupère un message d'erreur traduit (avec injection de langue)
 
         Args:
             error_type: "species_mismatch", "unknown_breed", etc.
-            language: "fr" ou "en"
+            language: "fr", "en", "es", etc.
             **kwargs: Variables à substituer
 
         Returns:
             Message d'erreur formaté
         """
         error_messages = self.prompts.get("error_messages", {})
-        msg_key = f"{error_type}_{language}"
+        message_template = error_messages.get(error_type, "")
+        language_name = LANGUAGE_DISPLAY_NAMES.get(language, language.upper())
 
-        message = error_messages.get(msg_key, "")
-
-        if not message:
-            logger.warning(f"Message d'erreur non trouvé: {msg_key}")
+        if not message_template:
+            logger.warning(f"Error message template not found: {error_type}")
             return f"Error: {error_type}"
 
         try:
-            return message.format(**kwargs)
+            # Inject language_name
+            kwargs_with_lang = {**kwargs, "language_name": language_name}
+            return message_template.format(**kwargs_with_lang)
         except KeyError as e:
             logger.error(f"Variable manquante dans message erreur: {e}")
-            return message
+            return message_template
 
     # 🆕 ================================================================
     # NOUVELLES MÉTHODES POUR CONTEXTUALISATION
@@ -256,7 +295,7 @@ class SystemPromptsManager:
         suggestions: Optional[List[str]] = None,
     ) -> str:
         """
-        🆕 Récupère un template de question de clarification
+        🆕 Récupère un template de question de clarification (avec injection de langue)
 
         Args:
             missing_field: Champ manquant ("breed", "age_days", "sex", etc.)
@@ -276,9 +315,8 @@ class SystemPromptsManager:
         """
         clarifications = self.prompts.get("clarification_prompts", {})
 
-        # Construire la clé: missing_breed_fr, missing_age_fr, etc.
-        template_key = f"missing_{missing_field}_{language}"
-
+        # Get template by missing_field key only (language-independent)
+        template_key = f"missing_{missing_field}"
         template = clarifications.get(template_key)
 
         if not template:
@@ -303,7 +341,7 @@ class SystemPromptsManager:
         self, missing_fields: List[str], language: str = "fr"
     ) -> str:
         """
-        🆕 Génère un template pour plusieurs champs manquants
+        🆕 Génère un template pour plusieurs champs manquants (avec injection de langue)
 
         Args:
             missing_fields: Liste des champs manquants
@@ -314,9 +352,8 @@ class SystemPromptsManager:
         """
         clarifications = self.prompts.get("clarification_prompts", {})
 
-        # Template pour plusieurs champs
-        multi_key = f"multiple_{language}"
-        multi_template = clarifications.get(multi_key, "")
+        # Template pour plusieurs champs (language-independent)
+        multi_template = clarifications.get("multiple", "")
 
         if not multi_template:
             if language == "fr":
@@ -341,7 +378,7 @@ class SystemPromptsManager:
 
     def get_clarification_confirmation(self, language: str = "fr") -> str:
         """
-        🆕 Message de confirmation après clarification
+        🆕 Message de confirmation après clarification (avec injection de langue)
 
         Args:
             language: Langue
@@ -351,8 +388,8 @@ class SystemPromptsManager:
         """
         clarifications = self.prompts.get("clarification_prompts", {})
 
-        confirm_key = f"confirmation_{language}"
-        confirmation = clarifications.get(confirm_key)
+        # Get confirmation template (language-independent)
+        confirmation = clarifications.get("confirmation")
 
         if not confirmation:
             if language == "fr":
