@@ -50,6 +50,7 @@ class QueryRoute(SerializableMixin):
     confidence: float = 1.0
     missing_fields: List[str] = field(default_factory=list)
     validation_details: Dict[str, Any] = field(default_factory=dict)
+    query_type: str = "standard"  # Type de query pour logging/tracking
 
     # to_dict() now inherited from SerializableMixin (removed 12 lines)
 
@@ -624,6 +625,7 @@ class QueryRouter:
                 validation_details=validation_details,
                 is_contextual=is_contextual,
                 confidence=0.5,
+                query_type="clarification_needed",
             )
 
         # 6. ROUTING INTELLIGENT
@@ -644,6 +646,9 @@ class QueryRouter:
         # Ajouter domain dans validation_details pour utilisation par generators
         validation_details["detected_domain"] = detected_domain
 
+        # Déterminer query_type basé sur destination et domaine
+        query_type = self._determine_query_type(destination, detected_domain, entities)
+
         return QueryRoute(
             destination=destination,
             entities=entities,
@@ -651,6 +656,7 @@ class QueryRouter:
             is_contextual=is_contextual,
             validation_details=validation_details,
             confidence=1.0,
+            query_type=query_type,
         )
 
     def _is_contextual(self, query: str, language: str) -> bool:
@@ -932,6 +938,42 @@ class QueryRouter:
 
         # Hybride: pas assez d'indices clairs
         return ("hybrid", "ambiguous_requires_both_sources")
+
+    def _determine_query_type(
+        self, destination: str, detected_domain: str, entities: Dict[str, Any]
+    ) -> str:
+        """
+        Détermine le type de query pour logging/tracking
+
+        Args:
+            destination: Destination routée (postgresql/weaviate/hybrid)
+            detected_domain: Domaine détecté (genetics_performance, health, etc.)
+            entities: Entités extraites
+
+        Returns:
+            Type de query (metric_query, health_query, comparison, etc.)
+        """
+        # Basé sur le domaine détecté
+        if detected_domain in ["genetics_performance", "metric_query", "metrics"]:
+            return "metric_query"
+        elif detected_domain in ["health_diagnostic", "health", "biosecurity_health"]:
+            return "health_query"
+        elif detected_domain in ["environment_management", "environment"]:
+            return "environment_query"
+        elif detected_domain in ["nutrition_feeding", "nutrition"]:
+            return "nutrition_query"
+
+        # Si comparaison détectée dans entities
+        if entities.get("comparison_type") or entities.get("breeds_to_compare"):
+            return "comparison"
+
+        # Par défaut basé sur destination
+        if destination == "postgresql":
+            return "performance_query"
+        elif destination == "weaviate":
+            return "knowledge_query"
+        else:
+            return "standard"
 
     def clear_context(self, user_id: str):
         """Efface le contexte conversationnel d'un utilisateur"""
