@@ -661,7 +661,7 @@ class QueryRouter:
                     f"⚠️ Breed mismatch detected: current='{current_breed}' vs context='{context_breed}'"
                 )
                 logger.info(
-                    f"🔒 Blocking context merge - different breed detected (new conversation context)"
+                    "🔒 Blocking context merge - different breed detected (new conversation context)"
                 )
                 # Ne merger QUE la breed de la query actuelle, pas les autres entités
                 # Cela force le système à demander clarification pour age/sex
@@ -966,6 +966,33 @@ class QueryRouter:
             intent = classification.get("intent", "general_knowledge")
             requirements = classification.get("requirements", {})
             routing = classification.get("routing", {})
+
+            # 🆕 FUSIONNER entités LLM (priorité) avec entités regex (fallback)
+            # Le LLM comprend le contexte naturel ("18th day", "at day 18", etc.)
+            # tandis que regex ne matche que des patterns fixes
+            llm_entities = classification.get("entities", {})
+            if llm_entities:
+                logger.debug(f"🤖 LLM extracted entities: {llm_entities}")
+
+                # LLM entities take priority over regex entities
+                if llm_entities.get("age_days") is not None:
+                    entities["age_days"] = llm_entities["age_days"]
+                    entities["has_explicit_age"] = True
+                    logger.info(f"✅ LLM age extraction: {llm_entities['age_days']} days")
+
+                if llm_entities.get("breed"):
+                    entities["breed"] = llm_entities["breed"]
+                    entities["has_explicit_breed"] = True
+                    logger.debug(f"✅ LLM breed extraction: {llm_entities['breed']}")
+
+                if llm_entities.get("sex"):
+                    entities["sex"] = llm_entities["sex"]
+                    entities["has_explicit_sex"] = True
+                    logger.debug(f"✅ LLM sex extraction: {llm_entities['sex']}")
+
+                if llm_entities.get("metric"):
+                    entities["metric_type"] = llm_entities["metric"]
+                    logger.debug(f"✅ LLM metric extraction: {llm_entities['metric']}")
 
             # Log classification
             logger.info(
