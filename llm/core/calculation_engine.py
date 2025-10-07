@@ -137,9 +137,9 @@ class CalculationEngine:
         """
         try:
             async with self.db_pool.acquire() as conn:
-                # Récupérer consommation cumulée à age_end et age_start
-                query = """
-                SELECT 
+                # Trouver l'âge le plus proche de age_start
+                query_start = """
+                SELECT
                     m.age_min,
                     m.value_numeric as cumulative_intake
                 FROM metrics m
@@ -148,41 +148,76 @@ class CalculationEngine:
                 WHERE s.strain_name = $1
                   AND d.sex = $2
                   AND m.metric_name LIKE 'feed_intake for %'
-                  AND m.age_min IN ($3, $4)
-                ORDER BY m.age_min
+                  AND m.value_numeric IS NOT NULL
+                ORDER BY ABS(m.age_min - $3)
+                LIMIT 1
                 """
 
-                rows = await conn.fetch(query, breed, sex, age_start, age_end)
+                # Trouver l'âge le plus proche de age_end
+                query_end = """
+                SELECT
+                    m.age_min,
+                    m.value_numeric as cumulative_intake
+                FROM metrics m
+                JOIN documents d ON m.document_id = d.id
+                JOIN strains s ON d.strain_id = s.id
+                WHERE s.strain_name = $1
+                  AND d.sex = $2
+                  AND m.metric_name LIKE 'feed_intake for %'
+                  AND m.value_numeric IS NOT NULL
+                ORDER BY ABS(m.age_min - $3)
+                LIMIT 1
+                """
 
-                if len(rows) < 2:
+                row_start = await conn.fetchrow(query_start, breed, sex, age_start)
+                row_end = await conn.fetchrow(query_end, breed, sex, age_end)
+
+                if not row_start or not row_end:
+                    logger.warning(f"❌ Données insuffisantes: start={row_start}, end={row_end}")
                     return CalculationResult(
                         value=0,
                         unit="g",
                         calculation_type="total_feed",
-                        details={"error": "Données insuffisantes"},
+                        details={
+                            "error": "Données insuffisantes",
+                            "breed": breed,
+                            "sex": sex,
+                            "age_start": age_start,
+                            "age_end": age_end,
+                        },
                         confidence=0.0,
                     )
 
-                intake_start = rows[0]["cumulative_intake"]
-                intake_end = rows[1]["cumulative_intake"]
+                actual_age_start = row_start["age_min"]
+                actual_age_end = row_end["age_min"]
+                intake_start = row_start["cumulative_intake"]
+                intake_end = row_end["cumulative_intake"]
+
                 total_feed = intake_end - intake_start
+
+                logger.info(
+                    f"📊 Feed calculation: age {actual_age_start}→{actual_age_end}, "
+                    f"intake {intake_start}g→{intake_end}g, total={total_feed}g"
+                )
 
                 return CalculationResult(
                     value=round(total_feed, 1),
                     unit="g",
                     calculation_type="total_feed",
                     details={
-                        "age_start": age_start,
-                        "age_end": age_end,
+                        "age_start_requested": age_start,
+                        "age_end_requested": age_end,
+                        "age_start_actual": actual_age_start,
+                        "age_end_actual": actual_age_end,
                         "intake_start": intake_start,
                         "intake_end": intake_end,
-                        "feed_per_day": round(total_feed / (age_end - age_start), 2),
+                        "feed_per_day": round(total_feed / (actual_age_end - actual_age_start), 2) if actual_age_end > actual_age_start else 0,
                     },
-                    confidence=1.0,
+                    confidence=1.0 if (actual_age_start == age_start and actual_age_end == age_end) else 0.9,
                 )
 
         except Exception as e:
-            logger.error(f"Erreur calcul consommation: {e}")
+            logger.error(f"❌ Erreur calcul consommation: {e}", exc_info=True)
             return CalculationResult(
                 value=0,
                 unit="g",
