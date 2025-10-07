@@ -330,7 +330,7 @@ class ClaimsExtractor:
             - La détection est insensible à la casse
             - Les patterns capturent le contexte autour de la comparaison
             - Les comparaisons implicites sans marqueurs explicites ne sont pas détectées
-            - \w+ capture les mots alphanumériques (lettres, chiffres, underscore)
+            - \\w+ capture les mots alphanumériques (lettres, chiffres, underscore)
         """
         comparative_patterns = [
             r"\w+\s+(?:plus|moins)\s+\w+\s+que\s+\w+",
