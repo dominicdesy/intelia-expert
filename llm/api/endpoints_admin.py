@@ -24,15 +24,31 @@ from config.config import BASE_PATH
 logger = logging.getLogger(__name__)
 
 
-# Custom JSON encoder pour gérer numpy arrays
+# Custom JSON encoder pour gérer numpy arrays et valeurs non-finies
 class NumpyEncoder(json.JSONEncoder):
-    """JSON encoder qui gère les types numpy"""
+    """JSON encoder qui gère les types numpy et valeurs float invalides"""
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         elif isinstance(obj, np.generic):
             return obj.item()
         return super().default(obj)
+
+    def encode(self, obj):
+        """Override encode to handle NaN/Infinity values"""
+        def sanitize(o):
+            if isinstance(o, float):
+                if np.isnan(o):
+                    return 0.0  # Replace NaN with 0
+                elif np.isinf(o):
+                    return 1.0 if o > 0 else 0.0  # Replace Inf with 1, -Inf with 0
+            elif isinstance(o, dict):
+                return {k: sanitize(v) for k, v in o.items()}
+            elif isinstance(o, list):
+                return [sanitize(item) for item in o]
+            return o
+
+        return super().encode(sanitize(obj))
 
 
 # ============================================================================
