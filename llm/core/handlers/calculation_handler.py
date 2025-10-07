@@ -182,7 +182,8 @@ class CalculationQueryHandler(BaseQueryHandler):
             breed=breed_normalized,
             sex=sex,
             age_start=age_start,
-            age_end=age_end
+            age_end=age_end,
+            target_weight=target_weight  # Pour interpolation proportionnelle
         )
 
         return {

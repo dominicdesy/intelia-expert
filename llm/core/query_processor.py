@@ -625,15 +625,25 @@ class RAGQueryProcessor:
             age_end = calc_result.get("age_end")
             total_kg = calc_result.get("total_feed_kg")
             target_weight = calc_result.get("target_weight")
+            details = calc_result.get("details", {})
+            interpolation_applied = details.get("interpolation_applied", False)
 
             if language == "en":
                 answer = f"To reach a target weight of {target_weight}g at day {age_end}, "
-                answer += f"you will need approximately {total_kg} kg of feed per bird "
-                answer += f"from day {age_start} to day {age_end}."
+                answer += f"you will need {total_kg} kg of feed per bird "
+                answer += f"from day {age_start} to day {age_end}"
+                if interpolation_applied:
+                    ratio = details.get("interpolation_ratio", 1.0)
+                    answer += f" (with proportional adjustment of {ratio:.1%} for the final day)"
+                answer += "."
             else:
                 answer = f"Pour atteindre un poids cible de {target_weight}g au jour {age_end}, "
-                answer += f"vous aurez besoin d'environ {total_kg} kg d'aliment par poulet "
-                answer += f"entre le jour {age_start} et le jour {age_end}."
+                answer += f"vous aurez besoin de {total_kg} kg d'aliment par poulet "
+                answer += f"entre le jour {age_start} et le jour {age_end}"
+                if interpolation_applied:
+                    ratio = details.get("interpolation_ratio", 1.0)
+                    answer += f" (avec ajustement proportionnel de {ratio:.1%} pour le dernier jour)"
+                answer += "."
 
             return answer
 

@@ -121,7 +121,7 @@ class CalculationEngine:
             )
 
     async def calculate_total_feed(
-        self, breed: str, sex: str, age_start: int, age_end: int
+        self, breed: str, sex: str, age_start: int, age_end: int, target_weight: float = None
     ) -> CalculationResult:
         """
         Calcule la consommation totale d'aliment entre deux âges
@@ -133,11 +133,15 @@ class CalculationEngine:
         - MAX = cumulative intake (consommation cumulée, ex: 878g)
         On utilise MIN (daily) et on additionne.
 
+        Interpolation: Si target_weight est fourni et atteint pendant le dernier jour,
+        la consommation du dernier jour est ajustée proportionnellement.
+
         Args:
             breed: Nom de la souche
             sex: Sexe
             age_start: Âge de départ (jours)
             age_end: Âge final (jours)
+            target_weight: Poids cible en grammes (optionnel, pour interpolation)
 
         Returns:
             CalculationResult avec consommation totale
@@ -183,18 +187,74 @@ class CalculationEngine:
                         confidence=0.0,
                     )
 
-                # Additionner tous les daily_intake
-                total_feed = sum(row["daily_intake"] for row in rows)
-                days_count = len(rows)
-                avg_daily = total_feed / days_count if days_count > 0 else 0
-
                 actual_age_start = rows[0]["age_min"]
                 actual_age_end = rows[-1]["age_min"]
 
-                logger.info(
-                    f"📊 Feed calculation: {days_count} days from {actual_age_start}→{actual_age_end}, "
-                    f"total={total_feed}g ({round(total_feed/1000, 2)}kg)"
-                )
+                # Interpolation proportionnelle si target_weight fourni
+                interpolation_applied = False
+                interpolation_ratio = 1.0
+
+                if target_weight and len(rows) >= 2:
+                    # Récupérer poids du jour précédent et du dernier jour
+                    query_weights = """
+                    SELECT
+                        m.age_min,
+                        MAX(m.value_numeric) as body_weight
+                    FROM metrics m
+                    JOIN documents d ON m.document_id = d.id
+                    JOIN strains s ON d.strain_id = s.id
+                    WHERE s.strain_name = $1
+                      AND d.sex = $2
+                      AND m.metric_name LIKE 'body_weight for %'
+                      AND m.value_numeric IS NOT NULL
+                      AND m.age_min IN ($3, $4)
+                    GROUP BY m.age_min
+                    ORDER BY m.age_min
+                    """
+
+                    weight_rows = await conn.fetch(
+                        query_weights, breed, sex, actual_age_end - 1, actual_age_end
+                    )
+
+                    if len(weight_rows) == 2:
+                        weight_previous = weight_rows[0]["body_weight"]
+                        weight_final = weight_rows[1]["body_weight"]
+
+                        # Si target_weight est entre les deux poids, interpoler
+                        if weight_previous < target_weight <= weight_final:
+                            interpolation_ratio = (target_weight - weight_previous) / (weight_final - weight_previous)
+                            interpolation_applied = True
+
+                            logger.info(
+                                f"🎯 Interpolation: target {target_weight}g entre jour {actual_age_end-1} "
+                                f"({weight_previous}g) et jour {actual_age_end} ({weight_final}g) "
+                                f"→ ratio={interpolation_ratio:.2%}"
+                            )
+
+                # Calculer total avec interpolation du dernier jour si applicable
+                if interpolation_applied:
+                    # Sommer tous les jours sauf le dernier
+                    total_feed_full_days = sum(row["daily_intake"] for row in rows[:-1])
+                    # Ajouter fraction du dernier jour
+                    last_day_intake = rows[-1]["daily_intake"]
+                    last_day_adjusted = last_day_intake * interpolation_ratio
+                    total_feed = total_feed_full_days + last_day_adjusted
+
+                    logger.info(
+                        f"📊 Feed total: {len(rows)-1} jours complets ({total_feed_full_days}g) + "
+                        f"{interpolation_ratio:.1%} du jour {actual_age_end} ({last_day_adjusted:.1f}g) "
+                        f"= {total_feed:.1f}g"
+                    )
+                else:
+                    # Pas d'interpolation, sommer normalement
+                    total_feed = sum(row["daily_intake"] for row in rows)
+                    logger.info(
+                        f"📊 Feed calculation: {len(rows)} jours complets de {actual_age_start}→{actual_age_end}, "
+                        f"total={total_feed}g ({round(total_feed/1000, 2)}kg)"
+                    )
+
+                days_count = len(rows)
+                avg_daily = total_feed / days_count if days_count > 0 else 0
 
                 return CalculationResult(
                     value=round(total_feed, 1),
@@ -208,6 +268,8 @@ class CalculationEngine:
                         "days_count": days_count,
                         "avg_daily_intake": round(avg_daily, 2),
                         "total_kg": round(total_feed / 1000, 2),
+                        "interpolation_applied": interpolation_applied,
+                        "interpolation_ratio": round(interpolation_ratio, 3) if interpolation_applied else None,
                     },
                     confidence=1.0,
                 )
