@@ -534,6 +534,11 @@ class RAGQueryProcessor:
                     # Build context_docs from calculation details for RAGAS evaluation
                     context_docs = self._build_calculation_contexts(calc_result, result.get("calculation_type"))
 
+                    # Debug: Verify contexts are being built
+                    logger.info(f"🔍 DEBUG: Built {len(context_docs)} context docs for calculation")
+                    for i, ctx in enumerate(context_docs):
+                        logger.info(f"   Context {i+1}: {len(ctx.get('content', ''))} chars")
+
                     return RAGResult(
                         source=RAGSource.RETRIEVAL_SUCCESS,
                         answer=self._format_calculation_answer(calc_result, language),
@@ -543,6 +548,7 @@ class RAGQueryProcessor:
                             "query_type": "calculation",
                             "calculation_type": result.get("calculation_type"),
                             "calculation_result": calc_result,
+                            "context_docs_count": len(context_docs),  # DEBUG
                         },
                     )
                 else:
