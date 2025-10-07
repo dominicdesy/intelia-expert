@@ -24,6 +24,7 @@ from utils.metrics_collector import METRICS as metrics_collector
 from .endpoints_health import create_health_endpoints
 from .endpoints_diagnostic import create_diagnostic_endpoints
 from .endpoints_chat import create_chat_endpoints
+from .endpoints_admin import create_admin_endpoints
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
             "version": "4.1.2-metrics-centralized",
             "timestamp": time.time(),
             "architecture": "modular-endpoints",
-            "modules": ["health", "diagnostic", "chat", "utils"],
+            "modules": ["health", "diagnostic", "chat", "admin", "utils"],
             "services_count": len(_services),
             "services_list": list(_services.keys()),
             "circular_import_fixed": True,
@@ -97,6 +98,10 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
     # Chat endpoints
     chat_router = create_chat_endpoints(_services)
     router.include_router(chat_router)
+
+    # Admin endpoints
+    admin_router = create_admin_endpoints(_services)
+    router.include_router(admin_router)
 
     return router
 
