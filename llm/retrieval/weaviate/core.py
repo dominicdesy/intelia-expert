@@ -648,6 +648,7 @@ class WeaviateCore(InitializableMixin):
             if not filtered_docs:
                 return RAGResult(
                     source=RAGSource.LOW_CONFIDENCE,
+                    context_docs=[],  # Empty list to prevent NoneType errors
                     metadata={
                         "threshold": effective_threshold,
                         "max_score": (
