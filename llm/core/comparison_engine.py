@@ -514,11 +514,15 @@ class ComparisonEngine:
             else:
                 logger.warning(f"Document format inconnu: {type(doc)}")
 
-        # Recherche par priorité
+        # Recherche par priorité (matching partiel pour "body_weight for males" etc.)
         for metric_name in self.METRIC_PRIORITIES:
             for doc_dict in docs_as_dicts:
-                if doc_dict.get("metric_name") == metric_name:
-                    logger.debug(f"Métrique sélectionnée: {metric_name}")
+                doc_metric = doc_dict.get("metric_name", "").lower()
+                priority_metric = metric_name.lower()
+
+                # Matching partiel: commence par ou contient la priorité
+                if doc_metric.startswith(priority_metric) or priority_metric in doc_metric:
+                    logger.debug(f"Métrique sélectionnée: {doc_dict.get('metric_name')} (priorité: {metric_name})")
                     return doc_dict
 
         # Fallback: premier doc disponible avec valeur numérique
