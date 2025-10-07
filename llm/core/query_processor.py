@@ -450,6 +450,8 @@ class RAGQueryProcessor:
             query_type = "diagnostic"
         elif route.destination == "comparative":
             query_type = "comparative"
+        elif route.destination == "calculation":
+            query_type = "calculation"
         else:  # hybrid
             query_type = "standard"
 
