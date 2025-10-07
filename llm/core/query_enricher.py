@@ -260,6 +260,32 @@ class ConversationalQueryEnricher:
 
         is_standalone_query = has_breed_in_query and has_metric_in_query
 
+        # 🔧 FIX: Extract age from CURRENT QUERY first (BEFORE standalone check)
+        # Important pour merged queries comme "What is weight of Cobb 500 male? 17"
+        age_from_current_query = None
+        if current_query:
+            current_query_stripped = current_query.strip()
+
+            # Check if current query is a simple number (clarification response)
+            if current_query_stripped.isdigit():
+                age_from_current_query = int(current_query_stripped)
+                logger.info(f"✅ Age extracted from current query: {age_from_current_query} days (number only)")
+            else:
+                # Try patterns in current query
+                age_patterns_current = [
+                    r"(\d+)\s*(?:jour|day)s?",  # "21 days", "21 jours"
+                    r"(\d+)\s*j\b",             # "21j"
+                    r"\?\s*(\d+)\s*$",          # "...male? 17" (nombre après ?)
+                    r"\s(\d+)\s*$",             # "...male 17" (nombre à la fin)
+                ]
+
+                for pattern in age_patterns_current:
+                    match = re.search(pattern, current_query.lower())
+                    if match:
+                        age_from_current_query = int(match.group(1))
+                        logger.info(f"✅ Age extracted from current query: {age_from_current_query} days (pattern match)")
+                        break
+
         if is_standalone_query:
             logger.info(
                 f"🚫 Standalone query detected (breed + metric present) - "
@@ -285,36 +311,18 @@ class ConversationalQueryEnricher:
                 logger.debug(f"Breed extracted from context: {breed_name}")
                 break
 
-        # Extract age in days - BUT ONLY if this is a follow-up question
-        # 🔒 PROTECTION: Don't extract age for standalone queries to avoid contamination
-        if not is_standalone_query:
+        # Extract age in days
+        # 🔧 PRIORITÉ #1: Use age already extracted from current query (above)
+        # 🔧 PRIORITÉ #2: Extract from context if follow-up query and no age in current query
+        if age_from_current_query is not None:
+            # Age already extracted from current query
+            entities["age_days"] = age_from_current_query
+        elif not is_standalone_query:
+            # Follow-up query: try to extract from context
             age_days = None
 
-            # 🆕 PRIORITÉ #1: Extract age from CURRENT QUERY first (clarification responses like "22")
-            if current_query:
-                current_query_stripped = current_query.strip()
-
-                # Check if current query is a simple number (clarification response)
-                if current_query_stripped.isdigit():
-                    age_days = int(current_query_stripped)
-                    logger.info(f"✅ Age extracted from current query: {age_days} days (clarification response)")
-                else:
-                    # Try patterns in current query
-                    age_patterns_current = [
-                        r"^(\d+)$",  # Just a number
-                        r"(\d+)\s*(?:jour|day)s?",
-                        r"(\d+)\s*j\b",
-                    ]
-
-                    for pattern in age_patterns_current:
-                        match = re.search(pattern, current_query.lower())
-                        if match:
-                            age_days = int(match.group(1))
-                            logger.info(f"✅ Age extracted from current query: {age_days} days")
-                            break
-
-            # 🆕 PRIORITÉ #2: If no age in current query, extract from context
-            if age_days is None:
+            # Extract from cleaned context
+            if contextual_history:
                 # Remove examples from history to avoid extracting from them
                 # 🔧 FIX: Also remove "e.g." patterns
                 history_cleaned = re.sub(
