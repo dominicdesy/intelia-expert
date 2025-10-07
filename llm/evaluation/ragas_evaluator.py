@@ -14,6 +14,7 @@ import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import json
+import numpy as np
 
 # RAGAS imports
 try:
@@ -43,6 +44,28 @@ except ImportError:
     )
 
 logger = logging.getLogger(__name__)
+
+
+def convert_numpy_to_python(obj):
+    """
+    Convertit les types numpy en types Python natifs pour JSON serialization.
+
+    Args:
+        obj: Objet à convertir (peut être dict, list, ndarray, etc.)
+
+    Returns:
+        Objet converti en types Python natifs
+    """
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_to_python(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_to_python(item) for item in obj]
+    else:
+        return obj
 
 
 class RAGASEvaluator:
@@ -201,24 +224,23 @@ class RAGASEvaluator:
                 evaluate, dataset=dataset, metrics=self.metrics, llm=self.evaluator_llm
             )
 
-            # Extraire scores
+            # Extraire scores et convertir numpy en Python natif
             scores = {
-                "context_precision": result.get("context_precision", 0.0),
-                "context_recall": result.get("context_recall", 0.0),
-                "faithfulness": result.get("faithfulness", 0.0),
-                "answer_relevancy": result.get("answer_relevancy", 0.0),
+                "context_precision": float(result.get("context_precision", 0.0)),
+                "context_recall": float(result.get("context_recall", 0.0)),
+                "faithfulness": float(result.get("faithfulness", 0.0)),
+                "answer_relevancy": float(result.get("answer_relevancy", 0.0)),
             }
 
             # Score global (moyenne)
             overall_score = sum(scores.values()) / len(scores)
-            scores["overall"] = overall_score
+            scores["overall"] = float(overall_score)
 
-            # Détails par cas de test
-            detailed_scores = (
-                result.to_pandas().to_dict("records")
-                if hasattr(result, "to_pandas")
-                else []
-            )
+            # Détails par cas de test (convertir numpy arrays)
+            detailed_scores = []
+            if hasattr(result, "to_pandas"):
+                detailed_scores_raw = result.to_pandas().to_dict("records")
+                detailed_scores = convert_numpy_to_python(detailed_scores_raw)
 
             # Résumé
             duration = (datetime.now() - start_time).total_seconds()
@@ -231,7 +253,7 @@ class RAGASEvaluator:
                 "timestamp": datetime.now().isoformat(),
                 "llm_model": self.llm_model,
                 "num_test_cases": len(test_cases),
-                "duration_seconds": duration,
+                "duration_seconds": float(duration),
             }
 
             logger.info(f"✅ Évaluation terminée: Overall={overall_score:.2%}")
