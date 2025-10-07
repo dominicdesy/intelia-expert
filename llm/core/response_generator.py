@@ -79,6 +79,10 @@ class RAGResponseGenerator:
         """
         # If answer NOT already present, generate via LLM
         if not (result.answer and result.answer.strip()):
+            # DEFENSIVE: Ensure context_docs is never None
+            if result.context_docs is None:
+                result.context_docs = []
+
             # If documents present but no answer, generate via LLM
             # Robust check: handle both None and empty list cases
             if result.context_docs:
