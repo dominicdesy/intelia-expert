@@ -102,7 +102,7 @@ rank-bm25==0.2.2
 
 # === LANGSMITH MONITORING ===
 langchain-core==0.1.52
-langsmith>=0.0.83,<0.1.0
+langsmith>=0.1.0,<0.2.0
 
 # === RAGAS EVALUATION FRAMEWORK ===
 # RAGAS for RAG evaluation (moved from dev dependencies for admin endpoints)
