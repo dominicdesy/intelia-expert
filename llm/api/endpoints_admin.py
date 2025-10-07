@@ -500,4 +500,63 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
             },
         }
 
+    @router.get("/reranker-status")
+    async def check_reranker_status():
+        """
+        Check Cohere reranker configuration and status.
+
+        Returns details about reranker availability, configuration, and statistics.
+        """
+        import os
+
+        status = {
+            "cohere_api_key_set": bool(os.getenv("COHERE_API_KEY")),
+            "cohere_model": os.getenv("COHERE_RERANK_MODEL", "rerank-multilingual-v3.0"),
+            "cohere_top_n": int(os.getenv("COHERE_RERANK_TOP_N", "3")),
+            "reranker_available": False,
+            "reranker_enabled": False,
+            "reranker_stats": None,
+            "weaviate_core_available": False,
+        }
+
+        # Check if reranker module is available
+        try:
+            from retrieval.reranker import CohereReranker
+            status["reranker_available"] = True
+
+            # Try to initialize reranker
+            reranker = CohereReranker()
+            status["reranker_enabled"] = reranker.is_enabled()
+
+            if status["reranker_enabled"]:
+                status["reranker_stats"] = reranker.get_stats()
+
+        except ImportError as e:
+            status["import_error"] = str(e)
+        except Exception as e:
+            status["initialization_error"] = str(e)
+
+        # Check Weaviate Core reranker integration
+        try:
+            rag_engine = get_service("rag_engine")
+            if rag_engine and hasattr(rag_engine, "weaviate_core"):
+                weaviate_core = rag_engine.weaviate_core
+                status["weaviate_core_available"] = bool(weaviate_core)
+
+                if weaviate_core and hasattr(weaviate_core, "reranker"):
+                    status["weaviate_reranker_configured"] = bool(weaviate_core.reranker)
+                    if weaviate_core.reranker:
+                        status["weaviate_reranker_enabled"] = weaviate_core.reranker.is_enabled()
+
+                if weaviate_core and hasattr(weaviate_core, "optimization_stats"):
+                    status["weaviate_stats"] = {
+                        "cohere_reranking_used": weaviate_core.optimization_stats.get("cohere_reranking_used", 0),
+                        "hybrid_searches": weaviate_core.optimization_stats.get("hybrid_searches", 0),
+                        "intelligent_rrf_used": weaviate_core.optimization_stats.get("intelligent_rrf_used", 0),
+                    }
+        except Exception as e:
+            status["weaviate_check_error"] = str(e)
+
+        return status
+
     return router
