@@ -28,7 +28,8 @@ from typing import Dict, Any, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Imports après path setup
-from evaluation.ragas_evaluator import RAGASEvaluator, generate_poultry_golden_dataset
+from evaluation.ragas_evaluator import RAGASEvaluator
+from evaluation.golden_dataset_intelia import get_intelia_test_dataset
 
 # Import du système RAG réel
 try:
@@ -128,8 +129,8 @@ async def run_evaluation(
     logger.info("=" * 70)
 
     # Générer dataset golden
-    logger.info("📊 Génération dataset golden...")
-    golden_dataset = generate_poultry_golden_dataset()
+    logger.info("📊 Chargement dataset golden Intelia...")
+    golden_dataset = get_intelia_test_dataset()
 
     # Limiter nombre de cas si spécifié
     if num_test_cases:
