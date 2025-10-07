@@ -496,7 +496,7 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
             },
             "system_status": {
                 "services_available": list(_services.keys()),
-                "rag_engine_initialized": bool(get_service("rag_engine")),
+                "rag_engine_initialized": bool(get_service("rag_engine_enhanced") or get_service("rag_engine")),
             },
         }
 
@@ -673,6 +673,56 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
             diagnostic["conclusion"] = "❌ intelligent_rrf.enabled=False (lecture env variable)"
         else:
             diagnostic["conclusion"] = "❌ Conditions partiellement remplies"
+
+        return diagnostic
+
+    @router.get("/service-registry-diagnostic")
+    async def service_registry_diagnostic():
+        """
+        Diagnose service registry to understand why chat endpoint can't access RAG engine.
+
+        Returns:
+            Detailed analysis of service availability and initialization
+        """
+        diagnostic = {
+            "services_in_registry": list(_services.keys()) if _services else [],
+            "health_monitor_exists": bool(get_service("health_monitor")),
+            "rag_engine_tests": {}
+        }
+
+        try:
+            # Test 1: Direct access
+            rag_direct = get_service("rag_engine_enhanced")
+            diagnostic["rag_engine_tests"]["direct_access"] = {
+                "found": bool(rag_direct),
+                "type": type(rag_direct).__name__ if rag_direct else None,
+                "is_initialized": getattr(rag_direct, "is_initialized", None) if rag_direct else None
+            }
+
+            # Test 2: Via health_monitor (same as chat endpoint)
+            health_monitor = get_service("health_monitor")
+            if health_monitor:
+                rag_via_health = health_monitor.get_service("rag_engine_enhanced")
+                diagnostic["rag_engine_tests"]["via_health_monitor"] = {
+                    "health_monitor_found": True,
+                    "rag_found": bool(rag_via_health),
+                    "type": type(rag_via_health).__name__ if rag_via_health else None,
+                    "is_initialized": getattr(rag_via_health, "is_initialized", None) if rag_via_health else None
+                }
+
+                # Test 3: All services in health_monitor
+                if hasattr(health_monitor, "get_all_services"):
+                    all_services = health_monitor.get_all_services()
+                    diagnostic["health_monitor_services"] = list(all_services.keys())
+            else:
+                diagnostic["rag_engine_tests"]["via_health_monitor"] = {
+                    "health_monitor_found": False
+                }
+
+        except Exception as e:
+            diagnostic["error"] = str(e)
+            import traceback
+            diagnostic["traceback"] = traceback.format_exc()
 
         return diagnostic
 
