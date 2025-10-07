@@ -625,7 +625,7 @@ class EnhancedResponseGenerator:
         logger.debug(f"📋 Context preview: {context_text[:300]}...")
 
         # ✅ SIMPLIFICATION: Instructions de langue compactes en tête
-        language_name = self.language_display_names.get(language, language.upper())
+        # language_name unused - removed to fix F841
 
         # Construction du prompt système avec domaine spécialisé
         if self.prompts_manager:
@@ -633,7 +633,7 @@ class EnhancedResponseGenerator:
 
             # ✅ Instructions de langue EN TÊTE (UNE SEULE FOIS)
             # 🌍 ALWAYS generate in English - translation to target language happens post-generation
-            language_instruction = f"""You are an expert in poultry production.
+            language_instruction = """You are an expert in poultry production.
 CRITICAL: Respond EXCLUSIVELY in ENGLISH.
 
 FORMATTING RULES - CLEAN & MODERN:
@@ -744,8 +744,7 @@ RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
 
         logger.info(f"🌍 Language mapped: '{language}' → '{language_name}'")
 
-        # Générer la liste des exemples de langues DYNAMIQUEMENT
-        language_examples = self._generate_language_examples()
+        # Language examples generation removed (unused variable F841)
 
         return f"""
 INSTRUCTIONS CRITIQUES - STRUCTURE ET FORMAT:
