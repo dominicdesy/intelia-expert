@@ -514,6 +514,13 @@ class ComparisonEngine:
             else:
                 logger.warning(f"Document format inconnu: {type(doc)}")
 
+        # DEBUG: Log des docs convertis
+        logger.debug(f"📊 _extract_best_metric: {len(docs_as_dicts)} docs convertis")
+        if docs_as_dicts:
+            first_doc_keys = list(docs_as_dicts[0].keys()) if docs_as_dicts[0] else []
+            logger.debug(f"📊 Clés du premier doc: {first_doc_keys}")
+            logger.debug(f"📊 Premier doc complet: {docs_as_dicts[0]}")
+
         # Recherche par priorité (matching partiel pour "body_weight for males" etc.)
         for metric_name in self.METRIC_PRIORITIES:
             for doc_dict in docs_as_dicts:
