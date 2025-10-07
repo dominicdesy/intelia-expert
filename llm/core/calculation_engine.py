@@ -137,11 +137,11 @@ class CalculationEngine:
         """
         try:
             async with self.db_pool.acquire() as conn:
-                # Trouver l'âge le plus proche de age_start
+                # Trouver l'âge le plus proche de age_start et prendre la valeur MAX (cumulatif)
                 query_start = """
                 SELECT
                     m.age_min,
-                    m.value_numeric as cumulative_intake
+                    MAX(m.value_numeric) as cumulative_intake
                 FROM metrics m
                 JOIN documents d ON m.document_id = d.id
                 JOIN strains s ON d.strain_id = s.id
@@ -149,15 +149,16 @@ class CalculationEngine:
                   AND d.sex = $2
                   AND m.metric_name LIKE 'feed_intake for %'
                   AND m.value_numeric IS NOT NULL
+                GROUP BY m.age_min
                 ORDER BY ABS(m.age_min - $3)
                 LIMIT 1
                 """
 
-                # Trouver l'âge le plus proche de age_end
+                # Trouver l'âge le plus proche de age_end et prendre la valeur MAX (cumulatif)
                 query_end = """
                 SELECT
                     m.age_min,
-                    m.value_numeric as cumulative_intake
+                    MAX(m.value_numeric) as cumulative_intake
                 FROM metrics m
                 JOIN documents d ON m.document_id = d.id
                 JOIN strains s ON d.strain_id = s.id
@@ -165,6 +166,7 @@ class CalculationEngine:
                   AND d.sex = $2
                   AND m.metric_name LIKE 'feed_intake for %'
                   AND m.value_numeric IS NOT NULL
+                GROUP BY m.age_min
                 ORDER BY ABS(m.age_min - $3)
                 LIMIT 1
                 """
