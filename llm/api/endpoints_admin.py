@@ -559,4 +559,89 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
 
         return status
 
+    @router.get("/rrf-diagnostic")
+    async def check_rrf_diagnostic():
+        """
+        Diagnostic complet pour Intelligent RRF.
+
+        Vérifie toutes les conditions nécessaires pour que RRF intelligent fonctionne.
+        """
+        import os
+        from config.config import ENABLE_INTELLIGENT_RRF, CACHE_ENABLED
+
+        diagnostic = {
+            "config": {
+                "ENABLE_INTELLIGENT_RRF": ENABLE_INTELLIGENT_RRF,
+                "CACHE_ENABLED": CACHE_ENABLED,
+                "REDIS_URL_set": bool(os.getenv("REDIS_URL")),
+            },
+            "imports": {
+                "IntelligentRRFFusion_available": False,
+            },
+            "runtime": {
+                "cache_manager_exists": False,
+                "cache_manager_enabled": False,
+                "intelligent_rrf_initialized": False,
+                "weaviate_core_exists": False,
+            },
+            "conclusion": "UNKNOWN"
+        }
+
+        # Check imports
+        try:
+            from retrieval.enhanced_rrf_fusion import IntelligentRRFFusion
+            diagnostic["imports"]["IntelligentRRFFusion_available"] = True
+        except ImportError as e:
+            diagnostic["imports"]["import_error"] = str(e)
+
+        # Check runtime state
+        try:
+            rag_engine = get_service("rag_engine")
+            if rag_engine:
+                # Check cache manager
+                if hasattr(rag_engine, "cache_manager"):
+                    cache_manager = rag_engine.cache_manager
+                    diagnostic["runtime"]["cache_manager_exists"] = bool(cache_manager)
+                    if cache_manager:
+                        diagnostic["runtime"]["cache_manager_enabled"] = getattr(cache_manager, "enabled", False)
+                        diagnostic["runtime"]["cache_manager_client"] = bool(getattr(cache_manager, "client", None))
+
+                # Check weaviate core
+                if hasattr(rag_engine, "weaviate_core"):
+                    weaviate_core = rag_engine.weaviate_core
+                    diagnostic["runtime"]["weaviate_core_exists"] = bool(weaviate_core)
+
+                    if weaviate_core:
+                        # Check intelligent_rrf
+                        diagnostic["runtime"]["intelligent_rrf_initialized"] = bool(
+                            getattr(weaviate_core, "intelligent_rrf", None)
+                        )
+
+                        # Check cache_manager dans weaviate_core
+                        diagnostic["runtime"]["weaviate_cache_manager"] = bool(
+                            getattr(weaviate_core, "cache_manager", None)
+                        )
+
+        except Exception as e:
+            diagnostic["runtime"]["error"] = str(e)
+
+        # Conclusion
+        if (diagnostic["config"]["ENABLE_INTELLIGENT_RRF"] and
+            diagnostic["imports"]["IntelligentRRFFusion_available"] and
+            diagnostic["runtime"]["cache_manager_enabled"] and
+            diagnostic["runtime"]["intelligent_rrf_initialized"]):
+            diagnostic["conclusion"] = "✅ RRF Intelligent ACTIF"
+        elif not diagnostic["config"]["ENABLE_INTELLIGENT_RRF"]:
+            diagnostic["conclusion"] = "❌ ENABLE_INTELLIGENT_RRF=false"
+        elif not diagnostic["imports"]["IntelligentRRFFusion_available"]:
+            diagnostic["conclusion"] = "❌ IntelligentRRFFusion non importable"
+        elif not diagnostic["runtime"]["cache_manager_enabled"]:
+            diagnostic["conclusion"] = "❌ Cache Manager désactivé ou non connecté"
+        elif not diagnostic["runtime"]["intelligent_rrf_initialized"]:
+            diagnostic["conclusion"] = "❌ intelligent_rrf non initialisé dans WeaviateCore"
+        else:
+            diagnostic["conclusion"] = "❌ Conditions partiellement remplies"
+
+        return diagnostic
+
     return router
