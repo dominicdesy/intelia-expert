@@ -194,7 +194,7 @@ class ComparisonHandler:
         logger.debug(f"📝 Génération réponse comparative (langue={language})")
 
         # Convertir Dict legacy → ComparisonResult pour le moteur
-        from .comparison_engine import ComparisonStatus
+        from ..comparison_engine import ComparisonStatus
 
         # Déterminer le status
         if comparison_result.get("success"):
