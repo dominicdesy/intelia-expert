@@ -766,7 +766,10 @@ class QueryRouter:
         """
         Détecte si la query est une comparaison multi-entités
 
-        Patterns: "vs", "versus", "compare", "comparer", "et", "and", "ou", "or"
+        Patterns: "vs", "versus", "compare", "comparer"
+
+        Validation stricte pour "et/and": doit avoir breed avant ET après
+        pour éviter faux positifs comme "poids ET fcr du Ross 308"
 
         Returns:
             True si pattern de comparaison détecté
@@ -777,13 +780,39 @@ class QueryRouter:
         query_lower = query.lower()
 
         # Détecter pattern de comparaison
-        has_comparison_keyword = self.comparison_regex.search(query_lower)
+        comparison_match = self.comparison_regex.search(query_lower)
 
-        if has_comparison_keyword:
-            logger.debug(f"🔀 Pattern comparatif détecté: '{has_comparison_keyword.group()}'")
-            return True
+        if not comparison_match:
+            return False
 
-        return False
+        keyword = comparison_match.group().lower()
+
+        # 🔧 VALIDATION STRICTE pour "et/and/ou/or" (mots génériques)
+        # Vérifier qu'il y a une breed AVANT et APRÈS le mot de comparaison
+        if keyword in ["et", "and", "ou", "or"]:
+            # Extraire toutes les breeds dans la query
+            all_breeds = self._extract_all_breeds(query)
+
+            # Si moins de 2 breeds, c'est un faux positif
+            if len(all_breeds) < 2:
+                logger.debug(f"⚠️ '{keyword}' détecté mais < 2 breeds → pas comparatif")
+                return False
+
+            # Vérifier que les breeds sont de part et d'autre du mot comparatif
+            # Sinon "Ross 308 et femelle" serait détecté comme comparatif
+            keyword_pos = query_lower.find(keyword)
+            text_before = query_lower[:keyword_pos]
+            text_after = query_lower[keyword_pos + len(keyword):]
+
+            breeds_before = sum(1 for b in all_breeds if b.lower() in text_before)
+            breeds_after = sum(1 for b in all_breeds if b.lower() in text_after)
+
+            if breeds_before == 0 or breeds_after == 0:
+                logger.debug(f"⚠️ Breeds pas de part et d'autre de '{keyword}' → pas comparatif")
+                return False
+
+        logger.debug(f"🔀 Pattern comparatif validé: '{keyword}'")
+        return True
 
     def _extract_all_breeds(self, query: str) -> List[str]:
         """

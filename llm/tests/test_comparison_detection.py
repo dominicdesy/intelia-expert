@@ -14,10 +14,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def test_comparison_patterns():
-    """Test patterns de comparaison"""
+    """
+    Test patterns de comparaison (REGEX SEULEMENT)
+
+    NOTE: Ce test vérifie uniquement le regex pattern.
+    La méthode _is_comparative() dans query_router.py ajoute une validation
+    supplémentaire pour filtrer les faux positifs (ex: "et" sans 2 breeds).
+    """
 
     print("\n" + "=" * 80)
-    print("TESTS COMPARISON PATTERNS")
+    print("TESTS COMPARISON PATTERNS (Regex only)")
     print("=" * 80)
 
     # Pattern de comparaison (copié depuis query_router.py)
@@ -35,6 +41,12 @@ def test_comparison_patterns():
         ("Quel est le poids du Ross 308?", False, None),
         ("Performance Ross 308", False, None),
         ("Compare performance", True, "compare"),
+
+        # NOTE: Ces cas matchent le regex mais seront FILTRÉS par _is_comparative()
+        # grâce à la validation stricte (vérification 2+ breeds)
+        ("Quel est le poids ET le FCR du Ross 308?", True, "et"),  # Regex match, mais filtré après
+        ("Ross 308 et femelle à 21 jours", True, "et"),  # Regex match, mais filtré après
+        ("Poids and FCR for Ross 308", True, "and"),  # Regex match, mais filtré après
     ]
 
     passed = 0
