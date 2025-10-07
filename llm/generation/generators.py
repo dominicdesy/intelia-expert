@@ -20,6 +20,7 @@ from config.config import (
 from utils.utilities import METRICS
 from .entity_manager import EntityEnrichmentBuilder
 from .models import ContextEnrichment
+from utils.llm_translator import LLMTranslator
 
 # Import du gestionnaire de messages pour disclaimers vétérinaires
 try:
@@ -97,6 +98,10 @@ class EnhancedResponseGenerator:
 
         # ✅ NOUVEAU: Charger les noms de langues dynamiquement
         self.language_display_names = self._load_language_names()
+
+        # 🌍 Initialiser traducteur pour réponses multilingues
+        self.translator = LLMTranslator(cache_enabled=True)
+        logger.info("✅ LLMTranslator initialized for response translation")
 
     def _load_language_names(self) -> Dict[str, str]:
         """
@@ -453,13 +458,34 @@ class EnhancedResponseGenerator:
                 language=lang,
             )
 
+            # 🌍 Translate response to target language if not English
+            # The LLM generates in English (based on English-translated query and English documents)
+            # We need to translate back to user's language
+            final_response = enhanced_response
+            if lang and lang != "en":
+                try:
+                    final_response = self.translator.translate(
+                        enhanced_response,
+                        target_language=lang,
+                        source_language="en"
+                    )
+                    logger.info(
+                        f"🌍 Response translated en→{lang}: {len(enhanced_response)} → {len(final_response)} chars"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"⚠️ Response translation failed (en→{lang}), using English: {e}"
+                    )
+                    # Fallback: keep English response
+                    final_response = enhanced_response
+
             # Mettre en cache
             if self.cache_manager and self.cache_manager.enabled:
                 await self.cache_manager.set_response(
-                    query, context_hash, enhanced_response, lang
+                    query, context_hash, final_response, lang
                 )
 
-            return enhanced_response
+            return final_response
 
         except Exception as e:
             logger.error(f"Erreur génération réponse enrichie: {e}")
@@ -606,8 +632,9 @@ class EnhancedResponseGenerator:
             system_prompt_parts = []
 
             # ✅ Instructions de langue EN TÊTE (UNE SEULE FOIS)
+            # 🌍 ALWAYS generate in English - translation to target language happens post-generation
             language_instruction = f"""You are an expert in poultry production.
-CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
+CRITICAL: Respond EXCLUSIVELY in ENGLISH.
 
 FORMATTING RULES - CLEAN & MODERN:
 - NO bold headers with asterisks (**Header:**)
@@ -757,25 +784,17 @@ COMPORTEMENT CONVERSATIONNEL:
 - Maintiens la cohérence de format entre TOUTES les langues
 
 {"="*80}
-⚠️ CRITICAL LANGUAGE REQUIREMENT - IMPÉRATIF ABSOLU DE LANGUE ⚠️
+⚠️ CRITICAL LANGUAGE REQUIREMENT ⚠️
 {"="*80}
 
-DETECTED QUESTION LANGUAGE / LANGUE DÉTECTÉE: {language_name}
+🔴 MANDATORY RULE:
+YOU MUST RESPOND EXCLUSIVELY IN ENGLISH.
 
-🔴 MANDATORY RULE - RÈGLE OBLIGATOIRE:
-YOU MUST RESPOND EXCLUSIVELY IN THE SAME LANGUAGE AS THE QUESTION.
-VOUS DEVEZ RÉPONDRE EXCLUSIVEMENT DANS LA MÊME LANGUE QUE LA QUESTION.
-
-DO NOT translate. DO NOT switch languages. DO NOT mix languages.
-NE PAS traduire. NE PAS changer de langue. NE PAS mélanger les langues.
-
-{language_examples}
+All responses will be automatically translated to the user's language ({language_name}) after generation.
 
 THIS INSTRUCTION OVERRIDES ALL OTHER INSTRUCTIONS.
-CETTE INSTRUCTION PRÉVAUT SUR TOUTES LES AUTRES INSTRUCTIONS.
 
-YOUR RESPONSE LANGUAGE MUST BE: {language_name}
-LANGUE DE VOTRE RÉPONSE DOIT ÊTRE: {language_name}
+YOUR RESPONSE LANGUAGE MUST BE: ENGLISH
 
 🎯 CRITICAL FORMAT CONSISTENCY:
 - Answer format MUST be IDENTICAL regardless of language
@@ -814,10 +833,9 @@ LANGUE DE VOTRE RÉPONSE DOIT ÊTRE: {language_name}
             logger.warning(f"Invalid language '{language}', using {FALLBACK_LANGUAGE}")
             language = FALLBACK_LANGUAGE
 
-        language_name = self.language_display_names.get(language, language.upper())
-
+        # 🌍 ALWAYS generate in English - translation to target language happens post-generation
         return f"""You are an expert in poultry production.
-CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
+CRITICAL: Respond EXCLUSIVELY in ENGLISH.
 
 CONTEXTE MÉTIER:
 {enrichment.entity_context}
