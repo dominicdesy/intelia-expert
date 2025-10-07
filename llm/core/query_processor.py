@@ -531,8 +531,9 @@ class RAGQueryProcessor:
                 if result.get("success"):
                     calc_result = result.get("calculation_result", {})
                     return RAGResult(
-                        source=RAGSource.POSTGRESQL,
+                        source=RAGSource.RETRIEVAL_SUCCESS,
                         answer=self._format_calculation_answer(calc_result, language),
+                        confidence=calc_result.get("confidence", 0.9),
                         metadata={
                             "query_type": "calculation",
                             "calculation_type": result.get("calculation_type"),
