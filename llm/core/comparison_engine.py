@@ -214,8 +214,8 @@ class ComparisonEngine:
                     error_message = f"Cannot compare different species: {reason}"
                     if breed1_info and breed2_info:
                         error_message = (
-                            f"Cannot compare {breed1_info.name} ({breed1_info.species}) "
-                            f"with {breed2_info.name} ({breed2_info.species}). "
+                            f"Cannot compare {breed1_info['name']} ({breed1_info['species']}) "
+                            f"with {breed2_info['name']} ({breed2_info['species']}). "
                             "Please compare breeds from the same species."
                         )
 
@@ -228,10 +228,10 @@ class ComparisonEngine:
                             "breed1": breed1,
                             "breed2": breed2,
                             "species1": (
-                                breed1_info.species if breed1_info else "unknown"
+                                breed1_info["species"] if breed1_info else "unknown"
                             ),
                             "species2": (
-                                breed2_info.species if breed2_info else "unknown"
+                                breed2_info["species"] if breed2_info else "unknown"
                             ),
                             "incompatibility_reason": reason,
                         },
@@ -242,8 +242,8 @@ class ComparisonEngine:
                     breed2_info = self.breeds_registry.get_breed(breed2)
                     if breed1_info and breed2_info:
                         logger.info(
-                            f"Species validation OK: {breed1_info.name} vs {breed2_info.name} "
-                            f"(both {breed1_info.species})"
+                            f"Species validation OK: {breed1_info['name']} vs {breed2_info['name']} "
+                            f"(both {breed1_info['species']})"
                         )
         # ====================================================================
 
@@ -383,7 +383,7 @@ class ComparisonEngine:
             # Utiliser le nom officiel depuis le registry si possible
             breed_info = self.breeds_registry.get_breed(entity_set["breed"])
             if breed_info:
-                parts.append(breed_info.name)
+                parts.append(breed_info["name"])
             else:
                 parts.append(entity_set["breed"].upper())
 
