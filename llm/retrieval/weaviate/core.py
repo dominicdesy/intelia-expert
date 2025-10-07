@@ -637,7 +637,11 @@ class WeaviateCore(InitializableMixin):
                     )
 
             if not documents:
-                return RAGResult(source=RAGSource.NO_DOCUMENTS_FOUND)
+                return RAGResult(
+                    source=RAGSource.NO_DOCUMENTS_FOUND,
+                    context_docs=[],  # Empty list to prevent NoneType errors
+                    metadata={"reason": "no_documents_returned_from_search"},
+                )
 
             # Filtrage par seuil de confiance
             effective_threshold = RAG_CONFIDENCE_THRESHOLD
@@ -670,9 +674,17 @@ class WeaviateCore(InitializableMixin):
                 )
 
                 if not response_text:
-                    return RAGResult(source=RAGSource.GENERATION_FAILED)
+                    return RAGResult(
+                        source=RAGSource.GENERATION_FAILED,
+                        context_docs=filtered_docs,
+                        metadata={"reason": "generator_returned_empty_response"},
+                    )
             else:
-                return RAGResult(source=RAGSource.GENERATION_FAILED)
+                return RAGResult(
+                    source=RAGSource.GENERATION_FAILED,
+                    context_docs=filtered_docs,
+                    metadata={"reason": "no_generator_configured"},
+                )
 
             # Calcul confiance finale
             final_confidence = self._calculate_confidence(filtered_docs)
