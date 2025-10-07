@@ -435,6 +435,7 @@ class StandardQueryHandler(BaseQueryHandler):
                 logger.info(f"Weaviate ({language}): 0 documents")
                 return RAGResult(
                     source=RAGSource.NO_RESULTS,
+                    context_docs=[],  # Empty list instead of None to prevent 'NoneType has no len()' errors
                     answer="Aucune information trouvée dans Weaviate.",
                     metadata={
                         "source": "weaviate_fallback",

@@ -19,6 +19,16 @@ except ImportError:
     ProactiveAssistant = None
     logger.warning("ProactiveAssistant not available")
 
+# Import LLM Ensemble for high-quality fallback responses
+try:
+    from generation.llm_ensemble import get_llm_ensemble, EnsembleMode
+    LLM_ENSEMBLE_AVAILABLE = True
+except ImportError:
+    LLM_ENSEMBLE_AVAILABLE = False
+    get_llm_ensemble = None
+    EnsembleMode = None
+    logger.warning("LLM Ensemble not available")
+
 
 class RAGResponseGenerator:
     """Generates LLM responses from retrieved documents"""
@@ -70,7 +80,8 @@ class RAGResponseGenerator:
         # If answer NOT already present, generate via LLM
         if not (result.answer and result.answer.strip()):
             # If documents present but no answer, generate via LLM
-            if result.context_docs and len(result.context_docs) > 0:
+            # Robust check: handle both None and empty list cases
+            if result.context_docs:
                 if not self.generator:
                     logger.warning("LLM generator not available, cannot generate response")
                     result.answer = "Data retrieved but response generation unavailable."
@@ -141,6 +152,54 @@ class RAGResponseGenerator:
                         logger.error(f"LLM generation error: {e}", exc_info=True)
                         result.answer = "Unable to generate response from the retrieved data."
                         result.metadata["llm_generation_error"] = str(e)
+
+            # FALLBACK: If NO documents found but question is IN-DOMAIN, generate LLM response without context
+            elif result.source == RAGSource.NO_RESULTS and self.generator:
+                logger.info("NO_RESULTS detected - generating LLM fallback response without context")
+
+                # Try to use LLM Ensemble for high-quality consensus response
+                if LLM_ENSEMBLE_AVAILABLE and get_llm_ensemble:
+                    try:
+                        logger.info("Using LLM Ensemble (multi-LLM consensus) for fallback response")
+
+                        # Get ensemble instance (uses Claude + OpenAI + DeepSeek in parallel)
+                        ensemble = get_llm_ensemble(mode=EnsembleMode.BEST_OF_N)
+
+                        # Generate ensemble response with empty context
+                        ensemble_result = await ensemble.generate_ensemble_response(
+                            query=original_query,
+                            context_docs=[],  # Empty context - use LLM general knowledge
+                            language=language,
+                            entities=result.metadata.get("entities", {}),
+                            query_type=result.metadata.get("query_type", "standard"),
+                            domain=result.metadata.get("detected_domain", "poultry"),
+                        )
+
+                        result.answer = ensemble_result["final_answer"]
+                        result.source = RAGSource.FALLBACK_NEEDED
+
+                        if not result.metadata:
+                            result.metadata = {}
+
+                        result.metadata["llm_fallback_used"] = True
+                        result.metadata["llm_ensemble_used"] = True
+                        result.metadata["ensemble_provider"] = ensemble_result.get("provider")
+                        result.metadata["ensemble_confidence"] = ensemble_result.get("confidence")
+                        result.metadata["no_documents_reason"] = "LOW_CONFIDENCE"
+
+                        logger.info(
+                            f"LLM Ensemble fallback response generated ({len(result.answer)} characters) "
+                            f"via {ensemble_result.get('provider')} (confidence: {ensemble_result.get('confidence', 0):.2f})"
+                        )
+
+                    except Exception as e:
+                        logger.warning(f"LLM Ensemble fallback failed: {e}, falling back to single LLM")
+                        # Fallback to single LLM if ensemble fails
+                        await self._fallback_single_llm(result, original_query, language)
+                else:
+                    # Use single LLM if ensemble not available
+                    logger.info("LLM Ensemble not available, using single LLM for fallback")
+                    await self._fallback_single_llm(result, original_query, language)
         else:
             logger.debug("Answer already present, skipping LLM generation")
 
@@ -191,3 +250,47 @@ class RAGResponseGenerator:
             )
 
         return result
+
+    async def _fallback_single_llm(
+        self, result: RAGResult, original_query: str, language: str
+    ):
+        """
+        Fallback to single LLM when ensemble is unavailable or fails
+
+        Args:
+            result: RAGResult to update with generated answer
+            original_query: Original user query
+            language: Query language
+        """
+        try:
+            # Generate response without specific context (general knowledge from LLM)
+            generated_answer = await self.generator.generate_response_async(
+                query=original_query,
+                context_docs=[],  # Empty context
+                language=language,
+                conversation_context="",
+            )
+
+            result.answer = generated_answer
+            result.source = RAGSource.FALLBACK_NEEDED
+
+            if not result.metadata:
+                result.metadata = {}
+
+            result.metadata["llm_fallback_used"] = True
+            result.metadata["llm_ensemble_used"] = False
+            result.metadata["no_documents_reason"] = "LOW_CONFIDENCE"
+
+            logger.info(
+                f"Single LLM fallback response generated ({len(generated_answer)} characters)"
+            )
+
+        except Exception as e:
+            logger.error(f"Single LLM fallback generation error: {e}", exc_info=True)
+            result.answer = (
+                "I don't have specific information about this in my database, "
+                "but I can help with general poultry production questions."
+            )
+            if not result.metadata:
+                result.metadata = {}
+            result.metadata["llm_fallback_error"] = str(e)
