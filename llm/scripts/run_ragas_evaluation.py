@@ -83,13 +83,26 @@ async def query_rag_system(
             # Extraire answer (RAGResult.answer)
             answer = result.answer or "[PAS DE RÉPONSE]"
 
-            # Extraire contextes des documents (RAGResult.context_docs: List[Dict])
+            # Extraire contextes des documents (RAGResult.context_docs: List[Union[Document, dict]])
             contexts = []
-            for doc in result.context_docs:
-                # doc est un dictionnaire avec 'content' ou 'text'
-                content = doc.get("content") or doc.get("text") or doc.get("page_content", "")
-                if content:
+
+            logger.info(f"   📄 RAG returned {len(result.context_docs)} context documents")
+
+            for i, doc in enumerate(result.context_docs):
+                # Extraction selon type (dict ou objet Document)
+                if isinstance(doc, dict):
+                    content = doc.get("content", "")
+                else:
+                    # Objet Document
+                    content = getattr(doc, "content", "")
+
+                if content and content.strip():
                     contexts.append(content)
+                    logger.debug(f"      [{i+1}] Content extracted: {len(content)} chars")
+                else:
+                    logger.warning(f"      [{i+1}] Empty content in document: {type(doc)}")
+
+            logger.info(f"   ✅ Extracted {len(contexts)} non-empty contexts")
 
             return {"answer": answer, "contexts": contexts}
 
