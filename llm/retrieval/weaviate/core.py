@@ -681,6 +681,7 @@ class WeaviateCore(InitializableMixin):
                 source=RAGSource.RAG_SUCCESS,
                 answer=response_text,
                 confidence=final_confidence,
+                context_docs=filtered_docs,  # ✅ FIX: Peupler context_docs pour RAGAS evaluation
                 metadata={
                     "approach": "weaviate_core_v5.1",
                     "documents_found": len(documents),
