@@ -622,6 +622,11 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
                         diagnostic["runtime"]["intelligent_rrf_initialized"] = bool(intelligent_rrf)
                         diagnostic["runtime"]["intelligent_rrf_attribute_exists"] = has_intelligent_rrf
 
+                        # CRITICAL: Check if intelligent_rrf.enabled is True
+                        if intelligent_rrf:
+                            diagnostic["runtime"]["intelligent_rrf_enabled"] = getattr(intelligent_rrf, "enabled", False)
+                            diagnostic["runtime"]["intelligent_rrf_has_enabled_attr"] = hasattr(intelligent_rrf, "enabled")
+
                         # Check cache_manager dans weaviate_core
                         has_cache_manager = hasattr(weaviate_core, "cache_manager")
                         cache_manager_value = getattr(weaviate_core, "cache_manager", None)
@@ -636,7 +641,8 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
         if (diagnostic["config"]["ENABLE_INTELLIGENT_RRF"] and
             diagnostic["imports"]["IntelligentRRFFusion_available"] and
             diagnostic["runtime"].get("cache_manager_enabled", False) and
-            diagnostic["runtime"].get("intelligent_rrf_initialized", False)):
+            diagnostic["runtime"].get("intelligent_rrf_initialized", False) and
+            diagnostic["runtime"].get("intelligent_rrf_enabled", False)):
             diagnostic["conclusion"] = "✅ RRF Intelligent ACTIF"
         elif not diagnostic["config"]["ENABLE_INTELLIGENT_RRF"]:
             diagnostic["conclusion"] = "❌ ENABLE_INTELLIGENT_RRF=false"
@@ -646,6 +652,8 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
             diagnostic["conclusion"] = "❌ Cache Manager désactivé ou non connecté"
         elif not diagnostic["runtime"].get("intelligent_rrf_initialized", False):
             diagnostic["conclusion"] = "❌ intelligent_rrf non initialisé dans WeaviateCore"
+        elif not diagnostic["runtime"].get("intelligent_rrf_enabled", False):
+            diagnostic["conclusion"] = "❌ intelligent_rrf.enabled=False (lecture env variable)"
         else:
             diagnostic["conclusion"] = "❌ Conditions partiellement remplies"
 
