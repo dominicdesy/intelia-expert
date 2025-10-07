@@ -13,7 +13,7 @@ import logging
 from utils.types import Dict, List, Any
 
 # Import du nouveau moteur unifié
-from .comparison_engine import ComparisonEngine, ComparisonResult
+from ..comparison_engine import ComparisonEngine, ComparisonResult
 
 logger = logging.getLogger(__name__)
 

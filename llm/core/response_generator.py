@@ -80,7 +80,7 @@ class RAGResponseGenerator:
                     )
 
                     # Retrieve contextual history
-                    contextual_history = preprocessed_data.get("contextual_history", "")
+                    contextual_history = preprocessed_data.get("contextual_history") if preprocessed_data else None
 
                     logger.debug(
                         f"Contextual history type: {type(contextual_history)}, "
@@ -102,9 +102,16 @@ class RAGResponseGenerator:
                             f"Calling generate_response with conversation_context length: {len(conversation_context)}"
                         )
 
+                        # Extract query with fallback
+                        query_to_use = (
+                            preprocessed_data.get("original_query", original_query)
+                            if preprocessed_data
+                            else original_query
+                        )
+
                         # Generate answer with retrieved documents and conversation context
                         generated_answer = await self.generator.generate_response(
-                            query=preprocessed_data.get("original_query", original_query),
+                            query=query_to_use,
                             context_docs=result.context_docs,
                             conversation_context=conversation_context,
                             language=language,
@@ -112,6 +119,11 @@ class RAGResponseGenerator:
                         )
 
                         result.answer = generated_answer
+
+                        # Ensure metadata exists before updating
+                        if not result.metadata:
+                            result.metadata = {}
+
                         result.metadata["llm_generation_applied"] = True
                         result.metadata["llm_input_docs_count"] = len(result.context_docs)
                         result.metadata["conversation_context_used"] = bool(
