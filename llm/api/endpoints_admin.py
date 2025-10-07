@@ -538,7 +538,8 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
 
         # Check Weaviate Core reranker integration
         try:
-            rag_engine = get_service("rag_engine")
+            # Try both possible service names
+            rag_engine = get_service("rag_engine_enhanced") or get_service("rag_engine")
             if rag_engine and hasattr(rag_engine, "weaviate_core"):
                 weaviate_core = rag_engine.weaviate_core
                 status["weaviate_core_available"] = bool(weaviate_core)
@@ -553,9 +554,25 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
                         "cohere_reranking_used": weaviate_core.optimization_stats.get("cohere_reranking_used", 0),
                         "hybrid_searches": weaviate_core.optimization_stats.get("hybrid_searches", 0),
                         "intelligent_rrf_used": weaviate_core.optimization_stats.get("intelligent_rrf_used", 0),
+                        "total_queries": weaviate_core.optimization_stats.get("total_queries", 0),
                     }
         except Exception as e:
             status["weaviate_check_error"] = str(e)
+
+        # Check PostgreSQL retriever reranker
+        try:
+            if rag_engine and hasattr(rag_engine, "postgresql_retriever"):
+                postgresql_retriever = rag_engine.postgresql_retriever
+                if postgresql_retriever and hasattr(postgresql_retriever, "reranker"):
+                    pg_reranker = postgresql_retriever.reranker
+                    status["postgresql_reranker_configured"] = bool(pg_reranker)
+                    if pg_reranker:
+                        status["postgresql_reranker_enabled"] = pg_reranker.is_enabled()
+                        # Get real stats from PostgreSQL reranker
+                        if hasattr(pg_reranker, "get_stats"):
+                            status["postgresql_reranker_stats"] = pg_reranker.get_stats()
+        except Exception as e:
+            status["postgresql_check_error"] = str(e)
 
         return status
 
