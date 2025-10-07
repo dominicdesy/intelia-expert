@@ -382,6 +382,44 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
     # INFO ENDPOINTS
     # ========================================================================
 
+    @router.get("/debug-imports")
+    async def debug_imports():
+        """
+        Debug endpoint to check RAGAS dependencies availability.
+
+        Returns import status for ragas, datasets, and langchain-openai.
+        """
+        import_status = {}
+
+        # Test RAGAS
+        try:
+            from ragas import evaluate
+            from ragas.metrics import context_precision
+            import_status["ragas"] = {"available": True, "version": "imported"}
+        except ImportError as e:
+            import_status["ragas"] = {"available": False, "error": str(e)}
+
+        # Test datasets
+        try:
+            from datasets import Dataset
+            import_status["datasets"] = {"available": True, "version": "imported"}
+        except ImportError as e:
+            import_status["datasets"] = {"available": False, "error": str(e)}
+
+        # Test langchain-openai
+        try:
+            from langchain_openai import ChatOpenAI
+            import_status["langchain_openai"] = {"available": True, "version": "imported"}
+        except ImportError as e:
+            import_status["langchain_openai"] = {"available": False, "error": str(e)}
+
+        return {
+            "imports": import_status,
+            "ready_for_evaluation": all(
+                imp["available"] for imp in import_status.values()
+            ),
+        }
+
     @router.get("/info")
     async def admin_info():
         """
