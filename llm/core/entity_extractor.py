@@ -129,7 +129,7 @@ class EntityExtractor:
         r"(\d+)(?:e|ème|eme)?\s+semaine",
     ]
 
-    # Patterns age en jours
+    # Patterns age en jours (English patterns only - non-EN queries are translated first)
     AGE_PATTERNS = [
         r"(\d+)\s*(?:jours?|days?|j)\b",
         r"à\s+(\d+)\s*(?:jours?|j)\b",

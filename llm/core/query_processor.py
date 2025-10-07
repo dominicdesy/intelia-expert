@@ -12,6 +12,7 @@ from utils.types import Dict, List, Any, Optional
 from .data_models import RAGResult, RAGSource
 from .query_enricher import ConversationalQueryEnricher
 from utils.clarification_helper import get_clarification_helper
+from utils.llm_translator import LLMTranslator
 
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger()
@@ -38,6 +39,10 @@ class RAGQueryProcessor:
         self.ood_detector = ood_detector
         self.enricher = ConversationalQueryEnricher()
         self.clarification_helper = get_clarification_helper()
+
+        # Initialize LLM translator for multilingual support
+        self.translator = LLMTranslator(cache_enabled=True)
+        logger.info("✅ LLMTranslator initialized for query translation")
 
     async def process_query(
         self,
@@ -224,10 +229,47 @@ class RAGQueryProcessor:
                     "entity_extraction_failed", request_id=request_id, error=str(e)
                 )
 
+        # Step 2.5: Translate query to English for universal entity extraction
+        # 🌍 Universal multilingual support: translate all non-English queries to English
+        # before routing/extraction, allowing us to use only English patterns
+        query_for_routing = enriched_query
+        if language != "en":
+            try:
+                translation_start = time.time()
+                query_for_routing = self.translator.translate(
+                    enriched_query,
+                    target_language="en",
+                    source_language=language
+                )
+                translation_duration = time.time() - translation_start
+
+                logger.info(
+                    f"🌍 Query translated {language}→en ({translation_duration*1000:.0f}ms): "
+                    f"'{enriched_query[:50]}...' → '{query_for_routing[:50]}...'"
+                )
+
+                structured_logger.info(
+                    "query_translated",
+                    request_id=request_id,
+                    source_lang=language,
+                    target_lang="en",
+                    duration_ms=translation_duration * 1000,
+                    original_length=len(enriched_query),
+                    translated_length=len(query_for_routing),
+                )
+            except Exception as e:
+                logger.warning(
+                    f"⚠️ Translation failed ({language}→en), using original: {e}"
+                )
+                # Fallback: use original query if translation fails
+                query_for_routing = enriched_query
+        else:
+            logger.debug("Query already in English, skipping translation")
+
         # Step 3: Route query with context-extracted entities
         step3_start = time.time()
         route = self.query_router.route(
-            query=enriched_query,
+            query=query_for_routing,  # 🆕 Use translated query for routing/extraction
             user_id=tenant_id,
             language=language,
             preextracted_entities=preextracted_entities or extracted_entities,
@@ -289,8 +331,8 @@ class RAGQueryProcessor:
 
         # Step 5: Build preprocessed data
         preprocessed_data = self._build_preprocessed_data(
-            enriched_query,
-            query,
+            query_for_routing,  # 🆕 Use translated query for extraction/retrieval
+            query,  # Keep original for display
             route,
             language,
             conversation_context,
