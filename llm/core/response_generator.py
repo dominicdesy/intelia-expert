@@ -153,9 +153,9 @@ class RAGResponseGenerator:
                         result.answer = "Unable to generate response from the retrieved data."
                         result.metadata["llm_generation_error"] = str(e)
 
-            # FALLBACK: If NO documents found but question is IN-DOMAIN, generate LLM response without context
-            elif result.source == RAGSource.NO_RESULTS and self.generator:
-                logger.info("NO_RESULTS detected - generating LLM fallback response without context")
+            # FALLBACK: If NO documents found or LOW confidence, generate LLM response without context
+            elif result.source in (RAGSource.NO_RESULTS, RAGSource.LOW_CONFIDENCE) and self.generator:
+                logger.info(f"{result.source} detected - generating LLM fallback response without context")
 
                 # Try to use LLM Ensemble for high-quality consensus response
                 if LLM_ENSEMBLE_AVAILABLE and get_llm_ensemble:
