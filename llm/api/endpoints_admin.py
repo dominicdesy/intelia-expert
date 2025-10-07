@@ -15,11 +15,24 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
+import numpy as np
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from config.config import BASE_PATH
 
 logger = logging.getLogger(__name__)
+
+
+# Custom JSON encoder pour gérer numpy arrays
+class NumpyEncoder(json.JSONEncoder):
+    """JSON encoder qui gère les types numpy"""
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.generic):
+            return obj.item()
+        return super().default(obj)
 
 
 # ============================================================================
@@ -214,7 +227,10 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
                 f"✅ RAGAS evaluation completed: Overall score = {result['scores']['overall']:.2%}"
             )
 
-            return result
+            # Retourner avec JSONResponse et NumpyEncoder pour gérer numpy arrays
+            return JSONResponse(
+                content=json.loads(json.dumps(result, cls=NumpyEncoder))
+            )
 
         except Exception as e:
             logger.error(f"❌ Error during RAGAS evaluation: {e}", exc_info=True)
