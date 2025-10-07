@@ -395,7 +395,7 @@ class StandardQueryHandler(BaseQueryHandler):
                 conversation_context=conversation_context_list,
             )
 
-            if result and result.source != RAGSource.NO_RESULTS:
+            if result and result.source not in (RAGSource.NO_RESULTS, RAGSource.LOW_CONFIDENCE):
                 doc_count = len(result.context_docs) if result.context_docs else 0
 
                 if result.context_docs and not result.answer:
