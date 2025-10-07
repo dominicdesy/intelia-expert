@@ -637,6 +637,7 @@ class EnhancedResponseGenerator:
 CRITICAL: Respond EXCLUSIVELY in ENGLISH.
 
 FORMATTING RULES - CLEAN & MODERN:
+- NO markdown headers (##, ###, ####) - start directly with text
 - NO bold headers with asterisks (**Header:**)
 - Use simple paragraph structure with clear topic sentences
 - Separate ideas with line breaks, not headers
@@ -928,27 +929,30 @@ Style professionnel et structuré avec recommandations actionnables.""",
 
         # ✅ NETTOYAGE AMÉLIORÉ DU FORMATAGE
 
-        # 1. Supprimer les numéros de liste (1., 2., etc.)
+        # 1. Supprimer les headers markdown (##, ###, ####, etc.) - convertit "## Titre" en "Titre"
+        response = re.sub(r"^#{1,6}\s+", "", response, flags=re.MULTILINE)
+
+        # 2. Supprimer les numéros de liste (1., 2., etc.)
         response = re.sub(r"^\d+\.\s+", "", response, flags=re.MULTILINE)
 
-        # 2. Nettoyer les astérisques orphelins (lignes avec juste ** ou **)
+        # 3. Nettoyer les astérisques orphelins (lignes avec juste ** ou **)
         response = re.sub(r"^\*\*\s*$", "", response, flags=re.MULTILINE)
 
-        # 3. SUPPRIMER COMPLÈTEMENT les headers en gras (**Titre:** ou **Titre**)
+        # 4. SUPPRIMER COMPLÈTEMENT les headers en gras (**Titre:** ou **Titre**)
         # Cette règle remplace les anciennes règles 3-5 qui essayaient de "corriger" les headers
         response = re.sub(r"\*\*([^*]+?):\*\*\s*", "", response)
         response = re.sub(r"\*\*([^*]+?)\*\*\s*:", "", response)
 
-        # 4. Nettoyer les deux-points orphelins sur des lignes isolées
+        # 5. Nettoyer les deux-points orphelins sur des lignes isolées
         response = re.sub(r"^\s*:\s*$", "", response, flags=re.MULTILINE)
 
-        # 5. Nettoyer les lignes vides multiples (3+ → 2)
+        # 6. Nettoyer les lignes vides multiples (3+ → 2)
         response = re.sub(r"\n{3,}", "\n\n", response)
 
-        # 6. Supprimer les espaces en fin de ligne
+        # 7. Supprimer les espaces en fin de ligne
         response = re.sub(r" +$", "", response, flags=re.MULTILINE)
 
-        # 7. S'assurer qu'il y a un espace après les bullet points
+        # 8. S'assurer qu'il y a un espace après les bullet points
         response = re.sub(r"^-([^ ])", r"- \1", response, flags=re.MULTILINE)
 
         # Ajouter avertissement vétérinaire si la question concerne la santé/maladie

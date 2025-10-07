@@ -59,27 +59,30 @@ class ResponsePostProcessor:
 
         # ✅ IMPROVED FORMATTING CLEANUP
 
-        # 1. Remove list numbers (1., 2., etc.)
+        # 1. Remove markdown headers (##, ###, ####, etc.) - converts "## Title" to "Title"
+        response = re.sub(r"^#{1,6}\s+", "", response, flags=re.MULTILINE)
+
+        # 2. Remove list numbers (1., 2., etc.)
         response = re.sub(r"^\d+\.\s+", "", response, flags=re.MULTILINE)
 
-        # 2. Clean orphan asterisks (lines with just ** or **)
+        # 3. Clean orphan asterisks (lines with just ** or **)
         response = re.sub(r"^\*\*\s*$", "", response, flags=re.MULTILINE)
 
-        # 3. COMPLETELY REMOVE bold headers (**Title:** or **Title**)
+        # 4. COMPLETELY REMOVE bold headers (**Title:** or **Title**)
         # This rule replaces the old rules 3-5 that tried to "fix" headers
         response = re.sub(r"\*\*([^*]+?):\*\*\s*", "", response)
         response = re.sub(r"\*\*([^*]+?)\*\*\s*:", "", response)
 
-        # 4. Clean orphan colons on isolated lines
+        # 5. Clean orphan colons on isolated lines
         response = re.sub(r"^\s*:\s*$", "", response, flags=re.MULTILINE)
 
-        # 5. Clean multiple empty lines (3+ → 2)
+        # 6. Clean multiple empty lines (3+ → 2)
         response = re.sub(r"\n{3,}", "\n\n", response)
 
-        # 6. Remove trailing spaces
+        # 7. Remove trailing spaces
         response = re.sub(r" +$", "", response, flags=re.MULTILINE)
 
-        # 7. Ensure space after bullet points
+        # 8. Ensure space after bullet points
         response = re.sub(r"^-([^ ])", r"- \1", response, flags=re.MULTILINE)
 
         # Add veterinary disclaimer if the question concerns health/disease
