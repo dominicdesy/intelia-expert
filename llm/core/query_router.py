@@ -700,8 +700,13 @@ class QueryRouter:
             )
 
         # 6. ROUTING INTELLIGENT
+        # 🧮 Si calcul multi-étapes, router vers "calculation"
+        if intent == "calculation_query":
+            destination = "calculation"
+            reason = "calculation_query_detected"
+            logger.info(f"🧮 Routing vers calculation handler: {entities.get('calculation_type')}")
         # 🔀 Si comparaison multi-races, router vers "comparative"
-        if is_comparative and entities.get("comparison_entities"):
+        elif is_comparative and entities.get("comparison_entities"):
             destination = "comparative"
             reason = "multi_breed_comparison_detected"
             logger.info(f"🔀 Routing vers comparative: {len(entities['comparison_entities'])} breeds")
@@ -1172,13 +1177,17 @@ class QueryRouter:
         Détermine le type de query pour logging/tracking
 
         Args:
-            destination: Destination routée (postgresql/weaviate/hybrid)
+            destination: Destination routée (postgresql/weaviate/hybrid/calculation)
             detected_domain: Domaine détecté (genetics_performance, health, etc.)
             entities: Entités extraites
 
         Returns:
-            Type de query (metric_query, health_query, comparison, etc.)
+            Type de query (metric_query, health_query, comparison, calculation, etc.)
         """
+        # Si calcul multi-étapes détecté
+        if destination == "calculation":
+            return "calculation"
+
         # Si comparaison détectée dans entities
         if entities.get("is_comparative") or entities.get("comparison_entities"):
             return "comparison"

@@ -23,7 +23,7 @@ Latence: ~100ms (vs <1ms patterns, mais beaucoup plus précis)
 
 import logging
 import json
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
@@ -77,6 +77,16 @@ Your task: Analyze the user's query and return a structured classification in JS
    - Requires: Nothing (no breed/age needed)
    - Routing: Weaviate (documentation)
 
+7. **calculation_query**: Calculations requiring multi-step operations
+   - Examples: "How much feed to reach 2.4kg from day 18?", "At what age will they reach 3kg?"
+   - Subcategories:
+     * reverse_lookup: Find age for target weight/FCR
+     * cumulative_feed: Calculate total feed between two ages
+     * projection: Project future weight/performance
+     * flock_calculation: Calculate totals for N birds
+   - Requires: breed + current_age or age_range + target_value
+   - Routing: PostgreSQL (uses calculation_engine)
+
 # ENTITY TYPES:
 
 - **breed**: Breed name (Ross 308, Cobb 500, ISA Brown, etc.)
@@ -85,6 +95,8 @@ Your task: Analyze the user's query and return a structured classification in JS
 - **metric**: Performance metric (body_weight, feed_conversion_ratio, feed_intake, mortality, etc.)
 - **disease_name**: Disease name (Newcastle, Gumboro, coccidiosis, etc.)
 - **treatment_type**: Treatment type (antibiotic, vaccine, feed additive, etc.)
+- **target_weight**: Target weight in kg or g (for reverse lookup calculations)
+- **calculation_type**: Type of calculation (reverse_lookup, cumulative_feed, projection, flock_calculation)
 
 # ROUTING LOGIC:
 
@@ -116,14 +128,16 @@ Language: {language}
 
 Return a JSON object with this EXACT structure:
 {{
-  "intent": "performance_query|general_knowledge|disease_info|treatment_info|nutrition_info|management_info",
+  "intent": "performance_query|general_knowledge|disease_info|treatment_info|nutrition_info|management_info|calculation_query",
   "entities": {{
     "breed": "string or null",
     "age_days": "number or null",
     "sex": "male|female|as_hatched|null",
     "metric": "string or null",
     "disease_name": "string or null",
-    "treatment_type": "string or null"
+    "treatment_type": "string or null",
+    "target_weight": "number or null (in grams)",
+    "calculation_type": "reverse_lookup|cumulative_feed|projection|flock_calculation|null"
   }},
   "requirements": {{
     "needs_breed": true/false,

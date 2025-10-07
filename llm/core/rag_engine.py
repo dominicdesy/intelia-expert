@@ -32,6 +32,7 @@ from .handlers import (
     TemporalQueryHandler,
     ComparativeQueryHandler,
     StandardQueryHandler,
+    CalculationQueryHandler,
 )
 from .query_router import QueryRouter
 from .entity_extractor import EntityExtractor
@@ -121,6 +122,7 @@ class InteliaRAGEngine(InitializableMixin):
         self.temporal_handler = TemporalQueryHandler()
         self.comparative_handler = ComparativeQueryHandler()
         self.standard_handler = StandardQueryHandler()
+        self.calculation_handler = None  # Initialized after PostgreSQL pool is available
 
         # External modules
         self.postgresql_retriever = None
@@ -172,6 +174,7 @@ class InteliaRAGEngine(InitializableMixin):
                     "temporal": self.temporal_handler,
                     "comparative": self.comparative_handler,
                     "standard": self.standard_handler,
+                    "calculation": self.calculation_handler,
                 },
                 conversation_memory=self.conversation_memory,
                 ood_detector=self.weaviate_core.ood_detector if self.weaviate_core else None,
@@ -226,6 +229,18 @@ class InteliaRAGEngine(InitializableMixin):
                 )
                 await self.postgresql_retriever.initialize()
                 logger.info("PostgreSQL Retriever initialized")
+
+                # Initialize Calculation Handler with PostgreSQL pool
+                if self.postgresql_retriever and self.postgresql_retriever.pool:
+                    try:
+                        self.calculation_handler = CalculationQueryHandler(
+                            db_pool=self.postgresql_retriever.pool
+                        )
+                        logger.info("✅ Calculation Handler initialized with PostgreSQL pool")
+                    except Exception as calc_err:
+                        logger.warning(f"Calculation Handler initialization failed: {calc_err}")
+                        self.add_initialization_error(f"CalculationHandler: {calc_err}")
+
             except Exception as e:
                 logger.warning(f"PostgreSQL Retriever failed: {e}")
                 self.add_initialization_error(f"PostgreSQLRetriever: {e}")

@@ -27,7 +27,7 @@ class RAGQueryProcessor:
 
         Args:
             query_router: QueryRouter instance
-            handlers: Dict of handler instances (temporal, comparative, standard)
+            handlers: Dict of handler instances (temporal, comparative, standard, calculation)
             conversation_memory: Optional ConversationMemory instance
             ood_detector: Optional OOD detector instance
         """
@@ -35,6 +35,7 @@ class RAGQueryProcessor:
         self.temporal_handler = handlers.get("temporal")
         self.comparative_handler = handlers.get("comparative")
         self.standard_handler = handlers.get("standard")
+        self.calculation_handler = handlers.get("calculation")
         self.conversation_memory = conversation_memory
         self.ood_detector = ood_detector
         self.enricher = ConversationalQueryEnricher()
@@ -512,10 +513,46 @@ class RAGQueryProcessor:
             logger.debug("→ Routing to ComparativeQueryHandler")
             return await self.comparative_handler.handle(preprocessed_data, start_time)
 
-        elif query_type in ["optimization", "calculation"]:
-            logger.debug(f"→ Routing to StandardHandler (type={query_type})")
-            preprocessed_data["is_optimization"] = query_type == "optimization"
-            preprocessed_data["is_calculation"] = query_type == "calculation"
+        elif query_type == "calculation":
+            logger.debug("→ Routing to CalculationQueryHandler")
+            if self.calculation_handler:
+                # Extract entities for calculation
+                entities = preprocessed_data.get("entities", {})
+                query = preprocessed_data.get("query", "")
+                result = await self.calculation_handler.handle(
+                    query=query,
+                    entities=entities,
+                    language=language
+                )
+
+                # Convert to RAGResult format
+                if result.get("success"):
+                    calc_result = result.get("calculation_result", {})
+                    return RAGResult(
+                        source=RAGSource.POSTGRESQL,
+                        answer=self._format_calculation_answer(calc_result, language),
+                        metadata={
+                            "query_type": "calculation",
+                            "calculation_type": result.get("calculation_type"),
+                            "calculation_result": calc_result,
+                        },
+                    )
+                else:
+                    return RAGResult(
+                        source=RAGSource.ERROR,
+                        answer=f"Calculation error: {result.get('error', 'Unknown error')}",
+                        metadata={"query_type": "calculation", "error": result.get("error")},
+                    )
+            else:
+                logger.warning("⚠️ CalculationHandler not available, falling back to StandardHandler")
+                preprocessed_data["is_calculation"] = True
+                return await self.standard_handler.handle(
+                    preprocessed_data, start_time, language=language
+                )
+
+        elif query_type == "optimization":
+            logger.debug(f"→ Routing to StandardHandler (type=optimization)")
+            preprocessed_data["is_optimization"] = True
             return await self.standard_handler.handle(
                 preprocessed_data, start_time, language=language
             )
@@ -575,3 +612,71 @@ class RAGQueryProcessor:
             "batch": "le lot",
         }
         return translations.get(field, field)
+
+    def _format_calculation_answer(self, calc_result: Dict[str, Any], language: str = "fr") -> str:
+        """Format calculation result into natural language answer"""
+
+        # Cumulative feed calculation
+        if "total_feed_kg" in calc_result:
+            age_start = calc_result.get("age_start")
+            age_end = calc_result.get("age_end")
+            total_kg = calc_result.get("total_feed_kg")
+            target_weight = calc_result.get("target_weight")
+
+            if language == "en":
+                answer = f"To reach a target weight of {target_weight}g at day {age_end}, "
+                answer += f"you will need approximately {total_kg} kg of feed per bird "
+                answer += f"from day {age_start} to day {age_end}."
+            else:
+                answer = f"Pour atteindre un poids cible de {target_weight}g au jour {age_end}, "
+                answer += f"vous aurez besoin d'environ {total_kg} kg d'aliment par poulet "
+                answer += f"entre le jour {age_start} et le jour {age_end}."
+
+            return answer
+
+        # Reverse lookup (age for target weight)
+        elif "age_found" in calc_result:
+            age = calc_result.get("age_found")
+            target = calc_result.get("target_weight")
+            actual = calc_result.get("weight_found")
+
+            if language == "en":
+                answer = f"The target weight of {target}g is reached at approximately day {age} "
+                answer += f"(actual weight: {actual}g)."
+            else:
+                answer = f"Le poids cible de {target}g est atteint vers le jour {age} "
+                answer += f"(poids réel: {actual}g)."
+
+            return answer
+
+        # Projection
+        elif "projected_weight_kg" in calc_result:
+            weight_kg = calc_result.get("projected_weight_kg")
+            age_end = calc_result.get("age_end")
+
+            if language == "en":
+                answer = f"The projected weight at day {age_end} is approximately {weight_kg} kg."
+            else:
+                answer = f"Le poids projeté au jour {age_end} est d'environ {weight_kg} kg."
+
+            return answer
+
+        # Flock calculation
+        elif "total_live_weight_kg" in calc_result:
+            flock_size = calc_result.get("flock_size")
+            total_weight = calc_result.get("total_live_weight_kg")
+            total_feed = calc_result.get("total_feed_consumed_kg")
+
+            if language == "en":
+                answer = f"For a flock of {flock_size} birds: "
+                answer += f"total live weight = {total_weight} kg, "
+                answer += f"total feed consumed = {total_feed} kg."
+            else:
+                answer = f"Pour un troupeau de {flock_size} poulets : "
+                answer += f"poids vif total = {total_weight} kg, "
+                answer += f"aliment total consommé = {total_feed} kg."
+
+            return answer
+
+        # Fallback
+        return str(calc_result)
