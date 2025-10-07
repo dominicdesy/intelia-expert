@@ -676,4 +676,66 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
 
         return diagnostic
 
+    @router.post("/ood-diagnostic")
+    async def ood_diagnostic_endpoint(query: str = "What is coccidiosis in broilers?"):
+        """
+        Test OOD detector directly to diagnose why queries are rejected.
+
+        Args:
+            query: Test query to classify (default: disease question)
+
+        Returns:
+            Detailed OOD detection result
+        """
+        diagnostic = {
+            "test_query": query,
+            "ood_detector_available": False,
+            "detection_result": None,
+            "error": None
+        }
+
+        try:
+            # Get RAG engine
+            rag_engine = get_service("rag_engine_enhanced") or get_service("rag_engine")
+            diagnostic["rag_engine_found"] = bool(rag_engine)
+
+            if not rag_engine:
+                diagnostic["error"] = "RAG engine not found in services"
+                return diagnostic
+
+            # Get WeaviateCore
+            weaviate_core = getattr(rag_engine, "weaviate_core", None)
+            diagnostic["weaviate_core_found"] = bool(weaviate_core)
+
+            if not weaviate_core:
+                diagnostic["error"] = "WeaviateCore not found in RAG engine"
+                return diagnostic
+
+            # Get OOD detector
+            ood_detector = getattr(weaviate_core, "ood_detector", None)
+            diagnostic["ood_detector_available"] = bool(ood_detector)
+            diagnostic["ood_detector_type"] = type(ood_detector).__name__ if ood_detector else None
+
+            if not ood_detector:
+                diagnostic["error"] = "OOD detector not initialized in WeaviateCore"
+                return diagnostic
+
+            # Test detection
+            logger.info(f"Testing OOD detector with query: {query}")
+            is_in_domain, confidence, details = ood_detector.is_in_domain(query, language="en")
+
+            diagnostic["detection_result"] = {
+                "is_in_domain": is_in_domain,
+                "confidence": confidence,
+                "details": details
+            }
+
+        except Exception as e:
+            logger.error(f"OOD diagnostic error: {e}")
+            diagnostic["error"] = str(e)
+            import traceback
+            diagnostic["traceback"] = traceback.format_exc()
+
+        return diagnostic
+
     return router
