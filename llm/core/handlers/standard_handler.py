@@ -395,42 +395,48 @@ class StandardQueryHandler(BaseQueryHandler):
                 conversation_context=conversation_context_list,
             )
 
-            # Always pass through response_generator to handle NO_RESULTS/LOW_CONFIDENCE with LLM fallback
-            if result:
+            # Handle result based on source
+            if result and result.source not in (RAGSource.NO_RESULTS, RAGSource.LOW_CONFIDENCE):
                 doc_count = len(result.context_docs) if result.context_docs else 0
-                logger.info(f"Weaviate ({language}): {doc_count} documents, source={result.source}")
+                logger.info(f"Weaviate ({language}): {doc_count} documents found")
 
-                # Ensure required keys exist for response generation
-                if "normalized_query" not in preprocessed_data:
-                    preprocessed_data["normalized_query"] = query
-                if "entities" not in preprocessed_data:
-                    preprocessed_data["entities"] = entities
-                if "language" not in preprocessed_data:
-                    preprocessed_data["language"] = language
+                # Generate answer if documents exist but no answer yet
+                if result.context_docs and not result.answer:
+                    logger.info("Generating Weaviate response with context")
 
-                # Pass to response_generator which will handle:
-                # - Documents found: Generate from context
-                # - NO_RESULTS/LOW_CONFIDENCE: Activate LLM Ensemble fallback
-                if self.response_generator:
-                    result = await self.response_generator.ensure_answer_generated(
-                        result=result,
-                        original_query=query,
-                        language=language,
-                        preprocessed_data=preprocessed_data,
+                    # Ensure required keys exist
+                    if "normalized_query" not in preprocessed_data:
+                        preprocessed_data["normalized_query"] = query
+                    if "entities" not in preprocessed_data:
+                        preprocessed_data["entities"] = entities
+                    if "language" not in preprocessed_data:
+                        preprocessed_data["language"] = language
+
+                    result.answer = await generate_response_with_generator(
+                        self.response_generator,
+                        result.context_docs,
+                        query,
+                        language,
+                        preprocessed_data,
                     )
 
                 # Enrich metadata
                 if is_optimization:
                     result.metadata["query_mode"] = "optimization"
-                    result.metadata["source"] = result.metadata.get("source", "weaviate_optimized")
+                    result.metadata["source"] = "weaviate_optimized"
                 else:
-                    result.metadata["source"] = result.metadata.get("source", "weaviate_fallback")
+                    result.metadata["source"] = "weaviate_fallback"
 
                 result.metadata["top_k_used"] = weaviate_top_k
                 result.metadata["processing_time"] = time.time() - start_time
                 result.metadata["language_used"] = language
                 result.metadata["filters_applied"] = filters
 
+                return result
+            elif result:
+                # LOW_CONFIDENCE or NO_RESULTS - return with empty message
+                # rag_engine will handle fallback to welcome message or LLM
+                logger.info(f"Weaviate ({language}): 0 documents (source={result.source})")
                 return result
             else:
                 logger.info(f"Weaviate ({language}): No result object returned")
