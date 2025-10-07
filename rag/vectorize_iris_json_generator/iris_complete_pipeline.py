@@ -105,10 +105,10 @@ class PDFUnlocker:
         Retourne le fichier original si pas de protection
         """
         if not cls.is_protected(pdf_path):
-            print(f"   🔓 PDF déjà débloqué")
+            print("   🔓 PDF déjà débloqué")
             return pdf_path
 
-        print(f"   🔒 PDF protégé - déblocage en cours...")
+        print("   🔒 PDF protégé - déblocage en cours...")
 
         # Créer fichier temporaire pour la version débloquée
         temp_dir = Path(tempfile.gettempdir())
@@ -116,16 +116,16 @@ class PDFUnlocker:
 
         # Essayer pikepdf d'abord (plus puissant)
         if cls.unlock_with_pikepdf(pdf_path, unlocked_path):
-            print(f"   ✅ Débloqué avec pikepdf")
+            print("   ✅ Débloqué avec pikepdf")
             return unlocked_path
 
         # Sinon PyMuPDF
         if cls.unlock_with_pymupdf(pdf_path, unlocked_path):
-            print(f"   ✅ Débloqué avec pymupdf")
+            print("   ✅ Débloqué avec pymupdf")
             return unlocked_path
 
         # Échec
-        print(f"   ⚠️  Impossible de débloquer - tentative avec fichier original")
+        print("   ⚠️  Impossible de débloquer - tentative avec fichier original")
         return pdf_path
 
 
@@ -150,7 +150,7 @@ class IrisExtractor:
 
     def upload_pdf(self, pdf_path: Path) -> str:
         """Upload PDF vers Iris"""
-        print(f"   📤 Upload vers Iris...")
+        print("   📤 Upload vers Iris...")
 
         upload_request = v.StartFileUploadRequest(
             content_type="application/pdf",
@@ -194,7 +194,7 @@ class IrisExtractor:
 
     def extract(self, file_id: str) -> str:
         """Démarre extraction"""
-        print(f"   🔄 Extraction démarrée...")
+        print("   🔄 Extraction démarrée...")
 
         extraction_request = v.StartExtractionRequest(file_id=file_id)
 
@@ -207,7 +207,7 @@ class IrisExtractor:
 
     def wait_for_result(self, extraction_id: str, timeout=600) -> dict:
         """Attend le résultat (max 10 min)"""
-        print(f"   ⏳ Attente du résultat...", end="", flush=True)
+        print("   ⏳ Attente du résultat...", end="", flush=True)
         start_time = time.time()
 
         dots = 0
@@ -255,7 +255,7 @@ class IrisExtractor:
         with open(txt_path, 'w', encoding='utf-8') as f:
             f.write(extraction_data.text)
 
-        print(f"   💾 Résultats sauvegardés:")
+        print("   💾 Résultats sauvegardés:")
         print(f"      📄 JSON: {json_path.name}")
         print(f"      📄 TXT: {txt_path.name}")
 
@@ -306,10 +306,10 @@ class CompletePipeline:
             text_length = len(extraction_data.text)
             chunks_count = len(getattr(extraction_data, 'chunks', []))
 
-            print(f"\n   📊 Statistiques:")
+            print("\n   📊 Statistiques:")
             print(f"      Texte: {text_length:,} caractères")
             print(f"      Chunks: {chunks_count}")
-            print(f"\n   ✅ SUCCÈS")
+            print("\n   ✅ SUCCÈS")
 
             result["success"] = True
             result["json_path"] = str(json_path)
@@ -357,7 +357,7 @@ class CompletePipeline:
         all_pdf_files = list(input_dir.rglob("*.pdf"))
 
         if not all_pdf_files:
-            print(f"❌ Aucun PDF trouvé")
+            print("❌ Aucun PDF trouvé")
             return {"total": 0, "success": 0, "failed": 0, "skipped": 0, "excluded": 0, "results": []}
 
         print(f"📚 {len(all_pdf_files)} PDF(s) trouvé(s)")
@@ -381,25 +381,25 @@ class CompletePipeline:
                 new_files.append(pdf_file)
 
         # Afficher le statut
-        print(f"\n📊 Statut:")
+        print("\n📊 Statut:")
         print(f"   ✅ Déjà extraits: {len(already_extracted)}")
         print(f"   🚫 Exclus: {len(excluded_files)}")
         print(f"   🆕 Nouveaux: {len(new_files)}")
 
         if excluded_files:
-            print(f"\n🚫 Fichiers exclus:")
+            print("\n🚫 Fichiers exclus:")
             for pdf, reason in excluded_files:
                 print(f"   • {pdf.name} - {reason}")
 
         if already_extracted:
-            print(f"\n⏭️  Fichiers déjà extraits (ignorés):")
+            print("\n⏭️  Fichiers déjà extraits (ignorés):")
             for pdf in already_extracted[:5]:
                 print(f"   • {pdf.name}")
             if len(already_extracted) > 5:
                 print(f"   ... et {len(already_extracted) - 5} autres")
 
         if not new_files:
-            print(f"\n✅ Aucun nouveau fichier à traiter!")
+            print("\n✅ Aucun nouveau fichier à traiter!")
             return {
                 "total": len(all_pdf_files),
                 "success": 0,
@@ -410,7 +410,7 @@ class CompletePipeline:
             }
 
         # Afficher les fichiers à traiter
-        print(f"\n📋 Nouveaux fichiers à traiter:")
+        print("\n📋 Nouveaux fichiers à traiter:")
         for i, pdf in enumerate(new_files, 1):
             print(f"   {i}. {pdf.name}")
 
@@ -447,7 +447,7 @@ class CompletePipeline:
         stats["elapsed_minutes"] = elapsed / 60
 
         print(f"\n{'='*70}")
-        print(f"📊 RAPPORT FINAL")
+        print("📊 RAPPORT FINAL")
         print(f"{'='*70}")
         print(f"Total PDFs trouvés: {stats['total']}")
         print(f"🚫 Exclus (trop gros): {stats['excluded']}")
@@ -458,7 +458,7 @@ class CompletePipeline:
         print(f"⏱️  Temps: {elapsed / 60:.1f} minutes")
 
         if stats['failed'] > 0:
-            print(f"\n❌ Fichiers en échec:")
+            print("\n❌ Fichiers en échec:")
             for r in stats['results']:
                 if not r['success']:
                     print(f"   • {r['pdf']}: {r['error']}")
@@ -494,7 +494,7 @@ def main():
     input_path = Path(DEFAULT_INPUT_DIR)
     output_path = Path(DEFAULT_OUTPUT_DIR)
 
-    print(f"\n📋 Configuration:")
+    print("\n📋 Configuration:")
     print(f"   Input: {input_path}")
     print(f"   Output: {output_path}")
     print(f"   Organisation: {organization_id}")
@@ -513,13 +513,13 @@ def main():
 
     # Message final
     if stats["success"] > 0:
-        print(f"\n🎉 Extraction terminée!")
+        print("\n🎉 Extraction terminée!")
         print(f"📁 Résultats dans: {output_path}")
-        print(f"\n💡 Prochaine étape:")
-        print(f"   cd ../knowledge_extractor")
-        print(f"   python knowledge_extractor.py --force")
+        print("\n💡 Prochaine étape:")
+        print("   cd ../knowledge_extractor")
+        print("   python knowledge_extractor.py --force")
     elif stats["skipped"] > 0 and stats["success"] == 0 and stats["failed"] == 0:
-        print(f"\n✅ Tous les fichiers sont déjà extraits!")
+        print("\n✅ Tous les fichiers sont déjà extraits!")
         print(f"📁 Résultats existants dans: {output_path}")
 
 
@@ -527,7 +527,7 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(f"\n\n⚠️  Interrompu par l'utilisateur")
+        print("\n\n⚠️  Interrompu par l'utilisateur")
     except Exception as e:
         print(f"\n❌ Erreur fatale: {e}")
         import traceback
