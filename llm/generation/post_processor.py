@@ -76,13 +76,23 @@ class ResponsePostProcessor:
         # 5. Clean orphan colons on isolated lines
         response = re.sub(r"^\s*:\s*$", "", response, flags=re.MULTILINE)
 
-        # 6. Clean multiple empty lines (3+ → 2)
+        # 6. Fix broken titles - join short lines (titles) that are split across multiple lines
+        # Pattern: Short line ending with lowercase + newline + lowercase start = broken title
+        # Example: "Standardisation des\nprocédures" -> "Standardisation des procédures"
+        response = re.sub(
+            r"^([A-ZÀ-Ý][^\n]{5,60}[a-zà-ÿ])\n([a-zà-ÿ])",
+            r"\1 \2",
+            response,
+            flags=re.MULTILINE
+        )
+
+        # 7. Clean multiple empty lines (3+ → 2)
         response = re.sub(r"\n{3,}", "\n\n", response)
 
-        # 7. Remove trailing spaces
+        # 8. Remove trailing spaces
         response = re.sub(r" +$", "", response, flags=re.MULTILINE)
 
-        # 8. Ensure space after bullet points
+        # 9. Ensure space after bullet points
         response = re.sub(r"^-([^ ])", r"- \1", response, flags=re.MULTILINE)
 
         # Add veterinary disclaimer if the question concerns health/disease

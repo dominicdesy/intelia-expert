@@ -946,13 +946,23 @@ Style professionnel et structuré avec recommandations actionnables.""",
         # 5. Nettoyer les deux-points orphelins sur des lignes isolées
         response = re.sub(r"^\s*:\s*$", "", response, flags=re.MULTILINE)
 
-        # 6. Nettoyer les lignes vides multiples (3+ → 2)
+        # 6. Corriger les titres brisés - joindre les lignes courtes (titres) coupées en plusieurs lignes
+        # Pattern: Ligne courte se terminant par minuscule + saut de ligne + début minuscule = titre brisé
+        # Exemple: "Standardisation des\nprocédures" -> "Standardisation des procédures"
+        response = re.sub(
+            r"^([A-ZÀ-Ý][^\n]{5,60}[a-zà-ÿ])\n([a-zà-ÿ])",
+            r"\1 \2",
+            response,
+            flags=re.MULTILINE
+        )
+
+        # 7. Nettoyer les lignes vides multiples (3+ → 2)
         response = re.sub(r"\n{3,}", "\n\n", response)
 
-        # 7. Supprimer les espaces en fin de ligne
+        # 8. Supprimer les espaces en fin de ligne
         response = re.sub(r" +$", "", response, flags=re.MULTILINE)
 
-        # 8. S'assurer qu'il y a un espace après les bullet points
+        # 9. S'assurer qu'il y a un espace après les bullet points
         response = re.sub(r"^-([^ ])", r"- \1", response, flags=re.MULTILINE)
 
         # Ajouter avertissement vétérinaire si la question concerne la santé/maladie
