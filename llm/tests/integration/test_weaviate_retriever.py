@@ -11,7 +11,6 @@ Tests:
 """
 
 import pytest
-import asyncio
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -49,7 +48,7 @@ async def test_weaviate_connection(weaviate_core):
     is_ready = weaviate_core.client.is_ready()
     assert is_ready, "Weaviate not ready"
 
-    print(f"\n✅ Test 1 PASSED - Weaviate connected")
+    print("\n✅ Test 1 PASSED - Weaviate connected")
     print(f"   URL: {weaviate_core.weaviate_url}")
 
 
@@ -66,7 +65,7 @@ async def test_weaviate_hybrid_search(weaviate_core):
     )
 
     # Peut retourner 0 résultats si la collection est vide
-    print(f"\n✅ Test 2 PASSED - Hybrid search")
+    print("\n✅ Test 2 PASSED - Hybrid search")
     print(f"   Results: {len(results)}")
 
     if len(results) > 0:
@@ -84,7 +83,7 @@ async def test_weaviate_vector_search(weaviate_core):
         limit=5
     )
 
-    print(f"\n✅ Test 3 PASSED - Vector search")
+    print("\n✅ Test 3 PASSED - Vector search")
     print(f"   Results: {len(results)}")
 
 
@@ -99,7 +98,7 @@ async def test_weaviate_keyword_search(weaviate_core):
         limit=5
     )
 
-    print(f"\n✅ Test 4 PASSED - Keyword search")
+    print("\n✅ Test 4 PASSED - Keyword search")
     print(f"   Results: {len(results)}")
 
 
@@ -122,7 +121,7 @@ async def test_weaviate_multilingual_search(weaviate_core):
 
         print(f"   {lang.upper()}: {len(results)} results")
 
-    print(f"\n✅ Test 5 PASSED - Multilingual search")
+    print("\n✅ Test 5 PASSED - Multilingual search")
 
 
 @pytest.mark.asyncio
@@ -138,7 +137,7 @@ async def test_weaviate_with_filters(weaviate_core):
         limit=5
     )
 
-    print(f"\n✅ Test 6 PASSED - Filtered search")
+    print("\n✅ Test 6 PASSED - Filtered search")
     print(f"   Results: {len(results)}")
 
 
@@ -162,7 +161,7 @@ async def test_weaviate_reranking(weaviate_core):
         use_reranker=True
     )
 
-    print(f"\n✅ Test 7 PASSED - Reranking")
+    print("\n✅ Test 7 PASSED - Reranking")
     print(f"   Without rerank: {len(results_no_rerank)} results")
     print(f"   With rerank: {len(results_reranked)} results")
 
@@ -175,7 +174,7 @@ async def test_weaviate_collection_info(weaviate_core):
         # Get collection schema
         collections = weaviate_core.client.collections.list_all()
 
-        print(f"\n✅ Test 8 PASSED - Collection info")
+        print("\n✅ Test 8 PASSED - Collection info")
         print(f"   Collections: {len(collections)}")
 
         for collection_name in list(collections.keys())[:5]:
@@ -201,8 +200,8 @@ async def test_weaviate_embeddings(weaviate_core):
         assert embedding is not None
         assert len(embedding) == 1536, f"Wrong embedding dimension: {len(embedding)}"
 
-    print(f"\n✅ Test 9 PASSED - Embeddings generation")
-    print(f"   Dimension: 1536 (text-embedding-3-large)")
+    print("\n✅ Test 9 PASSED - Embeddings generation")
+    print("   Dimension: 1536 (text-embedding-3-large)")
 
 
 @pytest.mark.asyncio
@@ -221,7 +220,7 @@ async def test_weaviate_performance(weaviate_core):
     for query in queries:
         start = time.time()
 
-        results = await weaviate_core.hybrid_search(
+        await weaviate_core.hybrid_search(
             query=query,
             limit=5
         )
@@ -231,7 +230,7 @@ async def test_weaviate_performance(weaviate_core):
 
     avg_time = sum(times) / len(times)
 
-    print(f"\n✅ Test 10 PASSED - Performance")
+    print("\n✅ Test 10 PASSED - Performance")
     print(f"   Average: {avg_time:.3f}s")
     print(f"   Min: {min(times):.3f}s, Max: {max(times):.3f}s")
 

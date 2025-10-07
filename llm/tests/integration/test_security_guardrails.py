@@ -11,7 +11,6 @@ Tests:
 """
 
 import pytest
-import asyncio
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -54,12 +53,12 @@ async def test_ood_in_domain_queries(ood_detector):
     for query in in_domain_queries:
         result = await ood_detector.detect(query)
 
-        assert result["is_in_domain"] == True, f"False negative: {query}"
+        assert result["is_in_domain"], f"False negative: {query}"
         assert result["confidence"] > 0.5, f"Low confidence for in-domain: {query}"
 
         print(f"   ✓ IN: {query[:50]}... ({result['confidence']:.2f})")
 
-    print(f"\n✅ Test 1 PASSED - In-domain detection")
+    print("\n✅ Test 1 PASSED - In-domain detection")
 
 
 @pytest.mark.asyncio
@@ -78,11 +77,11 @@ async def test_ood_out_domain_queries(ood_detector):
     for query in out_domain_queries:
         result = await ood_detector.detect(query)
 
-        assert result["is_in_domain"] == False, f"False positive: {query}"
+        assert not result["is_in_domain"], f"False positive: {query}"
 
         print(f"   ✓ OUT: {query[:50]}... ({result['confidence']:.2f})")
 
-    print(f"\n✅ Test 2 PASSED - Out-of-domain detection")
+    print("\n✅ Test 2 PASSED - Out-of-domain detection")
 
 
 @pytest.mark.asyncio
@@ -108,11 +107,11 @@ async def test_ood_multilingual(ood_detector):
     for query, lang in multilingual_queries:
         result = await ood_detector.detect(query, language=lang)
 
-        assert result["is_in_domain"] == True, f"{lang}: {query}"
+        assert result["is_in_domain"], f"{lang}: {query}"
 
         print(f"   {lang.upper()}: ✓ ({result['confidence']:.2f})")
 
-    print(f"\n✅ Test 3 PASSED - Multilingual OOD (12 languages)")
+    print("\n✅ Test 3 PASSED - Multilingual OOD (12 languages)")
 
 
 @pytest.mark.asyncio
@@ -135,7 +134,7 @@ async def test_ood_edge_cases(ood_detector):
 
         print(f"   {query}: {'IN' if result['is_in_domain'] else 'OUT'}")
 
-    print(f"\n✅ Test 4 PASSED - Edge cases")
+    print("\n✅ Test 4 PASSED - Edge cases")
 
 
 @pytest.mark.asyncio
@@ -160,7 +159,7 @@ async def test_blocked_terms_detection(guardrails):
             # Si pas bloqué explicitement, au moins un warning
             print(f"   ⚠ WARNING: {query[:50]}")
 
-    print(f"\n✅ Test 5 PASSED - Blocked terms")
+    print("\n✅ Test 5 PASSED - Blocked terms")
 
 
 @pytest.mark.asyncio
@@ -181,7 +180,7 @@ async def test_guardrails_safe_queries(guardrails):
 
         print(f"   ✓ SAFE: {query[:50]}")
 
-    print(f"\n✅ Test 6 PASSED - Safe queries pass")
+    print("\n✅ Test 6 PASSED - Safe queries pass")
 
 
 @pytest.mark.asyncio
@@ -203,7 +202,7 @@ async def test_veterinary_content_detection(guardrails):
 
         print(f"   {'[VET]' if is_veterinary else '[???]'} {query[:50]}")
 
-    print(f"\n✅ Test 7 PASSED - Veterinary detection")
+    print("\n✅ Test 7 PASSED - Veterinary detection")
 
 
 @pytest.mark.asyncio
@@ -237,7 +236,7 @@ async def test_guardrails_output_checking(guardrails):
             # Devrait être bloqué ou warning
             print(f"   ✓ {'BLOCKED' if blocked else 'WARNING'}: {test_case['text'][:50]}")
 
-    print(f"\n✅ Test 8 PASSED - Output checking")
+    print("\n✅ Test 8 PASSED - Output checking")
 
 
 @pytest.mark.asyncio
@@ -263,7 +262,7 @@ async def test_ood_vocabulary_coverage(ood_detector):
 
     coverage = in_domain_count / len(poultry_terms) * 100
 
-    print(f"\n✅ Test 9 PASSED - Vocabulary coverage")
+    print("\n✅ Test 9 PASSED - Vocabulary coverage")
     print(f"   Coverage: {coverage:.1f}% ({in_domain_count}/{len(poultry_terms)})")
 
     assert coverage > 70, "Low vocabulary coverage"
@@ -293,7 +292,7 @@ async def test_ood_performance(ood_detector):
 
     assert avg_time < 0.5, f"OOD detection too slow: {avg_time:.3f}s"
 
-    print(f"\n✅ Test 10 PASSED - Performance")
+    print("\n✅ Test 10 PASSED - Performance")
     print(f"   Average: {avg_time:.3f}s per query")
     print(f"   Total: {duration:.3f}s for {len(queries)} queries")
 

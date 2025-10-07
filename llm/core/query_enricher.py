@@ -288,12 +288,12 @@ class ConversationalQueryEnricher:
 
         if is_standalone_query:
             logger.info(
-                f"🚫 Standalone query detected (breed + metric present) - "
-                f"will NOT extract age from context to avoid contamination"
+                "🚫 Standalone query detected (breed + metric present) - "
+                "will NOT extract age from context to avoid contamination"
             )
         else:
             logger.debug(
-                f"✅ Follow-up query detected - will extract all entities from context"
+                "✅ Follow-up query detected - will extract all entities from context"
             )
 
         # Extract breed
@@ -351,7 +351,7 @@ class ConversationalQueryEnricher:
                 entities["age_days"] = age_days
         else:
             logger.info(
-                f"🔒 Skipping age extraction from context (standalone query with breed + metric)"
+                "🔒 Skipping age extraction from context (standalone query with breed + metric)"
             )
 
         # Extract sex

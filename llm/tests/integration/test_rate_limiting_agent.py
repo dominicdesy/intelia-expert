@@ -61,11 +61,11 @@ async def test_rate_limiting_single_user():
 
         # Devrait être rate limited
         if response.status_code == 429:
-            print(f"   ✓ Request 11 blocked (429)")
+            print("   ✓ Request 11 blocked (429)")
         else:
             print(f"   ⚠ Request 11 not blocked (got {response.status_code})")
 
-    print(f"\n✅ Test 1 PASSED - Rate limiting single user")
+    print("\n✅ Test 1 PASSED - Rate limiting single user")
     print(f"   Successful requests: {success_count}/10")
 
 
@@ -88,7 +88,7 @@ async def test_rate_limiting_multiple_users():
 
             assert response.status_code == 200, f"User {user_id} blocked incorrectly"
 
-    print(f"\n✅ Test 2 PASSED - Independent rate limiting per user")
+    print("\n✅ Test 2 PASSED - Independent rate limiting per user")
 
 
 @pytest.mark.asyncio
@@ -116,10 +116,10 @@ async def test_rate_limiting_reset():
         blocked_initially = response.status_code == 429
 
         if blocked_initially:
-            print(f"   ✓ Initially blocked (429)")
+            print("   ✓ Initially blocked (429)")
 
             # Attendre 61 secondes (un peu plus que la fenêtre de 60s)
-            print(f"   Waiting 61s for rate limit reset...")
+            print("   Waiting 61s for rate limit reset...")
             await asyncio.sleep(61)
 
             # Devrait pouvoir envoyer à nouveau
@@ -130,11 +130,11 @@ async def test_rate_limiting_reset():
             })
 
             if response_after.status_code == 200:
-                print(f"   ✓ Rate limit reset after 60s")
+                print("   ✓ Rate limit reset after 60s")
             else:
-                print(f"   ⚠ Still blocked after 60s")
+                print("   ⚠ Still blocked after 60s")
 
-    print(f"\n✅ Test 3 PASSED - Rate limit reset")
+    print("\n✅ Test 3 PASSED - Rate limit reset")
 
 
 # ============================================================================
@@ -171,7 +171,7 @@ async def test_agent_rag_simple_query(agent_rag):
     assert "answer" in result
     assert len(result["answer"]) > 50
 
-    print(f"\n✅ Test 4 PASSED - Agent RAG simple query")
+    print("\n✅ Test 4 PASSED - Agent RAG simple query")
     print(f"   Answer length: {len(result['answer'])} chars")
 
 
@@ -199,7 +199,7 @@ async def test_agent_rag_complex_query(agent_rag):
     answer_lower = result["answer"].lower()
     assert "ross" in answer_lower or "cobb" in answer_lower
 
-    print(f"\n✅ Test 5 PASSED - Agent RAG complex query")
+    print("\n✅ Test 5 PASSED - Agent RAG complex query")
     print(f"   Answer length: {len(result['answer'])} chars")
     if "sources" in result:
         print(f"   Sources: {len(result['sources'])}")
@@ -226,7 +226,7 @@ async def test_agent_rag_multi_criteria(agent_rag):
         assert result["answer"] is not None
         print(f"   ✓ {query[:50]}...")
 
-    print(f"\n✅ Test 6 PASSED - Multi-criteria queries")
+    print("\n✅ Test 6 PASSED - Multi-criteria queries")
 
 
 @pytest.mark.asyncio
@@ -243,7 +243,7 @@ async def test_agent_rag_fallback(agent_rag):
     assert result is not None
     assert result["answer"] is not None
 
-    print(f"\n✅ Test 7 PASSED - Agent RAG fallback")
+    print("\n✅ Test 7 PASSED - Agent RAG fallback")
 
 
 @pytest.mark.asyncio
@@ -268,7 +268,7 @@ async def test_agent_rag_multilingual(agent_rag):
 
         print(f"   {lang.upper()}: OK")
 
-    print(f"\n✅ Test 8 PASSED - Agent RAG multilingual")
+    print("\n✅ Test 8 PASSED - Agent RAG multilingual")
 
 
 @pytest.mark.asyncio
@@ -293,16 +293,15 @@ async def test_agent_rag_query_decomposition(agent_rag):
         for sq in sub_queries:
             print(f"   - {sq}")
     else:
-        print(f"   (No sub-query metadata)")
+        print("   (No sub-query metadata)")
 
-    print(f"\n✅ Test 9 PASSED - Query decomposition")
+    print("\n✅ Test 9 PASSED - Query decomposition")
 
 
 @pytest.mark.asyncio
 async def test_agent_rag_performance(agent_rag):
     """Test 10: Performance Agent RAG"""
 
-    import time
 
     queries = [
         "Poids Ross 308 35 jours",
@@ -314,7 +313,7 @@ async def test_agent_rag_performance(agent_rag):
     for query in queries:
         start = time.time()
 
-        result = await agent_rag.process_query(
+        await agent_rag.process_query(
             query=query,
             user_id="test_perf",
             language="fr"
@@ -328,7 +327,7 @@ async def test_agent_rag_performance(agent_rag):
 
     avg_time = sum(times) / len(times)
 
-    print(f"\n✅ Test 10 PASSED - Agent RAG performance")
+    print("\n✅ Test 10 PASSED - Agent RAG performance")
     print(f"   Average: {avg_time:.2f}s")
     print(f"   Min: {min(times):.2f}s, Max: {max(times):.2f}s")
 

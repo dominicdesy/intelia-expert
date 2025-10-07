@@ -175,6 +175,53 @@ class IntelligentDataExtractor:
 
         return None
 
+    def detect_unit_system(self, table_metadata: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Détecte le système d'unités dominant du document (metric/imperial/mixed)
+
+        Args:
+            table_metadata: Métadonnées de table contenant les définitions de colonnes
+
+        Returns:
+            str: 'metric', 'imperial', ou 'mixed'
+        """
+        if not table_metadata or "column_definitions" not in table_metadata:
+            # Par défaut, assume metric (standard international aviculture)
+            logger.debug("Pas de métadonnées de colonnes, assume metric par défaut")
+            return "metric"
+
+        units = []
+        for col_def in table_metadata["column_definitions"].values():
+            if "unit" in col_def:
+                unit_str = str(col_def["unit"]).lower()
+                units.append(unit_str)
+
+        if not units:
+            logger.debug("Aucune unité trouvée dans les métadonnées, assume metric")
+            return "metric"
+
+        # Listes d'unités par système
+        metric_units = ['grams', 'kilograms', 'kg', 'g', 'cm', 'mm', 'meter', 'celsius', '°c']
+        imperial_units = ['pounds', 'lb', 'lbs', 'oz', 'ounce', 'ounces', 'inches', 'inch', 'feet', 'foot', 'fahrenheit', '°f']
+
+        # Compter les unités de chaque système
+        metric_count = sum(1 for u in units if any(metric_unit in u for metric_unit in metric_units))
+        imperial_count = sum(1 for u in units if any(imperial_unit in u for imperial_unit in imperial_units))
+
+        # Déterminer le système dominant
+        if metric_count > 0 and imperial_count > 0:
+            result = "mixed"
+            logger.info(f"Système d'unités mixte détecté (metric: {metric_count}, imperial: {imperial_count})")
+        elif imperial_count > 0:
+            result = "imperial"
+            logger.info(f"Système d'unités impérial détecté ({imperial_count} unités)")
+        else:
+            result = "metric"
+            logger.info(f"Système d'unités métrique détecté ({metric_count} unités)")
+
+        logger.debug(f"Unités trouvées: {units}")
+        return result
+
     def _extract_with_metadata_guidance(
         self, sheet: Worksheet, sheet_name: str, table_metadata: Dict[str, Any]
     ) -> List[MetricData]:

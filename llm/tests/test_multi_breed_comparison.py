@@ -135,13 +135,13 @@ def test_multi_breed_comparison():
                 print("✅ PASS")
                 passed += 1
             else:
-                print(f"❌ FAIL - Mismatch detected:")
+                print("❌ FAIL - Mismatch detected:")
                 if not dest_match:
                     print(f"   - Destination wrong: {destination} != {expected_dest}")
                 if not count_match:
                     print(f"   - Breeds count wrong: {len(comparison_entities)} != {expected_count}")
                 if not breeds_match:
-                    print(f"   - Breeds mismatch")
+                    print("   - Breeds mismatch")
                 failed += 1
 
         except Exception as e:

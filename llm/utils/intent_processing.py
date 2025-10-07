@@ -66,20 +66,38 @@ def validate_intent_result(intent_result) -> bool:
 
 
 # ============================================================================
-# 🔧 NOUVELLE FONCTION: build_where_filter avec support variable d'environnement
+# 🔧 NOUVELLE FONCTION: build_where_filter v2.0 avec nouveaux champs BD
+# ============================================================================
+# Mapping des entités vers les champs Weaviate:
+# - breed → "breed" (TEXT, exact match prioritaire)
+# - company → "company" (TEXT, partial match)
+# - sex → "sex" (TEXT, exact match)
+# - age_days → "age_min_days" + "age_max_days" (INT, range query)
+# - species → "species" (TEXT, partial match)
+# - unit_system → "unit_system" (TEXT, exact match)
+# - data_type → "data_type" (TEXT, partial match)
+#
+# DEPRECATED: geneticLine, phase, age_band (remplacés par nouveaux champs)
 # ============================================================================
 
 
 def build_where_filter(intent_result) -> Dict:
     """
-    Construire where filter par entités avec support désactivation via variable d'environnement
+    Construire where filter par entités avec support des nouveaux champs v2.0
+
+    VERSION 2.0 (2025-01-15):
+    - ✅ Utilise les nouveaux champs: breed, sex, age_min_days, age_max_days, company, unit_system
+    - ✅ Support filtrage par plage d'âge précise (BETWEEN age_min_days AND age_max_days)
+    - ✅ Priorité aux champs structurés vs. champs legacy
+    - ⚠️  DEPRECATED: geneticLine, phase, age_band (compatibilité maintenue)
 
     NOUVEAU: Supporte la variable d'environnement DISABLE_WHERE_FILTER=true pour désactiver
     complètement le filtrage WHERE, utile pour diagnostiquer les problèmes de récupération.
-    CORRECTION: Utilise validate_intent_result pour une validation améliorée.
+
+    Voir documentation complète: llm/docs/DATABASE_SCHEMA.md
     """
 
-    # 🔧 NOUVEAU: Vérifier variable d'environnement pour désactiver le filtre
+    # 🔧 Vérifier variable d'environnement pour désactiver le filtre
     disable_where_filter = os.getenv("DISABLE_WHERE_FILTER", "false").lower() in [
         "true",
         "1",
@@ -93,11 +111,10 @@ def build_where_filter(intent_result) -> Dict:
         )
         return None
 
-    # CORRECTION: Validation intent_result améliorée
+    # Validation intent_result
     if not intent_result:
         return None
 
-    # Utiliser validate_intent_result pour vérifier la structure
     if not validate_intent_result(intent_result):
         logger.debug("Intent result invalide pour build_where_filter")
         return None
@@ -105,8 +122,129 @@ def build_where_filter(intent_result) -> Dict:
     entities = intent_result.detected_entities
     where_conditions = []
 
-    # Logique existante inchangée
-    if "line" in entities:
+    # ============================================================================
+    # NOUVEAUX CHAMPS v2.0 (PRIORITAIRES)
+    # ============================================================================
+
+    # 1. BREED - Filtrage exact sur la race (HAUTE PRIORITÉ)
+    if "breed" in entities:
+        breed_value = entities["breed"]
+        logger.debug(f"Filtrage par breed: {breed_value}")
+        where_conditions.append(
+            {
+                "path": ["breed"],
+                "operator": "Equal",  # Exact match pour précision
+                "valueText": breed_value,
+            }
+        )
+
+    # 2. COMPANY - Filtrage partiel sur la compagnie
+    if "company" in entities:
+        company_value = entities["company"]
+        logger.debug(f"Filtrage par company: {company_value}")
+        where_conditions.append(
+            {
+                "path": ["company"],
+                "operator": "Like",
+                "valueText": f"*{company_value}*",
+            }
+        )
+
+    # 3. SEX - Filtrage exact sur le sexe (HAUTE PRIORITÉ)
+    if "sex" in entities:
+        sex_value = entities["sex"]
+        # Normalisation des valeurs
+        sex_mapping = {
+            "male": "male",
+            "female": "female",
+            "mixed": "as_hatched",
+            "as_hatched": "as_hatched",
+            "as-hatched": "as_hatched",
+        }
+        normalized_sex = sex_mapping.get(sex_value.lower(), sex_value)
+        logger.debug(f"Filtrage par sex: {sex_value} → {normalized_sex}")
+        where_conditions.append(
+            {
+                "path": ["sex"],
+                "operator": "Equal",
+                "valueText": normalized_sex,
+            }
+        )
+
+    # 4. AGE_DAYS - Filtrage par plage d'âge précise (HAUTE PRIORITÉ)
+    # Nouveau: Utilise age_min_days et age_max_days au lieu de age_band
+    if "age_days" in entities:
+        age_days = entities["age_days"]
+        if isinstance(age_days, (int, float)):
+            age_int = int(age_days)
+            logger.debug(f"Filtrage par age: {age_int} jours")
+            # Requête: documents dont la plage d'âge contient age_days
+            # Condition: age_min_days <= age_days AND age_max_days >= age_days
+            where_conditions.append(
+                {
+                    "operator": "And",
+                    "operands": [
+                        {
+                            "path": ["age_min_days"],
+                            "operator": "LessThanEqual",
+                            "valueInt": age_int,
+                        },
+                        {
+                            "path": ["age_max_days"],
+                            "operator": "GreaterThanEqual",
+                            "valueInt": age_int,
+                        },
+                    ],
+                }
+            )
+
+    # 5. UNIT_SYSTEM - Filtrage par système d'unités (si spécifié)
+    if "unit_system" in entities:
+        unit_value = entities["unit_system"]
+        logger.debug(f"Filtrage par unit_system: {unit_value}")
+        where_conditions.append(
+            {
+                "path": ["unit_system"],
+                "operator": "Equal",
+                "valueText": unit_value,
+            }
+        )
+
+    # ============================================================================
+    # CHAMPS EXISTANTS (compatibilité maintenue)
+    # ============================================================================
+
+    # SPECIES - Toujours supporté
+    if "species" in entities:
+        species_value = entities["species"]
+        logger.debug(f"Filtrage par species: {species_value}")
+        where_conditions.append(
+            {
+                "path": ["species"],
+                "operator": "Like",
+                "valueText": f"*{species_value}*",
+            }
+        )
+
+    # DATA_TYPE - Filtrage par type de document
+    if "data_type" in entities:
+        data_type_value = entities["data_type"]
+        logger.debug(f"Filtrage par data_type: {data_type_value}")
+        where_conditions.append(
+            {
+                "path": ["data_type"],
+                "operator": "Like",
+                "valueText": f"*{data_type_value}*",
+            }
+        )
+
+    # ============================================================================
+    # LEGACY FIELDS (DEPRECATED mais maintenus pour compatibilité)
+    # ============================================================================
+
+    # Legacy: geneticLine (remplacé par breed)
+    if "line" in entities and "breed" not in entities:
+        logger.warning("⚠️  Utilisation de 'geneticLine' (deprecated). Utilisez 'breed' à la place.")
         where_conditions.append(
             {
                 "path": ["geneticLine"],
@@ -115,16 +253,9 @@ def build_where_filter(intent_result) -> Dict:
             }
         )
 
-    if "species" in entities:
-        where_conditions.append(
-            {
-                "path": ["species"],
-                "operator": "Like",
-                "valueText": f"*{entities['species']}*",
-            }
-        )
-
-    if "phase" in entities:
+    # Legacy: phase (remplacé par age_min_days/age_max_days)
+    if "phase" in entities and "age_days" not in entities:
+        logger.warning("⚠️  Utilisation de 'phase' (deprecated). Utilisez 'age_days' à la place.")
         where_conditions.append(
             {
                 "path": ["phase"],
@@ -133,29 +264,21 @@ def build_where_filter(intent_result) -> Dict:
             }
         )
 
-    if "age_days" in entities:
-        age_days = entities["age_days"]
-        if isinstance(age_days, (int, float)):
-            if age_days <= 7:
-                age_band = "0-7j"
-            elif age_days <= 21:
-                age_band = "8-21j"
-            elif age_days <= 35:
-                age_band = "22-35j"
-            else:
-                age_band = "36j+"
-
-            where_conditions.append(
-                {"path": ["age_band"], "operator": "Equal", "valueText": age_band}
-            )
+    # ============================================================================
+    # Construction du filtre final
+    # ============================================================================
 
     if not where_conditions:
+        logger.debug("Aucun filtre construit (aucune entité pertinente)")
         return None
 
     if len(where_conditions) == 1:
-        return where_conditions[0]
+        filter_result = where_conditions[0]
     else:
-        return {"operator": "And", "operands": where_conditions}
+        filter_result = {"operator": "And", "operands": where_conditions}
+
+    logger.info(f"✅ WHERE filter construit avec {len(where_conditions)} condition(s)")
+    return filter_result
 
 
 # ============================================================================

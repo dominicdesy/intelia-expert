@@ -77,7 +77,7 @@ class PostgreSQLManager:
             UNIQUE(breed_id, strain_name)
         );
 
-        -- Table des documents avec support data_type
+        -- Table des documents avec support data_type et unit_system
         CREATE TABLE IF NOT EXISTS documents (
             id SERIAL PRIMARY KEY,
             filename VARCHAR(255) NOT NULL,
@@ -86,6 +86,7 @@ class PostgreSQLManager:
             feather_color VARCHAR(50),
             sex VARCHAR(10),
             data_type VARCHAR(50),
+            unit_system VARCHAR(10),
             file_hash VARCHAR(64) UNIQUE,
             metadata JSONB,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -123,8 +124,10 @@ class PostgreSQLManager:
         CREATE INDEX IF NOT EXISTS idx_metrics_age ON metrics(age_min, age_max);
         CREATE INDEX IF NOT EXISTS idx_metrics_key ON metrics(metric_key);
         CREATE INDEX IF NOT EXISTS idx_metrics_name ON metrics(metric_name);
+        CREATE INDEX IF NOT EXISTS idx_metrics_unit ON metrics(unit);
         CREATE INDEX IF NOT EXISTS idx_documents_data_type ON documents(data_type);
-        
+        CREATE INDEX IF NOT EXISTS idx_documents_unit_system ON documents(unit_system);
+
         -- Index GIN pour recherche dans métadonnées JSONB
         CREATE INDEX IF NOT EXISTS idx_documents_metadata_gin ON documents USING GIN (metadata);
         
@@ -197,14 +200,15 @@ class PostgreSQLManager:
 
                 document_id = await conn.fetchval(
                     """
-                    INSERT INTO documents (filename, strain_id, housing_system, feather_color, sex, data_type, file_hash, metadata)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    INSERT INTO documents (filename, strain_id, housing_system, feather_color, sex, data_type, unit_system, file_hash, metadata)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                     ON CONFLICT (filename, file_hash) DO UPDATE SET
                         strain_id = EXCLUDED.strain_id,
                         housing_system = EXCLUDED.housing_system,
                         feather_color = EXCLUDED.feather_color,
                         sex = EXCLUDED.sex,
                         data_type = EXCLUDED.data_type,
+                        unit_system = EXCLUDED.unit_system,
                         metadata = EXCLUDED.metadata
                     RETURNING id
                 """,
@@ -214,6 +218,7 @@ class PostgreSQLManager:
                     taxonomy.feather_color,
                     taxonomy.sex,
                     taxonomy.data_type,
+                    taxonomy.unit_system,
                     file_hash,
                     json.dumps(full_metadata),
                 )

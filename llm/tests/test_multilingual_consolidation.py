@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.clarification_helper import ClarificationHelper
 from core.comparison_engine import ComparisonEngine
-from core.metric_calculator import MetricCalculator, ComparisonResult
+from core.metric_calculator import MetricCalculator
 
 
 def test_clarification_helper_multilingual():
@@ -239,7 +239,6 @@ def test_translation_consistency():
     helper = ClarificationHelper("config/clarification_strategies.json")
 
     # Langues attendues
-    expected_languages = ["fr", "en", "es", "de", "it", "pt", "th", "vi"]
 
     # Check COMPARISON_TRANSLATIONS
     comparison_langs = set()

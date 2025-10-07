@@ -19,6 +19,11 @@ class DocumentContext:
     table_types_expected: List[str]
     confidence_score: float = 0.0
     raw_analysis: str = ""
+    # NOUVEAUX CHAMPS - Alignement PostgreSQL
+    sex: Optional[str] = None  # male, female, as_hatched
+    company: Optional[str] = None  # Aviagen, Cobb, etc.
+    breed: Optional[str] = None  # Ross, Cobb, etc.
+    unit_system: Optional[str] = None  # metric, imperial, mixed
 
 
 @dataclass
@@ -37,6 +42,9 @@ class ChunkMetadata:
     detected_site_type: Optional[str]
     confidence_score: float = 0.0
     reasoning: str = ""
+    # NOUVEAUX CHAMPS - Alignement PostgreSQL
+    age_min_days: Optional[int] = None  # Âge minimum en jours
+    age_max_days: Optional[int] = None  # Âge maximum en jours
 
 
 @dataclass
@@ -81,6 +89,13 @@ class KnowledgeChunk:
             "source_file": self.source_file,
             "extraction_timestamp": rfc3339_timestamp,
             "chunk_id": self.chunk_id,
+            # NOUVEAUX CHAMPS - Alignement PostgreSQL
+            "sex": self.document_context.sex,
+            "age_min_days": self.metadata.age_min_days,
+            "age_max_days": self.metadata.age_max_days,
+            "company": self.document_context.company,
+            "breed": self.document_context.breed,
+            "unit_system": self.document_context.unit_system,
         }
 
 

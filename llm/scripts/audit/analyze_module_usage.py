@@ -4,10 +4,8 @@
 Analyse complète de l'utilisation des modules avancés du système
 """
 
-import os
 import re
 from pathlib import Path
-from collections import defaultdict
 
 # Modules avancés à vérifier
 ADVANCED_MODULES = {

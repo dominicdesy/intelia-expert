@@ -20,6 +20,7 @@ from .models import MetricResult
 from .normalizer import SQLQueryNormalizer
 from core.data_models import RAGResult, RAGSource
 from core.base import InitializableMixin
+from retrieval.unit_converter import UnitConverter
 
 # Cohere Reranker
 try:
@@ -216,6 +217,9 @@ class PostgreSQLRetriever(InitializableMixin):
         try:
             normalized_entities = self._normalize_entities(entities)
 
+            # ✅ NOUVEAU: Détection préférence unités
+            unit_preference = self._detect_unit_preference_from_query(query, entities)
+
             # ✅ DÉTECTION CALCUL DE MOULÉE
             start_age = entities.get("start_age_days") or entities.get("age_days")
             target_age = entities.get("target_age_days")
@@ -243,9 +247,10 @@ class PostgreSQLRetriever(InitializableMixin):
             logger.debug(f"Entities: {entities}")
             logger.debug(f"Normalized: {normalized_entities}")
             logger.debug(f"Filters: {filters}")
+            logger.debug(f"Unit preference: {unit_preference}")
 
             sql_query, params = self._build_query(
-                query, normalized_entities, entities, top_k, strict_sex_match, filters
+                query, normalized_entities, entities, top_k, strict_sex_match, filters, unit_preference
             )
 
             logger.debug(f"SQL Query: {sql_query}")
@@ -273,6 +278,7 @@ class PostgreSQLRetriever(InitializableMixin):
                         sex=row.get("sex"),
                         housing_system=row.get("housing_system"),
                         data_type=row.get("data_type"),
+                        unit_system=row.get("unit_system"),
                         confidence=self._calculate_relevance(
                             query, dict(row), normalized_entities
                         ),
@@ -295,13 +301,51 @@ class PostgreSQLRetriever(InitializableMixin):
                 # Informations sur le sexe
                 sex_info = self._format_sex_info(metric.sex)
 
+                # Valeurs à utiliser (possiblement converties)
+                display_value = metric.value_numeric
+                display_unit = metric.unit
+                original_value = None
+                original_unit = None
+                was_converted = False
+
+                # Conversion d'unités si nécessaire
+                if (
+                    unit_preference
+                    and metric.value_numeric is not None
+                    and metric.unit
+                    and metric.unit_system
+                ):
+                    # Vérifier si conversion nécessaire
+                    needs_conversion = False
+                    if unit_preference == "metric" and metric.unit_system in ["imperial", "mixed"]:
+                        needs_conversion = True
+                    elif unit_preference == "imperial" and metric.unit_system in ["metric", "mixed"]:
+                        needs_conversion = True
+
+                    if needs_conversion:
+                        # Tenter la conversion
+                        converted_value, converted_unit = UnitConverter.convert_to_preference(
+                            metric.value_numeric, metric.unit, unit_preference
+                        )
+
+                        if converted_value is not None and converted_unit:
+                            # Conversion réussie
+                            original_value = metric.value_numeric
+                            original_unit = metric.unit
+                            display_value = round(converted_value, 2)
+                            display_unit = converted_unit
+                            was_converted = True
+                            logger.debug(
+                                f"🔄 Converted {original_value} {original_unit} → {display_value} {display_unit}"
+                            )
+
                 # Créer un contenu textuel naturel et lisible pour le LLM
-                if metric.value_numeric is not None:
+                if display_value is not None:
                     # Phrase complète avec contexte
                     content = (
                         f"At {metric.age_min} days old, {metric.strain} {sex_info} chickens "
-                        f"have an average {metric_type_clean} of {metric.value_numeric} "
-                        f"{metric.unit or 'grams'}."
+                        f"have an average {metric_type_clean} of {display_value} "
+                        f"{display_unit or 'grams'}."
                     )
                 else:
                     # Fallback pour valeurs textuelles
@@ -311,25 +355,36 @@ class PostgreSQLRetriever(InitializableMixin):
                     )
 
                 # Structurer avec metadata complète
+                metadata = {
+                    "company": metric.company,
+                    "breed": metric.breed,
+                    "strain": metric.strain,
+                    "species": metric.species,
+                    "metric_name": metric.metric_name,
+                    "value_numeric": display_value,
+                    "value_text": metric.value_text,
+                    "unit": display_unit,
+                    "age_min": metric.age_min,
+                    "age_max": metric.age_max,
+                    "category": metric.category,
+                    "sex": metric.sex,
+                    "housing_system": metric.housing_system,
+                    "data_type": metric.data_type,
+                    "unit_system": metric.unit_system,
+                }
+
+                # Ajouter info de conversion si applicable
+                if was_converted:
+                    metadata["original_value"] = original_value
+                    metadata["original_unit"] = original_unit
+                    metadata["converted"] = True
+                else:
+                    metadata["converted"] = False
+
                 formatted_docs.append(
                     {
                         "content": content,
-                        "metadata": {
-                            "company": metric.company,
-                            "breed": metric.breed,
-                            "strain": metric.strain,
-                            "species": metric.species,
-                            "metric_name": metric.metric_name,
-                            "value_numeric": metric.value_numeric,
-                            "value_text": metric.value_text,
-                            "unit": metric.unit,
-                            "age_min": metric.age_min,
-                            "age_max": metric.age_max,
-                            "category": metric.category,
-                            "sex": metric.sex,
-                            "housing_system": metric.housing_system,
-                            "data_type": metric.data_type,
-                        },
+                        "metadata": metadata,
                         "score": metric.confidence,
                     }
                 )
@@ -623,6 +678,55 @@ class PostgreSQLRetriever(InitializableMixin):
                 },
             )
 
+    def _detect_unit_preference_from_query(
+        self, query: str, entities: Dict[str, Any] = None
+    ) -> Optional[str]:
+        """
+        Détecte la préférence d'unités depuis la query utilisateur.
+
+        Args:
+            query: Requête utilisateur
+            entities: Entités extraites de la query
+
+        Returns:
+            'metric', 'imperial', ou None (défaut: metric)
+        """
+        query_lower = query.lower()
+
+        # Mots-clés impériaux
+        imperial_keywords = [
+            'pound', 'pounds', 'lb', 'lbs', 'ounce', 'ounces', 'oz',
+            'feet', 'foot', 'ft', 'inch', 'inches', 'in', 'fahrenheit'
+        ]
+        if any(kw in query_lower for kw in imperial_keywords):
+            logger.info("🇺🇸 Unit preference detected: IMPERIAL (keyword found in query)")
+            return "imperial"
+
+        # Mots-clés métriques
+        metric_keywords = [
+            'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'kilo',
+            'meter', 'meters', 'cm', 'centimeter', 'celsius'
+        ]
+        if any(kw in query_lower for kw in metric_keywords):
+            logger.info("🌍 Unit preference detected: METRIC (keyword found in query)")
+            return "metric"
+
+        # Détecter depuis les entités (ex: entities["target_weight"] = "2.2kg")
+        if entities:
+            for key, value in entities.items():
+                if isinstance(value, str):
+                    # Chercher patterns comme "2.2kg", "5lb", etc.
+                    if re.search(r'\d+\.?\d*\s*(kg|g|gram)', value):
+                        logger.info(f"🌍 Unit preference detected: METRIC (from entity: {key}={value})")
+                        return "metric"
+                    if re.search(r'\d+\.?\d*\s*(lb|pound)', value):
+                        logger.info(f"🇺🇸 Unit preference detected: IMPERIAL (from entity: {key}={value})")
+                        return "imperial"
+
+        # Par défaut: métrique (standard international aviculture)
+        logger.debug("No unit preference detected, defaulting to METRIC")
+        return "metric"
+
     def _build_query(
         self,
         query: str,
@@ -631,8 +735,14 @@ class PostgreSQLRetriever(InitializableMixin):
         top_k: int,
         strict_sex_match: bool,
         filters: Dict[str, Any] = None,
+        unit_preference: Optional[str] = None,
     ) -> Tuple[str, List]:
-        """Construit une requête SQL avec filtres adaptatifs selon has_explicit_sex et species"""
+        """
+        Construit une requête SQL avec filtres adaptatifs selon has_explicit_sex, species et unit_system
+
+        Args:
+            unit_preference: 'metric', 'imperial', ou None (défaut: metric)
+        """
         conditions = []
         params = []
         param_count = 0
@@ -778,14 +888,37 @@ class PostgreSQLRetriever(InitializableMixin):
         if sex_condition:
             conditions.append(sex_condition)
 
+        # ✅ NOUVEAU: FILTRES POUR UNIT_SYSTEM
+        if unit_preference:
+            if unit_preference == "metric":
+                # Filtrer documents métriques + unités métriques
+                conditions.append(
+                    "(d.unit_system IN ('metric', 'mixed') OR d.unit_system IS NULL)"
+                )
+                conditions.append(
+                    """(m.unit IS NULL OR LOWER(m.unit) IN
+                       ('grams', 'g', 'kilograms', 'kg', 'percentage', '%', 'days', 'cm', 'mm', 'celsius'))"""
+                )
+                logger.info("📏 Filtering by METRIC units (kg, g, cm, etc.)")
+            elif unit_preference == "imperial":
+                # Filtrer documents impériaux + unités impériales
+                conditions.append(
+                    "(d.unit_system IN ('imperial', 'mixed') OR d.unit_system IS NULL)"
+                )
+                conditions.append(
+                    """(m.unit IS NULL OR LOWER(m.unit) IN
+                       ('pounds', 'lb', 'lbs', 'ounces', 'oz', 'percentage', '%', 'days', 'inches', 'in', 'feet', 'ft', 'fahrenheit'))"""
+                )
+                logger.info("📏 Filtering by IMPERIAL units (lb, oz, in, etc.)")
+
         where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
         sql_query = f"""
-            SELECT 
+            SELECT
                 c.company_name, b.breed_name, s.strain_name, s.species,
                 m.metric_name, m.value_numeric, m.value_text, m.unit,
                 m.age_min, m.age_max, m.sheet_name,
-                dc.category_name, d.sex, d.housing_system, d.data_type
+                dc.category_name, d.sex, d.housing_system, d.data_type, d.unit_system
             FROM companies c
             JOIN breeds b ON c.id = b.company_id
             JOIN strains s ON b.id = s.breed_id  

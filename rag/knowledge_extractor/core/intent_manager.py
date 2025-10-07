@@ -26,9 +26,10 @@ class IntentManager:
             except Exception as e:
                 self.logger.warning(f"Erreur chargement intents.json: {e}")
 
-        # Recherche automatique
+        # Recherche automatique - PRIORITÉ: Fichier centralisé llm/config/
         search_paths = [
-            Path(__file__).parent.parent / "intents.json",
+            Path(__file__).parent.parent.parent.parent / "llm" / "config" / "intents.json",  # Centralisé
+            Path(__file__).parent.parent / "intents.json",  # Fallback local
             Path(__file__).parent / "intents.json",
             Path.cwd() / "intents.json",
         ]

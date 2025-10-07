@@ -1,0 +1,96 @@
+{
+  "timestamp": "2025-10-07T16:28:23.802620",
+  "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\ascites_extracted.json",
+  "document_context": {
+    "genetic_line": "ross 308",
+    "document_type": "health_protocol",
+    "species": "broilers",
+    "confidence_score": 0.7
+  },
+  "segments_created": 5,
+  "injection_results": {
+    "success": [
+      {
+        "uuid": "0"
+      },
+      {
+        "uuid": "1"
+      },
+      {
+        "uuid": "2"
+      },
+      {
+        "uuid": "3"
+      },
+      {
+        "uuid": "4"
+      }
+    ],
+    "errors": [],
+    "total_processed": 5,
+    "success_count": 5,
+    "error_count": 0
+  },
+  "validation_results": {
+    "conformity_score": 1.0,
+    "validations": {
+      "content_integrity": {
+        "total_chunks": 5,
+        "perfect_matches": 5,
+        "content_mismatches": 0,
+        "integrity_rate": 1.0,
+        "mismatch_details": []
+      },
+      "metadata_consistency": {
+        "total_validated": 5,
+        "consistent_chunks": 5,
+        "inconsistent_chunks": 0,
+        "consistency_rate": 1.0,
+        "inconsistency_details": []
+      },
+      "encoding_preservation": {
+        "chunks_with_encoding_issues": 0,
+        "total_accents_lost": 0,
+        "encoding_preservation_rate": 1.0,
+        "critical_encoding_loss": false
+      },
+      "genetic_line_preservation": {
+        "total_chunks": 5,
+        "correct_genetic_lines": 5,
+        "genetic_line_issues": 0,
+        "consistency_rate": 1.0,
+        "issue_details": []
+      },
+      "chunk_coverage": {
+        "total_original_chunks": 5,
+        "found_chunks": 5,
+        "missing_chunks_count": 0,
+        "coverage_rate": 1.0,
+        "missing_chunk_ids": []
+      }
+    },
+    "requires_correction": false,
+    "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\ascites_extracted.json",
+    "validation_stats": {
+      "total_chunks": 5,
+      "method_1_success": 5,
+      "method_2_success": 0,
+      "method_3_success": 0,
+      "method_4_success": 0,
+      "method_5_success": 0,
+      "total_failures": 0,
+      "retrieval_details": []
+    },
+    "chunk_coverage_ratio": 1.0
+  },
+  "optimizations_applied": {
+    "advanced_llm_analysis": true,
+    "intent_based_enrichment": true,
+    "genetic_line_normalization": true,
+    "paginated_validation": true,
+    "quality_filtering_enhanced": true,
+    "intelligent_caching": true,
+    "security_validation": true,
+    "memory_management": true
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "timestamp": "2025-10-07T16:25:03.294662",
+  "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\6e3727d0-bbd7-11e6-bd5d-55bb08833e29_extracted.json",
+  "document_context": {
+    "genetic_line": "cobb 500",
+    "document_type": "management_guide",
+    "species": "breeders",
+    "confidence_score": 0.7
+  },
+  "segments_created": 17,
+  "injection_results": {
+    "success": [],
+    "errors": [
+      {
+        "error": "Insertion finale échouée: Every object failed during insertion. Here is the set of all errors: invalid integer property 'age_max_days' on class 'InteliaExpertKnowledge': requires an integer, the given value is ''\ninvalid integer property 'age_min_days' on class 'InteliaExpertKnowledge': requires an integer, the given value is ''",
+        "type": "final_insertion_failure"
+      }
+    ],
+    "total_processed": 17,
+    "success_count": 0,
+    "error_count": 0
+  },
+  "validation_results": {
+    "conformity_score": 0.0,
+    "error": "Impossible de récupérer les données injectées",
+    "requires_correction": true,
+    "validation_stats": {
+      "total_chunks": 17,
+      "method_1_success": 0,
+      "method_2_success": 0,
+      "method_3_success": 0,
+      "method_4_success": 0,
+      "method_5_success": 0,
+      "total_failures": 17,
+      "retrieval_details": []
+    },
+    "source_file": "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\6e3727d0-bbd7-11e6-bd5d-55bb08833e29_extracted.json",
+    "partial_success": true
+  },
+  "optimizations_applied": {
+    "advanced_llm_analysis": true,
+    "intent_based_enrichment": true,
+    "genetic_line_normalization": true,
+    "paginated_validation": true,
+    "quality_filtering_enhanced": true,
+    "intelligent_caching": true,
+    "security_validation": true,
+    "memory_management": true
+  }
+}

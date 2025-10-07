@@ -282,6 +282,760 @@ llm/
 
 ---
 
+## Complete File Reference
+
+### Overview
+
+This section provides a comprehensive reference of ALL files in the LLM module, documenting their role, inputs, and outputs. Files are organized by directory for easy navigation.
+
+---
+
+### API Layer (`api/`)
+
+#### `api/main.py`
+**Role:** FastAPI application entry point, initializes all routes and middleware
+**Inputs:** Environment variables, configuration files
+**Outputs:** FastAPI app instance
+**Key Functions:** `create_app()`, lifespan management
+
+#### `api/endpoints_chat.py`
+**Role:** Main chat endpoint handler (/chat)
+**Inputs:** `ChatRequest` (message, user_id, language, use_json_search)
+**Outputs:** StreamingResponse (SSE format) or `ChatResponse`
+**Key Functions:** `chat_endpoint()`, `chat_validate_endpoint()`
+**Dependencies:** RAGEngine, ConversationMemory, rate limiting
+
+#### `api/endpoints_diagnostic.py`
+**Role:** System diagnostic endpoints (/diagnostic/*)
+**Inputs:** Query parameters, diagnostic commands
+**Outputs:** JSON diagnostic data
+**Key Functions:** `search_test()`, `rag_test()`, `weaviate_test()`
+**Sub-modules:**
+- `endpoints_diagnostic/search_routes.py` - Search testing
+- `endpoints_diagnostic/rag_routes.py` - RAG pipeline testing
+- `endpoints_diagnostic/weaviate_routes.py` - Vector DB testing
+- `endpoints_diagnostic/helpers.py` - Diagnostic utilities
+
+#### `api/endpoints_health.py`
+**Role:** Health check and metrics endpoints
+**Inputs:** None (GET requests)
+**Outputs:** `HealthResponse`, Prometheus metrics
+**Key Functions:** `health_check()`, `metrics_endpoint()`
+**Sub-modules:**
+- `endpoints_health/basic_health.py` - Basic health checks
+- `endpoints_health/metrics_routes.py` - Prometheus metrics
+- `endpoints_health/helpers.py` - Health check utilities
+
+#### `api/chat_handlers.py`
+**Role:** Business logic for chat requests
+**Inputs:** User message, conversation context, language
+**Outputs:** Generated response, updated memory
+**Key Functions:** `handle_chat()`, `handle_streaming_chat()`
+**Dependencies:** RAGEngine, ConversationMemory, QueryRouter
+
+#### `api/chat_models.py`
+**Role:** Pydantic models for API requests/responses
+**Inputs:** N/A (data models)
+**Outputs:** Validated data structures
+**Models:** `ChatRequest`, `ChatResponse`, `ValidationResult`, `StreamChunk`
+
+#### `api/utils.py`
+**Role:** Shared API utilities
+**Inputs:** Various (request data, user IDs)
+**Outputs:** Utility functions results
+**Key Functions:** `get_user_id()`, `format_sse_message()`, `extract_language()`
+
+#### `api/service_registry.py`
+**Role:** Singleton registry for shared services
+**Inputs:** Service instances (RAGEngine, Memory)
+**Outputs:** Service instances
+**Key Functions:** `get_rag_engine()`, `get_conversation_memory()`, `register_service()`
+
+#### `api/middleware/` (empty)
+**Role:** Placeholder for custom middleware (rate limiting, CORS, etc.)
+
+---
+
+### Core Engine (`core/`)
+
+#### `core/rag_engine.py`
+**Role:** Main RAG orchestrator, coordinates all components
+**Inputs:** User query, language, tenant_id, context
+**Outputs:** `RAGResult` with answer, sources, metadata
+**Key Functions:** `process_query()`, `_route_to_handler()`
+**Dependencies:** QueryProcessor, QueryRouter, ResponseGenerator, ResponseValidator
+
+#### `core/rag_engine_core.py`
+**Role:** Core RAG functionality, OpenAI client management
+**Inputs:** Configuration, API keys
+**Outputs:** Initialized clients (OpenAI, Anthropic)
+**Key Functions:** `initialize()`, `get_openai_client()`
+
+#### `core/rag_engine_handlers.py`
+**Role:** Handler registration and dispatching
+**Inputs:** Route destination, query data
+**Outputs:** Handler instance
+**Key Functions:** `register_handler()`, `get_handler_for_route()`
+
+#### `core/query_interpreter.py`
+**Role:** Query understanding and preprocessing
+**Inputs:** Raw query string, language
+**Outputs:** Interpreted query with metadata
+**Key Functions:** `interpret()`, `detect_intent()`, `extract_temporal_references()`
+
+#### `core/multi_step_orchestrator.py`
+**Role:** Multi-step query decomposition and orchestration
+**Inputs:** Complex query requiring multiple steps
+**Outputs:** Aggregated results from sub-queries
+**Key Functions:** `decompose_query()`, `orchestrate_steps()`, `aggregate_results()`
+
+#### `core/optimization_engine.py`
+**Role:** Query and retrieval optimization
+**Inputs:** Query route, performance metrics
+**Outputs:** Optimized query plan
+**Key Functions:** `optimize_query()`, `select_optimal_retriever()`, `cache_strategy()`
+
+#### `core/reverse_lookup.py`
+**Role:** Reverse lookup for metric interpretation
+**Inputs:** Metric values, breed context
+**Outputs:** Contextual interpretation
+**Key Functions:** `lookup_metric_context()`, `interpret_value()`
+
+#### `core/data_validator.py`
+**Role:** Data validation and type checking
+**Inputs:** Various data structures
+**Outputs:** Validation results, sanitized data
+**Key Functions:** `validate_query_data()`, `validate_entities()`, `sanitize_input()`
+
+#### `core/data_models.py`
+**Role:** Core data structures and enums
+**Inputs:** N/A (data models)
+**Outputs:** Type-safe data structures
+**Classes:** `RAGResult`, `RAGSource`, `QueryRoute`, `ValidationResult`, `ProcessingMetadata`
+
+#### `core/base.py`
+**Role:** Base classes and mixins
+**Inputs:** N/A (abstract classes)
+**Outputs:** Base class implementations
+**Classes:** `InitializableMixin`, `Closeable`, `Configurable`
+
+#### `core/json_system.py`
+**Role:** JSON search and retrieval from local files
+**Inputs:** Query, JSON file paths
+**Outputs:** Matched JSON documents
+**Key Functions:** `search_json_files()`, `rank_json_results()`
+
+#### `core/rag_langsmith.py`
+**Role:** LangSmith integration for tracing and monitoring
+**Inputs:** Query traces, execution metrics
+**Outputs:** Logged traces to LangSmith
+**Key Functions:** `trace_query()`, `log_result()`
+
+#### `core/handlers/base_handler.py`
+**Role:** Base handler class for all query types
+**Inputs:** `QueryRoute`, preprocessed data
+**Outputs:** `RAGResult`
+**Key Functions:** `handle()`, `_retrieve()`, `_generate()`
+
+#### `core/handlers/standard_handler.py`
+**Role:** Handler for standard single-entity queries
+**Inputs:** Standard query route
+**Outputs:** `RAGResult` with direct answer
+**Key Functions:** `handle()`, inherits from `BaseHandler`
+
+#### `core/handlers/comparative_handler.py`
+**Role:** Handler for comparative queries (A vs B)
+**Inputs:** Comparative query with multiple breeds
+**Outputs:** `RAGResult` with comparison table/analysis
+**Key Functions:** `handle()`, `_compare_entities()`, `_format_comparison()`
+
+#### `core/handlers/temporal_handler.py`
+**Role:** Handler for time-series and trend queries
+**Inputs:** Temporal query with age ranges
+**Outputs:** `RAGResult` with trend analysis
+**Key Functions:** `handle()`, `_extract_time_series()`, `_analyze_trend()`
+
+---
+
+### Retrieval Layer (`retrieval/`)
+
+#### `retrieval/retriever.py` (LEGACY - redirects to retriever_core.py)
+**Role:** Legacy compatibility wrapper
+**Inputs:** Various
+**Outputs:** Delegates to `HybridWeaviateRetriever`
+
+#### `retrieval/retriever_core.py`
+**Role:** Hybrid Weaviate retriever - main class
+**Inputs:** Weaviate client, collection name
+**Outputs:** Retrieved documents with scores
+**Key Functions:** `__init__()`, `_detect_vector_dimension()`
+**Inherits:** `SearchMixin`, `AdaptiveMixin`, `RRFMixin`
+
+#### `retrieval/retriever_search.py`
+**Role:** Search mixin for Weaviate queries
+**Inputs:** Query vector, filters, top_k
+**Outputs:** Search results
+**Key Functions:** `hybrid_search()`, `near_vector_search()`, `bm25_search()`
+
+#### `retrieval/retriever_adaptive.py`
+**Role:** Adaptive search strategies
+**Inputs:** Query characteristics, performance metrics
+**Outputs:** Adjusted search parameters
+**Key Functions:** `adapt_search_params()`, `fallback_strategy()`
+
+#### `retrieval/retriever_rrf.py`
+**Role:** Reciprocal Rank Fusion (RRF) mixin
+**Inputs:** Multiple result lists
+**Outputs:** Fused and re-ranked results
+**Key Functions:** `rrf_fusion()`, `_calculate_rrf_score()`
+
+#### `retrieval/retriever_utils.py`
+**Role:** Shared retrieval utilities
+**Inputs:** Various utility inputs
+**Outputs:** Utility function results
+**Key Functions:** `normalize_scores()`, `deduplicate_results()`
+
+#### `retrieval/embedder.py`
+**Role:** Text embedding generation (OpenAI embeddings)
+**Inputs:** Text strings
+**Outputs:** 1536-dim embeddings (text-embedding-3-small) or 3072-dim (3-large)
+**Key Functions:** `embed_text()`, `embed_batch()`
+
+#### `retrieval/reranker.py`
+**Role:** Cohere Rerank v3 integration
+**Inputs:** Query, document list, top_n
+**Outputs:** Reranked documents with Cohere scores
+**Key Functions:** `rerank()`, `batch_rerank()`
+
+#### `retrieval/enhanced_rrf_fusion.py`
+**Role:** Advanced RRF fusion with intelligent weighting
+**Inputs:** Multiple retrieval sources (PostgreSQL + Weaviate)
+**Outputs:** Unified ranked result list
+**Key Functions:** `intelligent_rrf()`, `adaptive_fusion()`
+
+#### `retrieval/hybrid_retriever.py`
+**Role:** Coordinates PostgreSQL + Weaviate retrieval
+**Inputs:** Query, routing destination
+**Outputs:** Fused results from both sources
+**Key Functions:** `retrieve()`, `_merge_results()`
+
+#### `retrieval/unit_converter.py`
+**Role:** Unit conversion (metric ↔ imperial)
+**Inputs:** Value, unit, target unit system
+**Outputs:** Converted value, converted unit
+**Key Functions:** `convert()`, `convert_to_preference()`, `detect_unit_system()`
+
+#### PostgreSQL Sub-module (`retrieval/postgresql/`)
+
+##### `postgresql/retriever.py`
+**Role:** PostgreSQL structured data retrieval
+**Inputs:** Query entities (breed, age, sex, metric)
+**Outputs:** `RAGResult` with formatted metrics
+**Key Functions:** `search_metrics()`, `_calculate_feed_range()`, `_build_query()`
+**Special Features:** Feed calculation over age ranges, strict/flexible sex matching, species filtering
+
+##### `postgresql/query_builder.py`
+**Role:** SQL query construction
+**Inputs:** Entity filters, query type
+**Outputs:** SQL query string, parameters
+**Key Functions:** `build_query()`, `add_where_clause()`, `add_joins()`
+
+##### `postgresql/normalizer.py`
+**Role:** Query normalization and SQL term mapping
+**Inputs:** Raw query text
+**Outputs:** Normalized terms for SQL
+**Key Functions:** `normalize()`, `get_search_terms()`
+**Class:** `SQLQueryNormalizer`
+
+##### `postgresql/models.py`
+**Role:** PostgreSQL data models
+**Inputs:** N/A (data classes)
+**Outputs:** Type-safe metric representations
+**Classes:** `MetricResult`, `DocumentMetadata`
+
+##### `postgresql/config.py`
+**Role:** PostgreSQL configuration
+**Inputs:** Environment variables
+**Outputs:** Database config dict
+**Variables:** `DATABASE_CONFIG`, `ASYNCPG_AVAILABLE`
+
+##### `postgresql/router.py` (if exists)
+**Role:** Routes queries to appropriate PostgreSQL retrieval strategy
+**Inputs:** Query type, entities
+**Outputs:** Retrieval strategy selection
+**Key Functions:** `route_query()`, `determine_strategy()`
+
+##### `postgresql/temporal.py` (if exists)
+**Role:** Temporal query handling for PostgreSQL
+**Inputs:** Time-series queries
+**Outputs:** Aggregated temporal data
+**Key Functions:** `get_time_series()`, `calculate_trends()`
+
+---
+
+### Generation Layer (`generation/`)
+
+#### `generation/generators.py`
+**Role:** LLM response generation with multi-model routing
+**Inputs:** Query, context documents, domain, language
+**Outputs:** Generated answer string
+**Key Functions:** `generate()`, `_select_model_for_query()`, `_build_prompt()`
+**Supported Models:** GPT-4o, GPT-4o-mini, Claude 3.5, DeepSeek, Llama 3
+
+#### `generation/prompt_builder.py`
+**Role:** Dynamic prompt construction
+**Inputs:** Query, context, domain, language, specialized prompt
+**Outputs:** Complete LLM prompt
+**Key Functions:** `build_prompt()`, `add_context()`, `format_documents()`
+
+#### `generation/entity_manager.py`
+**Role:** Entity description and context management
+**Inputs:** Extracted entities
+**Outputs:** Rich entity descriptions
+**Key Functions:** `get_entity_description()`, `format_entity_context()`
+**Config:** Loads from `config/entity_descriptions.json`
+
+#### `generation/language_handler.py`
+**Role:** Multi-language response handling
+**Inputs:** Response, target language
+**Outputs:** Language-appropriate formatting
+**Key Functions:** `format_for_language()`, `translate_if_needed()`
+
+#### `generation/document_utils.py`
+**Role:** Document formatting utilities
+**Inputs:** Raw documents from retrievers
+**Outputs:** Formatted context strings
+**Key Functions:** `format_documents()`, `truncate_context()`, `extract_key_facts()`
+
+#### `generation/post_processor.py`
+**Role:** Response post-processing and cleanup
+**Inputs:** Raw LLM response
+**Outputs:** Cleaned, formatted response
+**Key Functions:** `post_process()`, `remove_artifacts()`, `format_markdown()`
+
+#### `generation/models.py`
+**Role:** Generation-related data models
+**Inputs:** N/A (data classes)
+**Outputs:** Type-safe generation structures
+**Classes:** `GenerationRequest`, `GenerationResult`, `ModelSelection`
+
+#### `generation/veterinary_handler.py`
+**Role:** Specialized handler for veterinary/health queries
+**Inputs:** Health-related query, symptoms, disease info
+**Outputs:** Expert veterinary response
+**Key Functions:** `handle_veterinary_query()`, `format_disease_info()`, `add_disclaimers()`
+
+---
+
+### Processing Layer (`processing/`)
+
+#### `processing/intent_classifier.py`
+**Role:** Intent classification for queries
+**Inputs:** Query text, language
+**Outputs:** `IntentType`, confidence score
+**Key Functions:** `classify()`, `_calculate_confidence()`
+**Uses:** Keywords from domain_keywords.json
+
+#### `processing/intent_processor.py`
+**Role:** Intent processing pipeline
+**Inputs:** Raw query
+**Outputs:** `IntentResult` with entities and classification
+**Key Functions:** `process_query()`, `extract_entities()`, `validate_intent()`
+**Config:** Loads from `config/intents.json`
+
+#### `processing/intent_types.py`
+**Role:** Intent type definitions
+**Inputs:** N/A (enums)
+**Outputs:** Intent type enums
+**Enums:** `IntentType`, `EntityType`, `QueryComplexity`
+
+#### `processing/query_expander.py`
+**Role:** Query expansion for better retrieval
+**Inputs:** Original query
+**Outputs:** Expanded query with synonyms, related terms
+**Key Functions:** `expand()`, `add_synonyms()`, `add_related_terms()`
+
+#### `processing/vocabulary_extractor.py`
+**Role:** Extract domain vocabulary from documents
+**Inputs:** Document corpus
+**Outputs:** Domain-specific vocabulary list
+**Key Functions:** `extract_vocabulary()`, `rank_terms()`
+**Usage:** For building term lists, not runtime
+
+---
+
+### Security Layer (`security/`)
+
+#### `security/advanced_guardrails.py`
+**Role:** Compatibility wrapper for modular guardrails
+**Inputs:** Query or response
+**Outputs:** Delegates to `security/guardrails/core.py`
+**Key Functions:** Redirects all calls to modular system
+
+#### `security/ood_detector.py`
+**Role:** Compatibility wrapper for out-of-domain detection
+**Inputs:** Query text
+**Outputs:** Delegates to `security/ood/detector.py`
+**Key Functions:** Redirects all calls to modular OOD system
+
+#### Guardrails Sub-module (`security/guardrails/`)
+
+##### `guardrails/core.py`
+**Role:** Main guardrails orchestrator
+**Inputs:** User query or LLM response
+**Outputs:** `GuardrailResult` (passed/blocked, violations)
+**Key Functions:** `check_input()`, `check_output()`, `_run_verifiers()`
+
+##### `guardrails/models.py`
+**Role:** Guardrails data models
+**Inputs:** N/A (data classes)
+**Outputs:** Type-safe guardrail structures
+**Classes:** `GuardrailResult`, `Violation`, `GuardrailConfig`
+
+##### `guardrails/config.py`
+**Role:** Guardrails configuration
+**Inputs:** Configuration files
+**Outputs:** Guardrail rules and thresholds
+**Variables:** `BLOCKED_TERMS`, `VALIDATION_RULES`
+
+##### `guardrails/cache.py`
+**Role:** Caching for guardrail checks
+**Inputs:** Query hash
+**Outputs:** Cached guardrail result
+**Key Functions:** `get_cached()`, `set_cached()`
+
+##### `guardrails/evidence_checker.py`
+**Role:** Checks LLM responses against source documents
+**Inputs:** Response, source documents
+**Outputs:** Evidence validation result
+**Key Functions:** `check_evidence()`, `verify_claims()`
+
+#### OOD Sub-module (`security/ood/`)
+
+##### `ood/detector.py`
+**Role:** Out-of-domain detection using LLM classification
+**Inputs:** User query
+**Outputs:** `OODResult` (in-domain/out-of-domain, confidence)
+**Key Functions:** `detect()`, `_classify_with_llm()`
+**Model:** gpt-4o-mini for fast classification
+
+##### `ood/models.py`
+**Role:** OOD data models
+**Inputs:** N/A (data classes)
+**Outputs:** Type-safe OOD structures
+**Classes:** `OODResult`, `DomainClassification`
+
+##### `ood/config.py`
+**Role:** OOD configuration
+**Inputs:** Configuration files
+**Outputs:** Domain definitions, thresholds
+**Variables:** `OOD_THRESHOLD`, `POULTRY_DOMAINS`
+
+##### `ood/query_normalizer.py`
+**Role:** Query normalization for OOD detection
+**Inputs:** Raw query
+**Outputs:** Normalized query text
+**Key Functions:** `normalize()`, `remove_noise()`
+
+##### `ood/context_analyzer.py`
+**Role:** Analyzes query context for domain relevance
+**Inputs:** Query, conversation history
+**Outputs:** Context analysis result
+**Key Functions:** `analyze_context()`, `detect_domain_shift()`
+
+##### `ood/ood_strategies.py`
+**Role:** Different OOD detection strategies
+**Inputs:** Query
+**Outputs:** Strategy-specific OOD result
+**Key Functions:** `keyword_strategy()`, `llm_strategy()`, `hybrid_strategy()`
+
+---
+
+### Utilities (`utils/`)
+
+#### `utils/breeds_registry.py`
+**Role:** Centralized breed registry and normalization
+**Inputs:** Breed name variants
+**Outputs:** Canonical breed name, species, DB name
+**Key Functions:** `normalize_breed_name()`, `get_species()`, `get_db_name()`, `are_comparable()`
+**Class:** `BreedsRegistry`
+**Config:** Loads from `config/intents.json` breed_registry section
+
+#### `utils/intent_processing.py`
+**Role:** Intent processing utilities
+**Inputs:** Intent result
+**Outputs:** WHERE filters for Weaviate, validation results
+**Key Functions:** `build_where_filter()`, `validate_intent_result()`
+**Factory:** `IntentProcessorFactory`
+
+#### `utils/language_detection.py`
+**Role:** Automatic language detection
+**Inputs:** Text string
+**Outputs:** ISO language code (fr, en, es, etc.)
+**Key Functions:** `detect_language()`, `detect_with_fallback()`
+
+#### `utils/translation_service.py`
+**Role:** Translation service integration
+**Inputs:** Text, source language, target language
+**Outputs:** Translated text
+**Key Functions:** `translate()`, `batch_translate()`
+
+#### `utils/translation_utils.py`
+**Role:** Translation helper utilities
+**Inputs:** Various translation needs
+**Outputs:** Utility function results
+**Key Functions:** `get_language_name()`, `is_supported_language()`
+
+#### `utils/text_utilities.py`
+**Role:** Text processing utilities
+**Inputs:** Text strings
+**Outputs:** Processed text
+**Key Functions:** `clean_text()`, `extract_numbers()`, `normalize_whitespace()`
+
+#### `utils/imports_and_dependencies.py`
+**Role:** Centralized import management and dependency checking
+**Inputs:** N/A (module-level)
+**Outputs:** Import availability flags
+**Variables:** `WEAVIATE_V4`, `COHERE_AVAILABLE`, `REDIS_AVAILABLE`
+
+#### `utils/metrics_collector.py`
+**Role:** Metrics collection and aggregation
+**Inputs:** Metric events (query processed, error occurred)
+**Outputs:** Prometheus metrics
+**Key Functions:** `record_query()`, `record_error()`, `get_metrics()`
+
+#### `utils/data_classes.py`
+**Role:** Shared data classes and types
+**Inputs:** N/A (data classes)
+**Outputs:** Type-safe data structures
+**Classes:** `ValidationReport`, `ProcessingResult`
+
+#### `utils/test_data.py`
+**Role:** Test data and fixtures
+**Inputs:** N/A (test data)
+**Outputs:** Sample queries, mock data
+**Usage:** Testing only
+
+#### `utils/types.py` (likely)
+**Role:** Type aliases and custom types
+**Inputs:** N/A (type definitions)
+**Outputs:** Type hints
+**Types:** `Optional`, `Dict`, `List`, `Any` (from typing)
+
+---
+
+### Configuration (`config/`)
+
+#### `config/intents.json`
+**Role:** Intent classification configuration
+**Contains:** Aliases, intent patterns, breed registry, db_name_mapping
+**Size:** ~100+ breeds, ~50 aliases per breed
+**Version:** 1.5 (2025-01-15)
+
+#### `config/domain_keywords.json`
+**Role:** Domain detection keywords (8 domains)
+**Contains:** 153+ bilingual keywords across nutrition, health, production, etc.
+**Structure:** `{domain_key: {keywords: {fr: [...], en: [...]}}}`
+
+#### `config/system_prompts.json`
+**Role:** Specialized prompts for each domain
+**Contains:** 8 specialized prompts × 13 languages = 104 prompt variants
+**Structure:** `{specialized_prompts: {domain: {lang: "prompt text"}}}`
+
+#### `config/clarification_strategies.json`
+**Role:** Clarification message templates
+**Contains:** Templates for missing entities (breed, age, sex, metric)
+**Structure:** `{strategy_key: {lang: "clarification message"}}`
+
+#### `config/entity_descriptions.json`
+**Role:** Rich descriptions for entities
+**Contains:** Detailed info about breeds, metrics, species
+**Usage:** Enriching LLM context
+
+#### `config/breeds_mapping.json`
+**Role:** Breed name normalization rules
+**Contains:** Canonical names, aliases, DB mappings
+**Note:** Likely redundant with intents.json breed_registry
+
+#### `config/metrics_normalization.json`
+**Role:** Metric name normalization
+**Contains:** Metric aliases, canonical names, units
+**Example:** "poids" → "body_weight", "fcr" → "feed_conversion_ratio"
+
+#### `config/blocked_terms.json`
+**Role:** Security - blocked terms and phrases
+**Contains:** Offensive terms, out-of-scope queries
+**Usage:** Guardrails input validation
+
+#### `config/technical_exclusions.json`
+**Role:** Technical terms that shouldn't trigger OOD
+**Contains:** Programming terms, system commands
+**Usage:** OOD detection fine-tuning
+
+#### `config/veterinary_terms.json`
+**Role:** Veterinary vocabulary
+**Contains:** Disease names, symptoms, treatments
+**Usage:** Health query processing
+
+#### `config/universal_terms_XX.json` (13 files)
+**Role:** Language-specific term dictionaries
+**Languages:** fr, en, es, de, nl, it, pt, pl, hi, id, th, zh, meta
+**Contains:** 24 domains × ~50 terms = ~1200 terms per language
+**Structure:** `{metadata, domains: {domain: {term: {canonical, confidence, variants}}}}`
+**Version:** 3.0.0
+
+#### `config/count_terms.py`
+**Role:** Utility script to count terms in universal_terms files
+**Usage:** Development only
+
+#### `config/validate_config.py`
+**Role:** Configuration file validation
+**Inputs:** Config file paths
+**Outputs:** Validation results
+**Usage:** CI/CD, development
+
+#### `config/messages.py`
+**Role:** System messages and templates
+**Contains:** Error messages, info messages, response templates
+**Usage:** Consistent messaging across modules
+
+---
+
+### Cache Layer (`cache/`)
+
+#### `cache/interface.py`
+**Role:** Cache interface definition (abstract)
+**Inputs:** N/A (interface)
+**Outputs:** Cache interface contract
+**Classes:** `CacheInterface` (abstract)
+
+#### `cache/cache_core.py`
+**Role:** Core caching logic
+**Inputs:** Cache key, value, TTL
+**Outputs:** Cached data
+**Key Functions:** `get()`, `set()`, `delete()`, `clear()`
+**Backend:** In-memory or Redis
+
+#### `cache/cache_semantic.py`
+**Role:** Semantic similarity-based caching
+**Inputs:** Query embedding
+**Outputs:** Cached result if semantically similar query exists
+**Key Functions:** `get_similar()`, `cache_with_embedding()`
+**Threshold:** Cosine similarity > 0.95
+
+#### `cache/redis_cache_manager.py`
+**Role:** Redis cache implementation
+**Inputs:** Redis connection config
+**Outputs:** Redis-backed cache operations
+**Key Functions:** `connect()`, `get()`, `set()`, `_serialize()`, `_deserialize()`
+**TTL:** Configurable (default 3600s)
+
+---
+
+### Monitoring (`monitoring/`)
+
+#### `monitoring/metrics.py`
+**Role:** Prometheus metrics definitions and collection
+**Inputs:** Metric events
+**Outputs:** Prometheus metrics
+**Metrics:** Counter, Histogram, Gauge for all operations
+**Endpoint:** GET /metrics
+
+---
+
+### Extensions (`extensions/`)
+
+Currently empty - reserved for future plugins and extensions.
+
+---
+
+### Tests (`tests/`)
+
+#### `tests/integration/test_llm_ensemble.py`
+**Role:** Tests multi-LLM router
+**Tests:** Model selection, fallback, cost optimization
+**Count:** 6 tests
+
+#### `tests/integration/test_hybrid_extraction.py`
+**Role:** Tests entity extraction (regex, keywords, LLM NER)
+**Tests:** Hybrid extraction pipeline
+**Count:** 4 tests
+
+#### `tests/integration/test_proactive_assistant.py`
+**Role:** Tests follow-up generation
+**Tests:** Multilingual follow-ups
+**Count:** 6 tests
+
+#### `tests/integration/test_adaptive_length.py`
+**Role:** Tests adaptive response length calculation
+**Tests:** Length optimization based on query
+**Count:** 6 tests
+
+#### Other test files
+**Status:** Total 22 tests passing (100%)
+**Coverage:** ~5% (need more tests)
+**See:** `docs/TEST_COVERAGE_ANALYSIS.md` for details
+
+---
+
+### Scripts (`scripts/`)
+
+#### `scripts/migrate_embeddings.py`
+**Role:** Migrate from text-embedding-ada-002 to text-embedding-3-large
+**Inputs:** Old embeddings in Weaviate
+**Outputs:** Re-embedded documents with new model
+**Usage:** One-time migration script
+
+#### `scripts/prepare_finetuning_dataset.py`
+**Role:** Prepare dataset for LLM fine-tuning
+**Inputs:** Query logs, high-quality responses
+**Outputs:** JSONL dataset for OpenAI fine-tuning
+**Usage:** Fine-tuning preparation
+
+#### `scripts/run_ragas_evaluation.py`
+**Role:** Run RAGAS evaluation framework
+**Inputs:** Test queries, expected answers
+**Outputs:** Faithfulness, answer relevancy, context precision/recall scores
+**Usage:** Quality evaluation
+
+#### `scripts/test_embedding_quality.py`
+**Role:** Test embedding quality and similarity
+**Inputs:** Query pairs
+**Outputs:** Similarity scores, quality metrics
+**Usage:** Embedding model evaluation
+
+#### `scripts/update_imports.py`
+**Role:** Update import statements after refactoring
+**Inputs:** Old/new module paths
+**Outputs:** Updated import statements
+**Usage:** Code migration
+
+---
+
+### Root Files
+
+#### `__init__.py`
+**Role:** Package initialization
+**Exports:** Main classes and functions
+**Usage:** Makes llm a Python package
+
+#### `requirements.txt`
+**Role:** Python dependencies
+**Contains:** fastapi, uvicorn, openai, anthropic, weaviate-client, cohere, etc.
+**Usage:** `pip install -r requirements.txt`
+
+#### `.env` (gitignored)
+**Role:** Environment variables
+**Contains:** API keys, database credentials
+**Template:** `.env.example`
+
+#### `README.md`
+**Role:** Project overview and quick start
+**Contents:** Links to full documentation
+**Audience:** New developers
+
+---
+
 ## Core Components
 
 ### 1. Query Router

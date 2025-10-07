@@ -67,15 +67,16 @@ class IntentsConfigLoader:
     def _load_config(self, config_path: Optional[str] = None) -> Dict:
         """Charge la configuration intents.json"""
 
-        # Chemins de recherche pour intents.json
+        # Chemins de recherche pour intents.json - PRIORITÉ: Fichier centralisé
         search_paths = [
             config_path if config_path else None,
+            Path(__file__).parent.parent.parent / "llm" / "config" / "intents.json",  # Centralisé
+            Path(__file__).parent / "intents.json",  # Fallback local
+            Path(__file__).parent.parent / "intents.json",
             "intents.json",
             "../intents.json",
             "./config/intents.json",
             "../config/intents.json",
-            Path(__file__).parent / "intents.json",
-            Path(__file__).parent.parent / "intents.json",
         ]
 
         for path in search_paths:

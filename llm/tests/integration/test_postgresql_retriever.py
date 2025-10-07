@@ -11,7 +11,6 @@ Tests:
 """
 
 import pytest
-import asyncio
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -59,7 +58,7 @@ async def test_pg_retriever_basic(pg_retriever):
         assert hasattr(result, "score")
         assert result.score >= 0
 
-    print(f"\n✅ Test 1 PASSED")
+    print("\n✅ Test 1 PASSED")
     print(f"   Results: {len(results)}")
     print(f"   Best score: {results[0].score:.3f}")
 
@@ -92,7 +91,7 @@ async def test_normalizer_multilingual(normalizer):
 
         print(f"   {lang.upper()}: {query[:40]}... -> OK")
 
-    print(f"\n✅ Test 2 PASSED - 12 languages normalized")
+    print("\n✅ Test 2 PASSED - 12 languages normalized")
 
 
 @pytest.mark.asyncio
@@ -118,7 +117,7 @@ async def test_normalizer_concepts(normalizer):
             normalized = normalizer.normalize_query(f"What is the {variant}?", language="en")
             assert normalized is not None
 
-    print(f"\n✅ Test 3 PASSED - Concept normalization")
+    print("\n✅ Test 3 PASSED - Concept normalization")
 
 
 @pytest.mark.asyncio
@@ -140,7 +139,7 @@ async def test_pg_retriever_with_breed_filter(pg_retriever):
 
         print(f"   {breed}: {len(results)} results")
 
-    print(f"\n✅ Test 4 PASSED - Breed filtering")
+    print("\n✅ Test 4 PASSED - Breed filtering")
 
 
 @pytest.mark.asyncio
@@ -157,7 +156,7 @@ async def test_pg_retriever_with_age_range(pg_retriever):
     )
 
     # Devrait retourner des résultats dans le range 30-40 jours
-    print(f"\n✅ Test 5 PASSED - Age range filtering")
+    print("\n✅ Test 5 PASSED - Age range filtering")
     print(f"   Results (30-40 days): {len(results)}")
 
 
@@ -177,7 +176,7 @@ async def test_pg_retriever_with_metric_filter(pg_retriever):
         # Certaines métriques peuvent avoir peu de données
         print(f"   {metric}: {len(results)} results")
 
-    print(f"\n✅ Test 6 PASSED - Metric filtering")
+    print("\n✅ Test 6 PASSED - Metric filtering")
 
 
 @pytest.mark.asyncio
@@ -201,7 +200,7 @@ async def test_pg_retriever_multilingual_queries(pg_retriever):
         assert len(results) > 0, f"No results for {lang}"
         print(f"   {lang.upper()}: {len(results)} results")
 
-    print(f"\n✅ Test 7 PASSED - Multilingual retrieval")
+    print("\n✅ Test 7 PASSED - Multilingual retrieval")
 
 
 @pytest.mark.asyncio
@@ -227,7 +226,7 @@ async def test_pg_retriever_reranking(pg_retriever):
     assert len(results_reranked) > 0
     assert len(results_reranked) <= 3
 
-    print(f"\n✅ Test 8 PASSED - Reranking")
+    print("\n✅ Test 8 PASSED - Reranking")
     print(f"   Without rerank: {len(results_no_rerank)} results")
     print(f"   With rerank: {len(results_reranked)} results")
 
@@ -243,10 +242,10 @@ async def test_pg_retriever_empty_query(pg_retriever):
         )
         # Si ça ne lève pas d'erreur, devrait retourner liste vide
         assert results == [] or results is None
-        print(f"\n✅ Test 9 PASSED - Empty query handled")
+        print("\n✅ Test 9 PASSED - Empty query handled")
     except ValueError:
         # C'est OK de lever une ValueError pour query vide
-        print(f"\n✅ Test 9 PASSED - Empty query raises ValueError")
+        print("\n✅ Test 9 PASSED - Empty query raises ValueError")
 
 
 @pytest.mark.asyncio
@@ -267,7 +266,7 @@ async def test_pg_retriever_performance(pg_retriever):
     for query in queries:
         start = time.time()
 
-        results = await pg_retriever.retrieve(
+        await pg_retriever.retrieve(
             query=query,
             top_k=5
         )
@@ -279,7 +278,7 @@ async def test_pg_retriever_performance(pg_retriever):
 
     avg_time = sum(times) / len(times)
 
-    print(f"\n✅ Test 10 PASSED - Performance")
+    print("\n✅ Test 10 PASSED - Performance")
     print(f"   Average: {avg_time:.3f}s")
     print(f"   Min: {min(times):.3f}s, Max: {max(times):.3f}s")
 
@@ -308,7 +307,7 @@ async def test_normalizer_technical_terms_preservation(normalizer):
 
         print(f"   {term}: preserved")
 
-    print(f"\n✅ Test 11 PASSED - Technical terms preserved")
+    print("\n✅ Test 11 PASSED - Technical terms preserved")
 
 
 if __name__ == "__main__":

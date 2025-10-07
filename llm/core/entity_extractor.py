@@ -137,6 +137,7 @@ class EntityExtractor:
         r"\b(\d+)\s*j\b",
         r"(\d+)(?:e|ème|eme)?\s+jour",
         r"day\s+(\d+)",
+        r"(\d+)(?:st|nd|rd|th)\s+day",  # English ordinals: 18th day, 21st day, 22nd day
         r"\bD(\d+)\b",  # Format D35
     ]
 

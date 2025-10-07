@@ -37,6 +37,7 @@ class MetricResult:
     sex: Optional[str] = None
     housing_system: Optional[str] = None
     data_type: Optional[str] = None
+    unit_system: Optional[str] = None  # metric/imperial/mixed
 
     def __post_init__(self):
         """Validation et nettoyage des données"""

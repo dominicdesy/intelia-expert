@@ -19,6 +19,7 @@ class TaxonomyInfo:
     feather_color: Optional[str] = None
     sex: Optional[str] = None
     data_type: Optional[str] = None  # performance/pharmaceutical/nutrition/carcass
+    unit_system: Optional[str] = None  # metric/imperial/mixed
 
 
 @dataclass

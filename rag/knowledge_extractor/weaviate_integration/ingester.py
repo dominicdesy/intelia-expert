@@ -194,15 +194,57 @@ class WeaviateIngester:
                         skip_vectorization=True,
                         description="Timestamp d'extraction RFC3339",
                     ),
+                    # NOUVEAUX CHAMPS - Alignement avec PostgreSQL
+                    Property(
+                        name="sex",
+                        data_type=DataType.TEXT,
+                        skip_vectorization=True,
+                        description="Sexe (male, female, as_hatched)",
+                    ),
+                    Property(
+                        name="age_min_days",
+                        data_type=DataType.INT,
+                        skip_vectorization=True,
+                        description="Âge minimum en jours",
+                    ),
+                    Property(
+                        name="age_max_days",
+                        data_type=DataType.INT,
+                        skip_vectorization=True,
+                        description="Âge maximum en jours",
+                    ),
+                    Property(
+                        name="company",
+                        data_type=DataType.TEXT,
+                        skip_vectorization=True,
+                        description="Compagnie (Aviagen, Cobb, Hybrid, etc.)",
+                    ),
+                    Property(
+                        name="breed",
+                        data_type=DataType.TEXT,
+                        skip_vectorization=True,
+                        description="Race/breed (Ross, Cobb, etc.)",
+                    ),
+                    Property(
+                        name="unit_system",
+                        data_type=DataType.TEXT,
+                        skip_vectorization=True,
+                        description="Système d'unités (metric, imperial, mixed)",
+                    ),
                 ],
-                # Configuration vectorielle - syntaxe v4 corrigée
-                vectorizer_config=Configure.Vectorizer.text2vec_openai(
-                    model="text-embedding-3-small", vectorize_collection_name=False
-                ),
+                # Configuration vectorielle - syntaxe v4 mise à jour
+                vectorizer_config=[
+                    Configure.NamedVectors.text2vec_openai(
+                        name="default",
+                        source_properties=["content"],
+                        model="text-embedding-3-small",
+                        vectorize_collection_name=False
+                    )
+                ],
             )
 
             self.logger.info(
-                f"Collection {self.collection_name} créée avec schéma complet (19 propriétés)"
+                f"Collection {self.collection_name} créée avec schéma complet (25 propriétés - aligné PostgreSQL)"
             )
 
         except Exception as e:
@@ -225,6 +267,12 @@ class WeaviateIngester:
                 "detected_phase",
                 "applicable_metrics",
                 "actionable_recommendations",
+                "sex",
+                "age_min_days",
+                "age_max_days",
+                "company",
+                "breed",
+                "unit_system",
             }
 
             existing_properties = {prop.name for prop in schema.properties}
@@ -377,8 +425,8 @@ class WeaviateIngester:
         cleaned = {}
 
         for key, value in obj.items():
-            if value is None:
-                # Remplacer None par des valeurs par défaut appropriées
+            if value is None or value == "":
+                # Champs requis: fournir des valeurs par défaut
                 if key in [
                     "genetic_line",
                     "document_type",
@@ -397,6 +445,14 @@ class WeaviateIngester:
                     cleaned[key] = 0.0
                 elif key == "word_count":
                     cleaned[key] = 0
+                # Champs optionnels INT: omettre complètement si None/vide
+                elif key in ["age_min_days", "age_max_days"]:
+                    continue  # Ne pas inclure dans l'objet
+                # Champs optionnels TEXT: mettre chaîne vide acceptable
+                elif key in ["sex", "company", "breed", "unit_system", "target_audience",
+                           "content_type", "technical_level", "detected_phase",
+                           "detected_bird_type", "detected_site_type"]:
+                    cleaned[key] = ""
                 else:
                     cleaned[key] = ""
             elif isinstance(value, list):

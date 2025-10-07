@@ -6,7 +6,7 @@ Response generator - Ensures answers are generated from retrieved documents
 import logging
 from utils.types import Dict, Any
 
-from .data_models import RAGResult
+from .data_models import RAGResult, RAGSource
 
 logger = logging.getLogger(__name__)
 

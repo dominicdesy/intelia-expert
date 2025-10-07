@@ -12,7 +12,6 @@ Tests complets du pipeline:
 """
 
 import pytest
-import asyncio
 import sys
 from pathlib import Path
 from httpx import AsyncClient
@@ -124,7 +123,7 @@ async def test_chat_endpoint_complex_query():
         assert "ross 308" in response_lower, "Ross 308 non mentionné"
         assert "cobb 500" in response_lower or "cobb" in response_lower, "Cobb 500 non mentionné"
 
-        print(f"\n✅ Test 3 PASSED - Complex query")
+        print("\n✅ Test 3 PASSED - Complex query")
         print(f"   Sources: {len(data['sources'])}")
         print(f"   Response length: {len(data['response'])} chars")
 
@@ -168,7 +167,7 @@ async def test_chat_endpoint_with_context():
         # La réponse devrait mentionner Cobb 500
         assert "cobb" in data2["response"].lower()
 
-        print(f"\n✅ Test 4 PASSED - Contextual query")
+        print("\n✅ Test 4 PASSED - Contextual query")
 
 
 @pytest.mark.asyncio
@@ -202,7 +201,7 @@ async def test_chat_endpoint_invalid_inputs():
         })
         assert response.status_code in [400, 413, 422], "Message trop long devrait être rejeté"
 
-        print(f"\n✅ Test 5 PASSED - Invalid inputs rejected")
+        print("\n✅ Test 5 PASSED - Invalid inputs rejected")
 
 
 @pytest.mark.asyncio
@@ -227,7 +226,7 @@ async def test_chat_endpoint_entity_extraction():
         # Note: Structure exacte dépend de votre implémentation
         assert len(data["response"]) > 50
 
-        print(f"\n✅ Test 6 PASSED - Entity extraction")
+        print("\n✅ Test 6 PASSED - Entity extraction")
         if entities:
             print(f"   Entities extracted: {list(entities.keys())}")
 
@@ -258,7 +257,7 @@ async def test_chat_endpoint_sources_metadata():
             if "metadata" in source:
                 assert isinstance(source["metadata"], dict)
 
-        print(f"\n✅ Test 7 PASSED - Sources metadata validated")
+        print("\n✅ Test 7 PASSED - Sources metadata validated")
         print(f"   Sources count: {len(sources)}")
 
 
@@ -282,7 +281,7 @@ async def test_chat_endpoint_performance():
         assert response.status_code == 200
         assert duration < 10.0, f"Query trop lente: {duration:.2f}s (max: 10s)"
 
-        print(f"\n✅ Test 8 PASSED - Performance")
+        print("\n✅ Test 8 PASSED - Performance")
         print(f"   Duration: {duration:.2f}s")
 
 
@@ -309,7 +308,7 @@ async def test_chat_endpoint_veterinary_disclaimer():
         has_disclaimer = any(keyword in response_text for keyword in disclaimer_keywords)
 
         # Note: Si votre système n'ajoute pas toujours de disclaimer, ajustez ce test
-        print(f"\n✅ Test 9 PASSED - Veterinary content")
+        print("\n✅ Test 9 PASSED - Veterinary content")
         print(f"   Disclaimer present: {has_disclaimer}")
 
 
@@ -332,7 +331,7 @@ async def test_chat_endpoint_error_handling():
         error_data = response.json()
         assert "detail" in error_data or "error" in error_data
 
-        print(f"\n✅ Test 10 PASSED - Error handling")
+        print("\n✅ Test 10 PASSED - Error handling")
 
 
 if __name__ == "__main__":

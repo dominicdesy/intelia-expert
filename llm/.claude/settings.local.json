@@ -1,22 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python:*)",
-      "Bash(git checkout:*)",
-      "Read(//c/intelia_gpt/intelia-expert/**)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(dir:*)",
-      "Read(//c/**)",
-      "Bash(powershell:*)",
-      "Bash(git rm:*)",
-      "Bash(git mv:*)",
-      "Bash(tree:*)",
-      "Bash(ruff check:*)",
-      "Bash(find:*)",
-      "Bash(cat:*)",
-      "Bash(pip install:*)"
+      "Bash(Question: \"{query}\")",
+      "Bash(ssh root@intelia.com \"docker logs llm --tail 200 2>&1 | grep -E ''(LLM|OOD|Composants de base|Error|Exception)''\")",
+      "Bash(curl -X GET \"https://api.digitalocean.com/v2/apps/3aa3bd51-6e68-4e5a-9bed-05ffdc1c6b9f/deployments\" -H \"Authorization: Bearer $DIGITALOCEAN_TOKEN\" -s)"
     ],
     "deny": [],
     "ask": []

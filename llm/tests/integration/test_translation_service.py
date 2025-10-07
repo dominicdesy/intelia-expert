@@ -21,7 +21,7 @@ load_dotenv()
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from utils.translation_service import UniversalTranslationService, get_translation_service
+from utils.translation_service import get_translation_service
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def test_translation_service_initialization(translation_service):
     num_dicts = len(translation_service._language_dictionaries)
     assert num_dicts > 0, "No dictionaries loaded"
 
-    print(f"\n✅ Test 1 PASSED - Service initialized")
+    print("\n✅ Test 1 PASSED - Service initialized")
     print(f"   Dictionaries loaded: {num_dicts}")
 
 
@@ -64,7 +64,7 @@ def test_translation_12_languages(translation_service):
 
         print(f"   {to_lang.upper()}: {translated}")
 
-    print(f"\n✅ Test 2 PASSED - 12 languages translation")
+    print("\n✅ Test 2 PASSED - 12 languages translation")
 
 
 def test_translation_technical_terms_preservation(translation_service):
@@ -93,7 +93,7 @@ def test_translation_technical_terms_preservation(translation_service):
 
         print(f"   {term}: ✓ preserved")
 
-    print(f"\n✅ Test 3 PASSED - Technical terms preserved")
+    print("\n✅ Test 3 PASSED - Technical terms preserved")
 
 
 def test_translation_domains(translation_service):
@@ -121,7 +121,7 @@ def test_translation_domains(translation_service):
         assert translated is not None
         print(f"   {domain}: OK")
 
-    print(f"\n✅ Test 4 PASSED - Domain translation")
+    print("\n✅ Test 4 PASSED - Domain translation")
 
 
 def test_translation_get_available_domains(translation_service):
@@ -132,7 +132,7 @@ def test_translation_get_available_domains(translation_service):
     assert len(domains) > 0, "No domains available"
     assert "genetic_lines" in domains or len(domains) > 20
 
-    print(f"\n✅ Test 5 PASSED - Available domains")
+    print("\n✅ Test 5 PASSED - Available domains")
     print(f"   Total domains: {len(domains)}")
     print(f"   Sample: {list(domains)[:5]}")
 
@@ -151,7 +151,7 @@ def test_translation_fallback_missing_dict(translation_service):
     # Devrait fallback sur le texte original ou une langue par défaut
     assert translated is not None
 
-    print(f"\n✅ Test 6 PASSED - Fallback on missing dict")
+    print("\n✅ Test 6 PASSED - Fallback on missing dict")
 
 
 def test_translation_empty_text(translation_service):
@@ -166,7 +166,7 @@ def test_translation_empty_text(translation_service):
     # Devrait retourner chaîne vide ou None
     assert translated == "" or translated is None
 
-    print(f"\n✅ Test 7 PASSED - Empty text handling")
+    print("\n✅ Test 7 PASSED - Empty text handling")
 
 
 def test_translation_very_long_text(translation_service):
@@ -183,7 +183,7 @@ def test_translation_very_long_text(translation_service):
     assert translated is not None
     assert len(translated) > 100
 
-    print(f"\n✅ Test 8 PASSED - Long text translation")
+    print("\n✅ Test 8 PASSED - Long text translation")
     print(f"   Length: {len(translated)} chars")
 
 
@@ -204,7 +204,7 @@ def test_translation_mixed_content(translation_service):
     assert "2100" in translated
     assert "1.5" in translated
 
-    print(f"\n✅ Test 9 PASSED - Mixed content")
+    print("\n✅ Test 9 PASSED - Mixed content")
     print(f"   Translated: {translated}")
 
 
@@ -231,7 +231,7 @@ def test_translation_batch(translation_service):
     assert len(results) == len(texts)
     assert all(r is not None for r in results)
 
-    print(f"\n✅ Test 10 PASSED - Batch translation")
+    print("\n✅ Test 10 PASSED - Batch translation")
     for original, translated in zip(texts, results):
         print(f"   {original} -> {translated}")
 
@@ -247,7 +247,7 @@ def test_translation_all_supported_languages_loaded(translation_service):
         assert lang in loaded_languages, f"Language {lang} not loaded"
         print(f"   {lang.upper()}: ✓ loaded")
 
-    print(f"\n✅ Test 11 PASSED - All languages loaded")
+    print("\n✅ Test 11 PASSED - All languages loaded")
     print(f"   Total: {len(loaded_languages)}/12")
 
 
@@ -273,7 +273,7 @@ def test_translation_roundtrip(translation_service):
     # Devrait être similaire (pas forcément identique)
     assert "chicken" in back_to_en.lower() or "weight" in back_to_en.lower()
 
-    print(f"\n✅ Test 12 PASSED - Roundtrip translation")
+    print("\n✅ Test 12 PASSED - Roundtrip translation")
     print(f"   Original: {original}")
     print(f"   FR: {translated_fr}")
     print(f"   Back: {back_to_en}")

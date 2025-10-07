@@ -124,7 +124,6 @@ def test_llm_classifier():
             print(f"Target: {target} (expected: {expected_target})")
 
             # Validation
-            intent_match = intent in [expected_intent, "general_knowledge", "disease_info", "treatment_info"]  # Accept variations
             age_match = needs_age == expected_needs_age
             breed_match = needs_breed == expected_needs_breed
             target_match = target == expected_target
@@ -133,7 +132,7 @@ def test_llm_classifier():
                 print("✅ PASS - Classification correcte")
                 passed += 1
             else:
-                print(f"❌ FAIL - Mismatch detected:")
+                print("❌ FAIL - Mismatch detected:")
                 if not age_match:
                     print(f"   - Age requirement wrong: {needs_age} != {expected_needs_age}")
                 if not breed_match:

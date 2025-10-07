@@ -11,7 +11,6 @@ Tests:
 """
 
 import pytest
-import asyncio
 import sys
 import time
 from pathlib import Path
@@ -66,7 +65,7 @@ async def test_reranker_basic(reranker):
         assert "score" in doc or "relevance_score" in doc
         print(f"   Score: {doc.get('score', doc.get('relevance_score')):.3f} | {doc.get('text', doc.get('content'))[:60]}...")
 
-    print(f"\n✅ Test 1 PASSED - Basic reranking")
+    print("\n✅ Test 1 PASSED - Basic reranking")
     print(f"   Top-3 from {len(documents)} documents")
 
 
@@ -97,7 +96,7 @@ async def test_reranker_score_improvement(reranker):
 
         assert "Ross 308" in top_text and "35 jours" in top_text, "Most relevant doc should be first"
 
-    print(f"\n✅ Test 2 PASSED - Score improvement")
+    print("\n✅ Test 2 PASSED - Score improvement")
 
 
 @pytest.mark.asyncio
@@ -145,7 +144,7 @@ async def test_reranker_multilingual(reranker):
 
         print(f"   {test_case['lang'].upper()}: {len(reranked)} reranked")
 
-    print(f"\n✅ Test 3 PASSED - Multilingual reranking")
+    print("\n✅ Test 3 PASSED - Multilingual reranking")
 
 
 @pytest.mark.asyncio
@@ -168,7 +167,7 @@ async def test_reranker_top_n_selection(reranker):
 
         print(f"   Top-{top_n}: OK")
 
-    print(f"\n✅ Test 4 PASSED - Top-N selection")
+    print("\n✅ Test 4 PASSED - Top-N selection")
 
 
 @pytest.mark.asyncio
@@ -186,7 +185,7 @@ async def test_reranker_empty_documents(reranker):
 
     assert len(reranked) == 0, "Should return empty list for empty input"
 
-    print(f"\n✅ Test 5 PASSED - Empty documents handling")
+    print("\n✅ Test 5 PASSED - Empty documents handling")
 
 
 @pytest.mark.asyncio
@@ -205,7 +204,7 @@ async def test_reranker_single_document(reranker):
 
     assert len(reranked) == 1, "Should return 1 document"
 
-    print(f"\n✅ Test 6 PASSED - Single document")
+    print("\n✅ Test 6 PASSED - Single document")
 
 
 @pytest.mark.asyncio
@@ -230,7 +229,7 @@ async def test_reranker_long_documents(reranker):
 
     assert len(reranked) > 0
 
-    print(f"\n✅ Test 7 PASSED - Long documents")
+    print("\n✅ Test 7 PASSED - Long documents")
 
 
 @pytest.mark.asyncio
@@ -254,7 +253,7 @@ async def test_reranker_special_characters(reranker):
 
     assert len(reranked) > 0
 
-    print(f"\n✅ Test 8 PASSED - Special characters")
+    print("\n✅ Test 8 PASSED - Special characters")
 
 
 @pytest.mark.asyncio
@@ -282,7 +281,7 @@ async def test_reranker_performance(reranker):
     assert duration < 3.0, f"Reranking too slow: {duration:.2f}s"
     assert len(reranked) == 3
 
-    print(f"\n✅ Test 9 PASSED - Performance")
+    print("\n✅ Test 9 PASSED - Performance")
     print(f"   Duration: {duration:.3f}s for 20 documents")
 
 
@@ -321,7 +320,7 @@ async def test_reranker_batch_queries(reranker):
 
     avg_time = sum(times) / len(times)
 
-    print(f"\n✅ Test 10 PASSED - Batch queries")
+    print("\n✅ Test 10 PASSED - Batch queries")
     print(f"   Average: {avg_time:.3f}s per query")
 
 
@@ -350,7 +349,7 @@ async def test_reranker_score_distribution(reranker):
     for i in range(len(scores) - 1):
         assert scores[i] >= scores[i+1], "Scores should be in descending order"
 
-    print(f"\n✅ Test 11 PASSED - Score distribution")
+    print("\n✅ Test 11 PASSED - Score distribution")
     print(f"   Scores: {[f'{s:.3f}' for s in scores]}")
 
 

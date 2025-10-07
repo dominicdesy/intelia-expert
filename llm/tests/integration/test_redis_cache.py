@@ -57,7 +57,7 @@ async def test_cache_basic_set_get(cache_core):
     retrieved = await cache_core.get(key)
     assert retrieved == value, "Retrieved value doesn't match"
 
-    print(f"\n✅ Test 1 PASSED - Basic set/get")
+    print("\n✅ Test 1 PASSED - Basic set/get")
 
 
 @pytest.mark.asyncio
@@ -70,7 +70,7 @@ async def test_cache_miss(cache_core):
     retrieved = await cache_core.get(key)
     assert retrieved is None, "Should return None for cache miss"
 
-    print(f"\n✅ Test 2 PASSED - Cache miss")
+    print("\n✅ Test 2 PASSED - Cache miss")
 
 
 @pytest.mark.asyncio
@@ -94,7 +94,7 @@ async def test_cache_ttl_expiration(cache_core):
     retrieved_after = await cache_core.get(key)
     assert retrieved_after is None, "Value should have expired"
 
-    print(f"\n✅ Test 3 PASSED - TTL expiration")
+    print("\n✅ Test 3 PASSED - TTL expiration")
 
 
 @pytest.mark.asyncio
@@ -119,7 +119,7 @@ async def test_cache_compression(cache_core):
     assert retrieved["data"] == large_value["data"]
     assert len(retrieved["array"]) == len(large_value["array"])
 
-    print(f"\n✅ Test 4 PASSED - Compression")
+    print("\n✅ Test 4 PASSED - Compression")
 
 
 @pytest.mark.asyncio
@@ -139,12 +139,12 @@ async def test_cache_semantic_similarity(cache_core):
     cached = await cache_core.get_semantic(query2, language="fr", threshold=0.85)
 
     if cached:
-        print(f"   ✓ Semantic cache HIT")
+        print("   ✓ Semantic cache HIT")
         assert cached["answer"] == result1["answer"]
     else:
-        print(f"   ⚠ Semantic cache MISS (might need tuning)")
+        print("   ⚠ Semantic cache MISS (might need tuning)")
 
-    print(f"\n✅ Test 5 PASSED - Semantic cache")
+    print("\n✅ Test 5 PASSED - Semantic cache")
 
 
 @pytest.mark.asyncio
@@ -174,7 +174,7 @@ async def test_cache_performance_hit_vs_miss(cache_core):
     avg_hit = sum(hits) / len(hits)
     avg_miss = sum(misses) / len(misses)
 
-    print(f"\n✅ Test 6 PASSED - Performance")
+    print("\n✅ Test 6 PASSED - Performance")
     print(f"   Cache HIT: {avg_hit*1000:.2f}ms")
     print(f"   Cache MISS: {avg_miss*1000:.2f}ms")
     print(f"   Speedup: {avg_miss/avg_hit:.1f}x")
@@ -198,7 +198,7 @@ async def test_cache_batch_operations(cache_core):
         retrieved = await cache_core.get(key)
         assert retrieved == expected_value
 
-    print(f"\n✅ Test 7 PASSED - Batch operations")
+    print("\n✅ Test 7 PASSED - Batch operations")
 
 
 @pytest.mark.asyncio
@@ -214,7 +214,7 @@ async def test_cache_stats(cache_core):
     stats = await cache_core.get_stats()
 
     assert stats is not None
-    print(f"\n✅ Test 8 PASSED - Cache stats")
+    print("\n✅ Test 8 PASSED - Cache stats")
     print(f"   Stats: {stats}")
 
 
@@ -237,7 +237,7 @@ async def test_cache_clear_namespace(cache_core):
     # Other namespace should remain
     assert await cache_core.get("other:1") == "value3"
 
-    print(f"\n✅ Test 9 PASSED - Clear namespace")
+    print("\n✅ Test 9 PASSED - Clear namespace")
 
 
 @pytest.mark.asyncio
@@ -258,7 +258,7 @@ async def test_cache_fallback_on_error(cache_core):
     except Exception as e:
         print(f"   ✓ Exception caught gracefully: {type(e).__name__}")
 
-    print(f"\n✅ Test 10 PASSED - Fallback on error")
+    print("\n✅ Test 10 PASSED - Fallback on error")
 
 
 @pytest.mark.asyncio
@@ -271,9 +271,9 @@ async def test_cache_memory_limit(cache_core):
         await cache_core.set(f"test:memory:{i}", large_value, ttl=60)
 
     # Le cache devrait toujours fonctionner
-    test_value = await cache_core.get("test:memory:0")
+    await cache_core.get("test:memory:0")
 
-    print(f"\n✅ Test 11 PASSED - Memory limit handling")
+    print("\n✅ Test 11 PASSED - Memory limit handling")
 
 
 @pytest.mark.asyncio
@@ -294,7 +294,7 @@ async def test_cache_concurrent_access(cache_core):
     assert len(results) == 20
     assert all(r is not None for r in results)
 
-    print(f"\n✅ Test 12 PASSED - Concurrent access")
+    print("\n✅ Test 12 PASSED - Concurrent access")
 
 
 if __name__ == "__main__":

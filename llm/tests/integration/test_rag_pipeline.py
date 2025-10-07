@@ -15,7 +15,6 @@ Couvre:
 """
 
 import pytest
-import asyncio
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -63,7 +62,7 @@ async def test_rag_pipeline_simple_query(rag_engine):
     assert "language" in metadata
     assert metadata["language"] == "fr"
 
-    print(f"\n✅ Test 1 PASSED")
+    print("\n✅ Test 1 PASSED")
     print(f"   Answer length: {len(result['answer'])}")
     print(f"   Sources: {len(result['sources'])}")
     print(f"   Retrieval method: {metadata.get('retrieval_method', 'unknown')}")
@@ -166,7 +165,7 @@ async def test_rag_pipeline_query_routing(rag_engine):
     assert result_pg["answer"] is not None
     assert result_open["answer"] is not None
 
-    print(f"\n✅ Test 4 PASSED - Query routing")
+    print("\n✅ Test 4 PASSED - Query routing")
     print(f"   Structured query method: {result_pg['metadata'].get('retrieval_method')}")
     print(f"   Open query method: {result_open['metadata'].get('retrieval_method')}")
 
@@ -200,7 +199,7 @@ async def test_rag_pipeline_conversation_memory(rag_engine):
     assert result2["answer"] is not None
     assert "cobb" in result2["answer"].lower()
 
-    print(f"\n✅ Test 5 PASSED - Conversation memory")
+    print("\n✅ Test 5 PASSED - Conversation memory")
 
 
 @pytest.mark.asyncio
@@ -221,7 +220,7 @@ async def test_rag_pipeline_multiple_breeds_comparison(rag_engine):
     # Devrait avoir plusieurs sources
     assert len(result["sources"]) >= 2
 
-    print(f"\n✅ Test 6 PASSED - Breed comparison")
+    print("\n✅ Test 6 PASSED - Breed comparison")
     print(f"   Sources: {len(result['sources'])}")
 
 
@@ -249,7 +248,7 @@ async def test_rag_pipeline_age_variants(rag_engine):
         assert result["answer"] is not None
         assert len(result["answer"]) > 50
 
-    print(f"\n✅ Test 7 PASSED - Age variants")
+    print("\n✅ Test 7 PASSED - Age variants")
     for i, query in enumerate(queries):
         print(f"   {query}: OK")
 
@@ -275,7 +274,7 @@ async def test_rag_pipeline_metric_variants(rag_engine):
         assert result["answer"] is not None
         print(f"   {metric.upper()}: {len(result['answer'])} chars")
 
-    print(f"\n✅ Test 8 PASSED - Metric variants")
+    print("\n✅ Test 8 PASSED - Metric variants")
 
 
 @pytest.mark.asyncio
@@ -300,7 +299,7 @@ async def test_rag_pipeline_species_support(rag_engine):
 
         print(f"   {query}: {len(result['answer'])} chars")
 
-    print(f"\n✅ Test 9 PASSED - Species support")
+    print("\n✅ Test 9 PASSED - Species support")
 
 
 @pytest.mark.asyncio
@@ -317,7 +316,7 @@ async def test_rag_pipeline_no_results_handling(rag_engine):
     assert result["answer"] is not None
     assert len(result["answer"]) > 20
 
-    print(f"\n✅ Test 10 PASSED - No results handling")
+    print("\n✅ Test 10 PASSED - No results handling")
     print(f"   Answer: {result['answer'][:100]}...")
 
 
@@ -351,7 +350,7 @@ async def test_rag_pipeline_performance(rag_engine):
 
     avg_time = sum(times) / len(times)
 
-    print(f"\n✅ Test 11 PASSED - Performance")
+    print("\n✅ Test 11 PASSED - Performance")
     print(f"   Average time: {avg_time:.2f}s")
     print(f"   Min: {min(times):.2f}s, Max: {max(times):.2f}s")
 

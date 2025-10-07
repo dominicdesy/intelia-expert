@@ -62,9 +62,9 @@ class TestRunner:
 
             # Print summary
             if success:
-                print(f"\n✅ SUCCESS: {passed} tests passed in {duration:.2f}s")
+                print(f"\n[OK] SUCCESS: {passed} tests passed in {duration:.2f}s")
             else:
-                print(f"\n❌ FAILED: {passed} passed, {failed} failed, {errors} errors")
+                print(f"\n[FAILED] FAILED: {passed} passed, {failed} failed, {errors} errors")
                 print("\nError output:")
                 print(result.stdout[-500:])  # Last 500 chars
 
@@ -72,7 +72,7 @@ class TestRunner:
 
         except subprocess.TimeoutExpired:
             duration = time.time() - start
-            print(f"\n⏱️ TIMEOUT after {duration:.2f}s")
+            print(f"\n[TIMEOUT] TIMEOUT after {duration:.2f}s")
 
             self.results[description] = {
                 "success": False,
@@ -86,7 +86,7 @@ class TestRunner:
             return False
 
         except Exception as e:
-            print(f"\n❌ ERROR: {e}")
+            print(f"\n[ERROR] ERROR: {e}")
 
             self.results[description] = {
                 "success": False,
@@ -133,7 +133,7 @@ class TestRunner:
 
         # Exécuter les tests
         print(f"\n{'*' * 80}")
-        print(f"INTELIA EXPERT LLM - TEST SUITE")
+        print("INTELIA EXPERT LLM - TEST SUITE")
         print(f"Mode: {'FAST' if self.fast_mode else 'CRITICAL ONLY' if self.critical_only else 'FULL'}")
         print(f"Total tests: {len(tests_to_run)}")
         print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -155,7 +155,7 @@ class TestRunner:
         """Affiche le rapport final"""
 
         print(f"\n\n{'*' * 80}")
-        print(f"FINAL REPORT")
+        print("FINAL REPORT")
         print(f"{'*' * 80}\n")
 
         total_passed = 0
@@ -165,7 +165,7 @@ class TestRunner:
         success_count = 0
 
         for description, result in self.results.items():
-            status = "✅ PASS" if result["success"] else "❌ FAIL"
+            status = "[PASS]" if result["success"] else "[FAIL]"
 
             print(f"{status} | {description}")
             print(f"       Tests: {result['passed']} passed, {result['failed']} failed, {result['errors']} errors")
@@ -182,7 +182,7 @@ class TestRunner:
 
         # Résumé global
         print(f"{'=' * 80}")
-        print(f"SUMMARY")
+        print("SUMMARY")
         print(f"{'=' * 80}")
         print(f"Test files: {success_count}/{len(self.results)} passed")
         print(f"Total tests: {total_passed} passed, {total_failed} failed, {total_errors} errors")
@@ -191,10 +191,10 @@ class TestRunner:
 
         # Verdict
         if success_count == len(self.results):
-            print(f"🎉 ALL TESTS PASSED!")
+            print("[SUCCESS] ALL TESTS PASSED!")
             return 0
         else:
-            print(f"❌ {len(self.results) - success_count} test file(s) failed")
+            print(f"[FAILED] {len(self.results) - success_count} test file(s) failed")
             return 1
 
 

@@ -559,7 +559,7 @@ class RAGQueryProcessor:
                 )
 
         elif query_type == "optimization":
-            logger.debug(f"→ Routing to StandardHandler (type=optimization)")
+            logger.debug("→ Routing to StandardHandler (type=optimization)")
             preprocessed_data["is_optimization"] = True
             return await self.standard_handler.handle(
                 preprocessed_data, start_time, language=language

@@ -183,7 +183,7 @@ Translation in {target_lang}:"""
             logger.error(f"❌ LLM translation error ({source_language}→{target_language}): {e}")
 
             # Fallback: retourner texte original
-            logger.warning(f"⚠️ Fallback to original text due to translation error")
+            logger.warning("⚠️ Fallback to original text due to translation error")
             return text
 
     def clear_cache(self):

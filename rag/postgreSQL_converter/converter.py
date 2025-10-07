@@ -107,6 +107,13 @@ class IntelligentExcelConverter:
                                 extractor._current_table_metadata
                             )
 
+                            # Détecter le système d'unités pour cette feuille
+                            unit_system = extractor.detect_unit_system(
+                                extractor._current_table_metadata
+                            )
+                            sheet_taxonomy.unit_system = unit_system
+                            logger.info(f"Système d'unités détecté pour '{sheet_name}': {unit_system}")
+
                         # Insertion en base pour cette feuille
                         document_id = await self.db_manager.insert_document_data(
                             sheet_taxonomy,
@@ -159,6 +166,13 @@ class IntelligentExcelConverter:
                     self.db_manager._current_table_metadata = (
                         extractor._current_table_metadata
                     )
+
+                    # Détecter le système d'unités
+                    unit_system = extractor.detect_unit_system(
+                        extractor._current_table_metadata
+                    )
+                    global_taxonomy.unit_system = unit_system
+                    logger.info(f"Système d'unités détecté: {unit_system}")
 
                 # Insertion en base
                 document_id = await self.db_manager.insert_document_data(

@@ -37,7 +37,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from core.intent_classifier import IntentClassifier
 from retrieval.retriever import create_retriever
 from generation.response_generator import ResponseGenerator
-from utils.utilities import METRICS
 
 # Configure logging
 logging.basicConfig(
@@ -416,7 +415,7 @@ class CompleteSystemTester:
         print("="*70)
 
         # Overall results
-        print(f"\nOverall Results:")
+        print("\nOverall Results:")
         print(f"  Total queries:    {self.summary.total_queries}")
         print(f"  Successful:       {self.summary.successful}")
         print(f"  Failed:           {self.summary.failed}")
@@ -424,27 +423,27 @@ class CompleteSystemTester:
         print(f"  Total time:       {self.summary.total_time_seconds:.1f}s")
 
         # Performance
-        print(f"\nPerformance Metrics:")
+        print("\nPerformance Metrics:")
         print(f"  Avg latency:      {self.summary.avg_latency_ms:.0f}ms")
         print(f"  Min latency:      {self.summary.min_latency_ms:.0f}ms")
         print(f"  Max latency:      {self.summary.max_latency_ms:.0f}ms")
 
         # Entity extraction
-        print(f"\nEntity Extraction:")
+        print("\nEntity Extraction:")
         print(f"  Success rate:     {self.summary.entity_extraction_success_rate:.1f}%")
         print(f"  Total entities:   {self.summary.total_entities_extracted}")
 
         # Proactive assistant
-        print(f"\nProactive Assistant:")
+        print("\nProactive Assistant:")
         print(f"  Follow-up rate:   {self.summary.follow_up_generation_rate:.1f}%")
 
         # Quality
-        print(f"\nResponse Quality:")
+        print("\nResponse Quality:")
         print(f"  Avg length:       {self.summary.avg_response_length:.0f} chars")
         print(f"  Length valid:     {self.summary.length_validation_rate:.1f}%")
 
         # Cost
-        print(f"\nEstimated Cost:")
+        print("\nEstimated Cost:")
         print(f"  Total:            ${self.summary.estimated_total_cost_usd:.2f} USD")
 
         # Failures

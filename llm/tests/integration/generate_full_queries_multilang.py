@@ -390,11 +390,11 @@ with open(base_file, 'w', encoding='utf-8') as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
 
 print(f'OK - Generated {len(queries)} total test queries')
-print(f'\nLanguage distribution:')
+print('\nLanguage distribution:')
 for lang, count in sorted(lang_count.items()):
     print(f'   - {lang.upper()}: {count}')
 
-print(f'\nDomain distribution:')
+print('\nDomain distribution:')
 for domain, count in sorted(domain_count.items()):
     print(f'   - {domain}: {count}')
 
