@@ -700,6 +700,9 @@ class QueryRouter:
             )
 
         # 6. ROUTING INTELLIGENT
+        # Récupérer intent depuis validation_details (stocké par _validate_completeness)
+        intent = validation_details.get("llm_intent", "general_knowledge")
+
         # 🧮 Si calcul multi-étapes, router vers "calculation"
         if intent == "calculation_query":
             destination = "calculation"
@@ -998,6 +1001,15 @@ class QueryRouter:
                 if llm_entities.get("metric"):
                     entities["metric_type"] = llm_entities["metric"]
                     logger.debug(f"✅ LLM metric extraction: {llm_entities['metric']}")
+
+                # Nouvelles entités pour calculs
+                if llm_entities.get("target_weight") is not None:
+                    entities["target_weight"] = llm_entities["target_weight"]
+                    logger.debug(f"✅ LLM target_weight extraction: {llm_entities['target_weight']}g")
+
+                if llm_entities.get("calculation_type"):
+                    entities["calculation_type"] = llm_entities["calculation_type"]
+                    logger.debug(f"✅ LLM calculation_type: {llm_entities['calculation_type']}")
 
             # Log classification
             logger.info(
