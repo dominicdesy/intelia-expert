@@ -286,6 +286,22 @@ class InteliaRAGEngine(InitializableMixin):
             response_generator=self.core.generator,
         )
 
+    def set_cache_manager(self, cache_manager):
+        """
+        Configure cache manager for WeaviateCore (required for Intelligent RRF).
+
+        This method should be called after RAG Engine initialization to enable
+        Intelligent RRF with Cohere reranking.
+
+        Args:
+            cache_manager: RedisCacheCore instance
+        """
+        if self.weaviate_core and hasattr(self.weaviate_core, 'set_cache_manager'):
+            self.weaviate_core.set_cache_manager(cache_manager)
+            logger.info("✅ Cache manager configured for WeaviateCore (Intelligent RRF enabled)")
+        else:
+            logger.warning("⚠️ Cannot configure cache: WeaviateCore not available or missing set_cache_manager method")
+
     async def generate_response(
         self,
         query: str,

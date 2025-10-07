@@ -411,6 +411,10 @@ class SystemHealthMonitor:
                 rag_engine_enhanced = InteliaRAGEngine()
                 await rag_engine_enhanced.initialize()
 
+                # ✅ FIX: Configure cache manager for Intelligent RRF
+                if cache_core and hasattr(rag_engine_enhanced, 'set_cache_manager'):
+                    rag_engine_enhanced.set_cache_manager(cache_core)
+
                 self._critical_services["rag_engine_enhanced"] = rag_engine_enhanced
 
                 if rag_engine_enhanced.is_initialized:
