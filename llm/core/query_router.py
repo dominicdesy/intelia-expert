@@ -443,6 +443,12 @@ class QueryRouter:
         else:
             self.breed_regex = None
 
+        # COMPARISON - Pattern pour détecter comparaisons multi-races
+        self.comparison_regex = re.compile(
+            r"\b(vs\.?|versus|compar[ae]|compare[zr]?|et|and|ou|or)\b",
+            re.IGNORECASE
+        )
+
         # AGE - Pattern universel multi-langues
         self.age_regex = re.compile(
             r"\b(\d+)\s*(jour|day|semaine|week|día|días|tag|tage|settimana|settimane|"
@@ -581,6 +587,9 @@ class QueryRouter:
         # 2. DÉTECTION CONTEXTUELLE
         is_contextual = self._is_contextual(query, language)
 
+        # 2a. DÉTECTION COMPARATIVE (multi-breed comparisons)
+        is_comparative = self._is_comparative(query)
+
         # 2.5. DÉTECTION DOMAINE (needed for hybrid extraction)
         # 🆕 Réutiliser domaine sauvegardé si clarification response
         if override_domain:
@@ -604,7 +613,40 @@ class QueryRouter:
             if key not in entities or not entities[key]:
                 entities[key] = value
 
-        # 3c. MERGE avec entités pré-extraites si disponibles
+        # 3c. EXTRACTION MULTI-BREEDS si comparatif détecté
+        comparison_entities = []
+        if is_comparative:
+            all_breeds = self._extract_all_breeds(query)
+
+            if len(all_breeds) >= 2:
+                logger.info(f"🔀 Comparaison multi-races détectée: {all_breeds}")
+
+                # Créer entités de comparaison pour chaque breed
+                for breed in all_breeds:
+                    comp_entity = {
+                        "breed": breed,
+                        "_comparison_label": breed,
+                    }
+
+                    # Hériter age, sex, metric des entités principales
+                    if entities.get("age_days"):
+                        comp_entity["age_days"] = entities["age_days"]
+                    if entities.get("sex"):
+                        comp_entity["sex"] = entities["sex"]
+                    if entities.get("metric_type"):
+                        comp_entity["metric_type"] = entities["metric_type"]
+
+                    comparison_entities.append(comp_entity)
+
+                # Stocker dans entities pour transmission
+                entities["comparison_entities"] = comparison_entities
+                entities["is_comparative"] = True
+                logger.info(f"📊 {len(comparison_entities)} entités comparatives créées")
+            else:
+                logger.debug(f"⚠️ Pattern comparatif détecté mais < 2 breeds: {all_breeds}")
+                is_comparative = False
+
+        # 3d. MERGE avec entités pré-extraites si disponibles
         if preextracted_entities:
             logger.info(
                 f"📦 Merging preextracted entities: {list(preextracted_entities.keys())}"
@@ -658,7 +700,13 @@ class QueryRouter:
             )
 
         # 6. ROUTING INTELLIGENT
-        destination, reason = self._determine_destination(query, entities, language)
+        # 🔀 Si comparaison multi-races, router vers "comparative"
+        if is_comparative and entities.get("comparison_entities"):
+            destination = "comparative"
+            reason = "multi_breed_comparison_detected"
+            logger.info(f"🔀 Routing vers comparative: {len(entities['comparison_entities'])} breeds")
+        else:
+            destination, reason = self._determine_destination(query, entities, language)
 
         # 7. STOCKAGE CONTEXTE (si succès)
         self.context_store[user_id] = ConversationContext(
@@ -713,6 +761,56 @@ class QueryRouter:
                 return True
 
         return False
+
+    def _is_comparative(self, query: str) -> bool:
+        """
+        Détecte si la query est une comparaison multi-entités
+
+        Patterns: "vs", "versus", "compare", "comparer", "et", "and", "ou", "or"
+
+        Returns:
+            True si pattern de comparaison détecté
+        """
+        if not self.comparison_regex:
+            return False
+
+        query_lower = query.lower()
+
+        # Détecter pattern de comparaison
+        has_comparison_keyword = self.comparison_regex.search(query_lower)
+
+        if has_comparison_keyword:
+            logger.debug(f"🔀 Pattern comparatif détecté: '{has_comparison_keyword.group()}'")
+            return True
+
+        return False
+
+    def _extract_all_breeds(self, query: str) -> List[str]:
+        """
+        Extrait TOUTES les races mentionnées dans la query (pas juste la première)
+
+        Utilisé pour les queries comparatives comme "Ross 308 vs Cobb 500"
+
+        Args:
+            query: Texte de la requête
+
+        Returns:
+            Liste des noms canoniques de races trouvées
+        """
+        if not self.breed_regex:
+            return []
+
+        breeds_found = []
+
+        # Trouver toutes les occurrences (pas juste la première)
+        for match in self.breed_regex.finditer(query):
+            breed_text = match.group(1)
+            canonical = self.config.get_breed_canonical(breed_text)
+            if canonical and canonical not in breeds_found:
+                breeds_found.append(canonical)
+                logger.debug(f"🔍 Breed {len(breeds_found)}: '{breed_text}' → '{canonical}'")
+
+        return breeds_found
 
     def _extract_entities(self, query: str, language: str) -> Dict[str, Any]:
         """Extraction via regex compilés - PAS d'appel OpenAI"""
