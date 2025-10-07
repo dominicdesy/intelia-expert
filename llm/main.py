@@ -274,6 +274,8 @@ async def lifespan(app: FastAPI):
 
         # Créer le nouveau router avec TOUS les services depuis health_monitor
         all_services = health_monitor.get_all_services()
+        # CRITICAL: Add health_monitor itself so chat endpoint can access it
+        all_services["health_monitor"] = health_monitor
         updated_router = create_router(all_services)
 
         # Remplacer les routes existantes
