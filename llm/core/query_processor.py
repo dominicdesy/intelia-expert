@@ -405,8 +405,14 @@ class RAGQueryProcessor:
             query_type = "standard"
         elif route.destination == "weaviate":
             query_type = "diagnostic"
+        elif route.destination == "comparative":
+            query_type = "comparative"
         else:  # hybrid
             query_type = "standard"
+
+        # Extract comparative info from entities
+        is_comparative = route.entities.get("is_comparative", False)
+        comparison_entities = route.entities.get("comparison_entities", [])
 
         preprocessed_data = {
             "normalized_query": enriched_query,
@@ -414,14 +420,14 @@ class RAGQueryProcessor:
             "entities": route.entities,
             "language": language,
             "routing_hint": route.destination,
-            "is_comparative": False,
-            "comparison_entities": [],
+            "is_comparative": is_comparative,
+            "comparison_entities": comparison_entities,
             "query_type": query_type,
             "metadata": {
                 "original_query": original_query,
                 "normalized_query": enriched_query,
                 "routing_hint": route.destination,
-                "is_comparative": False,
+                "is_comparative": is_comparative,
                 "routing_applied": True,
                 "confidence": route.confidence,
                 "language_detected": language,

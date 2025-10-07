@@ -1152,6 +1152,10 @@ class QueryRouter:
         Returns:
             Type de query (metric_query, health_query, comparison, etc.)
         """
+        # Si comparaison détectée dans entities
+        if entities.get("is_comparative") or entities.get("comparison_entities"):
+            return "comparison"
+
         # Basé sur le domaine détecté
         if detected_domain in ["genetics_performance", "metric_query", "metrics"]:
             return "metric_query"
@@ -1161,10 +1165,6 @@ class QueryRouter:
             return "environment_query"
         elif detected_domain in ["nutrition_feeding", "nutrition"]:
             return "nutrition_query"
-
-        # Si comparaison détectée dans entities
-        if entities.get("comparison_type") or entities.get("breeds_to_compare"):
-            return "comparison"
 
         # Par défaut basé sur destination
         if destination == "postgresql":
