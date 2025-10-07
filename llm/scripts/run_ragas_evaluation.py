@@ -73,29 +73,28 @@ async def query_rag_system(
     """
     if rag_engine and RAG_ENGINE_AVAILABLE:
         try:
-            # Appel réel au RAG
-            result = await rag_engine.query(
+            # Appel réel au RAG (méthode correcte: generate_response)
+            result = await rag_engine.generate_response(
                 query=question,
                 language="fr",  # Détection automatique dans le vrai système
                 conversation_id=f"ragas_eval_{datetime.now().timestamp()}",
             )
 
-            # Extraire answer et contexts
-            answer = result.get("answer", "")
+            # Extraire answer (RAGResult.answer)
+            answer = result.answer or "[PAS DE RÉPONSE]"
 
-            # Extraire contextes des documents
+            # Extraire contextes des documents (RAGResult.context_docs: List[Dict])
             contexts = []
-            for doc in result.get("context_documents", []):
-                if isinstance(doc, dict):
-                    contexts.append(doc.get("content", ""))
-                else:
-                    # Document object
-                    contexts.append(getattr(doc, "content", ""))
+            for doc in result.context_docs:
+                # doc est un dictionnaire avec 'content' ou 'text'
+                content = doc.get("content") or doc.get("text") or doc.get("page_content", "")
+                if content:
+                    contexts.append(content)
 
             return {"answer": answer, "contexts": contexts}
 
         except Exception as e:
-            logger.error(f"❌ Erreur query RAG: {e}")
+            logger.error(f"❌ Erreur query RAG: {e}", exc_info=True)
             return {"answer": f"[ERREUR: {str(e)}]", "contexts": []}
     else:
         # Mode simulation (si RAG non disponible)
