@@ -35,11 +35,14 @@ from utils.monitoring import create_health_monitor
 from utils.utilities import setup_logging
 from api.endpoints import create_router
 
+# === VERSION TRACKING ===
+from version import get_version_string, BUILD_ID
+
 # === DEBUG DEPLOYMENT - MESSAGES VISIBLES ===
 print("=" * 80)
 print("INTELIA EXPERT BACKEND - MAIN MODULE LOADED")
-print("INTELIA EXPERT BACKEND - MAIN MODULE LOADED")
-print(" TIMESTAMP CHARGEMENT:", time.time())
+print(f"🔧 {get_version_string()}")
+print(f"⏰ TIMESTAMP CHARGEMENT: {time.time()}")
 print("=" * 80)
 
 # Configuration

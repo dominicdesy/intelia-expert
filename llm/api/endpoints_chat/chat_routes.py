@@ -26,6 +26,9 @@ from ..chat_handlers import ChatHandlers
 # NOUVEAU: Import du monitoring
 from monitoring.metrics import get_metrics_collector
 
+# VERSION TRACKING
+from version import BUILD_ID
+
 logger = logging.getLogger(__name__)
 
 
@@ -111,6 +114,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
             )
 
             logger.info(
+                f"🔧 BUILD={BUILD_ID} | "
                 f"Langue détectée: {detected_language} "
                 f"(confiance: {getattr(language_result, 'confidence', 'N/A')})"
             )
