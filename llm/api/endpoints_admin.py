@@ -15,7 +15,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from config.config import BASE_PATH
 
@@ -170,15 +170,10 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
     # RAGAS EVALUATION ENDPOINTS
     # ========================================================================
 
-    @router.post("/evaluate-rag", response_model=EvaluationStatus)
-    async def trigger_ragas_evaluation(
-        request: EvaluationRequest, background_tasks: BackgroundTasks
-    ):
+    @router.post("/evaluate-rag")
+    async def trigger_ragas_evaluation(request: EvaluationRequest):
         """
-        Trigger RAGAS evaluation in background.
-
-        The evaluation will run asynchronously and results will be saved to
-        logs/ragas_evaluation_{timestamp}.json
+        Run RAGAS evaluation synchronously and return results immediately.
 
         **Cost estimates (approximate):**
         - test_cases=3: ~$0.03, ~18 seconds
@@ -195,33 +190,37 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
             "use_simulation": false
         }
         ```
+
+        **Returns:** Complete evaluation results with scores
         """
 
         # Estimate cost
         estimates = estimate_evaluation_cost(request.test_cases, request.llm_model)
 
-        # Add task to background
-        background_tasks.add_task(
-            run_ragas_evaluation_background,
-            test_cases=request.test_cases,
-            llm_model=request.llm_model,
-            use_simulation=request.use_simulation,
-        )
-
         logger.info(
-            f"📊 RAGAS evaluation queued: {request.test_cases} cases, model={request.llm_model}"
+            f"🚀 Starting RAGAS evaluation: {request.test_cases} cases, model={request.llm_model} "
+            f"(estimated: {estimates['estimated_duration_seconds']}s, ${estimates['estimated_cost_usd']})"
         )
 
-        return EvaluationStatus(
-            status="evaluation_started",
-            message=f"RAGAS evaluation started with {request.test_cases} test cases. "
-            f"Results will be available in ~{estimates['estimated_duration_seconds']}s. "
-            f"Check /admin/evaluation-results endpoint.",
-            test_cases=request.test_cases,
-            llm_model=request.llm_model,
-            estimated_duration_seconds=estimates["estimated_duration_seconds"],
-            estimated_cost_usd=estimates["estimated_cost_usd"],
-        )
+        # Run evaluation synchronously
+        try:
+            result = await run_ragas_evaluation_background(
+                test_cases=request.test_cases,
+                llm_model=request.llm_model,
+                use_simulation=request.use_simulation,
+            )
+
+            logger.info(
+                f"✅ RAGAS evaluation completed: Overall score = {result['scores']['overall']:.2%}"
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ Error during RAGAS evaluation: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500, detail=f"Evaluation failed: {str(e)}"
+            )
 
     @router.get("/evaluation-results")
     async def get_evaluation_results():
@@ -395,16 +394,17 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
             "endpoints": {
                 "evaluate-rag": {
                     "method": "POST",
-                    "description": "Trigger RAGAS evaluation",
+                    "description": "Run RAGAS evaluation synchronously (returns results immediately)",
                     "cost": "$0.05-0.50 depending on test_cases",
+                    "duration": "18s-3min depending on test_cases",
                 },
                 "evaluation-results": {
                     "method": "GET",
-                    "description": "Get latest evaluation results",
+                    "description": "Get latest evaluation results (file-based, may not work on ephemeral filesystems)",
                 },
                 "evaluation-history": {
                     "method": "GET",
-                    "description": "Get evaluation history",
+                    "description": "Get evaluation history (file-based, may not work on ephemeral filesystems)",
                 },
             },
             "evaluation_info": {
