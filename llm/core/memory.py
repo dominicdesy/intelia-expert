@@ -29,6 +29,7 @@ class ConversationMemory:
     # 🔄 Stockage partagé entre toutes les instances
     _shared_memory_store = {}
     _shared_pending_clarifications = {}
+    _shared_conversation_languages = {}  # 🆕 Stockage langue par conversation
 
     def __init__(self, client=None):
         self.client = client
@@ -179,6 +180,10 @@ class ConversationMemory:
         if tenant_id in self._shared_pending_clarifications:
             del self._shared_pending_clarifications[tenant_id]
 
+        # 🆕 Nettoyer aussi la langue de conversation
+        if tenant_id in self._shared_conversation_languages:
+            del self._shared_conversation_languages[tenant_id]
+
     def get_memory_stats(self, tenant_id: str) -> dict:
         """Statistiques de la mémoire pour un tenant"""
         if tenant_id not in self._shared_memory_store:
@@ -328,6 +333,11 @@ class ConversationMemory:
         if "age_days" in missing or "age" in missing:  # 🔧 Support both field names
             import re
 
+            # 🔧 FIX: Accepter un nombre seul comme réponse de clarification
+            # Si le message est juste un nombre (ex: "24"), c'est probablement l'âge
+            if message.strip().isdigit():
+                return True
+
             # Patterns: "21 jours", "35 days", "42j", "3 semaines"
             age_patterns = [
                 r"\d+\s*(jour|day|j\b)",
@@ -431,6 +441,49 @@ class ConversationMemory:
 
         if to_remove:
             logger.info(f"🧹 {len(to_remove)} clarifications expirées nettoyées")
+
+    # 🆕 ================================================================
+    # MÉTHODES POUR GESTION DE LA LANGUE DE CONVERSATION
+    # ================================================================
+
+    def set_conversation_language(self, tenant_id: str, language: str):
+        """
+        Sauvegarde la langue de la première question d'une conversation
+
+        Args:
+            tenant_id: Identifiant du tenant/conversation
+            language: Code langue (fr, en, es, etc.)
+        """
+        # Sauvegarder uniquement si c'est la première fois (première question)
+        if tenant_id not in self._shared_conversation_languages:
+            self._shared_conversation_languages[tenant_id] = language
+            logger.info(f"🌍 Langue de conversation sauvegardée pour {tenant_id}: {language}")
+
+    def get_conversation_language(self, tenant_id: str) -> Optional[str]:
+        """
+        Récupère la langue sauvegardée pour cette conversation
+
+        Args:
+            tenant_id: Identifiant du tenant/conversation
+
+        Returns:
+            Code langue (fr, en, es, etc.) ou None si pas encore défini
+        """
+        language = self._shared_conversation_languages.get(tenant_id)
+        if language:
+            logger.debug(f"🌍 Langue de conversation récupérée pour {tenant_id}: {language}")
+        return language
+
+    def clear_conversation_language(self, tenant_id: str):
+        """
+        Efface la langue sauvegardée (lors du reset de conversation)
+
+        Args:
+            tenant_id: Identifiant du tenant/conversation
+        """
+        if tenant_id in self._shared_conversation_languages:
+            del self._shared_conversation_languages[tenant_id]
+            logger.info(f"🌍 Langue de conversation effacée pour {tenant_id}")
 
     def get_clarification_stats(self) -> Dict[str, Any]:
         """

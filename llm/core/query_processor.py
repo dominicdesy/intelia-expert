@@ -77,9 +77,37 @@ class RAGQueryProcessor:
             timestamp=time.time(),
         )
 
+        # 🆕 STEP 0: Héritage de langue pour TOUTE la conversation
+        # Si on a déjà une langue sauvegardée pour cette conversation, l'utiliser
+        # Sauf si la query actuelle est longue et claire (> 10 mots)
+        if self.conversation_memory:
+            saved_language = self.conversation_memory.get_conversation_language(tenant_id)
+
+            if saved_language:
+                # Détecter si la query actuelle est courte/ambiguë
+                query_stripped = query.strip()
+                is_short_query = (
+                    len(query_stripped) < 50 or  # Moins de 50 caractères
+                    query_stripped.isdigit() or  # Juste un nombre
+                    len(query_stripped.split()) <= 5  # 5 mots ou moins
+                )
+
+                # Hériter la langue sauf si query longue et langue détectée différente avec haute confiance
+                if is_short_query or saved_language == language:
+                    if saved_language != language:
+                        logger.info(
+                            f"🌍 Langue héritée de la conversation: {language} → {saved_language} "
+                            f"(query: '{query_stripped[:50]}...')"
+                        )
+                        language = saved_language
+            else:
+                # Première question de la conversation: sauvegarder la langue
+                self.conversation_memory.set_conversation_language(tenant_id, language)
+                logger.info(f"🌍 Première question - langue sauvegardée: {language}")
+
         logger.info(f"Processing query with language: {language}")
 
-        # Step 0: Check if this is a clarification response
+        # Step 0.1: Check if this is a clarification response
         pending_clarification = None
         saved_domain = None  # 🆕 Domaine sauvegardé pour réutilisation
         if self.conversation_memory:
@@ -98,25 +126,6 @@ class RAGQueryProcessor:
                     saved_domain = pending_clarification.get("detected_domain")
                     if saved_domain:
                         logger.info(f"♻️ Réutilisation domaine sauvegardé: {saved_domain}")
-
-                    # 🆕 FIX BUG #2: Hériter la langue du contexte conversationnel
-                    # Si la query actuelle est courte/ambiguë (ex: "22"), hériter la langue de Q1
-                    saved_language = pending_clarification.get("language")
-                    if saved_language:
-                        # Détecter si query actuelle est ambiguë (courte, numérique, etc.)
-                        query_stripped = query.strip()
-                        is_ambiguous = (
-                            len(query_stripped) < 10 or  # Très courte
-                            query_stripped.isdigit() or  # Juste un nombre
-                            len(query_stripped.split()) <= 2  # 1-2 mots
-                        )
-
-                        if is_ambiguous and saved_language != language:
-                            logger.info(
-                                f"🌍 Langue héritée du contexte: {language} → {saved_language} "
-                                f"(query courte/ambiguë: '{query_stripped}')"
-                            )
-                            language = saved_language  # Override detected language
 
                     # Merge original query with clarification
                     original_query = pending_clarification.get("original_query", "")
