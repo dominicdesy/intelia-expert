@@ -104,8 +104,13 @@ rank-bm25==0.2.2
 langchain-core==0.1.16
 langsmith>=0.0.83,<0.1.0
 
+# === RAGAS EVALUATION FRAMEWORK ===
+# RAGAS for RAG evaluation (moved from dev dependencies for admin endpoints)
+ragas>=0.1.0
+datasets>=2.14.0
+
 # === LANGCHAIN POUR RAGAS ===
-# LangChain OpenAI pour évaluateur RAGAS (evaluation framework in requirements-dev.txt)
+# LangChain OpenAI pour évaluateur RAGAS
 langchain-openai>=0.0.5
 
 # === UTILITAIRES BASE ===
