@@ -20,6 +20,7 @@ logs/
 # ------------------------------
 __pycache__/
 *.py[cod]
+*.pyc
 *.pyo
 *.pyd
 *.so
@@ -36,6 +37,14 @@ htmlcov/
 .ruff_cache/
 .env
 .env.*
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+*.old
+*~
+nul
 
 # ------------------------------
 # Node / Next.js (frontend)

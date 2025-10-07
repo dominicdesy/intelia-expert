@@ -24,6 +24,21 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+# Fix UTF-8 encoding for Windows console FIRST (before any print)
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+# Charger .env depuis le répertoire llm/
+from dotenv import load_dotenv
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+    print(f"✅ Variables d'environnement chargées depuis: {env_path}")
+else:
+    print(f"⚠️ Fichier .env non trouvé: {env_path}")
+
 # Ajouter répertoire parent au path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

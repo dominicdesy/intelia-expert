@@ -106,7 +106,21 @@ class InteliaRAGEngine(InitializableMixin):
 
         # Core components
         self.core = RAGEngineCore(openai_client)
-        self.query_router = QueryRouter(config_dir="/app/config")
+
+        # Déterminer le config_dir dynamiquement
+        # Docker: /app/config, Local: llm/config
+        from pathlib import Path
+        import os
+        config_dir = os.getenv("LLM_CONFIG_DIR")
+        if not config_dir:
+            # Auto-détection: Si /app/config existe (Docker), l'utiliser
+            # Sinon, utiliser le chemin relatif depuis le fichier actuel
+            if Path("/app/config").exists():
+                config_dir = "/app/config"
+            else:
+                config_dir = str(Path(__file__).parent.parent / "config")
+
+        self.query_router = QueryRouter(config_dir=config_dir)
         self.entity_extractor = EntityExtractor()
 
         # Conversation memory (optional)
