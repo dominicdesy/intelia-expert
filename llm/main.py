@@ -272,8 +272,9 @@ async def lifespan(app: FastAPI):
         logger.info(" INJECTION DES SERVICES - ARCHITECTURE CENTRALISÉE ")
         logger.info("Mise à jour du router avec services initialisés...")
 
-        # Créer le nouveau router avec les services maintenant disponibles
-        updated_router = create_router(services)
+        # Créer le nouveau router avec TOUS les services depuis health_monitor
+        all_services = health_monitor.get_all_services()
+        updated_router = create_router(all_services)
 
         # Remplacer les routes existantes
         app.router.routes.clear()
