@@ -524,19 +524,23 @@ class ComparisonEngine:
         # Recherche par priorité (matching partiel pour "body_weight for males" etc.)
         for metric_name in self.METRIC_PRIORITIES:
             for doc_dict in docs_as_dicts:
-                doc_metric = doc_dict.get("metric_name", "").lower()
+                # ✅ FIX: Les métriques PostgreSQL ont metric_name dans metadata, pas à la racine
+                metadata = doc_dict.get("metadata", {})
+                doc_metric = metadata.get("metric_name", "").lower()
                 priority_metric = metric_name.lower()
 
                 # Matching partiel: commence par ou contient la priorité
                 if doc_metric.startswith(priority_metric) or priority_metric in doc_metric:
-                    logger.debug(f"Métrique sélectionnée: {doc_dict.get('metric_name')} (priorité: {metric_name})")
-                    return doc_dict
+                    logger.debug(f"Métrique sélectionnée: {metadata.get('metric_name')} (priorité: {metric_name})")
+                    # Retourner les metadata (pas le doc entier avec "content" et "score")
+                    return metadata
 
         # Fallback: premier doc disponible avec valeur numérique
         for doc_dict in docs_as_dicts:
-            if doc_dict.get("value_numeric") is not None:
-                logger.debug(f"Métrique fallback: {doc_dict.get('metric_name')}")
-                return doc_dict
+            metadata = doc_dict.get("metadata", {})
+            if metadata.get("value_numeric") is not None:
+                logger.debug(f"Métrique fallback: {metadata.get('metric_name')}")
+                return metadata
 
         logger.warning("Aucune métrique valide trouvée")
         return None
