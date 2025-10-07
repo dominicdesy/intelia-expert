@@ -714,7 +714,7 @@ class QueryRouter:
             reason = "multi_breed_comparison_detected"
             logger.info(f"🔀 Routing vers comparative: {len(entities['comparison_entities'])} breeds")
         else:
-            destination, reason = self._determine_destination(query, entities, language)
+            destination, reason = self._determine_destination(query, entities, language, validation_details)
 
         # 7. STOCKAGE CONTEXTE (si succès)
         self.context_store[user_id] = ConversationContext(
@@ -1162,14 +1162,38 @@ class QueryRouter:
         return missing
 
     def _determine_destination(
-        self, query: str, entities: Dict[str, Any], language: str
+        self, query: str, entities: Dict[str, Any], language: str, validation_details: Dict[str, Any] = None
     ) -> Tuple[str, str]:
         """
-        Routing intelligent basé sur keywords depuis universal_terms
+        Routing intelligent basé sur LLM classifier (priorité) puis keywords fallback
+
+        Args:
+            query: Question utilisateur
+            entities: Entités extraites
+            language: Langue détectée
+            validation_details: Détails de validation contenant llm_routing_target
 
         Returns:
             (destination, reason)
         """
+
+        # 🆕 PRIORITÉ 1: Utiliser routing LLM si disponible
+        if validation_details:
+            llm_target = validation_details.get("llm_routing_target")
+            llm_confidence = validation_details.get("llm_confidence", 0.0)
+            llm_intent = validation_details.get("llm_intent", "")
+
+            # Si LLM a une recommandation claire (confidence > 0.6), la respecter
+            if llm_target and llm_confidence > 0.6:
+                if llm_target == "weaviate":
+                    logger.info(f"🤖 LLM routing (confidence={llm_confidence:.2f}): weaviate for {llm_intent}")
+                    return ("weaviate", f"llm_classifier_{llm_intent}")
+                elif llm_target == "postgresql":
+                    logger.info(f"🤖 LLM routing (confidence={llm_confidence:.2f}): postgresql for {llm_intent}")
+                    return ("postgresql", f"llm_classifier_{llm_intent}")
+
+        # FALLBACK: Keyword-based routing (ancien comportement)
+        logger.debug("⚠️ Fallback to keyword-based routing (LLM routing not available or low confidence)")
 
         # PostgreSQL: métriques chiffrées
         if self.config.should_route_to_postgresql(query, language):
