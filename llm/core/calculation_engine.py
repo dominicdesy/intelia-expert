@@ -126,6 +126,13 @@ class CalculationEngine:
         """
         Calcule la consommation totale d'aliment entre deux âges
 
+        Méthode: Additionner les daily_intake jour par jour
+
+        Note: Pour chaque âge, il y a 2 valeurs feed_intake:
+        - MIN = daily intake (consommation quotidienne, ex: 93g)
+        - MAX = cumulative intake (consommation cumulée, ex: 878g)
+        On utilise MIN (daily) et on additionne.
+
         Args:
             breed: Nom de la souche
             sex: Sexe
@@ -137,11 +144,13 @@ class CalculationEngine:
         """
         try:
             async with self.db_pool.acquire() as conn:
-                # Trouver l'âge le plus proche de age_start et prendre la valeur MAX (cumulatif)
-                query_start = """
+                # Récupérer tous les daily_intake entre age_start et age_end
+                # MIN(value_numeric) = daily intake (la plus petite des 2 valeurs par jour)
+                # Filtre >= 10 pour exclure valeurs impériales
+                query = """
                 SELECT
                     m.age_min,
-                    MAX(m.value_numeric) as cumulative_intake
+                    MIN(m.value_numeric) as daily_intake
                 FROM metrics m
                 JOIN documents d ON m.document_id = d.id
                 JOIN strains s ON d.strain_id = s.id
@@ -149,39 +158,23 @@ class CalculationEngine:
                   AND d.sex = $2
                   AND m.metric_name LIKE 'feed_intake for %'
                   AND m.value_numeric IS NOT NULL
+                  AND m.value_numeric >= 10
+                  AND m.age_min >= $3
+                  AND m.age_min <= $4
                 GROUP BY m.age_min
-                ORDER BY ABS(m.age_min - $3)
-                LIMIT 1
+                ORDER BY m.age_min
                 """
 
-                # Trouver l'âge le plus proche de age_end et prendre la valeur MAX (cumulatif)
-                query_end = """
-                SELECT
-                    m.age_min,
-                    MAX(m.value_numeric) as cumulative_intake
-                FROM metrics m
-                JOIN documents d ON m.document_id = d.id
-                JOIN strains s ON d.strain_id = s.id
-                WHERE s.strain_name = $1
-                  AND d.sex = $2
-                  AND m.metric_name LIKE 'feed_intake for %'
-                  AND m.value_numeric IS NOT NULL
-                GROUP BY m.age_min
-                ORDER BY ABS(m.age_min - $3)
-                LIMIT 1
-                """
+                rows = await conn.fetch(query, breed, sex, age_start, age_end)
 
-                row_start = await conn.fetchrow(query_start, breed, sex, age_start)
-                row_end = await conn.fetchrow(query_end, breed, sex, age_end)
-
-                if not row_start or not row_end:
-                    logger.warning(f"❌ Données insuffisantes: start={row_start}, end={row_end}")
+                if not rows or len(rows) == 0:
+                    logger.warning(f"❌ Aucune donnée daily_intake trouvée entre jour {age_start} et {age_end}")
                     return CalculationResult(
                         value=0,
                         unit="g",
                         calculation_type="total_feed",
                         details={
-                            "error": "Données insuffisantes",
+                            "error": "Aucune donnée disponible",
                             "breed": breed,
                             "sex": sex,
                             "age_start": age_start,
@@ -190,16 +183,17 @@ class CalculationEngine:
                         confidence=0.0,
                     )
 
-                actual_age_start = row_start["age_min"]
-                actual_age_end = row_end["age_min"]
-                intake_start = row_start["cumulative_intake"]
-                intake_end = row_end["cumulative_intake"]
+                # Additionner tous les daily_intake
+                total_feed = sum(row["daily_intake"] for row in rows)
+                days_count = len(rows)
+                avg_daily = total_feed / days_count if days_count > 0 else 0
 
-                total_feed = intake_end - intake_start
+                actual_age_start = rows[0]["age_min"]
+                actual_age_end = rows[-1]["age_min"]
 
                 logger.info(
-                    f"📊 Feed calculation: age {actual_age_start}→{actual_age_end}, "
-                    f"intake {intake_start}g→{intake_end}g, total={total_feed}g"
+                    f"📊 Feed calculation: {days_count} days from {actual_age_start}→{actual_age_end}, "
+                    f"total={total_feed}g ({round(total_feed/1000, 2)}kg)"
                 )
 
                 return CalculationResult(
@@ -211,11 +205,11 @@ class CalculationEngine:
                         "age_end_requested": age_end,
                         "age_start_actual": actual_age_start,
                         "age_end_actual": actual_age_end,
-                        "intake_start": intake_start,
-                        "intake_end": intake_end,
-                        "feed_per_day": round(total_feed / (actual_age_end - actual_age_start), 2) if actual_age_end > actual_age_start else 0,
+                        "days_count": days_count,
+                        "avg_daily_intake": round(avg_daily, 2),
+                        "total_kg": round(total_feed / 1000, 2),
                     },
-                    confidence=1.0 if (actual_age_start == age_start and actual_age_end == age_end) else 0.9,
+                    confidence=1.0,
                 )
 
         except Exception as e:
