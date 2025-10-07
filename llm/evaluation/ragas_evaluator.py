@@ -24,7 +24,7 @@ try:
         faithfulness,
         answer_relevancy,
     )
-    from datasets import Dataset
+    from datasets import Dataset, Features, Value, Sequence
 
     RAGAS_AVAILABLE = True
 except ImportError:
@@ -155,7 +155,17 @@ class RAGASEvaluator:
                 case.get("ground_truth", "") for case in test_cases
             ]
 
-        dataset = Dataset.from_dict(ragas_data)
+        # Définir features explicitement pour RAGAS 0.1.1
+        features = Features({
+            "question": Value("string"),
+            "answer": Value("string"),
+            "contexts": Sequence(Value("string")),
+        })
+
+        if "ground_truth" in ragas_data:
+            features["ground_truth"] = Value("string")
+
+        dataset = Dataset.from_dict(ragas_data, features=features)
 
         logger.info(f"📊 Dataset RAGAS créé: {len(test_cases)} cas de test")
 
