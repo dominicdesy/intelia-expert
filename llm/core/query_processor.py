@@ -99,6 +99,25 @@ class RAGQueryProcessor:
                     if saved_domain:
                         logger.info(f"♻️ Réutilisation domaine sauvegardé: {saved_domain}")
 
+                    # 🆕 FIX BUG #2: Hériter la langue du contexte conversationnel
+                    # Si la query actuelle est courte/ambiguë (ex: "22"), hériter la langue de Q1
+                    saved_language = pending_clarification.get("language")
+                    if saved_language:
+                        # Détecter si query actuelle est ambiguë (courte, numérique, etc.)
+                        query_stripped = query.strip()
+                        is_ambiguous = (
+                            len(query_stripped) < 10 or  # Très courte
+                            query_stripped.isdigit() or  # Juste un nombre
+                            len(query_stripped.split()) <= 2  # 1-2 mots
+                        )
+
+                        if is_ambiguous and saved_language != language:
+                            logger.info(
+                                f"🌍 Langue héritée du contexte: {language} → {saved_language} "
+                                f"(query courte/ambiguë: '{query_stripped}')"
+                            )
+                            language = saved_language  # Override detected language
+
                     # Merge original query with clarification
                     original_query = pending_clarification.get("original_query", "")
                     merged_query = (

@@ -288,28 +288,59 @@ class ConversationalQueryEnricher:
         # Extract age in days - BUT ONLY if this is a follow-up question
         # 🔒 PROTECTION: Don't extract age for standalone queries to avoid contamination
         if not is_standalone_query:
-            # First, remove examples from history to avoid extracting from them
-            history_cleaned = re.sub(
-                r'(?:ex:|exemple:|example:).*?(?:\)|$)',  # Remove text after "ex:" until ) or end
-                '',
-                history_lower,
-                flags=re.IGNORECASE | re.DOTALL
-            )
+            age_days = None
 
-            age_patterns = [
-                r"(\d+)\s*(?:jour|day)s?",
-                r"(\d+)\s*j\b",
-                r"day\s*(\d+)",
-                r"à\s*(\d+)",
-            ]
+            # 🆕 PRIORITÉ #1: Extract age from CURRENT QUERY first (clarification responses like "22")
+            if current_query:
+                current_query_stripped = current_query.strip()
 
-            for pattern in age_patterns:
-                match = re.search(pattern, history_cleaned)
-                if match:
-                    age_days = int(match.group(1))
-                    entities["age_days"] = age_days
-                    logger.debug(f"Age extracted from context: {age_days} days")
-                    break
+                # Check if current query is a simple number (clarification response)
+                if current_query_stripped.isdigit():
+                    age_days = int(current_query_stripped)
+                    logger.info(f"✅ Age extracted from current query: {age_days} days (clarification response)")
+                else:
+                    # Try patterns in current query
+                    age_patterns_current = [
+                        r"^(\d+)$",  # Just a number
+                        r"(\d+)\s*(?:jour|day)s?",
+                        r"(\d+)\s*j\b",
+                    ]
+
+                    for pattern in age_patterns_current:
+                        match = re.search(pattern, current_query.lower())
+                        if match:
+                            age_days = int(match.group(1))
+                            logger.info(f"✅ Age extracted from current query: {age_days} days")
+                            break
+
+            # 🆕 PRIORITÉ #2: If no age in current query, extract from context
+            if age_days is None:
+                # Remove examples from history to avoid extracting from them
+                # 🔧 FIX: Also remove "e.g." patterns
+                history_cleaned = re.sub(
+                    r'(?:ex:|exemple:|example:|e\.g\.|eg\.).*?(?:\)|$)',  # Remove text after examples until ) or end
+                    '',
+                    history_lower,
+                    flags=re.IGNORECASE | re.DOTALL
+                )
+
+                age_patterns = [
+                    r"(\d+)\s*(?:jour|day)s?",
+                    r"(\d+)\s*j\b",
+                    r"day\s*(\d+)",
+                    r"à\s*(\d+)",
+                ]
+
+                for pattern in age_patterns:
+                    match = re.search(pattern, history_cleaned)
+                    if match:
+                        age_days = int(match.group(1))
+                        logger.debug(f"Age extracted from context: {age_days} days")
+                        break
+
+            # Store extracted age
+            if age_days is not None:
+                entities["age_days"] = age_days
         else:
             logger.info(
                 f"🔒 Skipping age extraction from context (standalone query with breed + metric)"
