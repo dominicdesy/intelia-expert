@@ -530,10 +530,15 @@ class RAGQueryProcessor:
                 # Convert to RAGResult format
                 if result.get("success"):
                     calc_result = result.get("calculation_result", {})
+
+                    # Build context_docs from calculation details for RAGAS evaluation
+                    context_docs = self._build_calculation_contexts(calc_result, result.get("calculation_type"))
+
                     return RAGResult(
                         source=RAGSource.RETRIEVAL_SUCCESS,
                         answer=self._format_calculation_answer(calc_result, language),
                         confidence=calc_result.get("confidence", 0.9),
+                        context_docs=context_docs,
                         metadata={
                             "query_type": "calculation",
                             "calculation_type": result.get("calculation_type"),
@@ -693,3 +698,133 @@ class RAGQueryProcessor:
 
         # Fallback
         return str(calc_result)
+
+    def _build_calculation_contexts(self, calc_result: Dict[str, Any], calc_type: str) -> List[Dict[str, Any]]:
+        """
+        Build context documents from calculation results for RAGAS evaluation.
+
+        Args:
+            calc_result: Calculation result dictionary
+            calc_type: Type of calculation performed
+
+        Returns:
+            List of context documents with content and metadata
+        """
+        contexts = []
+
+        # Extract breed and gender info
+        breed = calc_result.get("breed", "unknown")
+        gender = calc_result.get("gender", "unknown")
+
+        # Context 1: Source data used for calculation
+        source_context = f"Source des données: Standards de performance pour {breed}"
+        if gender != "unknown":
+            source_context += f" ({gender})"
+        source_context += ".\n"
+
+        # Add calculation-specific details
+        if "total_feed_kg" in calc_result:
+            # Cumulative feed calculation
+            age_start = calc_result.get("age_start")
+            age_end = calc_result.get("age_end")
+            target_weight = calc_result.get("target_weight")
+            total_feed = calc_result.get("total_feed_kg")
+
+            source_context += f"Données utilisées: Consommation alimentaire cumulée du jour {age_start} au jour {age_end}.\n"
+            source_context += f"Poids cible: {target_weight}g au jour {age_end}.\n"
+            source_context += f"Résultat calculé: {total_feed} kg d'aliment par poulet."
+
+            # Add interpolation details if present
+            details = calc_result.get("details", {})
+            if details.get("interpolation_applied"):
+                ratio = details.get("interpolation_ratio", 1.0)
+                source_context += f"\nAjustement proportionnel appliqué: {ratio:.1%} pour le dernier jour."
+
+        elif "age_found" in calc_result:
+            # Reverse lookup
+            age = calc_result.get("age_found")
+            target = calc_result.get("target_weight")
+            actual = calc_result.get("weight_found")
+
+            source_context += f"Recherche inversée effectuée pour trouver l'âge correspondant au poids cible de {target}g.\n"
+            source_context += f"Résultat: Jour {age} avec poids réel de {actual}g."
+
+        elif "projected_weight_kg" in calc_result:
+            # Projection
+            weight_kg = calc_result.get("projected_weight_kg")
+            age_end = calc_result.get("age_end")
+
+            source_context += f"Projection du poids au jour {age_end}.\n"
+            source_context += f"Poids projeté: {weight_kg} kg."
+
+        elif "total_live_weight_kg" in calc_result:
+            # Flock calculation
+            flock_size = calc_result.get("flock_size")
+            total_weight = calc_result.get("total_live_weight_kg")
+            total_feed = calc_result.get("total_feed_consumed_kg")
+
+            source_context += f"Calcul pour un troupeau de {flock_size} poulets.\n"
+            source_context += f"Poids vif total: {total_weight} kg.\n"
+            source_context += f"Aliment total consommé: {total_feed} kg."
+
+        contexts.append({
+            "content": source_context,
+            "metadata": {
+                "source": "calculation_engine",
+                "calculation_type": calc_type,
+                "breed": breed,
+                "gender": gender
+            }
+        })
+
+        # Context 2: Methodology explanation
+        methodology = "Méthodologie de calcul: "
+
+        if "total_feed_kg" in calc_result:
+            methodology += "Sommation de la consommation alimentaire quotidienne basée sur les courbes de référence pour la race. "
+            methodology += "Les valeurs sont interpolées si l'âge exact n'est pas disponible dans les standards."
+
+        elif "age_found" in calc_result:
+            methodology += "Recherche dans les courbes de croissance pour identifier le jour où le poids cible est atteint. "
+            methodology += "Interpolation linéaire utilisée entre les points de données disponibles."
+
+        elif "projected_weight_kg" in calc_result:
+            methodology += "Projection du poids basée sur les courbes de croissance standard pour la race. "
+            methodology += "Extrapolation si l'âge dépasse les données de référence."
+
+        elif "total_live_weight_kg" in calc_result:
+            methodology += "Calcul du poids et de la consommation totale en multipliant les valeurs individuelles par la taille du troupeau."
+
+        contexts.append({
+            "content": methodology,
+            "metadata": {
+                "source": "calculation_methodology",
+                "calculation_type": calc_type
+            }
+        })
+
+        # Context 3: Data quality and confidence
+        confidence = calc_result.get("confidence", 0.0)
+        quality_context = f"Niveau de confiance du calcul: {confidence:.1%}.\n"
+
+        # Add details about data quality
+        details = calc_result.get("details", {})
+        if details:
+            if details.get("interpolation_applied"):
+                quality_context += "Interpolation appliquée: Les valeurs pour certains jours ont été interpolées à partir des données disponibles.\n"
+            if details.get("extrapolation_applied"):
+                quality_context += "Extrapolation appliquée: Projection au-delà des données de référence disponibles.\n"
+            if details.get("data_source"):
+                quality_context += f"Source des données: {details.get('data_source')}.\n"
+
+        quality_context += "Les calculs sont basés sur les standards de performance publiés par les sélectionneurs."
+
+        contexts.append({
+            "content": quality_context,
+            "metadata": {
+                "source": "data_quality",
+                "confidence": confidence
+            }
+        })
+
+        return contexts
