@@ -37,28 +37,38 @@ class LLMOODDetector:
 
     CLASSIFICATION_PROMPT = """You are a domain classifier for a poultry production expert system.
 
-Determine if the following question is related to POULTRY PRODUCTION.
+Determine if the following question is related to POULTRY PRODUCTION AND VALUE CHAIN.
 
 POULTRY PRODUCTION includes:
-- Broilers (meat chickens), layers (egg chickens), ducks, turkeys, quails
-- Nutrition: feed formulation, ingredients, feeding programs
-- Health: diseases, treatments, vaccines, biosecurity, veterinary care
-- Genetics: breeds (Ross, Cobb, Hubbard, ISA, Lohmann, etc.), performance standards
-- Management: housing, climate control, lighting, water, density
-- Production metrics: weight, FCR, mortality, egg production, uniformity
-- Economics: profitability, costs, efficiency
+- Birds: Broilers (meat chickens), layers (egg chickens), ducks, turkeys, quails, parent stock, grandparent stock
+- Nutrition: feed formulation, ingredients, feed mills, feeding programs, nutritional requirements
+- Health: diseases, treatments, vaccines, biosecurity, veterinary care, laboratory diagnostics
+- Genetics: breeds (Ross, Cobb, Hubbard, ISA, Lohmann, etc.), performance standards, breeding programs
+- Management: housing, climate control, lighting, water quality, stocking density, ventilation
+- Production metrics: weight, FCR, mortality, egg production, uniformity, daily gain
+
+POULTRY VALUE CHAIN includes:
+- Hatcheries: egg incubation, hatching, chick quality, hatchery operations
+- Feed mills: feed manufacturing, ingredient sourcing, quality control
+- Farms: broiler farms, layer farms, breeder farms, rearing operations
+- Processing plants: slaughterhouses, abattoirs, processing operations, cutting rooms
+- Egg operations: egg candling stations (mirage), egg grading/classification, packing
+- Laboratories: disease diagnostics, feed analysis, quality testing
+- Integration: contract farming, vertical integration, farm-to-plant logistics
+- Data & planning: production planning, data requirements between facilities, forecasting
+- Economics: profitability, costs, efficiency, pricing
 
 OUT-OF-DOMAIN includes:
 - General knowledge (history, geography, politics)
-- Other animals (pets, cattle, pigs, fish)
-- Cooking recipes
+- Other animals (pets, cattle, pigs, fish, seafood)
+- Human cooking/recipes (unless about industrial poultry processing)
 - Human health or medicine
 - Technology unrelated to poultry
 - Entertainment, sports, culture
 
 Question: "{query}"
 
-Is this question about POULTRY PRODUCTION?
+Is this question about POULTRY PRODUCTION or POULTRY VALUE CHAIN?
 
 Answer ONLY with: YES or NO"""
 
@@ -148,7 +158,7 @@ Answer ONLY with: YES or NO"""
             logger.error(f"❌ LLM OOD classification error: {e}")
 
             # Fallback: accepter la query (fail-open pour meilleure UX)
-            logger.warning(f"⚠️ Fallback to IN-DOMAIN due to LLM error")
+            logger.warning("⚠️ Fallback to IN-DOMAIN due to LLM error")
             return (
                 True,  # Fail-open: accepter en cas d'erreur
                 0.5,   # Confidence basse
