@@ -100,6 +100,7 @@ class UserRegister(BaseModel):
     full_name: Optional[str] = None
     company: Optional[str] = None
     phone: Optional[str] = None
+    preferred_language: Optional[str] = "en"  # NOUVEAU: langue préférée
 
 
 class AuthResponse(BaseModel):
@@ -1286,6 +1287,9 @@ async def register_user(user_data: UserRegister):
             user_metadata["company"] = user_data.company
         if user_data.phone:
             user_metadata["phone"] = user_data.phone
+        # NOUVEAU: Stocker la langue préférée
+        if user_data.preferred_language:
+            user_metadata["preferred_language"] = user_data.preferred_language
 
         # Essayer la nouvelle API Supabase d'abord
         try:
