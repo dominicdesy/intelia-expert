@@ -122,13 +122,13 @@ async def save_conversation(
             f"conv_id={conversation_data.conversation_id[:8]}..."
         )
 
-        # Vérification sécurité
-        requester_id = current_user.get("email", current_user.get("user_id", ""))
+        # Vérification sécurité - Comparer les UUID
+        requester_id = current_user.get("user_id", "")
         if conversation_data.user_id != requester_id and not current_user.get(
             "is_admin", False
         ):
             logger.warning(
-                f"Tentative sauvegarde non autorisée: {requester_id} → {conversation_data.user_id}"
+                f"Tentative sauvegarde non autorisée: {requester_id} ({current_user.get('email')}) → {conversation_data.user_id}"
             )
             raise HTTPException(
                 status_code=403,
@@ -373,8 +373,8 @@ async def delete_all_user_conversations(
     try:
         logger.info(f"delete_all_user_conversations: user_id={user_id}")
 
-        # Vérification sécurité
-        requester_id = current_user.get("email", current_user.get("user_id", ""))
+        # Vérification sécurité - Comparer les UUID
+        requester_id = current_user.get("user_id", "")
         if user_id != requester_id and not current_user.get("is_admin", False):
             raise HTTPException(
                 status_code=403,

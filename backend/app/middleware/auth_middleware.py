@@ -75,15 +75,9 @@ PROTECTED_PATTERNS = [
     "/api/v1/billing/quotas",
     "/api/v1/billing/generate-invoice",
     # === ENDPOINTS ADMIN STRICTS ===
-    "/api/v1/logging/analytics/",
     "/api/v1/logging/questions",
     "/api/v1/admin/",
     "/api/v1/invitations/",
-    # === ENDPOINTS USERS (admin pour gestion utilisateurs) ===
-    "/api/v1/users/",
-    "/api/v1/users/profile",
-    "/api/v1/users/export",
-    "/api/v1/users/debug/",
     # === ENDPOINTS CACHE ADMIN ===
     "/api/v1/stats-admin/",
     "/api/v1/stats-admin/force-update/",
@@ -99,6 +93,12 @@ AUTHENTICATED_USER_PATTERNS = [
     "/api/v1/auth/me",
     "/api/v1/auth/heartbeat",
     "/api/v1/auth/logout",
+    # === ENDPOINTS USERS (profil personnel) ===
+    "/api/v1/users/profile",
+    "/api/v1/users/export",
+    "/api/v1/users/debug/",
+    # === ENDPOINTS LOGGING/ANALYTICS (sessions personnelles) ===
+    "/api/v1/logging/analytics/my-sessions",
     # === ENDPOINTS STATS-FAST ===
     "/api/v1/stats-fast/",
     "/api/v1/stats-fast/dashboard",
@@ -110,6 +110,9 @@ AUTHENTICATED_USER_PATTERNS = [
     # === ENDPOINTS BILLING UTILISATEUR ===
     "/api/v1/billing/my-billing",
     "/api/v1/billing/change-plan",
+    # === ENDPOINTS CONVERSATIONS (sauvegarde personnelle) ===
+    "/api/v1/conversations/save",
+    "/api/v1/conversations/user/",
 ]
 
 # PATTERNS PUBLICS ÉTENDUS (pour les vérifications par pattern)
