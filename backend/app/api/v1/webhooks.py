@@ -336,6 +336,8 @@ async def test_webhook():
     return {
         "success": True,
         "message": "Webhook endpoint is working",
+        "version": "1.0.0",  # 🔧 VERSION TRACKING
+        "build": "20251008-001",  # 🔧 BUILD NUMBER
         "timestamp": datetime.utcnow().isoformat(),
         "email_service_configured": bool(
             os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD")
@@ -348,6 +350,8 @@ async def test_webhook():
 async def webhook_config():
     """Endpoint de debug pour vérifier la configuration des webhooks"""
     return {
+        "version": "1.0.0",  # 🔧 VERSION TRACKING
+        "build": "20251008-001",  # 🔧 BUILD NUMBER
         "webhook_url": f"{os.getenv('BACKEND_URL', 'https://expert-app-cngws.ondigitalocean.app')}/api/v1/webhooks/supabase/auth",
         "smtp_configured": bool(os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD")),
         "webhook_secret_configured": bool(os.getenv("SUPABASE_WEBHOOK_SECRET")),
