@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Version tracking for deployment verification
-Automatically extracts git commit SHA for build identification
+Simple hardcoded version that increments with each deployment
 """
+
+# HARDCODED VERSION - INCREMENT THIS NUMBER WITH EACH DEPLOYMENT
+VERSION = "2.1.0"
 
 import subprocess
 import os
@@ -37,9 +40,10 @@ def get_version_info():
             stderr=subprocess.DEVNULL
         ).decode('utf-8').strip()
 
-        build_id = f"{branch}-{commit_sha}"
+        build_id = f"v{VERSION}-{commit_sha}"
 
         return {
+            'version': VERSION,
             'build_id': build_id,
             'commit_sha': commit_sha,
             'commit_time': commit_time,
@@ -49,7 +53,8 @@ def get_version_info():
     except Exception as e:
         # Fallback if git is not available
         return {
-            'build_id': 'unknown',
+            'version': VERSION,
+            'build_id': f"v{VERSION}",
             'commit_sha': 'unknown',
             'commit_time': 'unknown',
             'branch': 'unknown',
