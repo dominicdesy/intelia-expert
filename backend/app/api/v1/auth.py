@@ -18,6 +18,14 @@ try:
 except ImportError:
     SUPABASE_AVAILABLE = False
 
+# Import email service for multilingual confirmation emails
+try:
+    from app.services.email_service import get_email_service, EmailType
+    EMAIL_SERVICE_AVAILABLE = True
+except ImportError:
+    EMAIL_SERVICE_AVAILABLE = False
+    logger.warning("Email service not available")
+
 router = APIRouter(prefix="/auth")
 logger = logging.getLogger(__name__)
 
@@ -1318,6 +1326,32 @@ async def register_user(user_data: UserRegister):
 
         user = result.user
         logger.info(f"[Register] Compte créé dans Supabase: {user.id}")
+
+        # Envoyer l'email de confirmation multilingue (si email service disponible)
+        if EMAIL_SERVICE_AVAILABLE and user_data.preferred_language:
+            try:
+                email_service = get_email_service()
+
+                # Construire l'URL de confirmation (Supabase fournit normalement un token)
+                frontend_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com")
+                # Note: Supabase génère le token automatiquement, on utilise l'email comme identifiant temporaire
+                confirmation_url = f"{frontend_url}/auth/confirm?email={user_data.email}"
+
+                logger.info(f"[Register] Envoi email de confirmation à {user_data.email} en {user_data.preferred_language}")
+
+                email_service.send_auth_email(
+                    email_type=EmailType.SIGNUP_CONFIRMATION,
+                    to_email=user_data.email,
+                    language=user_data.preferred_language,
+                    confirmation_url=confirmation_url,
+                    otp_token="",  # Supabase gère les tokens
+                    first_name=user_data.first_name,
+                )
+
+                logger.info(f"[Register] Email de confirmation envoyé avec succès")
+            except Exception as e:
+                logger.error(f"[Register] Erreur envoi email: {e}")
+                # Ne pas bloquer la registration si l'email échoue
 
         # Créer le token JWT pour l'authentification immédiate
         expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
