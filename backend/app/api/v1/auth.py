@@ -1341,11 +1341,44 @@ async def register_user(user_data: UserRegister):
                 email_service = get_email_service()
                 logger.info(f"[Register] Email service initialisé: {type(email_service)}")
 
-                # Construire l'URL de confirmation vers la page verify-email
+                # Générer un lien de confirmation via l'API Admin Supabase
+                # Utiliser le service role key pour accéder à l'API admin
+                supabase_url = os.getenv("SUPABASE_URL")
+                service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
                 frontend_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com")
-                # Note: La page verify-email attend un token Supabase pour appeler l'API de vérification
-                # Pour l'instant, on passe juste l'email pour afficher la page "pending"
-                confirmation_url = f"{frontend_url}/auth/verify-email?email={user_data.email}"
+
+                confirmation_url = None
+                otp_token = None
+
+                if service_role_key:
+                    try:
+                        # Créer un client admin avec service role key
+                        from supabase import create_client
+                        admin_client = create_client(supabase_url, service_role_key)
+
+                        # Générer le lien de confirmation d'email
+                        # L'API Supabase admin permet de générer un lien avec token
+                        link_response = admin_client.auth.admin.generate_link({
+                            "type": "signup",
+                            "email": user_data.email,
+                            "options": {
+                                "redirect_to": f"{frontend_url}/auth/verify-email"
+                            }
+                        })
+
+                        if hasattr(link_response, 'properties') and link_response.properties:
+                            # Extraire l'URL complète avec le token
+                            confirmation_url = link_response.properties.get('action_link')
+                            logger.info(f"[Register] Lien de confirmation généré via API Admin")
+                        else:
+                            logger.warning(f"[Register] Impossible de générer le lien via API Admin")
+                    except Exception as e:
+                        logger.warning(f"[Register] Erreur génération lien admin: {e}")
+
+                # Fallback si pas de service role key ou erreur
+                if not confirmation_url:
+                    logger.warning(f"[Register] Fallback: utilisation URL simple sans token")
+                    confirmation_url = f"{frontend_url}/auth/verify-email?email={user_data.email}"
 
                 logger.info(f"[Register] Envoi email de confirmation à {user_data.email} en {user_data.preferred_language}")
                 logger.info(f"[Register] URL confirmation: {confirmation_url}")
@@ -1356,7 +1389,7 @@ async def register_user(user_data: UserRegister):
                     to_email=user_data.email,
                     language=user_data.preferred_language,
                     confirmation_url=confirmation_url,
-                    otp_token="",  # Supabase gère les tokens
+                    otp_token=otp_token or "",  # Token OTP si disponible
                     first_name=user_data.first_name,
                 )
 
