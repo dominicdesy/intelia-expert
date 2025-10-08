@@ -32,9 +32,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "calculation",
             "expected_behavior": "Doit utiliser reverse lookup (2400g → jour 35) puis calculer consommation cumulée avec interpolation proportionnelle",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 2. MALADIES - STATISTIQUES
         # =================================================================
@@ -44,9 +43,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "disease_statistics",
             "expected_behavior": "Doit fournir réponse basée sur documentation maladies courantes",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 3. MALADIES - PRÉVENTION
         # =================================================================
@@ -56,9 +54,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "disease_prevention",
             "expected_behavior": "Doit récupérer documentation sur prévention coccidiose",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 4. OUT-OF-DOMAIN (DOIT ÊTRE REJETÉ)
         # =================================================================
@@ -68,9 +65,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "out_of_domain",
             "expected_behavior": "Doit être détecté comme hors-domaine et poliment refusé",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 5. MALADIES - SYMPTÔMES
         # =================================================================
@@ -80,9 +76,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "disease_symptoms",
             "expected_behavior": "Doit récupérer documentation complète sur Newcastle",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 6. MÉTRIQUES - QUESTION INCOMPLÈTE (CLARIFICATION NÉCESSAIRE)
         # =================================================================
@@ -92,9 +87,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "clarification_needed",
             "expected_behavior": "Doit demander clarification pour l'âge, idéalement donner exemples",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 7. MULTI-LANGUE - ANGLAIS
         # =================================================================
@@ -104,9 +98,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "multilingual_english",
             "expected_behavior": "Doit détecter anglais et répondre en anglais avec demande de clarification",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 8. QUESTION TROP VAGUE
         # =================================================================
@@ -116,9 +109,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "too_vague",
             "expected_behavior": "Doit demander clarifications multiples (breed, sex, age)",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 9. COMPARATIF - DEUX SOUCHES
         # =================================================================
@@ -128,9 +120,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "comparative",
             "expected_behavior": "Doit comparer poids ET FCR, donner différences absolues et relatives",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 10. MÉTRIQUES SIMPLES - FCR
         # =================================================================
@@ -140,9 +131,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "metric_simple",
             "expected_behavior": "Doit récupérer valeur exacte depuis PostgreSQL",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 11. MULTI-LANGUE - THAÏ (HORS SCOPE)
         # =================================================================
@@ -152,9 +142,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "unsupported_language",
             "expected_behavior": "Doit détecter langue non supportée et demander traduction FR/EN",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 12. CALCUL TROUPEAU
         # =================================================================
@@ -164,9 +153,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "flock_calculation",
             "expected_behavior": "Doit calculer: poids final × FCR × nombre d'oiseaux × (1 - mortalité)",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 13. REVERSE LOOKUP - POIDS CIBLE
         # =================================================================
@@ -176,9 +164,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "reverse_lookup",
             "expected_behavior": "Doit utiliser reverse_lookup pour trouver âge correspondant à 3000g",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 14. PROJECTION DE CROISSANCE
         # =================================================================
@@ -188,9 +175,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "projection_diagnostic",
             "expected_behavior": "Doit détecter sous-performance, projeter avec ajustement, alerter sur retard",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 15. DIAGNOSTIC - RETARD DE CROISSANCE
         # =================================================================
@@ -200,9 +186,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "diagnostic_underperformance",
             "expected_behavior": "Doit calculer écart %, évaluer gravité, lister causes possibles",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 16. DIAGNOSTIC - FCR ÉLEVÉ
         # =================================================================
@@ -212,9 +197,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "diagnostic_fcr",
             "expected_behavior": "Doit calculer écart FCR, identifier impact économique, lister causes",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 17. NUTRITION - PROTÉINE STARTER (COBB 500)
         # =================================================================
@@ -224,9 +208,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "nutrition_specification",
             "expected_behavior": "Doit récupérer spécifications nutritionnelles Cobb 500 starter",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 18. NUTRITION - DIFFÉRENCE PHASES
         # =================================================================
@@ -236,9 +219,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "nutrition_concept",
             "expected_behavior": "Doit expliquer différences composition et objectifs nutritionnels",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 19. ENVIRONNEMENT - TEMPÉRATURE DÉMARRAGE
         # =================================================================
@@ -248,9 +230,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "environment_temperature",
             "expected_behavior": "Doit fournir température ambiante ET sous éleveuse, plus humidité",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 20. DIAGNOSTIC - STRESS THERMIQUE
         # =================================================================
@@ -260,9 +241,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "diagnostic_heat_stress",
             "expected_behavior": "Doit comparer avec température cible, évaluer gravité, donner actions correctives urgentes",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 21. MULTI-MÉTRIQUES
         # =================================================================
@@ -272,9 +252,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "multi_metric",
             "expected_behavior": "Doit extraire 3 métriques différentes simultanément",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 22. COMPARATIF MULTI-ÂGES
         # =================================================================
@@ -284,9 +263,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "comparative_multi_age",
             "expected_behavior": "Doit comparer 3 âges × 2 souches, calculer différences, identifier tendances",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 23. QUESTION SUBJECTIVE
         # =================================================================
@@ -296,9 +274,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "subjective_comparison",
             "expected_behavior": "Doit éviter réponse absolue, présenter avantages de chaque souche, contextualiser",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 24. VALIDATION - ÂGE HORS LIMITES
         # =================================================================
@@ -308,9 +285,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "category": "validation_age_limit",
             "expected_behavior": "Doit détecter âge invalide pour broiler, expliquer limites, demander clarification",
             "contexts": [],
-            "answer": ""
+            "answer": "",
         },
-
         # =================================================================
         # 25. CONVERSATIONNEL - CONTINUITÉ SIMPLE
         # =================================================================
@@ -322,9 +298,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "contexts": [],
             "answer": "",
             "follow_up_question": "Et à 28 jours ?",
-            "follow_up_ground_truth": "À 28 jours, le poids d'un Ross 308 mâle est de 1550 grammes (gain de 584g entre jour 21 et 28)."
+            "follow_up_ground_truth": "À 28 jours, le poids d'un Ross 308 mâle est de 1550 grammes (gain de 584g entre jour 21 et 28).",
         },
-
         # =================================================================
         # 26. CONVERSATIONNEL - FOLLOW-UP (TOUR 2)
         # =================================================================
@@ -336,9 +311,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "contexts": [],
             "answer": "",
             "requires_previous_context": True,
-            "context_from_question": "Quel est le poids Ross 308 mâle à 21 jours ?"
+            "context_from_question": "Quel est le poids Ross 308 mâle à 21 jours ?",
         },
-
         # =================================================================
         # 27. CONVERSATIONNEL - COMPARATIF TOUR 1
         # =================================================================
@@ -350,9 +324,8 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "contexts": [],
             "answer": "",
             "follow_up_question": "Lequel consomme le plus d'aliment ?",
-            "follow_up_ground_truth": "À 35 jours, Ross 308 mâle consomme légèrement plus d'aliment en valeur absolue (3394g vs 3352g pour Cobb 500), soit +42g. Cependant, grâce à son meilleur FCR (1.390 vs 1.410), Ross 308 convertit cet aliment plus efficacement en poids vif."
+            "follow_up_ground_truth": "À 35 jours, Ross 308 mâle consomme légèrement plus d'aliment en valeur absolue (3394g vs 3352g pour Cobb 500), soit +42g. Cependant, grâce à son meilleur FCR (1.390 vs 1.410), Ross 308 convertit cet aliment plus efficacement en poids vif.",
         },
-
         # =================================================================
         # 28. CONVERSATIONNEL - FOLLOW-UP COMPARATIF (TOUR 2)
         # =================================================================
@@ -364,7 +337,196 @@ def get_intelia_test_dataset() -> List[Dict[str, Any]]:
             "contexts": [],
             "answer": "",
             "requires_previous_context": True,
-            "context_from_question": "Compare Ross 308 et Cobb 500 à 35j"
+            "context_from_question": "Compare Ross 308 et Cobb 500 à 35j",
+        },
+        # =================================================================
+        # PHASE 3 TEST CASES (29-38)
+        # =================================================================
+        # =================================================================
+        # 29. QUERY DECOMPOSER - MULTI-FACTOR (ET)
+        # =================================================================
+        {
+            "question": "Impact de la température et densité sur le poids Ross 308 mâle à 35 jours",
+            "ground_truth": """À 35 jours, Ross 308 mâle atteint 2441g dans conditions optimales.
+
+Impact température:
+- Température optimale: 21-23°C maintient les performances maximales
+- Température élevée (>28°C): réduit le poids de 8-12% (stress thermique, baisse de consommation)
+- Température froide (<18°C): réduit le poids de 5-8% (augmentation des besoins énergétiques)
+
+Impact densité:
+- Densité optimale: 10-12 oiseaux/m² permet d'atteindre les standards
+- Densité excessive (>15 oiseaux/m²): réduit le poids de 5-10% (compétition pour mangeoires, stress, uniformité réduite)
+- Densité faible (<8 oiseaux/m²): peut légèrement améliorer performances individuelles mais réduit rentabilité
+
+Les deux facteurs peuvent avoir des effets cumulatifs négatifs si mal gérés simultanément.""",
+            "category": "phase3_query_decomposer",
+            "expected_behavior": "Doit détecter complexité (2 facteurs avec 'et'), décomposer en 2 sous-requêtes (température, densité), exécuter chaque sous-requête indépendamment, puis agréger avec stratégie 'combine'",
+            "expected_query_type": "HYBRID",
+            "expected_complexity": "complex",
+            "expected_decomposition": True,
+            "sub_queries_expected": 2,
+            "aggregation_strategy": "combine",
+            "contexts": [],
+            "answer": "",
+        },
+        # =================================================================
+        # 30. QUERY DECOMPOSER - MULTI-FACTOR (COMMA)
+        # =================================================================
+        {
+            "question": "Effet de la nutrition, ventilation et éclairage sur la mortalité Ross 308",
+            "ground_truth": """La mortalité Ross 308 est influencée par plusieurs facteurs:
+
+Nutrition:
+- Déficiences nutritionnelles (protéines, vitamines): augmentent mortalité de 2-5%
+- Qualité aliment (fraîcheur, mycotoxines): peut doubler la mortalité
+- Programme alimentaire inadapté: augmente mortalité de 1-3%
+
+Ventilation:
+- Ventilation insuffisante: augmente mortalité de 3-8% (maladies respiratoires, ammoniaque)
+- Ventilation excessive: stress thermique, augmente mortalité de 1-3%
+- Renouvellement d'air optimal: maintient mortalité <3-4%
+
+Éclairage:
+- Programme lumineux inadapté: augmente mortalité de 1-2%
+- Intensité excessive: stress, picage, augmente mortalité
+- Photopériode optimale (16-18h): favorise croissance et réduit mortalité
+
+Mortalité cumulée cible à 35j: 2.0-2.5% en conditions optimales.""",
+            "category": "phase3_query_decomposer",
+            "expected_behavior": "Doit détecter 3+ facteurs séparés par virgules, décomposer en 3 sous-requêtes, agréger avec stratégie 'combine' pour lister chaque impact séparément",
+            "expected_query_type": "HYBRID",
+            "expected_complexity": "complex",
+            "expected_decomposition": True,
+            "sub_queries_expected": 3,
+            "aggregation_strategy": "combine",
+            "contexts": [],
+            "answer": "",
+        },
+        # =================================================================
+        # 31. QUERY DECOMPOSER - COMPARE STRATEGY
+        # =================================================================
+        {
+            "question": "Comparer l'impact de la nutrition versus la température sur le FCR Ross 308",
+            "ground_truth": """Comparaison des impacts nutrition vs température sur FCR Ross 308:
+
+Impact Nutrition (plus important):
+- Formulation inadéquate: peut dégrader FCR de 0.10-0.20 points (ex: 1.39 → 1.49-1.59)
+- Qualité des ingrédients: impact de 0.05-0.15 points
+- Forme physique (granulés vs farine): impact de 0.03-0.08 points
+Impact moyen: 10-15% de dégradation possible
+
+Impact Température (significatif mais moindre):
+- Stress thermique (>28°C): dégrade FCR de 0.05-0.12 points (baisse de consommation, halètement)
+- Température sous-optimale (froid): dégrade FCR de 0.03-0.08 points (besoins énergétiques accrus)
+Impact moyen: 5-10% de dégradation possible
+
+Conclusion: La nutrition a un impact 1.5-2x plus important que la température sur le FCR. Cependant, une température extrême peut complètement annuler les bénéfices d'une nutrition optimale.""",
+            "category": "phase3_query_decomposer",
+            "expected_behavior": "Doit détecter mot-clé 'comparer/versus', décomposer en 2 sous-requêtes (nutrition, température), puis agréger avec stratégie 'compare' pour montrer différences/similitudes",
+            "expected_query_type": "HYBRID",
+            "expected_complexity": "complex",
+            "expected_decomposition": True,
+            "sub_queries_expected": 2,
+            "aggregation_strategy": "compare",
+            "contexts": [],
+            "answer": "",
+        },
+        # =================================================================
+        # 32. ENHANCED CLARIFICATION - NUTRITION AMBIGUITY
+        # =================================================================
+        {
+            "question": "Quelle formule d'aliment donner à mes poulets?",
+            "ground_truth": "Pour recommander la formule d'aliment appropriée, j'ai besoin de précisions:\n\n1. **Âge ou phase de production**: \n   - Starter (0-10 jours): 22-23% protéine, 2950-3000 kcal/kg\n   - Grower (11-24 jours): 20-21% protéine, 3100-3200 kcal/kg\n   - Finisher (25+ jours): 18-19% protéine, 3200-3300 kcal/kg\n\n2. **Race**: Ross 308, Cobb 500, autre?\n\n3. **Objectif**: Poids maximum, FCR optimal, ou coût minimal?\n\nPouvez-vous préciser ces informations pour que je vous donne la formule exacte adaptée à votre situation?",
+            "category": "phase3_enhanced_clarification",
+            "expected_behavior": "Doit détecter ambiguïté type 'nutrition_ambiguity' (pas d'âge/phase spécifié), demander clarifications avec exemples concrets des différentes phases",
+            "expected_clarification": True,
+            "ambiguity_type": "nutrition_ambiguity",
+            "missing_fields": ["age", "production_phase"],
+            "contexts": [],
+            "answer": "",
+        },
+        # =================================================================
+        # 33. ENHANCED CLARIFICATION - HEALTH SYMPTOM VAGUE
+        # =================================================================
+        {
+            "question": "Mes poulets sont malades depuis 3 jours",
+            "ground_truth": "Pour vous aider à identifier le problème et vous conseiller, j'ai besoin de plus d'informations:\n\n1. **Symptômes observés**: \n   - Respiratoires? (toux, éternuements, respiration difficile)\n   - Digestifs? (diarrhée, couleur des fientes)\n   - Nerveux? (tremblements, paralysie, torticolis)\n   - Baisse de consommation d'aliment ou d'eau?\n\n2. **Âge des poulets**: en jours?\n\n3. **Race**: Ross 308, Cobb 500, autre?\n\n4. **Mortalité**: Combien de pertes?\n\n5. **Statut vaccinal**: Protocole de vaccination suivi?\n\nCes informations me permettront de vous orienter vers un diagnostic et des actions correctives appropriées.",
+            "category": "phase3_enhanced_clarification",
+            "expected_behavior": "Doit détecter ambiguïté type 'health_symptom_vague' (symptômes non spécifiés), demander détails sur symptômes observés, âge, race, mortalité",
+            "expected_clarification": True,
+            "ambiguity_type": "health_symptom_vague",
+            "missing_fields": ["age", "breed", "symptoms"],
+            "contexts": [],
+            "answer": "",
+        },
+        # =================================================================
+        # 34. ENHANCED CLARIFICATION - ENVIRONMENT VAGUE
+        # =================================================================
+        {
+            "question": "Quelle température idéale pour mes poulets?",
+            "ground_truth": "La température optimale varie considérablement selon l'âge:\n\n**Démarrage (0-7 jours)**:\n- Ambiante: 32-34°C\n- Sous éleveuse: 40-42°C\n\n**Croissance (8-21 jours)**:\n- Semaine 2: 28-30°C\n- Semaine 3: 24-26°C\n\n**Finition (22+ jours)**:\n- 21-23°C\n\n**Pouvez-vous préciser l'âge de vos poulets (en jours) pour que je vous donne la température exacte recommandée?**\n\nNote: La race (Ross 308, Cobb 500) a peu d'impact sur les besoins en température.",
+            "category": "phase3_enhanced_clarification",
+            "expected_behavior": "Doit détecter ambiguïté type 'environment_vague' (température sans précision d'âge), demander âge et donner exemples pour différentes phases",
+            "expected_clarification": True,
+            "ambiguity_type": "environment_vague",
+            "missing_fields": ["age"],
+            "contexts": [],
+            "answer": "",
+        },
+        # =================================================================
+        # 35. ENHANCED CLARIFICATION - MANAGEMENT BROAD
+        # =================================================================
+        {
+            "question": "Comment améliorer ma rentabilité en élevage?",
+            "ground_truth": "Améliorer la rentabilité nécessite une approche ciblée sur plusieurs axes. Pour vous conseiller efficacement, j'ai besoin de précisions:\n\n1. **Problème principal actuel**:\n   - FCR trop élevé (mauvaise conversion)?\n   - Poids insuffisant à l'abattage?\n   - Mortalité excessive?\n   - Coût alimentaire trop élevé?\n\n2. **Votre situation actuelle**:\n   - Race élevée: Ross 308, Cobb 500, autre?\n   - Âge d'abattage cible: 35j, 42j, 49j?\n   - Performances actuelles vs objectifs?\n\n3. **Contraintes**:\n   - Budget pour investissements?\n   - Infrastructure existante?\n\nAvec ces informations, je pourrai vous proposer des actions concrètes et priorisées pour maximiser votre rentabilité.",
+            "category": "phase3_enhanced_clarification",
+            "expected_behavior": "Doit détecter ambiguïté type 'management_broad' (question trop large), demander précisions sur problème spécifique, situation actuelle, contraintes",
+            "expected_clarification": True,
+            "ambiguity_type": "management_broad",
+            "missing_fields": ["breed", "age", "metric", "current_performance"],
+            "contexts": [],
+            "answer": "",
+        },
+        # =================================================================
+        # 36. ENHANCED CLARIFICATION - GENETICS INCOMPLETE
+        # =================================================================
+        {
+            "question": "Comparer Ross 308 et Cobb 500",
+            "ground_truth": "Pour comparer Ross 308 et Cobb 500 de manière pertinente, j'ai besoin de précisions:\n\n1. **Critère de comparaison**:\n   - Poids vif?\n   - FCR (conversion alimentaire)?\n   - Mortalité?\n   - Rendement carcasse?\n   - Coût global de production?\n   - Tous les critères?\n\n2. **Âge de référence**: 21j, 28j, 35j, 42j, ou autre?\n\n3. **Sexe**: Mâles, femelles, ou mixte?\n\nExemple: \"Comparer Ross 308 et Cobb 500 sur poids et FCR à 35j pour mâles\"\n\nCela me permettra de vous fournir une comparaison chiffrée et précise.",
+            "category": "phase3_enhanced_clarification",
+            "expected_behavior": "Doit détecter ambiguïté type 'genetics_incomplete' (comparaison sans critères), demander métrique de comparaison, âge, sexe",
+            "expected_clarification": True,
+            "ambiguity_type": "genetics_incomplete",
+            "missing_fields": ["metric", "age", "sex"],
+            "contexts": [],
+            "answer": "",
+        },
+        # =================================================================
+        # 37. ENHANCED CLARIFICATION - TREATMENT PROTOCOL VAGUE
+        # =================================================================
+        {
+            "question": "Quel protocole vaccinal appliquer?",
+            "ground_truth": "Le protocole vaccinal dépend de plusieurs facteurs. Pour vous recommander un protocole adapté, j'ai besoin de:\n\n1. **Âge des poulets**: Poussins d'un jour, en croissance, ou protocole complet 0-42j?\n\n2. **Race**: Broilers (Ross 308, Cobb 500) ou pondeuses?\n\n3. **Région/Pays**: Les maladies prévalentes varient (ex: Newcastle obligatoire dans certaines zones)\n\n4. **Statut sanitaire de la région**:\n   - Présence de maladies endémiques?\n   - Vaccination obligatoire contre certaines maladies?\n\n5. **Type d'élevage**: Intensif, plein air, bio?\n\n**Protocole de base broilers (France/Europe)**:\n- J1: Marek (couvoir) + IB + Newcastle\n- J10-14: Gumboro\n- J21: Rappel Newcastle (zones à risque)\n\nPouvez-vous préciser votre situation pour un protocole personnalisé?",
+            "category": "phase3_enhanced_clarification",
+            "expected_behavior": "Doit détecter ambiguïté type 'treatment_protocol_vague' (protocole sans contexte), demander âge, race, région, type d'élevage",
+            "expected_clarification": True,
+            "ambiguity_type": "treatment_protocol_vague",
+            "missing_fields": ["age", "breed", "region"],
+            "contexts": [],
+            "answer": "",
+        },
+        # =================================================================
+        # 38. EDGE CASE - EMPTY QUERY
+        # =================================================================
+        {
+            "question": "",
+            "ground_truth": "Je n'ai pas reçu de question. Comment puis-je vous aider aujourd'hui? Vous pouvez me poser des questions sur:\n\n- **Performances**: poids, FCR, mortalité pour différentes races et âges\n- **Santé**: maladies, symptômes, traitements, prévention\n- **Nutrition**: formulations alimentaires, phases de production\n- **Environnement**: température, densité, ventilation, éclairage\n- **Comparaisons**: Ross 308 vs Cobb 500, etc.\n\nN'hésitez pas à poser votre question!",
+            "category": "phase3_edge_case",
+            "expected_behavior": "Doit détecter query vide/None, retourner QueryType.HYBRID comme safe fallback, répondre poliment en proposant des exemples de questions",
+            "expected_query_type": "HYBRID",
+            "contexts": [],
+            "answer": "",
         },
     ]
 
