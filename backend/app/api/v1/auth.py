@@ -1350,9 +1350,47 @@ async def register_user(user_data: UserRegister):
                 confirmation_url = None
                 otp_token = None
 
-                # DÉSACTIVÉ TEMPORAIREMENT - L'API Admin Supabase nécessite une syntaxe spécifique
-                # On utilise le fallback pour l'instant
-                logger.info(f"[Register] Utilisation URL de vérification simple (Admin API désactivé)")
+                # Générer un lien de confirmation avec token via l'API Admin Supabase
+                if supabase_url and service_role_key:
+                    try:
+                        logger.info(f"[Register] Génération du lien de confirmation via Admin API...")
+
+                        # Créer un client admin avec service role key
+                        from supabase import create_client
+                        admin_client = create_client(supabase_url, service_role_key)
+
+                        # Générer le lien de confirmation
+                        link_response = admin_client.auth.admin.generate_link(
+                            {
+                                "type": "signup",
+                                "email": user_data.email,
+                                "password": user_data.password,
+                            }
+                        )
+
+                        logger.info(f"[Register] Admin API response type: {type(link_response)}")
+
+                        # Extraire l'action_link et le hashed_token de la réponse
+                        if hasattr(link_response, 'properties'):
+                            properties = link_response.properties
+                            action_link = properties.get('action_link')
+                            hashed_token = properties.get('hashed_token')
+
+                            if action_link:
+                                confirmation_url = action_link
+                                otp_token = hashed_token
+                                logger.info(f"[Register] ✅ Lien de confirmation généré avec token")
+                            else:
+                                logger.warning(f"[Register] Pas d'action_link dans properties")
+                        else:
+                            logger.warning(f"[Register] Pas de 'properties' dans la réponse Admin API")
+
+                    except Exception as e:
+                        logger.error(f"[Register] ❌ Erreur Admin API: {type(e).__name__}: {str(e)}")
+                        import traceback
+                        logger.error(f"[Register] Traceback: {traceback.format_exc()}")
+                else:
+                    logger.warning(f"[Register] Service role key non configuré - Admin API skip")
 
                 # Fallback si pas de service role key ou erreur
                 if not confirmation_url:
