@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Confirmation</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .email-container {
+      background-color: white;
+      border-radius: 8px;
+      padding: 40px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    h1 {
+      color: #1a1a1a;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    p {
+      margin-bottom: 15px;
+      color: #666;
+    }
+    .button {
+      display: inline-block;
+      background-color: #0066cc;
+      color: white !important;
+      text-decoration: none;
+      padding: 14px 32px;
+      border-radius: 6px;
+      font-weight: 600;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .button:hover {
+      background-color: #0052a3;
+    }
+    .footer {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+      font-size: 12px;
+      color: #999;
+    }
+    .alternative-link {
+      word-break: break-all;
+      color: #0066cc;
+      font-size: 12px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="logo">
+      <h1 style="color: #0066cc; margin: 0;">Intelia Expert</h1>
+      <p style="color: #999; font-size: 14px; margin: 5px 0;">AI-Powered Poultry Assistant</p>
+    </div>
+
+    {{ if eq .UserMetaData.preferred_language "fr" }}
+      <!-- FRANÇAIS -->
+      <h1>Confirmez votre adresse email</h1>
+      <p>Bonjour {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ else }}{{ end }},</p>
+      <p>Merci de vous être inscrit sur Intelia Expert ! Pour commencer à utiliser votre compte, veuillez confirmer votre adresse email en cliquant sur le bouton ci-dessous :</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">Confirmer mon email</a>
+      </div>
+      <p>Ce lien expirera dans 24 heures.</p>
+      <p>Si vous n'avez pas créé de compte sur Intelia Expert, vous pouvez ignorer cet email en toute sécurité.</p>
+      <div class="footer">
+        <p>Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "es" }}
+      <!-- ESPAÑOL -->
+      <h1>Confirma tu dirección de correo electrónico</h1>
+      <p>Hola {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ else }}{{ end }},</p>
+      <p>¡Gracias por registrarte en Intelia Expert! Para comenzar a usar tu cuenta, por favor confirma tu dirección de correo electrónico haciendo clic en el botón a continuación:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">Confirmar mi correo</a>
+      </div>
+      <p>Este enlace caducará en 24 horas.</p>
+      <p>Si no creaste una cuenta en Intelia Expert, puedes ignorar este correo de forma segura.</p>
+      <div class="footer">
+        <p>Si el botón no funciona, copia y pega este enlace en tu navegador:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "de" }}
+      <!-- DEUTSCH -->
+      <h1>Bestätigen Sie Ihre E-Mail-Adresse</h1>
+      <p>Hallo {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ else }}{{ end }},</p>
+      <p>Vielen Dank für Ihre Registrierung bei Intelia Expert! Um Ihr Konto zu nutzen, bestätigen Sie bitte Ihre E-Mail-Adresse, indem Sie auf die Schaltfläche unten klicken:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">E-Mail bestätigen</a>
+      </div>
+      <p>Dieser Link läuft in 24 Stunden ab.</p>
+      <p>Wenn Sie kein Konto bei Intelia Expert erstellt haben, können Sie diese E-Mail ignorieren.</p>
+      <div class="footer">
+        <p>Wenn die Schaltfläche nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "pt" }}
+      <!-- PORTUGUÊS -->
+      <h1>Confirme seu endereço de e-mail</h1>
+      <p>Olá {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ else }}{{ end }},</p>
+      <p>Obrigado por se registrar no Intelia Expert! Para começar a usar sua conta, confirme seu endereço de e-mail clicando no botão abaixo:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">Confirmar meu e-mail</a>
+      </div>
+      <p>Este link expirará em 24 horas.</p>
+      <p>Se você não criou uma conta no Intelia Expert, pode ignorar este e-mail com segurança.</p>
+      <div class="footer">
+        <p>Se o botão não funcionar, copie e cole este link no seu navegador:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "it" }}
+      <!-- ITALIANO -->
+      <h1>Conferma il tuo indirizzo email</h1>
+      <p>Ciao {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ else }}{{ end }},</p>
+      <p>Grazie per esserti registrato su Intelia Expert! Per iniziare a utilizzare il tuo account, conferma il tuo indirizzo email cliccando sul pulsante qui sotto:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">Conferma la mia email</a>
+      </div>
+      <p>Questo link scadrà tra 24 ore.</p>
+      <p>Se non hai creato un account su Intelia Expert, puoi tranquillamente ignorare questa email.</p>
+      <div class="footer">
+        <p>Se il pulsante non funziona, copia e incolla questo link nel tuo browser:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "nl" }}
+      <!-- NEDERLANDS -->
+      <h1>Bevestig je e-mailadres</h1>
+      <p>Hallo {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ else }}{{ end }},</p>
+      <p>Bedankt voor je registratie bij Intelia Expert! Om je account te gaan gebruiken, bevestig je e-mailadres door op onderstaande knop te klikken:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">Bevestig mijn e-mail</a>
+      </div>
+      <p>Deze link verloopt over 24 uur.</p>
+      <p>Als je geen account hebt aangemaakt bij Intelia Expert, kun je deze e-mail veilig negeren.</p>
+      <div class="footer">
+        <p>Als de knop niet werkt, kopieer en plak deze link in je browser:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "pl" }}
+      <!-- POLSKI -->
+      <h1>Potwierdź swój adres e-mail</h1>
+      <p>Cześć {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ else }}{{ end }},</p>
+      <p>Dziękujemy za rejestrację w Intelia Expert! Aby rozpocząć korzystanie ze swojego konta, potwierdź swój adres e-mail klikając poniższy przycisk:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">Potwierdź mój e-mail</a>
+      </div>
+      <p>Ten link wygaśnie za 24 godziny.</p>
+      <p>Jeśli nie utworzyłeś konta w Intelia Expert, możesz bezpiecznie zignorować tę wiadomość.</p>
+      <div class="footer">
+        <p>Jeśli przycisk nie działa, skopiuj i wklej ten link do przeglądarki:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "ru" }}
+      <!-- РУССКИЙ -->
+      <h1>Подтвердите ваш адрес электронной почты</h1>
+      <p>Здравствуйте{{ if .UserMetaData.first_name }}, {{ .UserMetaData.first_name }}{{ else }}{{ end }}!</p>
+      <p>Спасибо за регистрацию в Intelia Expert! Чтобы начать использовать свою учетную запись, подтвердите свой адрес электронной почты, нажав на кнопку ниже:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">Подтвердить почту</a>
+      </div>
+      <p>Эта ссылка истекает через 24 часа.</p>
+      <p>Если вы не создавали учетную запись в Intelia Expert, вы можете безопасно проигнорировать это письмо.</p>
+      <div class="footer">
+        <p>Если кнопка не работает, скопируйте и вставьте эту ссылку в браузер:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "zh" }}
+      <!-- 中文 (CHINESE) -->
+      <h1>确认您的电子邮件地址</h1>
+      <p>你好{{ if .UserMetaData.first_name }}，{{ .UserMetaData.first_name }}{{ else }}{{ end }}！</p>
+      <p>感谢您注册 Intelia Expert！要开始使用您的帐户，请点击下面的按钮确认您的电子邮件地址：</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">确认我的电子邮件</a>
+      </div>
+      <p>此链接将在24小时后过期。</p>
+      <p>如果您没有在 Intelia Expert 创建帐户，可以安全地忽略此邮件。</p>
+      <div class="footer">
+        <p>如果按钮无效，请复制并粘贴此链接到浏览器：</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "th" }}
+      <!-- ไทย (THAI) -->
+      <h1>ยืนยันที่อยู่อีเมลของคุณ</h1>
+      <p>สวัสดี{{ if .UserMetaData.first_name }} คุณ{{ .UserMetaData.first_name }}{{ else }}{{ end }}</p>
+      <p>ขอบคุณที่ลงทะเบียนกับ Intelia Expert! เพื่อเริ่มใช้บัญชีของคุณ โปรดยืนยันที่อยู่อีเมลของคุณโดยคลิกปุ่มด้านล่าง:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">ยืนยันอีเมลของฉัน</a>
+      </div>
+      <p>ลิงก์นี้จะหมดอายุใน 24 ชั่วโมง</p>
+      <p>หากคุณไม่ได้สร้างบัญชีกับ Intelia Expert คุณสามารถเพิกเฉยอีเมลนี้ได้อย่างปลอดภัย</p>
+      <div class="footer">
+        <p>หากปุ่มไม่ทำงาน โปรดคัดลอกและวางลิงก์นี้ในเบราว์เซอร์ของคุณ:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "hi" }}
+      <!-- हिन्दी (HINDI) -->
+      <h1>अपना ईमेल पता सत्यापित करें</h1>
+      <p>नमस्ते{{ if .UserMetaData.first_name }} {{ .UserMetaData.first_name }}{{ else }}{{ end }},</p>
+      <p>Intelia Expert में पंजीकरण के लिए धन्यवाद! अपना खाता उपयोग करना शुरू करने के लिए, कृपया नीचे दिए गए बटन पर क्लिक करके अपना ईमेल पता सत्यापित करें:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">मेरा ईमेल सत्यापित करें</a>
+      </div>
+      <p>यह लिंक 24 घंटों में समाप्त हो जाएगी।</p>
+      <p>यदि आपने Intelia Expert पर कोई खाता नहीं बनाया है, तो आप इस ईमेल को सुरक्षित रूप से अनदेखा कर सकते हैं।</p>
+      <div class="footer">
+        <p>यदि बटन काम नहीं कर रहा है, तो इस लिंक को कॉपी करें और अपने ब्राउज़र में पेस्ट करें:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else if eq .UserMetaData.preferred_language "id" }}
+      <!-- BAHASA INDONESIA -->
+      <h1>Konfirmasi alamat email Anda</h1>
+      <p>Halo {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ else }}{{ end }},</p>
+      <p>Terima kasih telah mendaftar di Intelia Expert! Untuk mulai menggunakan akun Anda, silakan konfirmasi alamat email Anda dengan mengklik tombol di bawah ini:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">Konfirmasi email saya</a>
+      </div>
+      <p>Tautan ini akan kedaluwarsa dalam 24 jam.</p>
+      <p>Jika Anda tidak membuat akun di Intelia Expert, Anda dapat mengabaikan email ini dengan aman.</p>
+      <div class="footer">
+        <p>Jika tombol tidak berfungsi, salin dan tempel tautan ini di browser Anda:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+
+    {{ else }}
+      <!-- ENGLISH (DEFAULT) -->
+      <h1>Confirm your email address</h1>
+      <p>Hello{{ if .UserMetaData.first_name }} {{ .UserMetaData.first_name }}{{ else }}{{ end }},</p>
+      <p>Thank you for signing up for Intelia Expert! To start using your account, please confirm your email address by clicking the button below:</p>
+      <div style="text-align: center;">
+        <a href="{{ .ConfirmationURL }}" class="button">Confirm My Email</a>
+      </div>
+      <p>This link will expire in 24 hours.</p>
+      <p>If you didn't create an account with Intelia Expert, you can safely ignore this email.</p>
+      <div class="footer">
+        <p>If the button doesn't work, copy and paste this link into your browser:</p>
+        <div class="alternative-link">{{ .ConfirmationURL }}</div>
+      </div>
+    {{ end }}
+
+  </div>
+</body>
+</html>
