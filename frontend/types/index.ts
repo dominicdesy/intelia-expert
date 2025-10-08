@@ -1223,6 +1223,7 @@ export interface User {
   profile_id?: string;
   preferences?: Record<string, any>;
   is_admin?: boolean;
+  preferredLanguage?: string;
 }
 
 export interface ProfileUpdateData {
