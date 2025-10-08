@@ -159,7 +159,7 @@ function AuthCallbackHandler() {
 // PAGE LOGIN COMPLÈTE - VERSION UNIFIÉE
 function LoginPageContent() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, currentLanguage } = useTranslation();
   const { login, register, loginWithOAuth, isOAuthLoading } = useAuthStore(); // Store unifié avec OAuth
 
   // États simples
