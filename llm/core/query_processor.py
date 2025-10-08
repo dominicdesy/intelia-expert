@@ -168,6 +168,48 @@ class RAGQueryProcessor:
                     f"⏭️ Skipping OOD detection - clarification response likely: '{query[:30]}...'"
                 )
 
+        # BEFORE OOD detection: Check if this is a short follow-up response (yes/no/ok)
+        # after system asked "Can I help you with anything else?"
+        confirmation_words = {
+            'en': ['yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'please', 'yup'],
+            'fr': ['oui', 'ouais', 'd\'accord', 'ok', 'okay', 'bien sûr', 'volontiers'],
+            'es': ['sí', 'si', 'vale', 'ok', 'okay', 'claro', 'por supuesto'],
+            'de': ['ja', 'okay', 'ok', 'gerne', 'klar'],
+        }
+
+        query_words = query.lower().strip().split()
+        is_short_query = len(query_words) <= 3
+        is_confirmation = any(word in confirmation_words.get(language, []) for word in query_words)
+
+        if is_short_query and is_confirmation:
+            # Check if previous response contained a follow-up question
+            contextual_history_check = await self._get_contextual_history(tenant_id, query)
+            if contextual_history_check:
+                # User confirmed they want help - ask for clarification
+                logger.info(f"✅ Follow-up confirmation detected: '{query}' - asking for clarification")
+                from config.messages import get_message
+                clarification_msg = get_message("followup_clarification", language)
+                if not clarification_msg:
+                    # Fallback if message not configured
+                    clarification_msg = {
+                        'en': "Great! How can I help you with poultry production?",
+                        'fr': "Parfait ! Comment puis-je vous aider avec la production avicole ?",
+                        'es': "¡Perfecto! ¿Cómo puedo ayudarte con la producción avícola?",
+                        'de': "Prima! Wie kann ich Ihnen bei der Geflügelproduktion helfen?",
+                    }.get(language, "How can I help you?")
+
+                return RAGResult(
+                    source=RAGSource.CLARIFICATION_NEEDED,
+                    answer=clarification_msg,
+                    context_docs=[],
+                    processing_time=(time.time() - start_time),
+                    metadata={
+                        "query_type": "followup_confirmation",
+                        "original_query": query,
+                        "conversation_id": tenant_id,
+                    },
+                )
+
         if self.ood_detector and not skip_ood:
             try:
                 is_in_domain, domain_score, score_details = (
