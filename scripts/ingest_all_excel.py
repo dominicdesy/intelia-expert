@@ -70,10 +70,10 @@ async def main():
 
                 success = await converter.convert_file(file_path)
                 if success:
-                    print(f"   ✅ Succès\n")
+                    print("   ✅ Succès\n")
                     success_count += 1
                 else:
-                    print(f"   ❌ Échec\n")
+                    print("   ❌ Échec\n")
                     failed_count += 1
                     failed_files.append((filename, "Conversion échouée"))
 

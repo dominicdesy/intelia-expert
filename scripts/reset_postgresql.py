@@ -210,7 +210,7 @@ async def main():
         "ssl": os.getenv("DB_SSL", "require"),
     }
 
-    print(f"\n🔄 Connexion à PostgreSQL...")
+    print("\n🔄 Connexion à PostgreSQL...")
     print(f"   Host: {config['host']}")
     print(f"   Database: {config['database']}")
 

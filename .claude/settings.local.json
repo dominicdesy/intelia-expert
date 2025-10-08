@@ -34,7 +34,8 @@
       "Bash(do rm -rf \"$dir\")",
       "Bash(done)",
       "Bash(cat:*)",
-      "Bash(iconv:*)"
+      "Bash(iconv:*)",
+      "Bash(ssh:*)"
     ],
     "deny": [],
     "ask": []

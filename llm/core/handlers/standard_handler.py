@@ -437,6 +437,12 @@ class StandardQueryHandler(BaseQueryHandler):
                 # LOW_CONFIDENCE or NO_RESULTS - return with empty message
                 # rag_engine will handle fallback to welcome message or LLM
                 logger.info(f"Weaviate ({language}): 0 documents (source={result.source})")
+
+                # CRITICAL FIX: Ensure answer is initialized to empty string (not None)
+                # to prevent "object of type 'NoneType' has no len()" in response_generator
+                if result.answer is None:
+                    result.answer = ""
+
                 return result
             else:
                 logger.info(f"Weaviate ({language}): No result object returned")
