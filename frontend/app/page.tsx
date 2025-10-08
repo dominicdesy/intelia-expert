@@ -305,6 +305,7 @@ function LoginPageContent() {
         name: `${signupData.firstName} ${signupData.lastName}`,
         firstName: signupData.firstName,
         lastName: signupData.lastName,
+        country: signupData.country, // AJOUTÉ: pays de l'utilisateur
         companyName: signupData.companyName,
         phone:
           signupData.countryCode &&
