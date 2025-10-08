@@ -108,6 +108,7 @@ class UserRegister(BaseModel):
     full_name: Optional[str] = None
     company: Optional[str] = None
     phone: Optional[str] = None
+    country: Optional[str] = None  # NOUVEAU: pays
     preferred_language: Optional[str] = "en"  # NOUVEAU: langue préférée
 
 
@@ -1348,6 +1349,40 @@ async def register_user(user_data: UserRegister):
 
         user = result.user
         logger.info(f"[Register] Compte créé dans Supabase: {user.id}")
+
+        # NOUVEAU: Créer aussi une entrée dans la table public.users
+        try:
+            supabase_url_admin = os.getenv("SUPABASE_URL")
+            service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+            if supabase_url_admin and service_role_key:
+                admin_client = create_client(supabase_url_admin, service_role_key)
+
+                # Créer l'entrée utilisateur dans public.users
+                user_profile = {
+                    "auth_user_id": user.id,
+                    "email": user_data.email,
+                    "first_name": user_data.first_name,
+                    "last_name": user_data.last_name,
+                    "full_name": full_name,
+                    "country": user_data.country if hasattr(user_data, 'country') else None,
+                    "phone": user_data.phone,
+                    "company_name": user_data.company,
+                    "user_type": "user",
+                    "language": user_data.preferred_language or "en",
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+
+                # Filtrer les None
+                user_profile = {k: v for k, v in user_profile.items() if v is not None}
+
+                insert_response = admin_client.table("users").insert(user_profile).execute()
+                logger.info(f"[Register] Profil utilisateur créé dans public.users: {user.id}")
+            else:
+                logger.warning(f"[Register] Service role key non configuré - profil public.users non créé")
+        except Exception as e:
+            logger.error(f"[Register] Erreur création profil public.users: {e}")
+            # Ne pas bloquer l'inscription si la création du profil échoue
 
         # NOTE: Supabase envoie automatiquement l'email de confirmation via SMTP configuré
         # L'email utilise le template personnalisé (Supabase Dashboard → Email Templates → Confirm signup)
