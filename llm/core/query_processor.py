@@ -199,12 +199,13 @@ class RAGQueryProcessor:
                     }.get(language, "How can I help you?")
 
                 return RAGResult(
-                    source=RAGSource.CLARIFICATION_NEEDED,
+                    source=RAGSource.NEEDS_CLARIFICATION,
                     answer=clarification_msg,
                     context_docs=[],
                     processing_time=(time.time() - start_time),
                     metadata={
-                        "query_type": "followup_confirmation",
+                        "query_type": "clarification_needed",
+                        "needs_clarification": True,
                         "original_query": query,
                         "conversation_id": tenant_id,
                     },

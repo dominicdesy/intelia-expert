@@ -5,7 +5,7 @@ Simple hardcoded version that increments with each deployment
 """
 
 # HARDCODED VERSION - INCREMENT THIS NUMBER WITH EACH DEPLOYMENT
-VERSION = "2.1.0"
+VERSION = "2.1.1"
 
 import subprocess
 import os
