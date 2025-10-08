@@ -1350,30 +1350,9 @@ async def register_user(user_data: UserRegister):
                 confirmation_url = None
                 otp_token = None
 
-                if service_role_key:
-                    try:
-                        # Créer un client admin avec service role key
-                        from supabase import create_client
-                        admin_client = create_client(supabase_url, service_role_key)
-
-                        # Générer le lien de confirmation d'email
-                        # L'API Supabase admin permet de générer un lien avec token
-                        link_response = admin_client.auth.admin.generate_link({
-                            "type": "signup",
-                            "email": user_data.email,
-                            "options": {
-                                "redirect_to": f"{frontend_url}/auth/verify-email"
-                            }
-                        })
-
-                        if hasattr(link_response, 'properties') and link_response.properties:
-                            # Extraire l'URL complète avec le token
-                            confirmation_url = link_response.properties.get('action_link')
-                            logger.info(f"[Register] Lien de confirmation généré via API Admin")
-                        else:
-                            logger.warning(f"[Register] Impossible de générer le lien via API Admin")
-                    except Exception as e:
-                        logger.warning(f"[Register] Erreur génération lien admin: {e}")
+                # DÉSACTIVÉ TEMPORAIREMENT - L'API Admin Supabase nécessite une syntaxe spécifique
+                # On utilise le fallback pour l'instant
+                logger.info(f"[Register] Utilisation URL de vérification simple (Admin API désactivé)")
 
                 # Fallback si pas de service role key ou erreur
                 if not confirmation_url:
