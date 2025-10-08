@@ -254,6 +254,20 @@ async def get_user_conversations(
         requester_id = current_user.get("user_id", "")
         is_admin = current_user.get("user_type") == "admin" or current_user.get("is_admin", False)
 
+        # DEBUG: Log pour comprendre le problème 403
+        logger.info(
+            f"[DEBUG 403] user_id from URL: {user_id} (type: {type(user_id)})"
+        )
+        logger.info(
+            f"[DEBUG 403] requester_id from token: {requester_id} (type: {type(requester_id)})"
+        )
+        logger.info(
+            f"[DEBUG 403] current_user keys: {list(current_user.keys())}"
+        )
+        logger.info(
+            f"[DEBUG 403] Match: {user_id == requester_id}, is_admin: {is_admin}"
+        )
+
         if user_id != requester_id and not is_admin:
             logger.warning(
                 f"Tentative d'accès non autorisé: {requester_id} ({current_user.get('email')}) → {user_id}"
