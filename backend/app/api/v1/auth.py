@@ -1356,7 +1356,6 @@ async def register_user(user_data: UserRegister):
                         logger.info(f"[Register] Génération du lien de confirmation via Admin API...")
 
                         # Créer un client admin avec service role key
-                        from supabase import create_client
                         admin_client = create_client(supabase_url, service_role_key)
 
                         # Générer le lien de confirmation
