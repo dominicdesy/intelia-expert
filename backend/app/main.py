@@ -242,7 +242,15 @@ async def periodic_stats_update():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ========== INITIALISATION AU DEMARRAGE ==========
-    logger.info("Demarrage backend Expert API - Architecture simplifiee")
+    # 🔧 VERSION TRACKING
+    VERSION = "4.3.2"
+    BUILD = "20251008-003"  # Webhooks router + Version tracking
+    COMMIT = os.getenv("COMMIT_SHA", "unknown")[:8]
+
+    logger.info("=" * 80)
+    logger.info(f"🚀 Demarrage backend Expert API - Architecture simplifiee")
+    logger.info(f"📦 VERSION: {VERSION} | BUILD: {BUILD} | COMMIT: {COMMIT}")
+    logger.info("=" * 80)
 
     # ========== INITIALISATION DES SERVICES ==========
     try:
