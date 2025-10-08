@@ -89,15 +89,16 @@ PROTECTED_PATTERNS = [
     "/api/v1/stats-admin/force-update/",
     "/api/v1/stats-admin/cache/",
     "/api/v1/stats-admin/status",
-    # === ENDPOINTS AUTH PROTÉGÉS ===
-    "/api/v1/auth/me",
+    # === ENDPOINTS AUTH PROTÉGÉS (admin only) ===
     "/api/v1/auth/delete-data",
-    "/api/v1/auth/heartbeat",
-    "/api/v1/auth/logout",
 ]
 
 # PATTERNS POUR UTILISATEURS AUTHENTIFIÉS (niveau intermédiaire)
 AUTHENTICATED_USER_PATTERNS = [
+    # === ENDPOINTS AUTH UTILISATEURS ===
+    "/api/v1/auth/me",
+    "/api/v1/auth/heartbeat",
+    "/api/v1/auth/logout",
     # === ENDPOINTS STATS-FAST ===
     "/api/v1/stats-fast/",
     "/api/v1/stats-fast/dashboard",
