@@ -261,7 +261,15 @@ function LoginPageContent() {
   // FONCTION SIGNUP UNIFIÉE - utilise le store au lieu de fetch direct
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("[Signup] Utilisation du store unifié:", signupData);
+    console.log("[Signup] Utilisation du store unifié:", {
+      email: signupData.email,
+      firstName: signupData.firstName,
+      lastName: signupData.lastName,
+      country: signupData.country,
+      // Données sensibles masquées pour sécurité
+      password: "***",
+      confirmPassword: "***",
+    });
 
     setIsLoading(true);
     setError("");
