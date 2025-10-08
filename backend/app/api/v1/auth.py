@@ -1334,8 +1334,13 @@ async def register_user(user_data: UserRegister):
         user = result.user
         logger.info(f"[Register] Compte créé dans Supabase: {user.id}")
 
-        # Envoyer l'email de confirmation multilingue (si email service disponible)
-        if EMAIL_SERVICE_AVAILABLE and user_data.preferred_language:
+        # NOTE: L'email de confirmation sera envoyé par le Auth Hook Supabase
+        # qui appellera /api/v1/webhooks/supabase/auth
+        # Voir backend/app/api/v1/webhooks.py pour la logique d'envoi d'email
+        logger.info(f"[Register] Email de confirmation sera envoyé via Auth Hook webhook")
+
+        # DÉSACTIVÉ: Envoi direct d'email (maintenant géré par webhook)
+        if False and EMAIL_SERVICE_AVAILABLE and user_data.preferred_language:
             try:
                 logger.info(f"[Register] EMAIL_SERVICE_AVAILABLE=True, initialisation email service...")
                 email_service = get_email_service()
