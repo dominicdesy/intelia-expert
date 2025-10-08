@@ -528,6 +528,72 @@ Conclusion: La nutrition a un impact 1.5-2x plus important que la température s
             "contexts": [],
             "answer": "",
         },
+        # =================================================================
+        # 39. FARM-TO-PLANT INTEGRATION (Historically OOD)
+        # =================================================================
+        {
+            "question": "What are the main data points processing plants need from farms to plan efficiently?",
+            "ground_truth": """Processing plants require several critical data points from farms for efficient planning:
+
+**1. Production Schedule & Volumes:**
+- Flock placement dates and expected harvest dates
+- Number of birds per batch
+- Expected average weight at processing (target: 2.0-2.8 kg for broilers)
+- Weekly/monthly production forecast
+
+**2. Bird Performance Metrics:**
+- Current body weight and growth curve
+- Feed Conversion Ratio (FCR)
+- Mortality rate and daily mortality trend
+- Uniformity (CV% of flock weight - target <10%)
+- Health status (any disease outbreaks or antibiotic treatments)
+
+**3. Breed & Genetics Information:**
+- Breed type (Ross 308, Cobb 500, Hubbard, etc.)
+- Sex ratio (males/females/as-hatched)
+- Parent flock age and performance
+- Genetic line characteristics
+
+**4. Quality & Food Safety Indicators:**
+- Feed withdrawal timing (typically 8-12 hours before catch)
+- Last feed formulation and medication
+- Transport distance and estimated transit time
+- Stocking density history (affects meat quality)
+- Antibiotic withdrawal periods (regulatory compliance)
+- Any quality issues (leg problems, bruising, ascites)
+
+**5. Logistics & Operations:**
+- Farm location coordinates and road access
+- Loading bay capacity and equipment
+- Available catching crew size
+- Preferred catch time (typically night for stress reduction)
+- Crate/module availability
+
+**6. Compliance & Traceability:**
+- Farm certification status (organic, Label Rouge, etc.)
+- Complete vaccination records
+- Feed batch traceability
+- Biosecurity measures and audit results
+- Water and litter management records
+
+**Benefits of Data Sharing:**
+- Optimizes production line speed (birds/hour)
+- Reduces labor costs through better scheduling
+- Minimizes downtime and changeover time
+- Ensures food safety compliance
+- Improves yield prediction accuracy
+- Reduces processing waste
+- Enhances traceability for recalls
+
+**Integration Methods:**
+Modern farms use farm management software that can automatically share this data with plants via APIs, reducing manual data entry and improving accuracy.""",
+            "category": "farm_to_plant_integration",
+            "expected_behavior": "Doit fournir réponse détaillée sur intégration ferme-usine. Historiquement détecté comme OOD, mais devrait maintenant répondre car lié à l'aviculture et données de performance",
+            "expected_query_type": "KNOWLEDGE",
+            "historical_note": "Previously classified as OOD - test if system now handles farm-to-plant supply chain questions",
+            "contexts": [],
+            "answer": "",
+        },
     ]
 
 
