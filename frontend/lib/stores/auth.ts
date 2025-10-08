@@ -705,6 +705,7 @@ export const useAuthStore = create<AuthState>()(
               last_name: userData.lastName,
               company: userData.companyName,
               phone: userData.phone,
+              country: userData.country,
               preferred_language: preferredLanguage,
             },
           );
