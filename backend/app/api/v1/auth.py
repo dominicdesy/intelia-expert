@@ -1330,7 +1330,9 @@ async def register_user(user_data: UserRegister):
         # Envoyer l'email de confirmation multilingue (si email service disponible)
         if EMAIL_SERVICE_AVAILABLE and user_data.preferred_language:
             try:
+                logger.info(f"[Register] EMAIL_SERVICE_AVAILABLE=True, initialisation email service...")
                 email_service = get_email_service()
+                logger.info(f"[Register] Email service initialisé: {type(email_service)}")
 
                 # Construire l'URL de confirmation (Supabase fournit normalement un token)
                 frontend_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com")
@@ -1338,8 +1340,10 @@ async def register_user(user_data: UserRegister):
                 confirmation_url = f"{frontend_url}/auth/confirm?email={user_data.email}"
 
                 logger.info(f"[Register] Envoi email de confirmation à {user_data.email} en {user_data.preferred_language}")
+                logger.info(f"[Register] URL confirmation: {confirmation_url}")
+                logger.info(f"[Register] First name: {user_data.first_name}")
 
-                email_service.send_auth_email(
+                result = email_service.send_auth_email(
                     email_type=EmailType.SIGNUP_CONFIRMATION,
                     to_email=user_data.email,
                     language=user_data.preferred_language,
@@ -1348,10 +1352,20 @@ async def register_user(user_data: UserRegister):
                     first_name=user_data.first_name,
                 )
 
-                logger.info(f"[Register] Email de confirmation envoyé avec succès")
+                if result:
+                    logger.info(f"[Register] ✅ Email de confirmation envoyé avec succès")
+                else:
+                    logger.error(f"[Register] ❌ Échec envoi email (send_auth_email returned False)")
             except Exception as e:
-                logger.error(f"[Register] Erreur envoi email: {e}")
+                logger.error(f"[Register] ❌ Exception lors de l'envoi email: {type(e).__name__}: {str(e)}")
+                import traceback
+                logger.error(f"[Register] Traceback: {traceback.format_exc()}")
                 # Ne pas bloquer la registration si l'email échoue
+        else:
+            if not EMAIL_SERVICE_AVAILABLE:
+                logger.warning(f"[Register] EMAIL_SERVICE_AVAILABLE=False - email non envoyé")
+            elif not user_data.preferred_language:
+                logger.warning(f"[Register] preferred_language vide - email non envoyé")
 
         # Créer le token JWT pour l'authentification immédiate
         expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
