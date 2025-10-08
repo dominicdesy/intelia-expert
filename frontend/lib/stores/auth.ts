@@ -694,20 +694,26 @@ export const useAuthStore = create<AuthState>()(
             'en';
 
           console.log("[AuthStore] Langue détectée pour registration:", preferredLanguage);
+          console.log("[AuthStore] userData reçu:", JSON.stringify(userData, null, 2));
+          console.log("[AuthStore] userData.country:", userData.country);
+
+          const payload = {
+            email,
+            password,
+            full_name: fullName,
+            first_name: userData.firstName,
+            last_name: userData.lastName,
+            company: userData.companyName,
+            phone: userData.phone,
+            country: userData.country,
+            preferred_language: preferredLanguage,
+          };
+
+          console.log("[AuthStore] Payload envoyé au backend:", JSON.stringify(payload, null, 2));
 
           const response = await apiClient.post<{ token?: string; user?: any }>(
             "/auth/register",
-            {
-              email,
-              password,
-              full_name: fullName,
-              first_name: userData.firstName,
-              last_name: userData.lastName,
-              company: userData.companyName,
-              phone: userData.phone,
-              country: userData.country,
-              preferred_language: preferredLanguage,
-            },
+            payload,
           );
 
           if (!response.success) {
