@@ -1,4 +1,5 @@
-# app/api/v1/__init__.py - VERSION 5.7 CORRIGÉE POUR 100% DE SUCCÈS
+# app/api/v1/__init__.py - VERSION 5.8 - WEBHOOKS MULTILINGUES
+# NOUVEAUTÉ: Support du router webhooks pour emails multilingues Supabase
 # SUPPRESSION COMPLÈTE DES RÉFÉRENCES EXPERT
 # Support des routers de cache statistiques ultra-rapides
 # Support du router users pour gestion profils
@@ -283,6 +284,24 @@ except Exception as e:
     conversations_router = None
     logger.error("ERREUR import conversations router: %s", e)
 
+# Webhooks router (pour emails multilingues Supabase)
+WEBHOOKS_AVAILABLE = False
+try:
+    from .webhooks import router as webhooks_router
+
+    WEBHOOKS_AVAILABLE = True
+    logger.info(
+        "Webhooks router importé avec %d routes", len(webhooks_router.routes)
+    )
+except ImportError:
+    WEBHOOKS_AVAILABLE = False
+    webhooks_router = None
+    logger.warning("Webhooks router non disponible (normal si pas encore créé)")
+except Exception as e:
+    WEBHOOKS_AVAILABLE = False
+    webhooks_router = None
+    logger.error("ERREUR import webhooks router: %s", e)
+
 # Création du router principal
 logger.info("Création du router principal v1...")
 router = APIRouter(prefix="/v1")
@@ -418,6 +437,16 @@ if CONVERSATIONS_AVAILABLE and conversations_router:
         conversations_router, prefix="/conversations", tags=["Conversations"]
     )
     logger.info("Conversations router monté")
+
+# Webhooks (pour emails multilingues Supabase)
+if WEBHOOKS_AVAILABLE and webhooks_router:
+    router.include_router(
+        webhooks_router, prefix="/webhooks", tags=["Webhooks"]
+    )
+    logger.info("Webhooks router monté")
+    logger.info("Webhooks router maintenant disponible sur /v1/webhooks/*")
+else:
+    logger.warning("Webhooks router non monté (module non disponible)")
 
 # Résumé final
 total_routes = len(router.routes)
