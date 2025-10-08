@@ -8,8 +8,13 @@ import logging
 from utils.types import Dict, List, Any
 from functools import lru_cache
 import re
+import json
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Singleton pour VocabularyExtractor
+_vocabulary_extractor_instance = None
 
 # Définition locale des aliases de lignées (remplace l'import inexistant)
 LINE_ALIASES = {
@@ -32,6 +37,62 @@ def _normalize_metric(metric: str) -> str:
     return {"indice conversion": "fcr", "ic": "fcr", "poids": "weight"}.get(m, m)
 
 
+def _load_intents_config(config_path: str = "config/intents.json") -> Dict[str, Any]:
+    """Charge le fichier intents.json depuis différents emplacements possibles"""
+    possible_paths = [
+        config_path,
+        Path(__file__).parent.parent / "config" / "intents.json",
+        Path.cwd() / "config" / "intents.json",
+        "/app/config/intents.json",
+        "./config/intents.json",
+    ]
+
+    for path in possible_paths:
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            continue
+        except Exception as e:
+            logger.warning(f"Error loading intents from {path}: {e}")
+            continue
+
+    # Fallback: retourner une configuration minimale
+    logger.warning("Could not load intents.json, using minimal config")
+    return {
+        "aliases": {
+            "line": {},
+            "site_type": {},
+            "bird_type": {},
+            "phase": {},
+            "sex": {}
+        },
+        "intents": {},
+        "defaults_by_topic": {}
+    }
+
+
+def _get_vocabulary_extractor():
+    """Get or create singleton instance of PoultryVocabularyExtractor"""
+    global _vocabulary_extractor_instance
+    if _vocabulary_extractor_instance is None:
+        try:
+            from processing.vocabulary_extractor import PoultryVocabularyExtractor
+            intents_config = _load_intents_config()
+            _vocabulary_extractor_instance = PoultryVocabularyExtractor(intents_config)
+            logger.debug("VocabularyExtractor initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize VocabularyExtractor: {e}")
+            # Create a minimal fallback
+            class MinimalVocabularyExtractor:
+                def __init__(self):
+                    self.alias_mappings = {}
+                    self.metrics_vocabulary = {}
+                    self.topic_defaults = {}
+            _vocabulary_extractor_instance = MinimalVocabularyExtractor()
+    return _vocabulary_extractor_instance
+
+
 def _normalize_age(age: str) -> str:
     a = (
         age.lower()
@@ -47,7 +108,17 @@ def _normalize_age(age: str) -> str:
 class QueryExpander:
     """Expanseur de requêtes avec synonymes du domaine - Version améliorée avec normalisation et logique sexe/as-hatched"""
 
-    def __init__(self, vocabulary_extractor):
+    def __init__(self, vocabulary_extractor=None):
+        """
+        Initialize QueryExpander
+
+        Args:
+            vocabulary_extractor: Optional PoultryVocabularyExtractor instance.
+                                 If None, will use singleton from _get_vocabulary_extractor()
+        """
+        if vocabulary_extractor is None:
+            vocabulary_extractor = _get_vocabulary_extractor()
+
         self.vocab_extractor = vocabulary_extractor
         self.alias_mappings = vocabulary_extractor.alias_mappings
         self.metrics_vocabulary = vocabulary_extractor.metrics_vocabulary
@@ -442,3 +513,21 @@ def _build_expansion_patterns() -> Dict[str, Dict[str, List[str]]]:
             ],
         },
     }
+
+
+# Singleton pour QueryExpander
+_query_expander_instance = None
+
+
+def get_query_expander() -> QueryExpander:
+    """
+    Get singleton instance of QueryExpander
+
+    Returns:
+        QueryExpander instance
+    """
+    global _query_expander_instance
+    if _query_expander_instance is None:
+        _query_expander_instance = QueryExpander()
+        logger.debug("QueryExpander singleton initialized")
+    return _query_expander_instance
