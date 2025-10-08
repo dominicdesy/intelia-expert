@@ -1296,6 +1296,8 @@ async def register_user(user_data: UserRegister):
             user_metadata["company"] = user_data.company
         if user_data.phone:
             user_metadata["phone"] = user_data.phone
+        if user_data.country:
+            user_metadata["country"] = user_data.country
         # NOUVEAU: Stocker la langue préférée
         if user_data.preferred_language:
             user_metadata["preferred_language"] = user_data.preferred_language
@@ -1365,7 +1367,7 @@ async def register_user(user_data: UserRegister):
                     "first_name": user_data.first_name,
                     "last_name": user_data.last_name,
                     "full_name": full_name,
-                    "country": user_data.country if hasattr(user_data, 'country') else None,
+                    "country": user_data.country,
                     "phone": user_data.phone,
                     "company_name": user_data.company,
                     "user_type": "user",
