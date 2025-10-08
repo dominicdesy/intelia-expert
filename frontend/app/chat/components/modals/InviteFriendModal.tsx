@@ -98,7 +98,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
   // Validation side effect (conservé)
   useEffect(() => {
     if (!currentUser?.email) {
-      setErrors(["Vous devez être connecté pour envoyer des invitations"]);
+      setErrors([t('invite.loginRequired')]);
     } else {
       setErrors([]);
     }
@@ -138,12 +138,12 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
     setResults(null);
 
     if (!currentUser?.email) {
-      setErrors(["Vous devez être connecté pour envoyer des invitations"]);
+      setErrors([t('invite.loginRequired')]);
       return;
     }
 
     if (!emails.trim()) {
-      setErrors(["Au moins une adresse email est requise"]);
+      setErrors([t('invite.emailRequired')]);
       return;
     }
 
@@ -151,19 +151,19 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
 
     if (invalid.length > 0) {
       setErrors([
-        `Adresses email invalides : ${invalid.join(", ")}`,
-        "Format attendu : email@exemple.com",
+        `${t('invite.invalidEmails')}: ${invalid.join(", ")}`,
+        t('invite.emailFormat'),
       ]);
       return;
     }
 
     if (valid.length === 0) {
-      setErrors(["Aucune adresse email valide trouvée"]);
+      setErrors([t('invite.noValidEmails')]);
       return;
     }
 
     if (valid.length > 10) {
-      setErrors(["Maximum 10 invitations à la fois"]);
+      setErrors([t('invite.maxLimit')]);
       return;
     }
 
@@ -176,7 +176,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
         inviter_name:
           currentUser.name ||
           currentUser.email?.split("@")[0] ||
-          "Utilisateur Intelia",
+          "Intelia User",
         inviter_email: currentUser.email,
         language: currentUser.language || "fr",
         force_send: false,
@@ -195,12 +195,12 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
 
       if (!response.success) {
         throw new Error(
-          response.error?.message || "Erreur lors de l'envoi des invitations",
+          response.error?.message || t('invite.sendError'),
         );
       }
 
       if (!response.data) {
-        throw new Error("Réponse vide du serveur");
+        throw new Error(t('invite.sendError'));
       }
 
       console.log(
@@ -211,7 +211,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
     } catch (error) {
       console.error("❌ [InviteFriendModal] Erreur envoi:", error);
 
-      let errorMessage = "Erreur lors de l'envoi des invitations";
+      let errorMessage = t('invite.sendError');
 
       if (error instanceof Error) {
         errorMessage = error.message;
@@ -224,11 +224,11 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
         errorMessage.includes("Unauthorized")
       ) {
         setErrors([
-          "Session expirée",
-          "Veuillez vous reconnecter et réessayer",
+          t('invite.sessionExpired'),
+          t('invite.sessionExpiredDetail'),
         ]);
       } else {
-        setErrors([errorMessage, "Veuillez réessayer ou contactez le support"]);
+        setErrors([errorMessage, t('invite.retryOrContact')]);
       }
     } finally {
       setIsLoading(false);
@@ -242,11 +242,11 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
 
   const getFriendlyMessage = (result: InvitationResult) => {
     if (result.status === "sent") {
-      return `Invitation envoyée : ${result.email}`;
+      return `${t('invite.invitationSent')}: ${result.email}`;
     }
 
     if (result.status === "resent") {
-      return `Invitation renvoyée : ${result.email}`;
+      return `${t('invite.invitationSent')}: ${result.email}`;
     }
 
     if (result.status === "skipped") {
@@ -255,30 +255,30 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
           const registeredDate = new Date(
             result.details.registered_since,
           ).toLocaleDateString("fr-FR");
-          return `Utilisateur existant : ${result.email} (inscrit le ${registeredDate})`;
+          return `${t('invite.userExists')}: ${result.email} (registered ${registeredDate})`;
         }
-        return `Utilisateur existant : ${result.email}`;
+        return `${t('invite.userExists')}: ${result.email}`;
       }
 
       if (result.reason === "already_invited_by_you") {
-        return `Déjà invité par vous : ${result.email}`;
+        return `${t('invite.alreadyInvitedByYou')}: ${result.email}`;
       }
 
       if (result.reason === "already_invited_by_other") {
-        return `Déjà invité par quelqu'un d'autre : ${result.email}`;
+        return `${t('invite.alreadyInvitedByOther')}: ${result.email}`;
       }
 
-      return result.message || `Invitation ignorée : ${result.email}`;
+      return result.message || `${t('invite.userExists')}: ${result.email}`;
     }
 
     if (result.status === "failed") {
       if (result.reason?.includes("Invalid email")) {
-        return `Email invalide : ${result.email}`;
+        return `${t('invite.invalidEmail')}: ${result.email}`;
       }
       if (result.reason?.includes("rate limit")) {
-        return "Limite de débit atteinte";
+        return t('invite.rateLimit');
       }
-      return `Échec d'envoi : ${result.email}`;
+      return `${t('invite.sendFailed')}: ${result.email}`;
     }
 
     return result.message;
@@ -317,7 +317,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
           >
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">
-                Inviter des amis
+                {t('nav.inviteFriend')}
               </h2>
               <button
                 onClick={onClose}
@@ -344,17 +344,16 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
                   </svg>
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                  Connexion requise
+                  {t('invite.loginRequiredTitle')}
                 </h2>
                 <p className="text-sm text-gray-600 mb-4">
-                  Vous devez être connecté avec le système unifié pour envoyer
-                  des invitations
+                  {t('invite.loginRequired')}
                 </p>
                 <button
                   onClick={onClose}
                   className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                 >
-                  Fermer
+                  {t('modal.close')}
                 </button>
               </div>
             </div>
@@ -396,7 +395,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">
-              Inviter des amis
+              {t('nav.inviteFriend')}
             </h2>
             <button
               onClick={onClose}
@@ -427,11 +426,10 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
                   </svg>
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                  Partagez Intelia Expert
+                  {t('invite.subtitle')}
                 </h2>
                 <p className="text-sm text-gray-600">
-                  Invitez vos collègues à découvrir l'assistant IA spécialisé en
-                  agriculture
+                  {t('invite.title')}
                 </p>
               </div>
 
@@ -439,7 +437,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
               {results && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Statut d'envoi
+                    {t('invite.sendStatus')}
                   </h3>
 
                   <div className="space-y-3">
@@ -472,7 +470,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
                             </p>
                             {result.details?.last_login && (
                               <p className="text-xs text-gray-500 mt-1">
-                                Dernière connexion :{" "}
+                                {t('invite.lastLogin')}:{" "}
                                 {new Date(
                                   result.details.last_login,
                                 ).toLocaleDateString("fr-FR")}
@@ -480,7 +478,8 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
                             )}
                             {result.details?.hours_remaining && (
                               <p className="text-xs text-gray-500 mt-1">
-                                Prochain renvoi possible dans :{" "}
+                                {/* TODO: Add 'invite.nextResend' translation key */}
+                                Next resend possible in:{" "}
                                 {result.details.hours_remaining}h
                               </p>
                             )}
@@ -499,13 +498,13 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
                       }}
                       className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 transition-colors"
                     >
-                      Inviter d'autres personnes
+                      {t('invite.inviteOthers')}
                     </button>
                     <button
                       onClick={onClose}
                       className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
                     >
-                      Fermer
+                      {t('modal.close')}
                     </button>
                   </div>
                 </div>
@@ -529,7 +528,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
                           d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
                         />
                       </svg>
-                      Erreur de validation
+                      {t('invite.validationError')}
                     </p>
                     <ul className="list-disc list-inside space-y-1 text-sm">
                       {errors.map((error, index) => (
@@ -545,39 +544,37 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
                 <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Adresses email
+                      {t('invite.emailAddresses')}
                       {getEmailCount() > 0 && (
                         <span className="ml-2 text-blue-600 font-normal">
-                          ({getEmailCount()} destinataire
-                          {getEmailCount() > 1 ? "s" : ""})
+                          ({getEmailCount()} {t('invite.recipientCount')})
                         </span>
                       )}
                     </label>
                     <textarea
                       value={emails}
                       onChange={(e) => setEmails(e.target.value)}
-                      placeholder="email1@exemple.com, email2@exemple.com, ..."
+                      placeholder={t('invite.emailPlaceholder')}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                       rows={3}
                       disabled={isLoading}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Séparez les adresses par des virgules. Maximum 10
-                      invitations.
+                      {t('invite.emailHelp')}
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-900 mb-2">
-                      Message personnel
+                      {t('invite.personalMessage')}{" "}
                       <span className="text-gray-500 font-normal">
-                        (optionnel)
+                        {t('invite.optional')}
                       </span>
                     </label>
                     <textarea
                       value={personalMessage}
                       onChange={(e) => setPersonalMessage(e.target.value)}
-                      placeholder="Ajouter un message personnel à votre invitation..."
+                      placeholder={t('invite.messagePlaceholder')}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                       rows={4}
                       maxLength={500}
@@ -585,7 +582,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
                     />
                     <div className="flex justify-between items-center mt-1">
                       <p className="text-xs text-gray-500">
-                        Ce message sera inclus dans l'email d'invitation
+                        {t('invite.messageHelp')}
                       </p>
                       <span className="text-xs text-gray-400">
                         {personalMessage.length}/500
@@ -606,7 +603,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
                     {isLoading ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Envoi en cours...</span>
+                        <span>{t('invite.sending')}</span>
                       </>
                     ) : (
                       <>
@@ -624,7 +621,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
                           />
                         </svg>
                         <span>
-                          Envoyer{" "}
+                          {t('invite.send')}{" "}
                           {getEmailCount() > 0 ? `(${getEmailCount()})` : ""}
                         </span>
                       </>
@@ -635,8 +632,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
 
               {/* Footer */}
               <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
-                Les invitations sont gérées de manière sécurisée via le système
-                unifié. Vos contacts ne recevront qu'un seul email d'invitation.
+                {t('invite.footerInfo')}
               </div>
             </div>
           </div>
