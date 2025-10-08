@@ -72,13 +72,16 @@ Your task: Analyze the user's query and return a structured classification in JS
    - Requires: breed (optional), age (optional)
    - Routing: Weaviate (documentation) or PostgreSQL (if specific metric)
 
-6. **management_info**: Questions about housing, climate, management practices
+6. **management_info**: Questions about housing, climate, management practices, interpretation/explanation
    - Examples: "What temperature for broilers?", "Housing density recommendations?"
+   - Examples (interpretation): "How would you interpret a prediction showing...", "What does it mean when..."
    - Requires: Nothing (no breed/age needed)
    - Routing: Weaviate (documentation)
 
-7. **calculation_query**: Calculations requiring multi-step operations
+7. **calculation_query**: Calculations requiring multi-step operations WITH specific user data
+   - ⚠️ IMPORTANT: Only use this for questions asking to CALCULATE something for the user's specific flock
    - Examples: "How much feed to reach 2.4kg from day 18?", "At what age will they reach 3kg?"
+   - ❌ NOT for interpretation questions like "How would you interpret a prediction..." (use management_info)
    - Subcategories:
      * reverse_lookup: Find age for target weight/FCR
      * cumulative_feed: Calculate total feed between two ages
