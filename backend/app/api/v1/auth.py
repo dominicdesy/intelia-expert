@@ -1322,6 +1322,13 @@ async def register_user(user_data: UserRegister):
                 password=user_data.password,
                 user_metadata=user_metadata if user_metadata else {},
             )
+        except Exception as e:
+            # Capturer les erreurs Supabase (ex: utilisateur existant)
+            error_msg = str(e)
+            logger.error(f"[Register] Erreur Supabase sign_up: {error_msg}")
+            if "already registered" in error_msg.lower() or "already exists" in error_msg.lower():
+                raise HTTPException(status_code=400, detail="Un compte avec cet email existe déjà")
+            raise HTTPException(status_code=400, detail=error_msg)
 
         # Vérifier le résultat
         if result.user is None:
@@ -1331,15 +1338,25 @@ async def register_user(user_data: UserRegister):
             logger.error(f"[Register] Échec Supabase: {error_msg}")
             raise HTTPException(status_code=400, detail=error_msg)
 
+        # Vérifier si l'utilisateur existe déjà (Supabase peut retourner un user même si déjà inscrit)
+        # Dans ce cas, user.email_confirmed_at peut être None (nouveau) ou avoir une valeur (existant)
+        # MAIS si "Confirm email" est activé, tous les nouveaux users ont email_confirmed_at=None
+        # Donc on ne peut pas distinguer facilement. On va logger les métadonnées pour debug.
+        logger.info(f"[Register] User metadata envoyées: {user_metadata}")
+        if hasattr(result.user, "user_metadata"):
+            logger.info(f"[Register] User metadata retournées par Supabase: {result.user.user_metadata}")
+
         user = result.user
         logger.info(f"[Register] Compte créé dans Supabase: {user.id}")
 
-        # NOTE: L'email de confirmation sera envoyé par le Auth Hook Supabase
-        # qui appellera /api/v1/webhooks/supabase/auth
-        # Voir backend/app/api/v1/webhooks.py pour la logique d'envoi d'email
-        logger.info(f"[Register] Email de confirmation sera envoyé via Auth Hook webhook")
+        # NOTE: Supabase envoie automatiquement l'email de confirmation via SMTP configuré
+        # L'email utilise le template personnalisé (Supabase Dashboard → Email Templates → Confirm signup)
+        # Le template détecte la langue via {{ .UserMetaData.preferred_language }}
+        logger.info(f"[Register] Email de confirmation multilangue envoyé par Supabase (langue: {user_data.preferred_language})")
 
-        # DÉSACTIVÉ: Envoi direct d'email (maintenant géré par webhook)
+        # DÉSACTIVÉ: Envoi d'email custom car Supabase génère les tokens
+        # et ne les expose pas via l'API. Pour des emails multilingues,
+        # il faut personnaliser les templates dans Supabase Dashboard.
         if False and EMAIL_SERVICE_AVAILABLE and user_data.preferred_language:
             try:
                 logger.info(f"[Register] EMAIL_SERVICE_AVAILABLE=True, initialisation email service...")
