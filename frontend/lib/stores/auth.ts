@@ -14,8 +14,13 @@ interface BackendUserData {
   user_id: string;
   email: string;
   full_name?: string;
+  first_name?: string;  // NOUVEAU: champs séparés depuis Supabase
+  last_name?: string;   // NOUVEAU: champs séparés depuis Supabase
   phone?: string;
+  phone_number?: string;
   country?: string;
+  country_code?: string;
+  area_code?: string;
   linkedin_profile?: string;
   company_name?: string;
   company_website?: string;
@@ -294,9 +299,10 @@ export const useAuthStore = create<AuthState>()(
                 userData.full_name ||
                 userData.email?.split("@")[0] ||
                 "Utilisateur",
-              firstName: userData.full_name?.split(" ")[0] || "",
-              lastName: userData.full_name?.split(" ").slice(1).join(" ") || "",
-              phone: userData.phone || "",
+              // CORRECTION: Utiliser first_name/last_name depuis Supabase si disponibles
+              firstName: userData.first_name || userData.full_name?.split(" ")[0] || "",
+              lastName: userData.last_name || userData.full_name?.split(" ").slice(1).join(" ") || "",
+              phone: userData.phone || userData.phone_number || "",
               country: userData.country || "",
               linkedinProfile: userData.linkedin_profile || "",
               companyName: userData.company_name || "",
