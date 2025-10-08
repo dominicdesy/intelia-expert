@@ -16,7 +16,7 @@ from pydantic import BaseModel, EmailStr
 
 from app.services.email_service import get_email_service, EmailType
 
-router = APIRouter(prefix="/webhooks")
+router = APIRouter()  # Prefix is added when mounting in __init__.py
 logger = logging.getLogger(__name__)
 
 
@@ -336,8 +336,8 @@ async def test_webhook():
     return {
         "success": True,
         "message": "Webhook endpoint is working",
-        "version": "1.0.0",  # 🔧 VERSION TRACKING
-        "build": "20251008-002",  # 🔧 BUILD NUMBER (fixed router loading)
+        "version": "1.0.1",  # 🔧 VERSION TRACKING
+        "build": "20251008-003",  # 🔧 BUILD NUMBER (fixed double prefix /webhooks/webhooks)
         "timestamp": datetime.utcnow().isoformat(),
         "email_service_configured": bool(
             os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD")
@@ -350,8 +350,8 @@ async def test_webhook():
 async def webhook_config():
     """Endpoint de debug pour vérifier la configuration des webhooks"""
     return {
-        "version": "1.0.0",  # 🔧 VERSION TRACKING
-        "build": "20251008-002",  # 🔧 BUILD NUMBER (fixed router loading)
+        "version": "1.0.1",  # 🔧 VERSION TRACKING
+        "build": "20251008-003",  # 🔧 BUILD NUMBER (fixed double prefix /webhooks/webhooks)
         "webhook_url": f"{os.getenv('BACKEND_URL', 'https://expert-app-cngws.ondigitalocean.app')}/api/v1/webhooks/supabase/auth",
         "smtp_configured": bool(os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD")),
         "webhook_secret_configured": bool(os.getenv("SUPABASE_WEBHOOK_SECRET")),
