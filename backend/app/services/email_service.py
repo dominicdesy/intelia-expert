@@ -575,6 +575,9 @@ class EmailService:
                 logger.error("SMTP credentials not configured")
                 return False
 
+            logger.info(f"[EmailService] Tentative envoi email à {to_email}")
+            logger.info(f"[EmailService] SMTP: {self.smtp_host}:{self.smtp_port}")
+
             # Créer le message
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
@@ -585,17 +588,35 @@ class EmailService:
             html_part = MIMEText(html_content, "html")
             msg.attach(html_part)
 
-            # Envoyer via SMTP
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
-                server.send_message(msg)
+            # Envoyer via SMTP - utiliser SMTP_SSL pour port 465, SMTP+STARTTLS pour port 587
+            if self.smtp_port == 465:
+                # SSL direct (Resend, Gmail avec App Password)
+                logger.info("[EmailService] Utilisation SMTP_SSL (port 465)")
+                with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=30) as server:
+                    logger.info("[EmailService] Connexion SSL établie, login...")
+                    server.login(self.smtp_user, self.smtp_password)
+                    logger.info("[EmailService] Login réussi, envoi du message...")
+                    server.send_message(msg)
+                    logger.info("[EmailService] Message envoyé avec succès")
+            else:
+                # STARTTLS (port 587)
+                logger.info("[EmailService] Utilisation SMTP+STARTTLS (port 587)")
+                with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=30) as server:
+                    logger.info("[EmailService] Connexion établie, STARTTLS...")
+                    server.starttls()
+                    logger.info("[EmailService] STARTTLS OK, login...")
+                    server.login(self.smtp_user, self.smtp_password)
+                    logger.info("[EmailService] Login réussi, envoi du message...")
+                    server.send_message(msg)
+                    logger.info("[EmailService] Message envoyé avec succès")
 
-            logger.info(f"Email sent successfully to {to_email}")
+            logger.info(f"✅ Email sent successfully to {to_email}")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to send email to {to_email}: {e}")
+            logger.error(f"❌ Failed to send email to {to_email}: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
     def send_auth_email(
