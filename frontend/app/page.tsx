@@ -312,7 +312,10 @@ function LoginPageContent() {
           signupData.phoneNumber
             ? `${signupData.countryCode}${signupData.areaCode}${signupData.phoneNumber}`
             : undefined,
+        preferredLanguage: currentLanguage, // Passer la langue actuelle du frontend
       };
+
+      console.log("[Signup] Langue envoyée au backend:", currentLanguage);
 
       await register(signupData.email, signupData.password, userData);
 

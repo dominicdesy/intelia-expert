@@ -679,6 +679,16 @@ export const useAuthStore = create<AuthState>()(
             throw new Error("Le nom doit contenir au moins 2 caractères");
           }
 
+          // Détecter la langue préférée depuis le store de langue ou le navigateur
+          const languageStore = (window as any).__LANGUAGE_STORE__;
+          const preferredLanguage =
+            languageStore?.getState?.()?.currentLanguage ||
+            userData.preferredLanguage ||
+            navigator.language.split('-')[0] ||
+            'en';
+
+          console.log("[AuthStore] Langue détectée pour registration:", preferredLanguage);
+
           const response = await apiClient.post<{ token?: string; user?: any }>(
             "/auth/register",
             {
@@ -689,6 +699,7 @@ export const useAuthStore = create<AuthState>()(
               last_name: userData.lastName,
               company: userData.companyName,
               phone: userData.phone,
+              preferred_language: preferredLanguage,
             },
           );
 
