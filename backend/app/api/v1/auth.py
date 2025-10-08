@@ -1793,18 +1793,90 @@ async def delete_user_data(current_user: Dict[str, Any] = Depends(get_current_us
 
 @router.get("/me")
 async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """Récupère le profil de l'utilisateur connecté"""
-    return {
-        "user_id": current_user.get("user_id"),
-        "email": current_user.get("email"),
-        "session_id": current_user.get("session_id"),  # NOUVEAU
-        "user_type": current_user.get("user_type"),
-        "full_name": current_user.get("full_name"),
-        "is_admin": current_user.get("is_admin"),
-        "preferences": current_user.get("preferences", {}),
-        "profile_id": current_user.get("profile_id"),
-        "jwt_secret_used": current_user.get("jwt_secret_used"),
-    }
+    """Récupère le profil de l'utilisateur connecté avec données complètes depuis Supabase"""
+
+    try:
+        # Récupérer les données complètes depuis Supabase
+        if SUPABASE_AVAILABLE:
+            url = os.getenv("SUPABASE_URL")
+            service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+            if url and service_key:
+                try:
+                    supabase = create_client(url, service_key)
+                    response = (
+                        supabase.table("users")
+                        .select("*")
+                        .eq("auth_user_id", current_user["user_id"])
+                        .single()
+                        .execute()
+                    )
+
+                    if response.data:
+                        profile_data = response.data
+                        logger.info(f"[/auth/me] Profil complet récupéré pour {current_user.get('email')}")
+
+                        # Retourner les données complètes incluant first_name, last_name, country
+                        return {
+                            "user_id": current_user.get("user_id"),
+                            "email": current_user.get("email"),
+                            "session_id": current_user.get("session_id"),
+                            "user_type": profile_data.get("user_type", current_user.get("user_type")),
+                            "full_name": profile_data.get("full_name", current_user.get("full_name")),
+                            "first_name": profile_data.get("first_name"),  # NOUVEAU
+                            "last_name": profile_data.get("last_name"),    # NOUVEAU
+                            "country": profile_data.get("country"),        # NOUVEAU
+                            "country_code": profile_data.get("country_code"),
+                            "area_code": profile_data.get("area_code"),
+                            "phone_number": profile_data.get("phone_number"),
+                            "phone": profile_data.get("phone"),
+                            "linkedin_profile": profile_data.get("linkedin_profile"),
+                            "company_name": profile_data.get("company_name"),
+                            "company_website": profile_data.get("company_website"),
+                            "linkedin_corporate": profile_data.get("linkedin_corporate"),
+                            "language": profile_data.get("language", "fr"),
+                            "is_admin": current_user.get("is_admin") or profile_data.get("is_admin", False),
+                            "preferences": current_user.get("preferences", {}),
+                            "profile_id": current_user.get("profile_id"),
+                            "jwt_secret_used": current_user.get("jwt_secret_used"),
+                            "plan": profile_data.get("plan"),
+                            "avatar_url": profile_data.get("avatar_url"),
+                            "consent_given": profile_data.get("consent_given"),
+                            "consent_date": profile_data.get("consent_date"),
+                            "created_at": profile_data.get("created_at"),
+                            "updated_at": profile_data.get("updated_at"),
+                        }
+                except Exception as e:
+                    logger.warning(f"[/auth/me] Erreur récupération profil Supabase: {e}")
+                    # Fallback vers données JWT si erreur Supabase
+
+        # Fallback: retourner les données du JWT token si Supabase non disponible
+        logger.info(f"[/auth/me] Fallback vers données JWT pour {current_user.get('email')}")
+        return {
+            "user_id": current_user.get("user_id"),
+            "email": current_user.get("email"),
+            "session_id": current_user.get("session_id"),
+            "user_type": current_user.get("user_type"),
+            "full_name": current_user.get("full_name"),
+            "is_admin": current_user.get("is_admin"),
+            "preferences": current_user.get("preferences", {}),
+            "profile_id": current_user.get("profile_id"),
+            "jwt_secret_used": current_user.get("jwt_secret_used"),
+        }
+    except Exception as e:
+        logger.error(f"[/auth/me] Erreur inattendue: {e}")
+        # En cas d'erreur, retourner au minimum les données du JWT
+        return {
+            "user_id": current_user.get("user_id"),
+            "email": current_user.get("email"),
+            "session_id": current_user.get("session_id"),
+            "user_type": current_user.get("user_type"),
+            "full_name": current_user.get("full_name"),
+            "is_admin": current_user.get("is_admin"),
+            "preferences": current_user.get("preferences", {}),
+            "profile_id": current_user.get("profile_id"),
+            "jwt_secret_used": current_user.get("jwt_secret_used"),
+        }
 
 
 @router.get("/debug/jwt-config")
