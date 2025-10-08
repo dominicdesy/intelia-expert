@@ -354,8 +354,9 @@ Réponds en {language}."""
     ) -> Dict[str, str]:
         """Generate response from Claude 3.5 Sonnet"""
         try:
+            model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
             response = await self.claude_client.messages.create(
-                model="claude-3-5-sonnet-20250110",
+                model=model,
                 max_tokens=max_tokens,
                 system=system_prompt
                 or "Tu es un expert en production avicole. Réponds de manière factuelle et précise.",

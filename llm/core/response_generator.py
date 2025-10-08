@@ -268,7 +268,7 @@ class RAGResponseGenerator:
         """
         try:
             # Generate response without specific context (general knowledge from LLM)
-            generated_answer = await self.generator.generate_response_async(
+            generated_answer = await self.generator.generate_response(
                 query=original_query,
                 context_docs=[],  # Empty context
                 language=language,

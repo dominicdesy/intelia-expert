@@ -262,8 +262,9 @@ class LLMRouter:
             if m["role"] != "system"
         ]
 
+        model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
         response = await self.claude_client.messages.create(
-            model="claude-3-5-sonnet-20250110",
+            model=model,
             system=system_msg,
             messages=user_messages,
             temperature=temperature,
