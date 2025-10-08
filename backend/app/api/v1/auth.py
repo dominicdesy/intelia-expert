@@ -1299,13 +1299,20 @@ async def register_user(user_data: UserRegister):
         if user_data.preferred_language:
             user_metadata["preferred_language"] = user_data.preferred_language
 
+        # Configuration de l'URL de redirection après confirmation
+        frontend_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com")
+        redirect_to = f"{frontend_url}/auth/verify-email"
+
         # Essayer la nouvelle API Supabase d'abord
         try:
             result = supabase.auth.sign_up(
                 {
                     "email": user_data.email,
                     "password": user_data.password,
-                    "options": {"data": user_metadata} if user_metadata else {},
+                    "options": {
+                        "data": user_metadata if user_metadata else {},
+                        "email_redirect_to": redirect_to,  # URL de redirection après clic sur le lien
+                    },
                 }
             )
         except AttributeError:
@@ -1334,10 +1341,11 @@ async def register_user(user_data: UserRegister):
                 email_service = get_email_service()
                 logger.info(f"[Register] Email service initialisé: {type(email_service)}")
 
-                # Construire l'URL de confirmation (Supabase fournit normalement un token)
+                # Construire l'URL de confirmation vers la page verify-email
                 frontend_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com")
-                # Note: Supabase génère le token automatiquement, on utilise l'email comme identifiant temporaire
-                confirmation_url = f"{frontend_url}/auth/confirm?email={user_data.email}"
+                # Note: La page verify-email attend un token Supabase pour appeler l'API de vérification
+                # Pour l'instant, on passe juste l'email pour afficher la page "pending"
+                confirmation_url = f"{frontend_url}/auth/verify-email?email={user_data.email}"
 
                 logger.info(f"[Register] Envoi email de confirmation à {user_data.email} en {user_data.preferred_language}")
                 logger.info(f"[Register] URL confirmation: {confirmation_url}")
