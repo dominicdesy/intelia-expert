@@ -192,10 +192,10 @@ class RAGQueryProcessor:
                 if not clarification_msg:
                     # Fallback if message not configured
                     clarification_msg = {
-                        'en': "Great! How can I help you with poultry production?",
-                        'fr': "Parfait ! Comment puis-je vous aider avec la production avicole ?",
-                        'es': "¡Perfecto! ¿Cómo puedo ayudarte con la producción avícola?",
-                        'de': "Prima! Wie kann ich Ihnen bei der Geflügelproduktion helfen?",
+                        'en': "Great! How can I help you?",
+                        'fr': "Parfait ! Comment puis-je vous aider ?",
+                        'es': "¡Perfecto! ¿Cómo puedo ayudarte?",
+                        'de': "Prima! Wie kann ich Ihnen helfen?",
                     }.get(language, "How can I help you?")
 
                 return RAGResult(
