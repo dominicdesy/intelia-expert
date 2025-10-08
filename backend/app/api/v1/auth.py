@@ -1367,37 +1367,16 @@ async def register_user(user_data: UserRegister):
             elif not user_data.preferred_language:
                 logger.warning(f"[Register] preferred_language vide - email non envoyé")
 
-        # Créer le token JWT pour l'authentification immédiate
-        expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        token_data = {
-            "user_id": user.id,
-            "email": user_data.email,
-            "sub": user.id,  # Standard JWT claim
-            "iss": "intelia-expert",  # Issuer
-            "aud": "authenticated",  # Audience
-        }
+        # NE PAS créer de token JWT - l'utilisateur doit confirmer son email d'abord
+        # Le login sera possible uniquement après confirmation de l'email
 
-        token = create_access_token(token_data, expires)
-
-        # Construire la réponse utilisateur
-        user_response = {
-            "id": user.id,
-            "email": user_data.email,
-            "full_name": full_name,
-            "first_name": user_data.first_name,
-            "last_name": user_data.last_name,
-            "company": user_data.company,
-            "phone": user_data.phone,
-            "created_at": datetime.utcnow().isoformat(),
-        }
-
-        logger.info(f"[Register] Inscription réussie: {user_data.email}")
+        logger.info(f"[Register] Inscription réussie: {user_data.email} - Email de confirmation requis")
 
         return AuthResponse(
             success=True,
-            message="Compte créé avec succès",
-            token=token,
-            user=user_response,
+            message="Compte créé avec succès. Veuillez vérifier votre email pour confirmer votre compte.",
+            token=None,  # Pas de token tant que l'email n'est pas confirmé
+            user=None,   # Pas d'infos utilisateur tant que l'email n'est pas confirmé
         )
 
     except HTTPException:
