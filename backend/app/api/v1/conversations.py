@@ -250,11 +250,13 @@ async def get_user_conversations(
             f"requester={current_user.get('email', 'unknown')}"
         )
 
-        # Vérification sécurité
-        requester_id = current_user.get("email", current_user.get("user_id", ""))
-        if user_id != requester_id and not current_user.get("is_admin", False):
+        # Vérification sécurité - comparer les user_id (UUID)
+        requester_id = current_user.get("user_id", "")
+        is_admin = current_user.get("user_type") == "admin" or current_user.get("is_admin", False)
+
+        if user_id != requester_id and not is_admin:
             logger.warning(
-                f"Tentative d'accès non autorisé: {requester_id} → {user_id}"
+                f"Tentative d'accès non autorisé: {requester_id} ({current_user.get('email')}) → {user_id}"
             )
             raise HTTPException(
                 status_code=403,
