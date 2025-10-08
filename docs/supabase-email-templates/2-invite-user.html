@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You've Been Invited</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+    .email-container { background-color: white; border-radius: 8px; padding: 40px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .logo { text-align: center; margin-bottom: 30px; }
+    h1 { color: #1a1a1a; font-size: 24px; margin-bottom: 20px; }
+    p { margin-bottom: 15px; color: #666; }
+    .button { display: inline-block; background-color: #0066cc; color: white !important; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; }
+    .alt-link { word-break: break-all; color: #0066cc; font-size: 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="logo">
+      <h1 style="color: #0066cc; margin: 0;">Intelia Expert</h1>
+      <p style="color: #999; font-size: 14px; margin: 5px 0;">AI-Powered Poultry Assistant</p>
+    </div>
+
+    {{ if eq .UserMetaData.preferred_language "fr" }}
+      <h1>Vous avez été invité</h1>
+      <p>Bonjour,</p>
+      <p>Vous avez été invité à rejoindre Intelia Expert. Cliquez sur le bouton ci-dessous pour accepter l'invitation et créer votre compte :</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Accepter l'invitation</a></div>
+      <p>Ce lien expire dans 24 heures.</p>
+      <div class="footer"><p>Lien alternatif :</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "es" }}
+      <h1>Has sido invitado</h1>
+      <p>Hola,</p>
+      <p>Has sido invitado a unirte a Intelia Expert. Haz clic en el botón para aceptar la invitación y crear tu cuenta:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Aceptar invitación</a></div>
+      <p>Este enlace caduca en 24 horas.</p>
+      <div class="footer"><p>Enlace alternativo:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "de" }}
+      <h1>Sie wurden eingeladen</h1>
+      <p>Hallo,</p>
+      <p>Sie wurden eingeladen, Intelia Expert beizutreten. Klicken Sie auf die Schaltfläche, um die Einladung anzunehmen:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Einladung annehmen</a></div>
+      <p>Dieser Link läuft in 24 Stunden ab.</p>
+      <div class="footer"><p>Alternativer Link:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "pt" }}
+      <h1>Você foi convidado</h1>
+      <p>Olá,</p>
+      <p>Você foi convidado para se juntar ao Intelia Expert. Clique no botão para aceitar o convite e criar sua conta:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Aceitar convite</a></div>
+      <p>Este link expira em 24 horas.</p>
+      <div class="footer"><p>Link alternativo:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "it" }}
+      <h1>Sei stato invitato</h1>
+      <p>Ciao,</p>
+      <p>Sei stato invitato a unirti a Intelia Expert. Fai clic sul pulsante per accettare l'invito e creare il tuo account:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Accetta invito</a></div>
+      <p>Questo link scade tra 24 ore.</p>
+      <div class="footer"><p>Link alternativo:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "nl" }}
+      <h1>Je bent uitgenodigd</h1>
+      <p>Hallo,</p>
+      <p>Je bent uitgenodigd om lid te worden van Intelia Expert. Klik op de knop om de uitnodiging te accepteren:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Uitnodiging accepteren</a></div>
+      <p>Deze link verloopt over 24 uur.</p>
+      <div class="footer"><p>Alternatieve link:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "pl" }}
+      <h1>Otrzymałeś zaproszenie</h1>
+      <p>Cześć,</p>
+      <p>Otrzymałeś zaproszenie do dołączenia do Intelia Expert. Kliknij przycisk, aby zaakceptować zaproszenie:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Zaakceptuj zaproszenie</a></div>
+      <p>Ten link wygasa za 24 godziny.</p>
+      <div class="footer"><p>Link alternatywny:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "ru" }}
+      <h1>Вас пригласили</h1>
+      <p>Здравствуйте,</p>
+      <p>Вас пригласили присоединиться к Intelia Expert. Нажмите кнопку, чтобы принять приглашение:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Принять приглашение</a></div>
+      <p>Ссылка действительна 24 часа.</p>
+      <div class="footer"><p>Альтернативная ссылка:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "zh" }}
+      <h1>您收到邀请</h1>
+      <p>你好，</p>
+      <p>您已被邀请加入 Intelia Expert。点击按钮接受邀请并创建帐户：</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">接受邀请</a></div>
+      <p>此链接将在24小时后过期。</p>
+      <div class="footer"><p>备用链接：</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "th" }}
+      <h1>คุณได้รับเชิญ</h1>
+      <p>สวัสดี,</p>
+      <p>คุณได้รับเชิญให้เข้าร่วม Intelia Expert คลิกปุ่มเพื่อยอมรับคำเชิญและสร้างบัญชี:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">ยอมรับคำเชิญ</a></div>
+      <p>ลิงก์นี้จะหมดอายุใน 24 ชั่วโมง</p>
+      <div class="footer"><p>ลิงก์สำรอง:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "hi" }}
+      <h1>आपको आमंत्रित किया गया है</h1>
+      <p>नमस्ते,</p>
+      <p>आपको Intelia Expert में शामिल होने के लिए आमंत्रित किया गया है। आमंत्रण स्वीकार करने के लिए बटन पर क्लिक करें:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">आमंत्रण स्वीकार करें</a></div>
+      <p>यह लिंक 24 घंटों में समाप्त हो जाएगी।</p>
+      <div class="footer"><p>वैकल्पिक लिंक:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "id" }}
+      <h1>Anda telah diundang</h1>
+      <p>Halo,</p>
+      <p>Anda telah diundang untuk bergabung dengan Intelia Expert. Klik tombol untuk menerima undangan dan membuat akun:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Terima undangan</a></div>
+      <p>Tautan ini akan kedaluwarsa dalam 24 jam.</p>
+      <div class="footer"><p>Tautan alternatif:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else }}
+      <h1>You've Been Invited</h1>
+      <p>Hello,</p>
+      <p>You've been invited to join Intelia Expert. Click the button below to accept the invitation and create your account:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Accept Invitation</a></div>
+      <p>This link expires in 24 hours.</p>
+      <div class="footer"><p>Alternative link:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ end }}
+
+  </div>
+</body>
+</html>

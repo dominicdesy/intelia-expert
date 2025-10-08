@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reauthentication Required</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+    .email-container { background-color: white; border-radius: 8px; padding: 40px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .logo { text-align: center; margin-bottom: 30px; }
+    h1 { color: #1a1a1a; font-size: 24px; margin-bottom: 20px; }
+    p { margin-bottom: 15px; color: #666; }
+    .button { display: inline-block; background-color: #0066cc; color: white !important; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+    .security { background-color: #ffebee; border-left: 4px solid #f44336; padding: 12px; margin: 20px 0; border-radius: 4px; }
+    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; }
+    .alt-link { word-break: break-all; color: #0066cc; font-size: 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="logo">
+      <h1 style="color: #0066cc; margin: 0;">Intelia Expert</h1>
+      <p style="color: #999; font-size: 14px; margin: 5px 0;">AI-Powered Poultry Assistant</p>
+    </div>
+
+    {{ if eq .UserMetaData.preferred_language "fr" }}
+      <h1>Réauthentification requise</h1>
+      <p>Bonjour {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ end }},</p>
+      <p>Pour des raisons de sécurité, nous devons vérifier votre identité. Cliquez sur le bouton ci-dessous pour vous réauthentifier :</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Me réauthentifier</a></div>
+      <div class="security">🔒 Cette vérification est nécessaire avant d'effectuer des actions sensibles sur votre compte.</div>
+      <p>Ce lien expire dans 15 minutes.</p>
+      <div class="footer"><p>Lien alternatif :</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "es" }}
+      <h1>Reautenticación requerida</h1>
+      <p>Hola {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ end }},</p>
+      <p>Por razones de seguridad, necesitamos verificar tu identidad. Haz clic en el botón para reautenticarte:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Reautenticarme</a></div>
+      <div class="security">🔒 Esta verificación es necesaria antes de realizar acciones sensibles en tu cuenta.</div>
+      <p>Este enlace caduca en 15 minutos.</p>
+      <div class="footer"><p>Enlace alternativo:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "de" }}
+      <h1>Erneute Authentifizierung erforderlich</h1>
+      <p>Hallo {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ end }},</p>
+      <p>Aus Sicherheitsgründen müssen wir Ihre Identität überprüfen. Klicken Sie auf die Schaltfläche, um sich erneut zu authentifizieren:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Erneut authentifizieren</a></div>
+      <div class="security">🔒 Diese Überprüfung ist erforderlich, bevor sensible Aktionen in Ihrem Konto durchgeführt werden.</div>
+      <p>Dieser Link läuft in 15 Minuten ab.</p>
+      <div class="footer"><p>Alternativer Link:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "pt" }}
+      <h1>Reautenticação necessária</h1>
+      <p>Olá {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ end }},</p>
+      <p>Por motivos de segurança, precisamos verificar sua identidade. Clique no botão para se reautenticar:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Reautenticar</a></div>
+      <div class="security">🔒 Esta verificação é necessária antes de realizar ações sensíveis em sua conta.</div>
+      <p>Este link expira em 15 minutos.</p>
+      <div class="footer"><p>Link alternativo:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "it" }}
+      <h1>Riautenticazione richiesta</h1>
+      <p>Ciao {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ end }},</p>
+      <p>Per motivi di sicurezza, dobbiamo verificare la tua identità. Fai clic sul pulsante per riautenticarti:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Riautenticati</a></div>
+      <div class="security">🔒 Questa verifica è necessaria prima di eseguire azioni sensibili sul tuo account.</div>
+      <p>Questo link scade tra 15 minuti.</p>
+      <div class="footer"><p>Link alternativo:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "nl" }}
+      <h1>Herauthenticatie vereist</h1>
+      <p>Hallo {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ end }},</p>
+      <p>Om veiligheidsredenen moeten we je identiteit verifiëren. Klik op de knop om opnieuw te authenticeren:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Herauthenticeren</a></div>
+      <div class="security">🔒 Deze verificatie is noodzakelijk voordat gevoelige acties op je account worden uitgevoerd.</div>
+      <p>Deze link verloopt over 15 minuten.</p>
+      <div class="footer"><p>Alternatieve link:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "pl" }}
+      <h1>Wymagana ponowna uwierzytelnienie</h1>
+      <p>Cześć {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ end }},</p>
+      <p>Ze względów bezpieczeństwa musimy zweryfikować twoją tożsamość. Kliknij przycisk, aby ponownie się uwierzytelnić:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Uwierzytelnij ponownie</a></div>
+      <div class="security">🔒 Ta weryfikacja jest konieczna przed wykonaniem wrażliwych działań na twoim koncie.</div>
+      <p>Ten link wygasa za 15 minut.</p>
+      <div class="footer"><p>Link alternatywny:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "ru" }}
+      <h1>Требуется повторная аутентификация</h1>
+      <p>Здравствуйте{{ if .UserMetaData.first_name }}, {{ .UserMetaData.first_name }}{{ end }}!</p>
+      <p>По соображениям безопасности нам необходимо проверить вашу личность. Нажмите кнопку для повторной аутентификации:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Повторная аутентификация</a></div>
+      <div class="security">🔒 Эта проверка необходима перед выполнением конфиденциальных действий с вашей учетной записью.</div>
+      <p>Эта ссылка действительна 15 минут.</p>
+      <div class="footer"><p>Альтернативная ссылка:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "zh" }}
+      <h1>需要重新认证</h1>
+      <p>你好{{ if .UserMetaData.first_name }}，{{ .UserMetaData.first_name }}{{ end }}！</p>
+      <p>出于安全原因，我们需要验证您的身份。点击按钮重新认证：</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">重新认证</a></div>
+      <div class="security">🔒 在执行帐户敏感操作之前，需要进行此验证。</div>
+      <p>此链接将在15分钟后过期。</p>
+      <div class="footer"><p>备用链接：</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "th" }}
+      <h1>ต้องการการยืนยันตัวตนอีกครั้ง</h1>
+      <p>สวัสดี{{ if .UserMetaData.first_name }} คุณ{{ .UserMetaData.first_name }}{{ end }}</p>
+      <p>ด้วยเหตุผลด้านความปลอดภัย เราจำเป็นต้องตรวจสอบตัวตนของคุณ คลิกปุ่มเพื่อยืนยันตัวตนอีกครั้ง:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">ยืนยันตัวตนอีกครั้ง</a></div>
+      <div class="security">🔒 การตรวจสอบนี้จำเป็นก่อนดำเนินการที่สำคัญในบัญชีของคุณ</div>
+      <p>ลิงก์นี้จะหมดอายุใน 15 นาที</p>
+      <div class="footer"><p>ลิงก์สำรอง:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "hi" }}
+      <h1>पुन: प्रमाणीकरण आवश्यक</h1>
+      <p>नमस्ते{{ if .UserMetaData.first_name }} {{ .UserMetaData.first_name }}{{ end }},</p>
+      <p>सुरक्षा कारणों से, हमें आपकी पहचान सत्यापित करने की आवश्यकता है। पुन: प्रमाणित करने के लिए बटन पर क्लिक करें:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">पुन: प्रमाणित करें</a></div>
+      <div class="security">🔒 आपके खाते पर संवेदनशील कार्रवाई करने से पहले यह सत्यापन आवश्यक है।</div>
+      <p>यह लिंक 15 मिनट में समाप्त हो जाएगी।</p>
+      <div class="footer"><p>वैकल्पिक लिंक:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else if eq .UserMetaData.preferred_language "id" }}
+      <h1>Autentikasi ulang diperlukan</h1>
+      <p>Halo {{ if .UserMetaData.first_name }}{{ .UserMetaData.first_name }}{{ end }},</p>
+      <p>Karena alasan keamanan, kami perlu memverifikasi identitas Anda. Klik tombol untuk autentikasi ulang:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Autentikasi ulang</a></div>
+      <div class="security">🔒 Verifikasi ini diperlukan sebelum melakukan tindakan sensitif pada akun Anda.</div>
+      <p>Tautan ini akan kedaluwarsa dalam 15 menit.</p>
+      <div class="footer"><p>Tautan alternatif:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ else }}
+      <h1>Reauthentication Required</h1>
+      <p>Hello{{ if .UserMetaData.first_name }} {{ .UserMetaData.first_name }}{{ end }},</p>
+      <p>For security reasons, we need to verify your identity. Click the button below to reauthenticate:</p>
+      <div style="text-align: center;"><a href="{{ .ConfirmationURL }}" class="button">Reauthenticate</a></div>
+      <div class="security">🔒 This verification is required before performing sensitive actions on your account.</div>
+      <p>This link expires in 15 minutes.</p>
+      <div class="footer"><p>Alternative link:</p><div class="alt-link">{{ .ConfirmationURL }}</div></div>
+    {{ end }}
+
+  </div>
+</body>
+</html>
