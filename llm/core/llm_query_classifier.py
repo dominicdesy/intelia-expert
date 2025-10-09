@@ -72,22 +72,25 @@ Your task: Analyze the user's query and return a structured classification in JS
    - Requires: breed (optional), age (optional)
    - Routing: Weaviate (documentation) or PostgreSQL (if specific metric)
 
-6. **management_info**: Questions about housing, climate, management practices, interpretation/explanation
+6. **management_info**: Questions about housing, climate, management practices, interpretation/explanation, methodology
    - Examples: "What temperature for broilers?", "Housing density recommendations?"
    - Examples (interpretation): "How would you interpret a prediction showing...", "What does it mean when..."
+   - Examples (methodology): "How can I calculate cost per kg?", "How to calculate feed efficiency?"
    - Requires: Nothing (no breed/age needed)
    - Routing: Weaviate (documentation)
 
-7. **calculation_query**: Calculations requiring multi-step operations WITH specific user data
-   - ⚠️ IMPORTANT: Only use this for questions asking to CALCULATE something for the user's specific flock
+7. **calculation_query**: Actual calculations WITH specific user data (not methodology questions)
+   - ⚠️ CRITICAL DISTINCTION:
+     * ✅ "Calculate feed needed for MY 10,000 birds from day 1 to 35" → calculation_query (has specific data)
+     * ❌ "How can I calculate the cost per kg?" → management_info (asking for methodology/explanation)
+     * ❌ "How to calculate feed efficiency?" → management_info (asking how to do it, not doing it)
    - Examples: "How much feed to reach 2.4kg from day 18?", "At what age will they reach 3kg?"
-   - ❌ NOT for interpretation questions like "How would you interpret a prediction..." (use management_info)
    - Subcategories:
-     * reverse_lookup: Find age for target weight/FCR
-     * cumulative_feed: Calculate total feed between two ages
-     * projection: Project future weight/performance
-     * flock_calculation: Calculate totals for N birds
-   - Requires: breed + current_age or age_range + target_value
+     * reverse_lookup: Find age for target weight/FCR (with breed/current data)
+     * cumulative_feed: Calculate total feed between two ages (with breed/age range)
+     * projection: Project future weight/performance (with breed/current data)
+     * flock_calculation: Calculate totals for N birds (with flock size + metrics)
+   - Requires: breed + current_age or age_range + target_value + specific numbers
    - Routing: PostgreSQL (uses calculation_engine)
 
 # ENTITY TYPES:
