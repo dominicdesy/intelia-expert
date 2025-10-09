@@ -481,6 +481,8 @@ class ProactiveAssistant:
                 "daily_gain": "gain quotidien",
                 "mortality": "mortalité",
                 "livability": "viabilité",
+                "feed_intake": "consommation d'aliment",
+                "water_intake": "consommation d'eau",
             },
             "en": {
                 "body_weight": "weight",
@@ -488,6 +490,8 @@ class ProactiveAssistant:
                 "daily_gain": "daily gain",
                 "mortality": "mortality",
                 "livability": "livability",
+                "feed_intake": "feed intake",
+                "water_intake": "water intake",
             },
             "es": {
                 "body_weight": "peso",
@@ -495,6 +499,8 @@ class ProactiveAssistant:
                 "daily_gain": "ganancia diaria",
                 "mortality": "mortalidad",
                 "livability": "viabilidad",
+                "feed_intake": "consumo de alimento",
+                "water_intake": "consumo de agua",
             },
         }
 

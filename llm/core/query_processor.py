@@ -169,7 +169,9 @@ class RAGQueryProcessor:
                 )
 
         # BEFORE OOD detection: Check if this is a short follow-up response (yes/no/ok)
-        # after system asked "Can I help you with anything else?"
+        # We need to distinguish between:
+        # 1. Response to generic "Can I help you?" → ask for clarification
+        # 2. Response to specific follow-up like "Want to optimize feed?" → reformulate and continue
         confirmation_words = {
             'en': ['yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'please', 'yup'],
             'fr': ['oui', 'ouais', 'd\'accord', 'ok', 'okay', 'bien sûr', 'volontiers'],
@@ -185,31 +187,53 @@ class RAGQueryProcessor:
             # Check if previous response contained a follow-up question
             contextual_history_check = await self._get_contextual_history(tenant_id, query)
             if contextual_history_check:
-                # User confirmed they want help - ask for clarification
-                logger.info(f"✅ Follow-up confirmation detected: '{query}' - asking for clarification")
-                from config.messages import get_message
-                clarification_msg = get_message("followup_clarification", language)
-                if not clarification_msg:
-                    # Fallback if message not configured
-                    clarification_msg = {
-                        'en': "Great! How can I help you?",
-                        'fr': "Parfait ! Comment puis-je vous aider ?",
-                        'es': "¡Perfecto! ¿Cómo puedo ayudarte?",
-                        'de': "Prima! Wie kann ich Ihnen helfen?",
-                    }.get(language, "How can I help you?")
+                # 🆕 Check if the previous answer contains a SPECIFIC follow-up (with metric/topic)
+                # vs generic "Can I help?" question
+                # Specific follow-ups contain keywords like "optimiser", "améliorer", specific metric names
+                specific_followup_keywords = [
+                    'optimiser', 'optimize', 'optimizar',  # Optimization
+                    'améliorer', 'improve', 'mejorar',  # Improvement
+                    'consommation', 'consumption', 'intake', 'feed', 'water',  # Metrics
+                    'poids', 'weight', 'peso',  # Weight
+                    'fcr', 'gain', 'mortalité', 'mortality',  # Performance
+                    'stratégie', 'strategy', 'estrategia',  # Strategy
+                    'conseils', 'advice', 'recomendaciones',  # Advice
+                ]
 
-                return RAGResult(
-                    source=RAGSource.NEEDS_CLARIFICATION,
-                    answer=clarification_msg,
-                    context_docs=[],
-                    processing_time=(time.time() - start_time),
-                    metadata={
-                        "query_type": "clarification_needed",
-                        "needs_clarification": True,
-                        "original_query": query,
-                        "conversation_id": tenant_id,
-                    },
-                )
+                history_lower = contextual_history_check.lower()
+                has_specific_followup = any(keyword in history_lower for keyword in specific_followup_keywords)
+
+                if has_specific_followup:
+                    # User confirmed interest in specific topic - reformulate query from context
+                    logger.info(f"✅ Specific follow-up confirmation: '{query}' - reformulating from context")
+                    # Let the query continue processing with context enrichment
+                    # The enricher will reformulate "Oui" into a proper question based on history
+                else:
+                    # Generic follow-up - user just said "yes" to generic help offer
+                    logger.info(f"✅ Generic follow-up confirmation: '{query}' - asking for clarification")
+                    from config.messages import get_message
+                    clarification_msg = get_message("followup_clarification", language)
+                    if not clarification_msg:
+                        # Fallback if message not configured
+                        clarification_msg = {
+                            'en': "Great! How can I help you?",
+                            'fr': "Parfait ! Comment puis-je vous aider ?",
+                            'es': "¡Perfecto! ¿Cómo puedo ayudarte?",
+                            'de': "Prima! Wie kann ich Ihnen helfen?",
+                        }.get(language, "How can I help you?")
+
+                    return RAGResult(
+                        source=RAGSource.NEEDS_CLARIFICATION,
+                        answer=clarification_msg,
+                        context_docs=[],
+                        processing_time=(time.time() - start_time),
+                        metadata={
+                            "query_type": "clarification_needed",
+                            "needs_clarification": True,
+                            "original_query": query,
+                            "conversation_id": tenant_id,
+                        },
+                    )
 
         if self.ood_detector and not skip_ood:
             try:
