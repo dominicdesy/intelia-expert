@@ -423,51 +423,55 @@ class StandardQueryHandler(BaseQueryHandler):
                 doc_count_before = len(result.context_docs) if result.context_docs else 0
                 logger.info(f"Weaviate ({language}): {doc_count_before} documents retrieved (before re-ranking)")
 
-                # 🆕 STEP 2: Appliquer re-ranking sémantique
-                logger.info(f"🔍 DEBUG Re-ranker check: has_docs={bool(result.context_docs)}, reranker={self.reranker is not None}")
-
-                if result.context_docs and self.reranker:
-                    try:
-                        # Extraire textes des documents
-                        doc_texts = [
-                            doc.get('content', '') if isinstance(doc, dict)
-                            else getattr(doc, 'content', '')
-                            for doc in result.context_docs
-                        ]
-
-                        logger.info(f"🔍 DEBUG About to rerank: query='{query[:50]}...', num_docs={len(doc_texts)}, top_k={weaviate_top_k}")
-
-                        # Re-ranker avec cross-encoder
-                        reranked_texts = self.reranker.rerank(
-                            query=query,
-                            documents=doc_texts,
-                            top_k=weaviate_top_k,  # Garder seulement top 5-12
-                            return_scores=False
-                        )
-
-                        logger.info(f"🔍 DEBUG Re-ranker returned {len(reranked_texts) if reranked_texts else 0} texts")
-
-                        # Reconstruire docs avec seulement les pertinents
-                        if reranked_texts:
-                            # Mapper textes → docs originaux
-                            text_to_doc = {
-                                (doc.get('content', '') if isinstance(doc, dict) else getattr(doc, 'content', '')): doc
-                                for doc in result.context_docs
-                            }
-
-                            result.context_docs = [text_to_doc[text] for text in reranked_texts if text in text_to_doc]
-
-                            doc_count_after = len(result.context_docs)
-                            logger.info(
-                                f"✅ Re-ranking: {doc_count_before} docs → {doc_count_after} relevant docs "
-                                f"(filtered {doc_count_before - doc_count_after})"
-                            )
-                        else:
-                            logger.warning(f"⚠️ Re-ranking returned 0 docs - keeping original")
-
-                    except Exception as e:
-                        logger.error(f"❌ Re-ranking error: {e}. Using original documents.", exc_info=True)
-                        # Continue avec documents originaux si erreur
+                # 🆕 STEP 2: Re-ranking DISABLED (too aggressive for poultry domain)
+                # REASON: Cross-encoder threshold 0.1 filters out ALL docs (77→0, 70→0)
+                # Cross-encoder trained on general MS-MARCO doesn't understand poultry jargon
+                # Weaviate embeddings alone perform better for this specialized domain
+                #
+                # logger.info(f"🔍 DEBUG Re-ranker check: has_docs={bool(result.context_docs)}, reranker={self.reranker is not None}")
+                #
+                # if result.context_docs and self.reranker:
+                #     try:
+                #         # Extraire textes des documents
+                #         doc_texts = [
+                #             doc.get('content', '') if isinstance(doc, dict)
+                #             else getattr(doc, 'content', '')
+                #             for doc in result.context_docs
+                #         ]
+                #
+                #         logger.info(f"🔍 DEBUG About to rerank: query='{query[:50]}...', num_docs={len(doc_texts)}, top_k={weaviate_top_k}")
+                #
+                #         # Re-ranker avec cross-encoder
+                #         reranked_texts = self.reranker.rerank(
+                #             query=query,
+                #             documents=doc_texts,
+                #             top_k=weaviate_top_k,  # Garder seulement top 5-12
+                #             return_scores=False
+                #         )
+                #
+                #         logger.info(f"🔍 DEBUG Re-ranker returned {len(reranked_texts) if reranked_texts else 0} texts")
+                #
+                #         # Reconstruire docs avec seulement les pertinents
+                #         if reranked_texts:
+                #             # Mapper textes → docs originaux
+                #             text_to_doc = {
+                #                 (doc.get('content', '') if isinstance(doc, dict) else getattr(doc, 'content', '')): doc
+                #                 for doc in result.context_docs
+                #             }
+                #
+                #             result.context_docs = [text_to_doc[text] for text in reranked_texts if text in text_to_doc]
+                #
+                #             doc_count_after = len(result.context_docs)
+                #             logger.info(
+                #                 f"✅ Re-ranking: {doc_count_before} docs → {doc_count_after} relevant docs "
+                #                 f"(filtered {doc_count_before - doc_count_after})"
+                #             )
+                #         else:
+                #             logger.warning(f"⚠️ Re-ranking returned 0 docs - keeping original")
+                #
+                #     except Exception as e:
+                #         logger.error(f"❌ Re-ranking error: {e}. Using original documents.", exc_info=True)
+                #         # Continue avec documents originaux si erreur
 
                 doc_count = len(result.context_docs) if result.context_docs else 0
 
