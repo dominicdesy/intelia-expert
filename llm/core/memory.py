@@ -83,6 +83,7 @@ class ConversationMemory:
             for i, exchange in enumerate(reversed(recent_exchanges)):
                 question = exchange.get("question", "")
                 answer = exchange.get("answer", "")
+                followup = exchange.get("followup", "")  # 🆕 Récupérer le follow-up
 
                 if not question or not answer:
                     logger.info(
@@ -90,8 +91,14 @@ class ConversationMemory:
                     )
                     continue
 
-                # Format: Q: ... R: ...
+                # Format: Q: ... R: ... (+ Follow-up si présent)
                 exchange_text = f"Q: {question[:200]}... R: {answer[:200]}..."
+
+                # 🆕 Ajouter le follow-up à l'échange s'il existe
+                if followup:
+                    exchange_text += f" [Follow-up: {followup[:150]}...]"
+                    logger.debug(f"🔍 MEMORY - Follow-up inclus dans contexte: {followup[:50]}...")
+
                 exchange_length = len(exchange_text)
 
                 logger.info(
@@ -148,14 +155,31 @@ class ConversationMemory:
             )
             return ""
 
-    def add_exchange(self, tenant_id: str, question: str, answer: str):
-        """Ajoute un échange avec métadonnées dans le store partagé"""
+    def add_exchange(self, tenant_id: str, question: str, answer: str, followup: Optional[str] = None):
+        """
+        Ajoute un échange avec métadonnées dans le store partagé
+
+        Args:
+            tenant_id: Identifiant du tenant
+            question: Question de l'utilisateur
+            answer: Réponse du système
+            followup: Follow-up proactif optionnel (question de relance du système)
+        """
         if tenant_id not in self._shared_memory_store:
             self._shared_memory_store[tenant_id] = []
 
-        self._shared_memory_store[tenant_id].append(
-            {"question": question, "answer": answer, "timestamp": time.time()}
-        )
+        exchange_data = {
+            "question": question,
+            "answer": answer,
+            "timestamp": time.time()
+        }
+
+        # 🆕 Ajouter le follow-up s'il existe
+        if followup:
+            exchange_data["followup"] = followup
+            logger.debug(f"💾 SAVE - Follow-up ajouté: {followup[:80]}...")
+
+        self._shared_memory_store[tenant_id].append(exchange_data)
 
         # 🔍 DEBUG - Sauvegarde
         logger.debug(

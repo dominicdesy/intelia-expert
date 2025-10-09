@@ -200,33 +200,34 @@ class ChatHandlers:
 
         return FallbackResult(aviculture_response, fallback_reason)
 
-    async def _save_to_memory(
-        self,
-        tenant_id: str,
-        message: str,
-        answer: str,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        """
-        Sauvegarde dans ConversationMemory (système unique)
-
-        Args:
-            tenant_id: ID utilisateur
-            message: Question de l'utilisateur
-            answer: Réponse générée
-            metadata: Métadonnées optionnelles
-        """
-        # Sauvegarde dans ConversationMemory
-        if self.conversation_memory:
-            try:
-                self.conversation_memory.add_exchange(
-                    tenant_id=tenant_id, question=message, answer=answer
-                )
-                logger.debug(f"✅ Sauvegarde ConversationMemory OK pour {tenant_id}")
-            except Exception as e:
-                logger.error(f"❌ Erreur sauvegarde ConversationMemory: {e}")
-        else:
-            logger.warning(f"⚠️ ConversationMemory non disponible pour {tenant_id}")
+    # 🗑️ DEPRECATED - Méthode remplacée par sauvegarde inline avec follow-up support
+    # async def _save_to_memory(
+    #     self,
+    #     tenant_id: str,
+    #     message: str,
+    #     answer: str,
+    #     metadata: Optional[Dict[str, Any]] = None,
+    # ) -> None:
+    #     """
+    #     Sauvegarde dans ConversationMemory (système unique)
+    #
+    #     Args:
+    #         tenant_id: ID utilisateur
+    #         message: Question de l'utilisateur
+    #         answer: Réponse générée
+    #         metadata: Métadonnées optionnelles
+    #     """
+    #     # Sauvegarde dans ConversationMemory
+    #     if self.conversation_memory:
+    #         try:
+    #             self.conversation_memory.add_exchange(
+    #                 tenant_id=tenant_id, question=message, answer=answer
+    #             )
+    #             logger.debug(f"✅ Sauvegarde ConversationMemory OK pour {tenant_id}")
+    #         except Exception as e:
+    #             logger.error(f"❌ Erreur sauvegarde ConversationMemory: {e}")
+    #     else:
+    #         logger.warning(f"⚠️ ConversationMemory non disponible pour {tenant_id}")
 
     async def generate_streaming_response(
         self,
@@ -316,8 +317,10 @@ class ChatHandlers:
 
             # Envoyer follow-up proactif si disponible (message séparé)
             proactive_followup = metadata.get("proactive_followup")
+            followup_to_save = None  # 🆕 Variable pour sauvegarder le follow-up
             if proactive_followup and isinstance(proactive_followup, str):
                 logger.info(f"📤 Envoi follow-up proactif: {proactive_followup[:80]}...")
+                followup_to_save = proactive_followup  # 🆕 Capturer pour sauvegarde
                 yield sse_event(
                     {
                         "type": "proactive_followup",
@@ -369,12 +372,21 @@ class ChatHandlers:
                 # 🆕 Utiliser conversation_id comme clé mémoire (fallback to tenant_id)
                 memory_key = conversation_id or tenant_id
                 logger.debug(f"💾 Saving to memory with key: {memory_key}")
-                await self._save_to_memory(
-                    tenant_id=memory_key,  # Utiliser conversation_id comme clé
-                    message=message,
-                    answer=str(answer),
-                    metadata=metadata,
-                )
+
+                # 🆕 Sauvegarder avec le follow-up si présent
+                if self.conversation_memory:
+                    try:
+                        self.conversation_memory.add_exchange(
+                            tenant_id=memory_key,
+                            question=message,
+                            answer=str(answer),
+                            followup=followup_to_save  # 🆕 Inclure le follow-up
+                        )
+                        logger.debug(f"✅ Sauvegarde ConversationMemory OK pour {memory_key} (with followup: {followup_to_save is not None})")
+                    except Exception as e:
+                        logger.error(f"❌ Erreur sauvegarde ConversationMemory: {e}")
+                else:
+                    logger.warning(f"⚠️ ConversationMemory non disponible pour {memory_key}")
 
         except Exception as e:
             logger.error(f"Erreur streaming: {e}", exc_info=True)
