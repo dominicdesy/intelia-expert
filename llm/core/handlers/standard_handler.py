@@ -422,6 +422,8 @@ class StandardQueryHandler(BaseQueryHandler):
                 logger.info(f"Weaviate ({language}): {doc_count_before} documents retrieved (before re-ranking)")
 
                 # 🆕 STEP 2: Appliquer re-ranking sémantique
+                logger.info(f"🔍 DEBUG Re-ranker check: has_docs={bool(result.context_docs)}, reranker={self.reranker is not None}")
+
                 if result.context_docs and self.reranker:
                     try:
                         # Extraire textes des documents
@@ -431,6 +433,8 @@ class StandardQueryHandler(BaseQueryHandler):
                             for doc in result.context_docs
                         ]
 
+                        logger.info(f"🔍 DEBUG About to rerank: query='{query[:50]}...', num_docs={len(doc_texts)}, top_k={weaviate_top_k}")
+
                         # Re-ranker avec cross-encoder
                         reranked_texts = self.reranker.rerank(
                             query=query,
@@ -438,6 +442,8 @@ class StandardQueryHandler(BaseQueryHandler):
                             top_k=weaviate_top_k,  # Garder seulement top 5-12
                             return_scores=False
                         )
+
+                        logger.info(f"🔍 DEBUG Re-ranker returned {len(reranked_texts) if reranked_texts else 0} texts")
 
                         # Reconstruire docs avec seulement les pertinents
                         if reranked_texts:
