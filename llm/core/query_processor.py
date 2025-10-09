@@ -183,6 +183,9 @@ class RAGQueryProcessor:
         is_short_query = len(query_words) <= 3
         is_confirmation = any(word in confirmation_words.get(language, []) for word in query_words)
 
+        # 🆕 Flag to skip OOD detector for specific follow-up confirmations
+        skip_ood_for_followup = False
+
         if is_short_query and is_confirmation:
             # Check if previous response contained a follow-up question
             contextual_history_check = await self._get_contextual_history(tenant_id, query)
@@ -206,6 +209,8 @@ class RAGQueryProcessor:
                 if has_specific_followup:
                     # User confirmed interest in specific topic - reformulate query from context
                     logger.info(f"✅ Specific follow-up confirmation: '{query}' - reformulating from context")
+                    # 🆕 Skip OOD detector since this is a valid in-domain continuation
+                    skip_ood_for_followup = True
                     # Let the query continue processing with context enrichment
                     # The enricher will reformulate "Oui" into a proper question based on history
                 else:
@@ -235,7 +240,8 @@ class RAGQueryProcessor:
                         },
                     )
 
-        if self.ood_detector and not skip_ood:
+        # 🆕 Skip OOD detector if specific follow-up confirmation detected
+        if self.ood_detector and not skip_ood and not skip_ood_for_followup:
             try:
                 is_in_domain, domain_score, score_details = (
                     self.ood_detector.calculate_ood_score_multilingual(
