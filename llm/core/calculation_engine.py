@@ -233,10 +233,10 @@ class CalculationEngine:
 
                 # Calculer total avec interpolation du dernier jour si applicable
                 if interpolation_applied:
-                    # Sommer tous les jours sauf le dernier
-                    total_feed_full_days = sum(row["daily_intake"] for row in rows[:-1])
-                    # Ajouter fraction du dernier jour
-                    last_day_intake = rows[-1]["daily_intake"]
+                    # Sommer tous les jours sauf le dernier (convert Decimal to float)
+                    total_feed_full_days = sum(float(row["daily_intake"]) for row in rows[:-1])
+                    # Ajouter fraction du dernier jour (convert Decimal to float)
+                    last_day_intake = float(rows[-1]["daily_intake"])
                     last_day_adjusted = last_day_intake * interpolation_ratio
                     total_feed = total_feed_full_days + last_day_adjusted
 
@@ -246,8 +246,8 @@ class CalculationEngine:
                         f"= {total_feed:.1f}g"
                     )
                 else:
-                    # Pas d'interpolation, sommer normalement
-                    total_feed = sum(row["daily_intake"] for row in rows)
+                    # Pas d'interpolation, sommer normalement (convert Decimal to float)
+                    total_feed = sum(float(row["daily_intake"]) for row in rows)
                     logger.info(
                         f"📊 Feed calculation: {len(rows)} jours complets de {actual_age_start}→{actual_age_end}, "
                         f"total={total_feed}g ({round(total_feed/1000, 2)}kg)"
@@ -461,9 +461,10 @@ class CalculationEngine:
                 # Ajustement mortalité
                 surviving_birds = flock_size * (1 - mortality_pct / 100)
 
-                weight_per_bird = row["weight"]
+                # Convert Decimal to float for calculations
+                weight_per_bird = float(row["weight"]) if row["weight"] else 0
                 intake_per_bird = (
-                    row["cumulative_intake"] if row["cumulative_intake"] else 0
+                    float(row["cumulative_intake"]) if row["cumulative_intake"] else 0
                 )
 
                 total_weight_kg = (weight_per_bird * surviving_birds) / 1000
