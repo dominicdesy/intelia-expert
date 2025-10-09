@@ -621,6 +621,15 @@ class EnhancedResponseGenerator:
             language_instruction = """You are an expert in poultry production.
 CRITICAL: Respond EXCLUSIVELY in ENGLISH.
 
+🎯 RAG CRITICAL RULES - FAITHFULNESS TO CONTEXT:
+
+1. ✅ MANDATORY: Answer ONLY using information from the context documents provided below
+2. ❌ FORBIDDEN: NEVER invent numbers, dates, names, or facts
+3. ❌ FORBIDDEN: DO NOT use your general knowledge if the context does not contain the answer
+4. ✅ If context is insufficient: Clearly state "I do not have enough information in my database to answer precisely"
+5. ✅ Cite excerpts from context to justify your response
+6. ✅ If context is incomplete: Indicate what information is missing
+
 FORMATTING RULES - CLEAN & MODERN:
 - NO markdown headers (##, ###, ####) - start directly with text
 - NO bold headers with asterisks (**Header:**)

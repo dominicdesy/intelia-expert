@@ -15,6 +15,7 @@ from .standard_handler_helpers import (
     parse_contextual_history,
     generate_response_with_generator,
 )
+from retrieval.semantic_reranker import get_reranker
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,22 @@ class StandardQueryHandler(BaseQueryHandler):
     def __init__(self):
         super().__init__()
         self.response_generator = None
+        self.semantic_reranker = None  # Lazy load
+
+    @property
+    def reranker(self):
+        """Lazy load semantic re-ranker"""
+        if self.semantic_reranker is None:
+            try:
+                self.semantic_reranker = get_reranker(
+                    model_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
+                    score_threshold=0.3  # Liberal pour commencer
+                )
+                logger.info("✅ Semantic re-ranker initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ Re-ranker init failed: {e}. Continuing without re-ranking.")
+                self.semantic_reranker = False  # Flag pour ne pas réessayer
+        return self.semantic_reranker if self.semantic_reranker is not False else None
 
     def configure(
         self,
@@ -387,9 +404,13 @@ class StandardQueryHandler(BaseQueryHandler):
 
             conversation_context_list = parse_contextual_history(preprocessed_data)
 
+            # 🆕 STEP 1: Récupérer PLUS de documents (20 au lieu de 5-12)
+            # pour avoir un meilleur recall avant re-ranking
+            weaviate_initial_k = weaviate_top_k * 3  # 15-36 docs au lieu de 5-12
+
             result = await self.weaviate_core.search(
                 query=query,
-                top_k=weaviate_top_k,
+                top_k=weaviate_initial_k,  # Plus de docs
                 language=language,
                 filters=filters,
                 conversation_context=conversation_context_list,
@@ -397,8 +418,50 @@ class StandardQueryHandler(BaseQueryHandler):
 
             # Handle result based on source
             if result and result.source not in (RAGSource.NO_RESULTS, RAGSource.LOW_CONFIDENCE):
+                doc_count_before = len(result.context_docs) if result.context_docs else 0
+                logger.info(f"Weaviate ({language}): {doc_count_before} documents retrieved (before re-ranking)")
+
+                # 🆕 STEP 2: Appliquer re-ranking sémantique
+                if result.context_docs and self.reranker:
+                    try:
+                        # Extraire textes des documents
+                        doc_texts = [
+                            doc.get('content', '') if isinstance(doc, dict)
+                            else getattr(doc, 'content', '')
+                            for doc in result.context_docs
+                        ]
+
+                        # Re-ranker avec cross-encoder
+                        reranked_texts = self.reranker.rerank(
+                            query=query,
+                            documents=doc_texts,
+                            top_k=weaviate_top_k,  # Garder seulement top 5-12
+                            return_scores=False
+                        )
+
+                        # Reconstruire docs avec seulement les pertinents
+                        if reranked_texts:
+                            # Mapper textes → docs originaux
+                            text_to_doc = {
+                                (doc.get('content', '') if isinstance(doc, dict) else getattr(doc, 'content', '')): doc
+                                for doc in result.context_docs
+                            }
+
+                            result.context_docs = [text_to_doc[text] for text in reranked_texts if text in text_to_doc]
+
+                            doc_count_after = len(result.context_docs)
+                            logger.info(
+                                f"✅ Re-ranking: {doc_count_before} docs → {doc_count_after} relevant docs "
+                                f"(filtered {doc_count_before - doc_count_after})"
+                            )
+                        else:
+                            logger.warning(f"⚠️ Re-ranking returned 0 docs - keeping original")
+
+                    except Exception as e:
+                        logger.error(f"❌ Re-ranking error: {e}. Using original documents.", exc_info=True)
+                        # Continue avec documents originaux si erreur
+
                 doc_count = len(result.context_docs) if result.context_docs else 0
-                logger.info(f"Weaviate ({language}): {doc_count} documents found")
 
                 # Generate answer if documents exist but no answer yet
                 if result.context_docs and not result.answer:
