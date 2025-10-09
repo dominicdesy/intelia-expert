@@ -396,7 +396,8 @@ class StandardQueryHandler(BaseQueryHandler):
             preprocessed_data = {}
 
         try:
-            weaviate_top_k = 5 if is_optimization else top_k
+            # Use higher top_k for better recall before re-ranking
+            weaviate_top_k = 12 if is_optimization else top_k
 
             logger.info(
                 f"Weaviate search (top_k={weaviate_top_k}, language={language}, filters={filters})"
