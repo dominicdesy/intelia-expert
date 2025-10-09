@@ -35,7 +35,7 @@ class StandardQueryHandler(BaseQueryHandler):
             try:
                 self.semantic_reranker = get_reranker(
                     model_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
-                    score_threshold=0.3  # Liberal pour commencer
+                    score_threshold=0.1  # Très permissif (poor Weaviate retrieval quality)
                 )
                 logger.info("✅ Semantic re-ranker initialized")
             except Exception as e:
@@ -404,9 +404,9 @@ class StandardQueryHandler(BaseQueryHandler):
 
             conversation_context_list = parse_contextual_history(preprocessed_data)
 
-            # 🆕 STEP 1: Récupérer PLUS de documents (20 au lieu de 5-12)
-            # pour avoir un meilleur recall avant re-ranking
-            weaviate_initial_k = weaviate_top_k * 3  # 15-36 docs au lieu de 5-12
+            # 🆕 STEP 1: Récupérer BEAUCOUP PLUS de documents pour compenser
+            # la faible qualité de retrieval Weaviate (chunks trop granulaires)
+            weaviate_initial_k = weaviate_top_k * 10  # 50-120 docs au lieu de 5-12
 
             result = await self.weaviate_core.search(
                 query=query,
