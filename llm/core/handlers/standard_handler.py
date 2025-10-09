@@ -6,6 +6,7 @@ Standard query handler for processing regular requests with intelligent routing
 import time
 import logging
 import traceback
+import os
 from utils.types import Dict, Any, Optional
 
 from config.config import RAG_SIMILARITY_TOP_K
@@ -16,6 +17,7 @@ from .standard_handler_helpers import (
     generate_response_with_generator,
 )
 from retrieval.semantic_reranker import get_reranker
+from retrieval.cohere_reranker import get_cohere_reranker
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +32,25 @@ class StandardQueryHandler(BaseQueryHandler):
 
     @property
     def reranker(self):
-        """Lazy load semantic re-ranker"""
+        """Lazy load re-ranker (Cohere or cross-encoder based on RERANKER_TYPE env var)"""
         if self.semantic_reranker is None:
             try:
-                self.semantic_reranker = get_reranker(
-                    model_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
-                    score_threshold=0.1  # Très permissif (poor Weaviate retrieval quality)
-                )
-                logger.info("✅ Semantic re-ranker initialized")
+                reranker_type = os.getenv("RERANKER_TYPE", "cross-encoder")  # "cross-encoder" or "cohere"
+
+                if reranker_type == "cohere":
+                    logger.info("🔧 Initializing Cohere re-ranker (rerank-multilingual-v3.0)...")
+                    self.semantic_reranker = get_cohere_reranker(
+                        model='rerank-multilingual-v3.0'
+                    )
+                    logger.info("✅ Cohere re-ranker initialized (multilingual, production-grade)")
+                else:
+                    logger.info("🔧 Initializing cross-encoder re-ranker (ms-marco-MiniLM)...")
+                    self.semantic_reranker = get_reranker(
+                        model_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
+                        score_threshold=0.3  # Balanced threshold (was 0.1 = too strict)
+                    )
+                    logger.info("✅ Cross-encoder re-ranker initialized (threshold=0.3)")
+
             except Exception as e:
                 logger.warning(f"⚠️ Re-ranker init failed: {e}. Continuing without re-ranking.")
                 self.semantic_reranker = False  # Flag pour ne pas réessayer
@@ -423,55 +436,50 @@ class StandardQueryHandler(BaseQueryHandler):
                 doc_count_before = len(result.context_docs) if result.context_docs else 0
                 logger.info(f"Weaviate ({language}): {doc_count_before} documents retrieved (before re-ranking)")
 
-                # 🆕 STEP 2: Re-ranking DISABLED (too aggressive for poultry domain)
-                # REASON: Cross-encoder threshold 0.1 filters out ALL docs (77→0, 70→0)
-                # Cross-encoder trained on general MS-MARCO doesn't understand poultry jargon
-                # Weaviate embeddings alone perform better for this specialized domain
-                #
-                # logger.info(f"🔍 DEBUG Re-ranker check: has_docs={bool(result.context_docs)}, reranker={self.reranker is not None}")
-                #
-                # if result.context_docs and self.reranker:
-                #     try:
-                #         # Extraire textes des documents
-                #         doc_texts = [
-                #             doc.get('content', '') if isinstance(doc, dict)
-                #             else getattr(doc, 'content', '')
-                #             for doc in result.context_docs
-                #         ]
-                #
-                #         logger.info(f"🔍 DEBUG About to rerank: query='{query[:50]}...', num_docs={len(doc_texts)}, top_k={weaviate_top_k}")
-                #
-                #         # Re-ranker avec cross-encoder
-                #         reranked_texts = self.reranker.rerank(
-                #             query=query,
-                #             documents=doc_texts,
-                #             top_k=weaviate_top_k,  # Garder seulement top 5-12
-                #             return_scores=False
-                #         )
-                #
-                #         logger.info(f"🔍 DEBUG Re-ranker returned {len(reranked_texts) if reranked_texts else 0} texts")
-                #
-                #         # Reconstruire docs avec seulement les pertinents
-                #         if reranked_texts:
-                #             # Mapper textes → docs originaux
-                #             text_to_doc = {
-                #                 (doc.get('content', '') if isinstance(doc, dict) else getattr(doc, 'content', '')): doc
-                #                 for doc in result.context_docs
-                #             }
-                #
-                #             result.context_docs = [text_to_doc[text] for text in reranked_texts if text in text_to_doc]
-                #
-                #             doc_count_after = len(result.context_docs)
-                #             logger.info(
-                #                 f"✅ Re-ranking: {doc_count_before} docs → {doc_count_after} relevant docs "
-                #                 f"(filtered {doc_count_before - doc_count_after})"
-                #             )
-                #         else:
-                #             logger.warning(f"⚠️ Re-ranking returned 0 docs - keeping original")
-                #
-                #     except Exception as e:
-                #         logger.error(f"❌ Re-ranking error: {e}. Using original documents.", exc_info=True)
-                #         # Continue avec documents originaux si erreur
+                # 🆕 STEP 2: Re-ranking with balanced threshold (0.3)
+                # TESTING: Increased from 0.1 to 0.3 to avoid filtering ALL documents
+                # Previous issue: threshold 0.1 was too strict (77→0, 70→0 docs)
+
+                if result.context_docs and self.reranker:
+                    try:
+                        # Extraire textes des documents
+                        doc_texts = [
+                            doc.get('content', '') if isinstance(doc, dict)
+                            else getattr(doc, 'content', '')
+                            for doc in result.context_docs
+                        ]
+
+                        logger.info(f"🔍 Re-ranking {len(doc_texts)} docs with threshold 0.3...")
+
+                        # Re-ranker avec cross-encoder
+                        reranked_texts = self.reranker.rerank(
+                            query=query,
+                            documents=doc_texts,
+                            top_k=weaviate_top_k,  # Garder seulement top 5-12
+                            return_scores=False
+                        )
+
+                        # Reconstruire docs avec seulement les pertinents
+                        if reranked_texts:
+                            # Mapper textes → docs originaux
+                            text_to_doc = {
+                                (doc.get('content', '') if isinstance(doc, dict) else getattr(doc, 'content', '')): doc
+                                for doc in result.context_docs
+                            }
+
+                            result.context_docs = [text_to_doc[text] for text in reranked_texts if text in text_to_doc]
+
+                            doc_count_after = len(result.context_docs)
+                            logger.info(
+                                f"✅ Re-ranking: {doc_count_before} docs → {doc_count_after} relevant docs "
+                                f"(filtered {doc_count_before - doc_count_after})"
+                            )
+                        else:
+                            logger.warning(f"⚠️ Re-ranking returned 0 docs - keeping original")
+
+                    except Exception as e:
+                        logger.error(f"❌ Re-ranking error: {e}. Using original documents.", exc_info=True)
+                        # Continue avec documents originaux si erreur
 
                 doc_count = len(result.context_docs) if result.context_docs else 0
 
