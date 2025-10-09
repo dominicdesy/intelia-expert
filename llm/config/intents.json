@@ -221,7 +221,8 @@
     },
     "metric": {
       "performance": ["poids","fcr","gain","croissance","production"],
-      "consumption": ["eau","aliment","feed","water"],
+      "water_intake": ["eau","water"],
+      "feed_intake": ["aliment","feed","alimentation"],
       "environment": ["température","humidité","ventilation","lighting"],
       "economics": ["coût","prix","rentabilité","economics"]
     }

@@ -458,26 +458,11 @@ class EnhancedResponseGenerator:
                 language=lang,
             )
 
-            # 🌍 Translate response to target language if not English
-            # The LLM generates in English (based on English-translated query and English documents)
-            # We need to translate back to user's language
+            # ✅ NO TRANSLATION NEEDED - LLM already generates in target language
+            # The system prompt instructs the LLM to respond in the user's language directly
+            # Removed unnecessary translation that was causing timeouts and errors
             final_response = enhanced_response
-            if lang and lang != "en":
-                try:
-                    final_response = self.translator.translate(
-                        enhanced_response,
-                        target_language=lang,
-                        source_language="en"
-                    )
-                    logger.info(
-                        f"🌍 Response translated en→{lang}: {len(enhanced_response)} → {len(final_response)} chars"
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"⚠️ Response translation failed (en→{lang}), using English: {e}"
-                    )
-                    # Fallback: keep English response
-                    final_response = enhanced_response
+            logger.debug(f"✅ Response generated directly in language: {lang}")
 
             # Mettre en cache
             if self.cache_manager and self.cache_manager.enabled:

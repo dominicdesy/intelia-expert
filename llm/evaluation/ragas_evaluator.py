@@ -225,11 +225,13 @@ class RAGASEvaluator:
             )
 
             # Extraire scores et convertir numpy en Python natif
+            # result est un EvaluationResult object, convertir en dict via to_pandas()
+            result_df = result.to_pandas()
             scores = {
-                "context_precision": float(result.get("context_precision", 0.0)),
-                "context_recall": float(result.get("context_recall", 0.0)),
-                "faithfulness": float(result.get("faithfulness", 0.0)),
-                "answer_relevancy": float(result.get("answer_relevancy", 0.0)),
+                "context_precision": float(result_df["context_precision"].mean()),
+                "context_recall": float(result_df["context_recall"].mean()),
+                "faithfulness": float(result_df["faithfulness"].mean()),
+                "answer_relevancy": float(result_df["answer_relevancy"].mean()),
             }
 
             # Score global (moyenne)
