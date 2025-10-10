@@ -42,7 +42,7 @@ Determine if the following question is related to POULTRY PRODUCTION AND VALUE C
 POULTRY PRODUCTION includes:
 - Birds: Broilers (meat chickens), layers (egg chickens), ducks, turkeys, quails, parent stock, grandparent stock
 - Nutrition: feed formulation, ingredients, feed mills, feeding programs, nutritional requirements
-- Health: diseases, treatments, vaccines, biosecurity, veterinary care, laboratory diagnostics
+- Health: diseases, treatments, vaccines, biosecurity, veterinary care, laboratory diagnostics, meat quality defects (spaghetti breast, white striping, wooden breast)
 - Genetics: breeds (Ross, Cobb, Hubbard, ISA, Lohmann, etc.), performance standards, breeding programs
 - Management: housing, climate control, lighting, water quality, stocking density, ventilation
 - Production metrics: weight, FCR, mortality, egg production, uniformity, daily gain
@@ -75,6 +75,8 @@ IMPORTANT CLARIFICATIONS:
   * "What is the ideal temperature?" → YES (poultry housing)
   * "How to store feed?" → YES (poultry nutrition)
   * "What causes mortality?" → YES (poultry health)
+  * "What is Spaghetti breast?" → YES (poultry meat quality defect)
+  * "What is white striping?" → YES (poultry meat quality defect)
   * "Is it safe to use AI to raise poultry?" → YES (using technology FOR poultry)
   * "Can I use solar panels for my chicken farm?" → YES (using technology FOR poultry)
 - Examples of OUT-OF-DOMAIN questions:
