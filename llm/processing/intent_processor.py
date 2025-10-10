@@ -551,6 +551,71 @@ class IntentProcessor:
 
         return None
 
+    def _detect_general_poultry_terms(self, query: str) -> bool:
+        """
+        Détecte si la requête contient des termes généraux d'aviculture
+
+        Utilisé pour éviter de marquer comme OUT_OF_DOMAIN des questions générales
+        sur l'aviculture qui ne contiennent pas d'entités spécifiques.
+
+        Exemples:
+        - "Is it safe to use AI to raise poultry?" ✅ (contient "raise", "poultry")
+        - "How to improve chicken farming?" ✅ (contient "chicken", "farming")
+        - "What is the best temperature for broilers?" ✅ (already detected via entities)
+        - "What is artificial intelligence?" ❌ (pas d'aviculture)
+
+        Returns:
+            True si la requête contient des termes généraux d'aviculture
+        """
+        query_lower = self._safe_string_lower(query) or ""
+
+        # Charger les termes universels si disponibles
+        universal_terms = self.intents_config.get("universal_terms", {})
+
+        # 1. Check general_terms from universal_terms
+        if universal_terms:
+            general_terms = universal_terms.get("general_terms", {})
+            for term_key, term_data in general_terms.items():
+                variants = term_data.get("variants", [])
+                for variant in variants:
+                    variant_lower = self._safe_string_lower(variant)
+                    if variant_lower and variant_lower in query_lower:
+                        logger.debug(f"🐔 General poultry term detected: {variant}")
+                        return True
+
+        # 2. Fallback: hardcoded general poultry terms (if universal_terms not loaded)
+        general_poultry_terms = [
+            # General terms
+            "poultry", "aviculture", "chicken", "chickens", "bird", "birds",
+            "hen", "hens", "rooster", "roosters", "broiler", "broilers",
+            "layer", "layers", "breeder", "breeders",
+
+            # French terms
+            "volaille", "volailles", "poulet", "poulets", "poule", "poules",
+            "avicole", "élevage", "élever",
+
+            # Spanish terms
+            "ave", "aves", "pollo", "pollos", "gallina", "gallinas",
+            "avicultura", "criar",
+
+            # Actions related to poultry
+            "raise", "raising", "farming", "farm", "breeding", "breed",
+            "hatching", "incubation", "egg production", "meat production",
+
+            # French actions
+            "élever", "élevage", "reproduction", "ponte",
+
+            # Spanish actions
+            "criar", "crianza", "granja",
+        ]
+
+        for term in general_poultry_terms:
+            if term in query_lower:
+                logger.debug(f"🐔 General poultry term detected (fallback): {term}")
+                return True
+
+        return False
+
     def _detect_species_fallback(self, query: str) -> Optional[str]:
         """
         Détection basique d'espèce sans universal_terms (fallback)
@@ -709,8 +774,18 @@ class IntentProcessor:
         if detected_entities:
             confidence = min(0.95, 0.5 + len(detected_entities) * 0.15)
         else:
-            confidence = 0.3
-            intent_type = IntentType.OUT_OF_DOMAIN
+            # ✅ FIX: Before marking as OUT_OF_DOMAIN, check for general poultry terms
+            # Questions like "Is it safe to use AI to raise poultry?" should be IN-DOMAIN
+            # even without specific entities (genetic lines, metrics, etc.)
+            is_poultry_domain = self._detect_general_poultry_terms(query)
+
+            if is_poultry_domain:
+                confidence = 0.6  # Medium confidence (no specific entities but clearly poultry-related)
+                intent_type = IntentType.GENERAL_POULTRY  # General poultry questions
+                logger.info(f"🐔 General poultry query detected (no specific entities): {query[:80]}...")
+            else:
+                confidence = 0.3
+                intent_type = IntentType.OUT_OF_DOMAIN
 
         return IntentResult(
             intent_type=intent_type,
