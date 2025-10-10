@@ -22,9 +22,11 @@ COPY requirements.txt .
 
 # Installation GROUPÉE de toutes les dépendances (Layer mis en cache)
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir --target=/opt/venv "typing-extensions>=4.12.0" \
     && pip install --no-cache-dir --target=/opt/venv \
        torch --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir --target=/opt/venv -r requirements.txt
+    && pip install --no-cache-dir --target=/opt/venv -r requirements.txt \
+    && pip install --no-cache-dir --target=/opt/venv --upgrade "typing-extensions>=4.12.0"
 
 # Stage 2: Runtime minimal (inchangé)
 FROM python:3.11-slim
