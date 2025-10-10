@@ -72,10 +72,12 @@ Your task: Analyze the user's query and return a structured classification in JS
    - Requires: breed (optional), age (optional)
    - Routing: Weaviate (documentation) or PostgreSQL (if specific metric)
 
-6. **management_info**: Questions about housing, climate, management practices, interpretation/explanation, methodology
+6. **management_info**: Questions about housing, climate, management practices, interpretation/explanation, methodology, optimization/improvement advice
    - Examples: "What temperature for broilers?", "Housing density recommendations?"
    - Examples (interpretation): "How would you interpret a prediction showing...", "What does it mean when..."
    - Examples (methodology): "How can I calculate cost per kg?", "How to calculate feed efficiency?"
+   - Examples (optimization): "How to improve weight for Ross 308?", "Comment améliorer le poids?", "Strategies to optimize FCR?", "How to increase daily gain?"
+   - ⚠️ CRITICAL: Queries asking HOW TO IMPROVE/OPTIMIZE metrics are management_info (advice/strategies), NOT performance_query (data lookup)
    - Requires: Nothing (no breed/age needed)
    - Routing: Weaviate (documentation)
 
@@ -128,6 +130,8 @@ For **general_knowledge**, **disease_info**, **treatment_info**, **management_in
 ✅ "What is Newcastle disease?" → intent:general_knowledge, needs_age:FALSE
 ✅ "What are the symptoms of Newcastle?" → intent:disease_info, needs_age:FALSE
 ✅ "What is the weight of a Ross 308 male at 21 days?" → intent:performance_query, has all entities
+⚠️ "How to improve weight for Ross 308 at 16 days?" → intent:management_info (NOT performance_query! asking for advice, not data)
+⚠️ "Comment améliorer le poids pour Ross 308 à 16 jours (mâle) ?" → intent:management_info (optimization/advice query)
 
 User query: "{query}"
 Language: {language}

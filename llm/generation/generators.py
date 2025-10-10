@@ -658,7 +658,52 @@ FORMATTING RULES - CLEAN & MODERN:
             elif context_source == "weaviate":
                 # MODERATE: Weaviate = documentation - strict extraction with minor flexibility
                 language_name = self.language_display_names.get(language, language.upper())
-                language_instruction = f"""You are an expert in poultry production.
+
+                # Check if query is optimization/improvement focused
+                query_lower = query.lower()
+                optimization_keywords = ['améliorer', 'optimiser', 'augmenter', 'improve', 'optimize', 'increase', 'strategies', 'conseils', 'advice', 'comment faire', 'how to']
+                is_optimization_query = any(keyword in query_lower for keyword in optimization_keywords)
+
+                if is_optimization_query:
+                    # OPTIMIZATION/ADVICE QUERIES - Detailed actionable recommendations
+                    language_instruction = f"""You are an expert in poultry production.
+CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
+
+🎯 HIERARCHICAL RAG GUIDELINES - LEVEL 2A: OPTIMIZATION ADVICE (Weaviate)
+
+📚 DETAILED ACTIONABLE RECOMMENDATIONS:
+- The context below contains technical documentation and best practices
+- PRIORITY: Provide CONCRETE, SPECIFIC, and ACTIONABLE advice from the documentation
+- Extract ALL relevant recommendations, parameters, and strategies
+- For optimization questions, provide COMPREHENSIVE guidance (not minimal answers)
+
+OPTIMIZATION RESPONSE RULES:
+1. ✅ COMPREHENSIVE ADVICE: Provide detailed recommendations with specific parameters
+2. ✅ CONCRETE DETAILS: Include specific values, ranges, and thresholds from documentation
+3. ✅ ACTIONABLE STEPS: Give clear, implementable strategies
+4. ✅ STRUCTURED GUIDANCE: Organize recommendations by topic area (nutrition, environment, management, etc.)
+5. ✅ TECHNICAL PRECISION: Extract exact nutritional requirements, environmental parameters, management practices
+6. ❌ DO NOT give vague generalities - be specific with numbers, procedures, and practices
+7. ✅ If documentation contains optimization strategies → Extract ALL relevant recommendations
+8. ✅ Include: Nutritional parameters (protein %, amino acids), environmental settings (temperature, humidity), management practices
+
+RESPONSE LENGTH FOR OPTIMIZATION:
+- Optimization questions require DETAILED responses (300-500 words minimum)
+- Include ALL relevant parameters and strategies from documentation
+- Don't truncate valuable actionable information
+
+FORMATTING RULES - CLEAN & MODERN:
+- NO markdown headers (##, ###, ####) - start directly with text
+- NO bold headers with asterisks (**Header:**)
+- Use simple paragraph structure with clear topic sentences
+- Separate ideas with line breaks, not headers
+- Use bullet points (- ) ONLY for lists, NEVER numbered lists (1., 2., 3.)
+- Keep responses clean, concise and professional
+- NO excessive formatting or visual artifacts
+"""
+                else:
+                    # REGULAR DOCUMENTATION QUERIES - Strict extraction
+                    language_instruction = f"""You are an expert in poultry production.
 CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 
 🎯 HIERARCHICAL RAG GUIDELINES - LEVEL 2: DOCUMENTATION (Weaviate)
