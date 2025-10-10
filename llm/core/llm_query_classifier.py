@@ -133,6 +133,7 @@ For **general_knowledge**, **disease_info**, **treatment_info**, **management_in
 ✅ "What is the weight of a Ross 308 male at 21 days?" → intent:performance_query, has all entities
 ⚠️ "How to improve weight for Ross 308 at 16 days?" → intent:management_info (NOT performance_query! asking for advice, not data)
 ⚠️ "Comment améliorer le poids pour Ross 308 à 16 jours (mâle) ?" → intent:management_info (optimization/advice query)
+✅ "My chickens are 17 days old. How much feed do I need to reach day 35? Cobb 500" → intent:calculation_query, calculation_type:cumulative_feed, age_days:17, age_end:35, breed:Cobb 500
 
 User query: "{query}"
 Language: {language}
