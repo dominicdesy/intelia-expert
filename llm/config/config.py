@@ -86,7 +86,8 @@ ENABLE_TRANSLATION_METRICS = (
 )
 
 # ===== RRF INTELLIGENT CONFIGURATION =====
-ENABLE_INTELLIGENT_RRF = os.getenv("ENABLE_INTELLIGENT_RRF", "false").lower() == "true"
+# PHASE 1 OPTIMIZATION: RRF Intelligent activé pour améliorer Faithfulness
+ENABLE_INTELLIGENT_RRF = os.getenv("ENABLE_INTELLIGENT_RRF", "true").lower() == "true"
 RRF_LEARNING_MODE = os.getenv("RRF_LEARNING_MODE", "true").lower() == "true"
 RRF_GENETIC_BOOST = os.getenv("RRF_GENETIC_BOOST", "true").lower() == "true"
 RRF_DEBUG_MODE = os.getenv("RRF_DEBUG_MODE", "false").lower() == "true"
