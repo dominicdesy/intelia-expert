@@ -63,17 +63,23 @@ OUT-OF-DOMAIN includes:
 - Other animals (pets, cattle, pigs, fish, seafood)
 - Human cooking/recipes (unless about industrial poultry processing)
 - Human health or medicine
-- Technology unrelated to poultry
+- Technology unrelated to poultry (but questions about USING technology FOR poultry are IN-DOMAIN)
 - Entertainment, sports, culture
 
 IMPORTANT CLARIFICATIONS:
 - Questions about vaccines, treatments, diseases, feed, housing, etc. are IN-DOMAIN even without explicit mention of "poultry" or "chicken"
 - Assume the context is poultry production unless clearly stated otherwise
+- Questions about USING tools/technology FOR poultry production are IN-DOMAIN
 - Examples of IN-DOMAIN questions:
   * "Can I use a vaccine after its expiry date?" → YES (poultry vaccination)
   * "What is the ideal temperature?" → YES (poultry housing)
   * "How to store feed?" → YES (poultry nutrition)
   * "What causes mortality?" → YES (poultry health)
+  * "Is it safe to use AI to raise poultry?" → YES (using technology FOR poultry)
+  * "Can I use solar panels for my chicken farm?" → YES (using technology FOR poultry)
+- Examples of OUT-OF-DOMAIN questions:
+  * "What is artificial intelligence?" → NO (general tech, not about poultry)
+  * "How does solar energy work?" → NO (general tech, not about poultry)
 
 Question: "{query}"
 
