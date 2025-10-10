@@ -100,7 +100,7 @@ try:
     import core.handlers as handlers_module
     all_handlers = [name for name in dir(handlers_module) if 'Handler' in name]
     print(f"   Available handlers: {all_handlers}")
-except:
+except Exception:
     pass
 
 print()

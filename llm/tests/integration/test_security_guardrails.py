@@ -21,8 +21,8 @@ load_dotenv()
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from security.ood.detector import OODDetector
-from security.guardrails.core import GuardrailsOrchestrator
+from security.ood.detector import OODDetector  # noqa: E402
+from security.guardrails.core import GuardrailsOrchestrator  # noqa: E402
 
 
 @pytest.fixture

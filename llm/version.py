@@ -7,9 +7,9 @@ Simple hardcoded version that increments with each deployment
 # HARDCODED VERSION - INCREMENT THIS NUMBER WITH EACH DEPLOYMENT
 VERSION = "2.1.2"
 
-import subprocess
-import os
-from datetime import datetime
+import subprocess  # noqa: E402
+import os  # noqa: E402
+from datetime import datetime  # noqa: E402
 
 def get_version_info():
     """

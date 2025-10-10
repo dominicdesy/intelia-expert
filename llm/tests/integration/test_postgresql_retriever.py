@@ -21,8 +21,8 @@ load_dotenv()
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from retrieval.postgresql.retriever import PostgreSQLRetriever
-from retrieval.postgresql.normalizer import SQLQueryNormalizer
+from retrieval.postgresql.retriever import PostgreSQLRetriever  # noqa: E402
+from retrieval.postgresql.normalizer import SQLQueryNormalizer  # noqa: E402
 
 
 @pytest.fixture

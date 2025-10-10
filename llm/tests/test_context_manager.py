@@ -67,21 +67,21 @@ class TestContextManager:
 
     def test_detect_coreference_explicit(self, manager):
         """Test explicit coreference patterns"""
-        assert manager.is_coreference("Et pour les femelles?") == True
-        assert manager.is_coreference("Même chose pour le Hubbard?") == True
-        assert manager.is_coreference("À cet âge-là?") == True
-        assert manager.is_coreference("Pour cette race?") == True
+        assert manager.is_coreference("Et pour les femelles?")
+        assert manager.is_coreference("Même chose pour le Hubbard?")
+        assert manager.is_coreference("À cet âge-là?")
+        assert manager.is_coreference("Pour cette race?")
 
     def test_detect_coreference_short_query(self, manager):
         """Test coreference detection on short queries"""
-        assert manager.is_coreference("Poids?") == True  # Too short
-        assert manager.is_coreference("FCR") == True  # Too short
-        assert manager.is_coreference("Quel poids?") == True  # No context
+        assert manager.is_coreference("Poids?")  # Too short
+        assert manager.is_coreference("FCR")  # Too short
+        assert manager.is_coreference("Quel poids?")  # No context
 
     def test_detect_no_coreference(self, manager):
         """Test queries that don't need coreference"""
-        assert manager.is_coreference("Quel est le poids Ross 308 à 35 jours?") == False
-        assert manager.is_coreference("FCR Cobb 500 at 42 days") == False
+        assert not manager.is_coreference("Quel est le poids Ross 308 à 35 jours?")
+        assert not manager.is_coreference("FCR Cobb 500 at 42 days")
 
     # ===== CONTEXT UPDATE =====
 

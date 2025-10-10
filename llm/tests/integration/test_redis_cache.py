@@ -25,7 +25,7 @@ load_dotenv()
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from cache.cache_core import RedisCacheCore
+from cache.cache_core import RedisCacheCore  # noqa: E402
 
 
 @pytest.fixture

@@ -20,7 +20,7 @@ else:
 # Add llm to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from core.rag_engine import InteliaRAGEngine
+from core.rag_engine import InteliaRAGEngine  # noqa: E402
 
 async def test_processing_plant_query():
     """Test la question processing plants avec le nouveau fallback"""

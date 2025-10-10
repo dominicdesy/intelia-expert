@@ -43,10 +43,10 @@ else:
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Imports après path setup
-from evaluation.ragas_evaluator import RAGASEvaluator
-from evaluation.golden_dataset_intelia import get_intelia_test_dataset
-from evaluation.golden_dataset_weaviate import get_weaviate_test_dataset
-from evaluation.golden_dataset_weaviate_v2 import get_weaviate_v2_test_dataset
+from evaluation.ragas_evaluator import RAGASEvaluator  # noqa: E402
+from evaluation.golden_dataset_intelia import get_intelia_test_dataset  # noqa: E402
+from evaluation.golden_dataset_weaviate import get_weaviate_test_dataset  # noqa: E402
+from evaluation.golden_dataset_weaviate_v2 import get_weaviate_v2_test_dataset  # noqa: E402
 
 # Import du système RAG réel
 try:

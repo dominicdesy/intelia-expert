@@ -136,7 +136,7 @@ class CodebaseAnalyzer:
 
                     if not is_script:
                         unused_files.append((file_path, "Never imported, not a script"))
-                except:
+                except Exception:
                     pass
 
         return unused_files
@@ -200,7 +200,7 @@ class CodebaseAnalyzer:
                                 if file in content:
                                     is_referenced = True
                                     break
-                        except:
+                        except Exception:
                             pass
 
                     if not is_referenced:

@@ -50,7 +50,7 @@ def analyze_imports(files, root_dir):
                     if node.module:
                         imports[rel_path].add(node.module)
                         file_imports[node.module].add(rel_path)
-        except:
+        except Exception:
             pass
 
     return imports, file_imports
@@ -83,7 +83,7 @@ def find_unused(files, file_imports, root_dir):
                             'file': rel_path,
                             'size': file_path.stat().st_size
                         })
-            except:
+            except Exception:
                 pass
 
     return sorted(unused, key=lambda x: x['size'], reverse=True)
@@ -111,7 +111,7 @@ def analyze_complexity(files, root_dir):
                             'complexity': complexity,
                             'line': node.lineno
                         })
-        except:
+        except Exception:
             pass
 
     return sorted(high_complexity, key=lambda x: x['complexity'], reverse=True)
@@ -133,7 +133,7 @@ def find_duplicates(files, root_dir):
                         'file': str(file_path.relative_to(root_dir)),
                         'line': i + 1
                     })
-        except:
+        except Exception:
             pass
 
     duplicates = []
@@ -161,7 +161,7 @@ def analyze_type_hints(files, root_dir):
                     total += 1
                     if node.returns and all(arg.annotation for arg in node.args.args if arg.arg != 'self'):
                         typed += 1
-        except:
+        except Exception:
             pass
 
     coverage = (typed / total * 100) if total > 0 else 0

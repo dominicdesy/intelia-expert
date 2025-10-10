@@ -19,7 +19,7 @@ else:
 # Add llm to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from security.llm_ood_detector import LLMOODDetector
+from security.llm_ood_detector import LLMOODDetector  # noqa: E402
 
 # Initialize detector
 detector = LLMOODDetector()

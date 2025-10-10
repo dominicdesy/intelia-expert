@@ -256,7 +256,7 @@ class TestCheckAndClarify:
             language='en'
         )
 
-        assert result['needs_clarification'] == False
+        assert not result['needs_clarification']
         assert result['message'] == ''
         assert result['ambiguity_type'] is None
 
@@ -268,7 +268,7 @@ class TestCheckAndClarify:
             language='en'
         )
 
-        assert result['needs_clarification'] == True
+        assert result['needs_clarification']
         assert len(result['message']) > 0
         assert 'missing_fields' in result
         assert len(result['missing_fields']) == 2
@@ -282,7 +282,7 @@ class TestCheckAndClarify:
             entities={}
         )
 
-        assert result['needs_clarification'] == True
+        assert result['needs_clarification']
         # ambiguity_type may be None or a string depending on helper availability
         assert 'ambiguity_type' in result
 
@@ -312,7 +312,7 @@ class TestShouldClarifyBeforeLLM:
             confidence=0.8
         )
 
-        assert should_clarify == True  # breed is critical
+        assert should_clarify  # breed is critical
 
     def test_should_clarify_many_fields_missing(self, clarifier):
         """Test clarification when many fields missing"""
@@ -322,7 +322,7 @@ class TestShouldClarifyBeforeLLM:
             confidence=0.8
         )
 
-        assert should_clarify == True  # 3+ fields missing
+        assert should_clarify  # 3+ fields missing
 
     def test_should_clarify_low_confidence(self, clarifier):
         """Test clarification when low confidence"""
@@ -332,7 +332,7 @@ class TestShouldClarifyBeforeLLM:
             confidence=0.3
         )
 
-        assert should_clarify == True  # Low confidence + missing field
+        assert should_clarify  # Low confidence + missing field
 
     def test_should_not_clarify_high_confidence_non_critical(self, clarifier):
         """Test no clarification when high confidence and non-critical"""
@@ -353,7 +353,7 @@ class TestShouldClarifyBeforeLLM:
             confidence=0.9
         )
 
-        assert should_clarify == False
+        assert not should_clarify
 
 
 class TestGracefulDegradation:
@@ -369,7 +369,7 @@ class TestGracefulDegradation:
             clarifier = EnhancedClarification()
 
             assert clarifier is not None
-            assert clarifier.is_available() == False
+            assert not clarifier.is_available()
 
             # Should still be able to build messages (using fallback)
             message = clarifier.build_clarification_message(
@@ -418,7 +418,7 @@ class TestIntegration:
         entities = {}
 
         # Detect ambiguity
-        ambiguity = clarifier.detect_ambiguity_type(query, missing_fields, entities)
+        _ambiguity = clarifier.detect_ambiguity_type(query, missing_fields, entities)
 
         # Build message
         message = clarifier.build_clarification_message(
@@ -438,7 +438,7 @@ class TestIntegration:
             confidence=0.4
         )
 
-        assert should_clarify == True
+        assert should_clarify
 
     def test_full_workflow_complete_question(self, clarifier):
         """Test workflow with complete question"""
@@ -455,7 +455,7 @@ class TestIntegration:
             entities=entities
         )
 
-        assert result['needs_clarification'] == False
+        assert not result['needs_clarification']
 
     def test_full_workflow_health_question(self, clarifier):
         """Test workflow for health question"""
@@ -469,7 +469,7 @@ class TestIntegration:
             language=language
         )
 
-        assert result['needs_clarification'] == True
+        assert result['needs_clarification']
         assert len(result['message']) > 0
 
 

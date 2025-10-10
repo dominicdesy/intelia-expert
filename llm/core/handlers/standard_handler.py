@@ -480,7 +480,6 @@ class StandardQueryHandler(BaseQueryHandler):
                         logger.error(f"❌ Re-ranking error: {e}. Using original documents.", exc_info=True)
                         # Continue with original documents on error
 
-                doc_count = len(result.context_docs) if result.context_docs else 0
 
                 # Generate answer if documents exist but no answer yet
                 if result.context_docs and not result.answer:

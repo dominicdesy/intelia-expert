@@ -130,7 +130,6 @@ class SemanticReRanker:
             # Check cache for scores
             scores = []
             if self.enable_caching:
-                cached_pairs = []
                 uncached_pairs = []
                 uncached_indices = []
 

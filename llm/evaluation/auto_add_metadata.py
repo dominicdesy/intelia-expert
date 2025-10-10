@@ -76,7 +76,6 @@ def add_metadata_to_file(input_file: Path, output_file: Path):
     output_parts = []
 
     for match in category_pattern.finditer(content):
-        category_line = match.group(1)
         match_start, match_end = match.span(1)
 
         # Add content before this match

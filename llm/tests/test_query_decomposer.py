@@ -52,27 +52,27 @@ class TestComplexityDetection:
     def test_detect_multiple_and_conjunctions(self, decomposer):
         """Test detection of multiple AND conjunctions"""
         query = "Impact nutrition et température et densité sur FCR"
-        assert decomposer.detect_complexity(query) == True
+        assert decomposer.detect_complexity(query)
 
     def test_detect_multiple_or_conjunctions(self, decomposer):
         """Test detection of multiple OR conjunctions"""
         query = "Ross 308 ou Cobb 500 ou Hubbard pour performance"
-        assert decomposer.detect_complexity(query) == True
+        assert decomposer.detect_complexity(query)
 
     def test_detect_comma_separated_factors(self, decomposer):
         """Test detection of comma-separated factors"""
         query = "Effet nutrition, température, densité sur FCR Ross 308"
-        assert decomposer.detect_complexity(query) == True
+        assert decomposer.detect_complexity(query)
 
     def test_detect_impact_pattern(self, decomposer):
         """Test detection of impact patterns"""
         query = "Impact nutrition et température sur FCR"
-        assert decomposer.detect_complexity(query) == True
+        assert decomposer.detect_complexity(query)
 
     def test_detect_multiple_questions(self, decomposer):
         """Test detection of multiple question marks"""
         query = "Quel poids? Quel FCR? Quelle mortalité?"
-        assert decomposer.detect_complexity(query) == True
+        assert decomposer.detect_complexity(query)
 
     def test_detect_many_factors(self, decomposer):
         """Test detection based on factor count (3+)"""
@@ -82,12 +82,12 @@ class TestComplexityDetection:
             if __import__('re').search(pattern, query.lower())
         )
         assert factors_found >= 3
-        assert decomposer.detect_complexity(query) == True
+        assert decomposer.detect_complexity(query)
 
     def test_simple_query_not_complex(self, decomposer):
         """Test that simple queries are not marked as complex"""
         query = "Quel est le poids Ross 308 à 35 jours?"
-        assert decomposer.detect_complexity(query) == False
+        assert not decomposer.detect_complexity(query)
 
     def test_single_factor_not_complex(self, decomposer):
         """Test single factor query is not complex"""
@@ -212,7 +212,7 @@ class TestQueryDecomposition:
         result = decomposer.decompose(query)
 
         assert isinstance(result, DecompositionResult)
-        assert result.is_complex == False
+        assert not result.is_complex
         assert len(result.sub_queries) == 1
         assert result.sub_queries[0].query == query
         assert result.aggregation_strategy == 'none'
@@ -223,7 +223,7 @@ class TestQueryDecomposition:
         result = decomposer.decompose(query)
 
         assert isinstance(result, DecompositionResult)
-        assert result.is_complex == True
+        assert result.is_complex
         assert len(result.sub_queries) >= 2
         assert result.aggregation_strategy in ['combine', 'compare', 'synthesize']
 
@@ -232,7 +232,7 @@ class TestQueryDecomposition:
         query = "Effet nutrition, température et densité sur FCR Ross 308 mâles"
         result = decomposer.decompose(query)
 
-        assert result.is_complex == True
+        assert result.is_complex
         assert len(result.sub_queries) >= 2
 
         # Check sub-query structure
@@ -258,7 +258,6 @@ class TestQueryDecomposition:
         if result.is_complex:
             # Sub-queries should contain relevant information
             for sub_query in result.sub_queries:
-                query_lower = sub_query.query.lower()
                 # Should contain some context from original query
                 assert len(sub_query.query) > 5
 
@@ -373,7 +372,7 @@ class TestResultAggregation:
         assert aggregated['aggregation_type'] == 'synthesize'
         assert 'synthesis_parts' in aggregated
         assert len(aggregated['synthesis_parts']) == 3
-        assert aggregated['needs_llm_synthesis'] == True
+        assert aggregated['needs_llm_synthesis']
 
     def test_aggregate_handles_errors(self, decomposer):
         """Test aggregation handles error results"""
@@ -443,7 +442,7 @@ class TestIntegration:
 
         # Step 1: Detect complexity
         is_complex = decomposer.detect_complexity(query)
-        assert is_complex == True
+        assert is_complex
 
         # Step 2: Extract factors
         factors = decomposer.extract_factors(query)
@@ -451,7 +450,7 @@ class TestIntegration:
 
         # Step 3: Decompose
         result = decomposer.decompose(query)
-        assert result.is_complex == True
+        assert result.is_complex
         assert len(result.sub_queries) >= 2
 
         # Step 4: Mock execution
@@ -475,7 +474,7 @@ class TestIntegration:
 
         # Should not decompose
         result = decomposer.decompose(query)
-        assert result.is_complex == False
+        assert not result.is_complex
         assert len(result.sub_queries) == 1
         assert result.aggregation_strategy == 'none'
 

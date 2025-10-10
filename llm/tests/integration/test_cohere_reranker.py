@@ -22,7 +22,7 @@ load_dotenv()
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from retrieval.reranker import CohereReranker
+from retrieval.reranker import CohereReranker  # noqa: E402
 
 
 @pytest.fixture

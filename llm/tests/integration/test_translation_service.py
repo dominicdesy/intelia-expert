@@ -21,7 +21,7 @@ load_dotenv()
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from utils.translation_service import get_translation_service
+from utils.translation_service import get_translation_service  # noqa: E402
 
 
 @pytest.fixture

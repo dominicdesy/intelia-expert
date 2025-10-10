@@ -127,7 +127,7 @@ class DeepCodeAnalyzer:
                     if isinstance(node, (ast.Import, ast.ImportFrom)):
                         if isinstance(node, ast.ImportFrom) and node.module:
                             dependencies[rel_path].add(node.module)
-            except:
+            except Exception:
                 pass
 
         # Detect circular dependencies
@@ -177,7 +177,7 @@ class DeepCodeAnalyzer:
                             'line': i + 1,
                             'code': block[:100]  # First 100 chars
                         })
-            except:
+            except Exception:
                 pass
 
         # Find actual duplicates
@@ -227,7 +227,7 @@ class DeepCodeAnalyzer:
                                 'function': node.name,
                                 'line': node.lineno
                             })
-            except:
+            except Exception:
                 pass
 
         coverage = (typed_functions / total_functions * 100) if total_functions > 0 else 0
@@ -269,7 +269,7 @@ class DeepCodeAnalyzer:
                                 'name': node.name,
                                 'line': node.lineno
                             })
-            except:
+            except Exception:
                 pass
 
         coverage = (documented_items / total_items * 100) if total_items > 0 else 0
@@ -305,7 +305,7 @@ class DeepCodeAnalyzer:
                                     'file': str(file_path.relative_to(self.root_dir)),
                                     'line': handler.lineno
                                 })
-            except:
+            except Exception:
                 pass
 
         self.analysis_results['analyses']['error_handling'] = {
@@ -328,7 +328,6 @@ class DeepCodeAnalyzer:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                     tree = ast.parse(content)
-                    lines = content.split('\n')
 
                 for node in ast.walk(tree):
                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -342,7 +341,7 @@ class DeepCodeAnalyzer:
                                     'line': node.lineno,
                                     'length': length
                                 })
-            except:
+            except Exception:
                 pass
 
         long_functions.sort(key=lambda x: x['length'], reverse=True)
@@ -391,7 +390,7 @@ class DeepCodeAnalyzer:
                             'file': str(file_path.relative_to(self.root_dir)),
                             'import': name
                         })
-            except:
+            except Exception:
                 pass
 
         self.analysis_results['analyses']['import_optimization'] = {
@@ -423,7 +422,7 @@ class DeepCodeAnalyzer:
                                 'value': node.value,
                                 'line': node.lineno
                             })
-            except:
+            except Exception:
                 pass
 
         # Count occurrences
@@ -465,7 +464,7 @@ class DeepCodeAnalyzer:
                             'line': line_num,
                             'code': match.group()[:80]
                         })
-            except:
+            except Exception:
                 pass
 
         self.analysis_results['analyses']['performance_patterns'] = {

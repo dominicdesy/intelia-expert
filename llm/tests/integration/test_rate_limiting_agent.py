@@ -23,8 +23,8 @@ load_dotenv()
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from main import app
-from extensions.agent_rag_extension import InteliaAgentRAG
+from main import app  # noqa: E402
+from extensions.agent_rag_extension import InteliaAgentRAG  # noqa: E402
 
 
 # ============================================================================

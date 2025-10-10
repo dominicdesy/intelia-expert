@@ -24,7 +24,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Import FastAPI app
-from main import app
+from main import app  # noqa: E402
 
 
 @pytest.mark.asyncio

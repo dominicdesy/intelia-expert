@@ -114,7 +114,7 @@ def main():
 
     # Read original file
     with open("evaluation/golden_dataset_intelia.py", "r", encoding="utf-8") as f:
-        content = f.read()
+        _content = f.read()
 
     # Process each test
     for idx, item in enumerate(dataset):
