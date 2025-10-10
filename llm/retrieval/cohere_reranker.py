@@ -81,7 +81,7 @@ class CohereReRanker:
             try:
                 import cohere
                 self._client = cohere.Client(api_key=self.api_key)
-                logger.info(f"✅ Cohere client loaded successfully")
+                logger.info("✅ Cohere client loaded successfully")
             except ImportError:
                 logger.error(
                     "❌ cohere package not installed! "

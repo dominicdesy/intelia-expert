@@ -13,7 +13,6 @@ Analyse:
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Set
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -51,11 +50,11 @@ def analyze_routing_keywords():
 
     router = QueryRouter()
 
-    print(f"\n🔍 Mots-clés METRICS (→ PostgreSQL)")
+    print("\n🔍 Mots-clés METRICS (→ PostgreSQL)")
     print(f"   Total: {len(router.metric_keywords)}")
     print(f"   Exemples: {', '.join(list(router.metric_keywords)[:10])}")
 
-    print(f"\n📚 Mots-clés KNOWLEDGE (→ Weaviate)")
+    print("\n📚 Mots-clés KNOWLEDGE (→ Weaviate)")
     print(f"   Total: {len(router.knowledge_keywords)}")
     print(f"   Exemples: {', '.join(list(router.knowledge_keywords)[:10])}")
 
@@ -68,7 +67,7 @@ def analyze_routing_keywords():
         ("FCR à 42 jours pour Hubbard", "METRICS"),
     ]
 
-    print(f"\n🧪 Tests de routing:")
+    print("\n🧪 Tests de routing:")
     for query, expected in test_queries:
         result = router.route_query(query)
         status = "✅" if result.value.upper() == expected else "⚠️"
@@ -91,12 +90,12 @@ def analyze_domain_coverage():
         domains = terms_data.get("domains", {})
         metadata = terms_data.get("metadata", {})
 
-        print(f"\n📚 Dictionnaire universel (FR)")
+        print("\n📚 Dictionnaire universel (FR)")
         print(f"   Version: {metadata.get('version', 'N/A')}")
         print(f"   Total domaines: {len(domains)}")
         print(f"   Dernière MAJ: {metadata.get('last_updated', 'N/A')}")
 
-        print(f"\n🏷️ Domaines disponibles:")
+        print("\n🏷️ Domaines disponibles:")
 
         domain_stats = {}
         for domain_name, domain_data in domains.items():

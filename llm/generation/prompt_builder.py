@@ -200,7 +200,9 @@ class PromptBuilder:
                 f"📄 Doc {i+1}: line={genetic_line}, species={species}, content_len={len(content)}"
             )
 
-            doc_text = f"Document {i+1} ({genetic_line} - {species}):\n{content[:1000]}"
+            # Use FULL document content (no truncation) - GPT-4o has 128k context window
+            # We already filtered to top 5 docs, so no need to truncate further
+            doc_text = f"Document {i+1} ({genetic_line} - {species}):\n{content}"
             context_text_parts.append(doc_text)
 
         context_text = "\n\n".join(context_text_parts)

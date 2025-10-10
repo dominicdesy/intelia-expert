@@ -1031,9 +1031,9 @@ class WeaviateCore(InitializableMixin):
         context_hash = ""
         if conversation_context:
             context_str = str(conversation_context)
-            context_hash = hashlib.md5(context_str.encode()).hexdigest()[:8]
+            context_hash = hashlib.md5(context_str.encode(), usedforsecurity=False).hexdigest()[:8]
 
-        return f"{tenant_id}:{hashlib.md5(query.encode()).hexdigest()}:{language}:{context_hash}"
+        return f"{tenant_id}:{hashlib.md5(query.encode(), usedforsecurity=False).hexdigest()}:{language}:{context_hash}"
 
     async def _get_cached_response(
         self, cache_key: str, query: str, language: str

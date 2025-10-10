@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-rag_engine_core.py - Core fonctionnalités du RAG Engine
+rag_engine_core.py - RAG Engine core functionalities
 """
 
 import logging
@@ -19,48 +19,48 @@ logger = logging.getLogger(__name__)
 
 
 class RAGEngineCore(InitializableMixin):
-    """Core du RAG Engine avec gestion OpenAI et générateur de réponses"""
+    """RAG Engine core with OpenAI management and response generator"""
 
     def __init__(self, openai_client: AsyncOpenAI = None):
-        """Initialisation du core avec tous les composants nécessaires"""
+        """Initialize core with all required components"""
         super().__init__()
 
-        # Client OpenAI - DOIT être initialisé en premier
+        # OpenAI client - MUST be initialized first
         try:
             self.openai_client = openai_client or self._build_openai_client()
             if self.openai_client:
-                logger.info("Client OpenAI créé avec httpx")
+                logger.info("OpenAI client created with httpx")
         except Exception as e:
-            logger.warning(f"Erreur client OpenAI: {e}")
+            logger.warning(f"OpenAI client error: {e}")
             self.openai_client = None
 
-        # Générateur de réponses - CORRECTION CRITIQUE avec passage du client
+        # Response generator - Critical correction with client passing
         try:
             from generation.generators import EnhancedResponseGenerator
 
             if self.openai_client:
                 self.generator = EnhancedResponseGenerator(client=self.openai_client)
                 logger.info(
-                    "✅ Generator initialisé dans RAGEngineCore avec client OpenAI"
+                    "✅ Generator initialized in RAGEngineCore with OpenAI client"
                 )
             else:
                 logger.error(
-                    "❌ Impossible d'initialiser generator: client OpenAI manquant"
+                    "❌ Cannot initialize generator: OpenAI client missing"
                 )
                 self.generator = None
 
         except Exception as e:
-            logger.error(f"❌ Échec initialisation generator: {e}")
+            logger.error(f"❌ Generator initialization failed: {e}")
             self.generator = None
 
     def _build_openai_client(self) -> Optional[AsyncOpenAI]:
-        """Construction du client OpenAI avec configuration optimisée"""
+        """Build OpenAI client with optimized configuration"""
         if not OPENAI_AVAILABLE or not AsyncOpenAI:
-            logger.warning("OpenAI non disponible")
+            logger.warning("OpenAI not available")
             return None
 
         if not OPENAI_API_KEY:
-            logger.warning("OPENAI_API_KEY manquante")
+            logger.warning("OPENAI_API_KEY missing")
             return None
 
         try:
@@ -72,33 +72,33 @@ class RAGEngineCore(InitializableMixin):
             except ImportError:
                 return AsyncOpenAI(api_key=OPENAI_API_KEY)
         except Exception as e:
-            logger.error(f"Erreur création client OpenAI: {e}")
+            logger.error(f"Error creating OpenAI client: {e}")
             return None
 
     async def initialize(self):
-        """Initialisation asynchrone du core"""
-        logger.info("RAG Engine Core initialisé")
+        """Async core initialization"""
+        logger.info("RAG Engine Core initialized")
 
-        # Vérification des composants critiques
+        # Verify critical components
         if not self.openai_client:
-            logger.warning("OpenAI client non disponible")
+            logger.warning("OpenAI client not available")
 
         if not self.generator:
-            logger.error("Generator non disponible - les réponses LLM échoueront")
+            logger.error("Generator not available - LLM responses will fail")
         else:
-            logger.info("✅ Tous les composants critiques disponibles")
+            logger.info("✅ All critical components available")
 
         await super().initialize()
         return self
 
     async def close(self):
-        """Fermeture propre du core et libération des ressources"""
+        """Clean core shutdown and resource release"""
         if self.openai_client and hasattr(self.openai_client, "close"):
             try:
                 await self.openai_client.close()
-                logger.info("Client OpenAI fermé")
+                logger.info("OpenAI client closed")
             except Exception as e:
-                logger.warning(f"Erreur fermeture OpenAI client: {e}")
+                logger.warning(f"Error closing OpenAI client: {e}")
 
         await super().close()
-        logger.info("RAG Engine Core fermé")
+        logger.info("RAG Engine Core closed")

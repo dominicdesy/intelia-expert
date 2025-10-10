@@ -8,7 +8,7 @@ Based on pragmatic recommendations for production-ready datasets.
 
 import re
 import json
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Any
 from collections import Counter
 from golden_dataset_intelia import get_intelia_test_dataset
 
@@ -114,7 +114,7 @@ class DatasetValidator:
             self.warnings.append((idx, f"NUMERIC: Has 'metric' ({item['metric']}) but missing 'target_value'"))
 
         if has_target and not has_tolerance:
-            self.info.append((idx, f"Has 'target_value' but no tolerance. Consider adding 'tolerance_abs' or 'tolerance_rel'"))
+            self.info.append((idx, "Has 'target_value' but no tolerance. Consider adding 'tolerance_abs' or 'tolerance_rel'"))
 
     def validate_empty_contexts(self, idx: int, item: Dict[str, Any]) -> None:
         """Check if contexts are empty (expected if filled dynamically)"""
@@ -238,15 +238,15 @@ class DatasetValidator:
         for cat, count in self.stats['by_category'].most_common():
             print(f"  - {cat}: {count}")
 
-        print(f"\n🌍 By Language:")
+        print("\n🌍 By Language:")
         for lang, count in self.stats['by_lang'].most_common():
             print(f"  - {lang}: {count}")
 
-        print(f"\n📈 By Difficulty:")
+        print("\n📈 By Difficulty:")
         for diff, count in self.stats['by_difficulty'].most_common():
             print(f"  - {diff}: {count}")
 
-        print(f"\n🔍 Quality Metrics:")
+        print("\n🔍 Quality Metrics:")
         print(f"  - Missing IDs: {self.stats['missing_ids']}/{self.stats['total_tests']}")
         print(f"  - Missing source_refs: {self.stats['missing_source_refs']}/{self.stats['total_tests']}")
         print(f"  - Long ground truths (>200 words): {self.stats['long_ground_truths']}")

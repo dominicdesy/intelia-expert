@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class StandardQueryHandler(BaseQueryHandler):
-    """Handler pour les requêtes standard avec routage intelligent"""
+    """Handler for standard queries with intelligent routing"""
 
     def __init__(self):
         super().__init__()
@@ -47,13 +47,13 @@ class StandardQueryHandler(BaseQueryHandler):
                     logger.info("🔧 Initializing cross-encoder re-ranker (ms-marco-MiniLM)...")
                     self.semantic_reranker = get_reranker(
                         model_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
-                        score_threshold=0.3  # Balanced threshold (was 0.1 = too strict)
+                        score_threshold=0.3  # Balanced threshold
                     )
                     logger.info("✅ Cross-encoder re-ranker initialized (threshold=0.3)")
 
             except Exception as e:
                 logger.warning(f"⚠️ Re-ranker init failed: {e}. Continuing without re-ranking.")
-                self.semantic_reranker = False  # Flag pour ne pas réessayer
+                self.semantic_reranker = False  # Flag to avoid retry
         return self.semantic_reranker if self.semantic_reranker is not False else None
 
     def configure(
@@ -64,7 +64,7 @@ class StandardQueryHandler(BaseQueryHandler):
         response_generator=None,
         **kwargs,
     ):
-        """Configure le handler avec les systèmes nécessaires"""
+        """Configure handler with required systems"""
         self.postgresql_system = postgresql_system
         self.weaviate_core = weaviate_core
         self.postgresql_validator = postgresql_validator
@@ -81,8 +81,8 @@ class StandardQueryHandler(BaseQueryHandler):
         preprocessing_result: Dict[str, Any] = None,
         language: str = "fr",
     ) -> RAGResult:
-        """Traite une requête standard avec routage intelligent"""
-        # Extraction des données depuis preprocessed_data si disponible
+        """Process standard query with intelligent routing"""
+        # Extract data from preprocessed_data if available
         if preprocessed_data:
             query = preprocessed_data.get("normalized_query", query)
             entities = preprocessed_data.get("entities", entities)
@@ -356,7 +356,7 @@ class StandardQueryHandler(BaseQueryHandler):
         language: str = "fr",
         filters: Dict[str, Any] = None,
     ) -> Optional[RAGResult]:
-        """Effectue UNE SEULE recherche PostgreSQL"""
+        """Execute single PostgreSQL search"""
         if filters is None:
             filters = {}
 
@@ -401,7 +401,7 @@ class StandardQueryHandler(BaseQueryHandler):
         filters: Dict[str, Any] = None,
         preprocessed_data: Dict[str, Any] = None,
     ) -> RAGResult:
-        """Recherche directe dans Weaviate"""
+        """Direct Weaviate search"""
         if filters is None:
             filters = {}
 
@@ -409,9 +409,9 @@ class StandardQueryHandler(BaseQueryHandler):
             preprocessed_data = {}
 
         try:
-            # CRITICAL: Use top_k directly (no reduction for optimization)
+            # Use top_k directly (no reduction for optimization)
             # The 10x multiplier + re-ranker will handle filtering
-            weaviate_top_k = top_k  # Was: 12 if is_optimization else top_k
+            weaviate_top_k = top_k
 
             logger.info(
                 f"Weaviate search (top_k={weaviate_top_k}, language={language}, filters={filters})"
@@ -419,9 +419,8 @@ class StandardQueryHandler(BaseQueryHandler):
 
             conversation_context_list = parse_contextual_history(preprocessed_data)
 
-            # 🆕 STEP 1: Récupérer BEAUCOUP PLUS de documents pour compenser
-            # la faible qualité de retrieval Weaviate (chunks trop granulaires)
-            weaviate_initial_k = weaviate_top_k * 10  # 50-120 docs au lieu de 5-12
+            # Retrieve more documents to compensate for Weaviate granular chunks
+            weaviate_initial_k = weaviate_top_k * 10  # 50-120 docs instead of 5-12
 
             result = await self.weaviate_core.search(
                 query=query,
@@ -436,13 +435,10 @@ class StandardQueryHandler(BaseQueryHandler):
                 doc_count_before = len(result.context_docs) if result.context_docs else 0
                 logger.info(f"Weaviate ({language}): {doc_count_before} documents retrieved (before re-ranking)")
 
-                # 🆕 STEP 2: Re-ranking with balanced threshold (0.3)
-                # TESTING: Increased from 0.1 to 0.3 to avoid filtering ALL documents
-                # Previous issue: threshold 0.1 was too strict (77→0, 70→0 docs)
-
+                # Re-ranking with balanced threshold
                 if result.context_docs and self.reranker:
                     try:
-                        # Extraire textes des documents
+                        # Extract document texts
                         doc_texts = [
                             doc.get('content', '') if isinstance(doc, dict)
                             else getattr(doc, 'content', '')
@@ -451,17 +447,20 @@ class StandardQueryHandler(BaseQueryHandler):
 
                         logger.info(f"🔍 Re-ranking {len(doc_texts)} docs with threshold 0.3...")
 
-                        # Re-ranker avec cross-encoder
+                        # Re-ranker with cross-encoder OR Cohere
+                        # Always filter to 5 docs max for Context Precision
+                        final_top_k = 5  # Fixed: always filter to 5 relevant docs
+
                         reranked_texts = self.reranker.rerank(
                             query=query,
                             documents=doc_texts,
-                            top_k=weaviate_top_k,  # Garder seulement top 5-12
+                            top_k=final_top_k,  # Always 5 docs max
                             return_scores=False
                         )
 
-                        # Reconstruire docs avec seulement les pertinents
+                        # Rebuild docs with only relevant ones
                         if reranked_texts:
-                            # Mapper textes → docs originaux
+                            # Map texts to original docs
                             text_to_doc = {
                                 (doc.get('content', '') if isinstance(doc, dict) else getattr(doc, 'content', '')): doc
                                 for doc in result.context_docs
@@ -475,11 +474,11 @@ class StandardQueryHandler(BaseQueryHandler):
                                 f"(filtered {doc_count_before - doc_count_after})"
                             )
                         else:
-                            logger.warning(f"⚠️ Re-ranking returned 0 docs - keeping original")
+                            logger.warning("⚠️ Re-ranking returned 0 docs - keeping original")
 
                     except Exception as e:
                         logger.error(f"❌ Re-ranking error: {e}. Using original documents.", exc_info=True)
-                        # Continue avec documents originaux si erreur
+                        # Continue with original documents on error
 
                 doc_count = len(result.context_docs) if result.context_docs else 0
 
@@ -521,8 +520,7 @@ class StandardQueryHandler(BaseQueryHandler):
                 # rag_engine will handle fallback to welcome message or LLM
                 logger.info(f"Weaviate ({language}): 0 documents (source={result.source})")
 
-                # CRITICAL FIX: Ensure answer is initialized to empty string (not None)
-                # to prevent "object of type 'NoneType' has no len()" in response_generator
+                # Ensure answer is initialized to empty string (not None)
                 if result.answer is None:
                     result.answer = ""
 

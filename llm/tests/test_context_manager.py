@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from processing.context_manager import ContextManager, ConversationContext
+from processing.context_manager import ContextManager
 
 
 class TestContextManager:

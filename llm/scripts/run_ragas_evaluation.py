@@ -45,6 +45,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Imports après path setup
 from evaluation.ragas_evaluator import RAGASEvaluator
 from evaluation.golden_dataset_intelia import get_intelia_test_dataset
+from evaluation.golden_dataset_weaviate import get_weaviate_test_dataset
+from evaluation.golden_dataset_weaviate_v2 import get_weaviate_v2_test_dataset
 
 # Import du système RAG réel
 try:
@@ -72,7 +74,7 @@ logger = logging.getLogger(__name__)
 
 
 async def query_rag_system(
-    question: str, rag_engine: Optional[object] = None
+    question: str, rag_engine: Optional[object] = None, expected_lang: str = "en"
 ) -> Dict[str, Any]:
     """
     Interroge le système RAG et retourne réponse + contextes.
@@ -80,6 +82,7 @@ async def query_rag_system(
     Args:
         question: Question à poser
         rag_engine: Instance de InteliaRAGEngine (optionnel)
+        expected_lang: Langue attendue de la question (depuis le dataset)
 
     Returns:
         Dictionnaire avec:
@@ -88,10 +91,14 @@ async def query_rag_system(
     """
     if rag_engine and RAG_ENGINE_AVAILABLE:
         try:
+            # Utiliser la langue du dataset au lieu de la détection automatique
+            detected_lang = expected_lang
+            logger.debug(f"   Langue utilisée: {detected_lang} (depuis dataset)")
+
             # Appel réel au RAG (méthode correcte: generate_response)
             result = await rag_engine.generate_response(
                 query=question,
-                language="fr",  # Détection automatique dans le vrai système
+                language=detected_lang,  # Utiliser la langue détectée
                 conversation_id=f"ragas_eval_{datetime.now().timestamp()}",
             )
 
@@ -141,6 +148,7 @@ async def run_evaluation(
     output_path: str = None,
     llm_model: str = "gpt-4o",
     use_real_rag: bool = True,
+    dataset_type: str = "intelia",
 ):
     """
     Exécute l'évaluation RAGAS complète.
@@ -150,14 +158,22 @@ async def run_evaluation(
         output_path: Chemin fichier de sortie
         llm_model: Modèle LLM évaluateur
         use_real_rag: Utiliser vrai RAG (True) ou simulation (False)
+        dataset_type: Type de dataset ('intelia' ou 'weaviate')
     """
     logger.info("=" * 70)
     logger.info("🚀 RAGAS EVALUATION - Intelia Expert LLM")
     logger.info("=" * 70)
 
     # Générer dataset golden
-    logger.info("📊 Chargement dataset golden Intelia...")
-    golden_dataset = get_intelia_test_dataset()
+    if dataset_type == "weaviate_v2":
+        logger.info("📊 Chargement dataset WEAVIATE V2 (questions basées sur documents Health réels)...")
+        golden_dataset = get_weaviate_v2_test_dataset()
+    elif dataset_type == "weaviate":
+        logger.info("📊 Chargement dataset WEAVIATE (contenu narratif/qualitatif)...")
+        golden_dataset = get_weaviate_test_dataset()
+    else:
+        logger.info("📊 Chargement dataset INTELIA (mixte PostgreSQL+Weaviate)...")
+        golden_dataset = get_intelia_test_dataset()
 
     # Limiter nombre de cas si spécifié
     if num_test_cases:
@@ -187,9 +203,12 @@ async def run_evaluation(
     for i, case in enumerate(golden_dataset, 1):
         logger.info(f"   [{i}/{len(golden_dataset)}] {case['question'][:60]}...")
 
-        # Query RAG
+        # Query RAG avec la langue du dataset
+        expected_lang = case.get("lang", "en")  # Langue depuis le dataset
         rag_result = await query_rag_system(
-            question=case["question"], rag_engine=rag_engine
+            question=case["question"],
+            rag_engine=rag_engine,
+            expected_lang=expected_lang
         )
 
         # Mettre à jour cas de test
@@ -260,6 +279,13 @@ def main():
         help="Modèle LLM évaluateur (défaut: gpt-4o)",
     )
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default="intelia",
+        choices=["intelia", "weaviate", "weaviate_v2"],
+        help="Dataset: 'intelia' (mixte), 'weaviate' (narratif), 'weaviate_v2' (Health docs réels)",
+    )
+    parser.add_argument(
         "--simulate",
         action="store_true",
         help="Mode simulation (ne pas utiliser vrai RAG)",
@@ -280,6 +306,7 @@ def main():
                 output_path=args.output,
                 llm_model=args.llm,
                 use_real_rag=not args.simulate,
+                dataset_type=args.dataset,
             )
         )
     except KeyboardInterrupt:

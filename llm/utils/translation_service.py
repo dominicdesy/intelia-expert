@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-translation_service.py - Service de traduction universel hybride
-Combine dictionnaire local + Google Translate avec cache intelligent
-Version avec chargement dynamique des dictionnaires par langue
-CORRECTION MAJEURE: Support d'une langue par fichier avec clés canonical communes
+translation_service.py - Universal hybrid translation service
+Combines local dictionary and Google Translate with intelligent caching and dynamic loading
 """
 
 import json
@@ -16,7 +14,7 @@ from pathlib import Path
 from cachetools import TTLCache
 import threading
 
-# Import conditionnel Google Cloud Translate
+# Conditional Google Cloud Translate import
 try:
     from google.cloud import translate_v2 as translate
 
@@ -27,7 +25,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Constantes pour le chargement dynamique
+# Constants for dynamic loading
 FALLBACK_LANGUAGE = "en"
 DICTIONARY_PREFIX = "universal_terms"
 EXCLUSIONS_FILENAME = "technical_exclusions.json"
@@ -35,7 +33,7 @@ EXCLUSIONS_FILENAME = "technical_exclusions.json"
 
 @dataclass
 class TranslationResult:
-    """Résultat d'une traduction avec métadonnées"""
+    """Translation result with metadata"""
 
     text: str
     source: str  # "local", "google", "fallback", "excluded"
@@ -48,7 +46,7 @@ class TranslationResult:
 
 @dataclass
 class CacheStats:
-    """Statistiques du cache de traduction"""
+    """Translation cache statistics"""
 
     hits: int = 0
     misses: int = 0
@@ -62,10 +60,8 @@ class CacheStats:
 
 class UniversalTranslationService:
     """
-    Service de traduction hybride avec dictionnaire local + Google Translate
-    Architecture à 3 niveaux: Cache → Dictionnaire local → Google API
-    Chargement dynamique des dictionnaires par langue
-    NOUVEAU: Support d'une langue par fichier avec clés canonical communes
+    Hybrid translation service with 3-tier architecture: Cache → Local Dictionary → Google API
+    Supports dynamic dictionary loading per language with technical term exclusion
     """
 
     def __init__(
@@ -88,38 +84,37 @@ class UniversalTranslationService:
         self.confidence_threshold = confidence_threshold
         self.enable_technical_exclusion = enable_technical_exclusion
 
-        # NOUVEAU: Charger les exclusions depuis JSON
+        # Load exclusions from JSON
         self.exclusions = self._load_technical_exclusions()
 
-        # Cache 2-niveaux
+        # 2-tier cache
         self._memory_cache = TTLCache(maxsize=cache_size, ttl=cache_ttl)
 
-        # Dictionnaires par langue (chargement dynamique)
+        # Language dictionaries with dynamic loading
         self._language_dictionaries: Dict[str, Dict[str, Any]] = {}
         self._dictionary_lock = threading.Lock()
 
-        # Google Client (lazy loading)
+        # Google Client with lazy loading
         self._google_client = None
         self._google_client_lock = threading.Lock()
 
-        # Stats et monitoring
+        # Stats and monitoring
         self.stats = CacheStats()
         self._stats_lock = threading.Lock()
 
-        # Validation initiale
+        # Initial validation
         self._validate_setup()
 
     def _load_technical_exclusions(self) -> Dict[str, Set[str]]:
         """
-        NOUVELLE MÉTHODE: Charge les exclusions techniques depuis JSON
-        Retourne un dictionnaire avec différentes catégories d'exclusions
+        Load technical exclusions from JSON with fallback to defaults
         """
         exclusions_file = self.dict_path / EXCLUSIONS_FILENAME
 
         if not exclusions_file.exists():
             logger.warning(
-                f"Fichier {EXCLUSIONS_FILENAME} non trouvé: {exclusions_file}, "
-                "utilisation des exclusions par défaut"
+                f"File {EXCLUSIONS_FILENAME} not found: {exclusions_file}, "
+                "using default exclusions"
             )
             return self._get_default_exclusions()
 
@@ -136,25 +131,27 @@ class UniversalTranslationService:
                 }
 
                 logger.info(
-                    f"Exclusions chargées depuis JSON: {len(exclusions['exact'])} termes exacts, "
-                    f"{len(exclusions['partial'])} termes partiels, "
+                    f"Exclusions loaded from JSON: {len(exclusions['exact'])} exact terms, "
+                    f"{len(exclusions['partial'])} partial terms, "
                     f"{len(exclusions['extensions'])} extensions, "
-                    f"{len(exclusions['database'])} termes DB, "
-                    f"{len(exclusions['api'])} termes API"
+                    f"{len(exclusions['database'])} DB terms, "
+                    f"{len(exclusions['api'])} API terms"
                 )
 
                 return exclusions
 
         except Exception as e:
-            logger.error(f"Erreur chargement exclusions depuis JSON: {e}")
+            logger.error(f"Error loading exclusions from JSON: {e}")
             return self._get_default_exclusions()
 
     def _get_default_exclusions(self) -> Dict[str, Set[str]]:
-        """Exclusions minimales par défaut si le fichier JSON est absent"""
-        logger.info("Utilisation des exclusions par défaut (fallback)")
+        """
+        Minimal default exclusions if JSON file is absent
+        """
+        logger.info("Using default exclusions (fallback)")
         return {
             "exact": {
-                # Termes de données/fichiers techniques
+                # Technical data/file terms
                 "weight_curves",
                 "growth_curves",
                 "fcr_curves",
@@ -163,7 +160,7 @@ class UniversalTranslationService:
                 "breeding_data",
                 "nutrition_data",
                 "feed_data",
-                # Identifiants lignées génétiques
+                # Genetic line identifiers
                 "ross308",
                 "ross_308",
                 "cobb500",
@@ -173,7 +170,7 @@ class UniversalTranslationService:
                 "dekalb_white",
                 "novogen_brown",
                 "bovans_white",
-                # Termes techniques avicoles
+                # Poultry technical terms
                 "broiler_performance",
                 "layer_performance",
                 "breeder_performance",
@@ -186,7 +183,7 @@ class UniversalTranslationService:
                 "livability_rate",
                 "uniformity_index",
                 "european_production_index",
-                # Identifiants de métriques
+                # Metric identifiers
                 "epef",
                 "eef",
                 "fcr",
@@ -198,11 +195,11 @@ class UniversalTranslationService:
                 "lr",
                 "ui",
                 "epi",
-                # Noms de fichiers/extensions techniques
+                # Technical file/extension names
                 "broiler_objectives",
                 "layer_standards",
                 "breeder_targets",
-                # Codes et références techniques
+                # Technical codes and references
                 "ap_male",
                 "ap_female",
                 "straight_run",
@@ -213,7 +210,7 @@ class UniversalTranslationService:
                 "selection_line",
             },
             "partial": {
-                # Préfixes techniques
+                # Technical prefixes
                 "ross",
                 "cobb",
                 "hubbard",
@@ -226,7 +223,7 @@ class UniversalTranslationService:
                 "petersons",
                 "grimaud",
                 "group",
-                # Suffixes techniques
+                # Technical suffixes
                 "_data",
                 "_curves",
                 "_performance",
@@ -238,7 +235,7 @@ class UniversalTranslationService:
                 "_rate",
                 "_gain",
                 "_weight",
-                # Codes produits
+                # Product codes
                 "308",
                 "500",
                 "flex",
@@ -269,99 +266,99 @@ class UniversalTranslationService:
 
     def _is_technical_term(self, term: str) -> Tuple[bool, str]:
         """
-        MÉTHODE MODIFIÉE: Vérifie si un terme est technique et ne doit PAS être traduit
-        Utilise les exclusions chargées depuis JSON au lieu des constantes
+        Check if term is technical and should not be translated
         """
         if not self.enable_technical_exclusion:
             return False, ""
 
         term_lower = term.lower().strip()
 
-        # 1. Exclusion exacte
+        # Exact exclusion
         if term_lower in self.exclusions["exact"]:
             return True, f"exact_match: {term_lower}"
 
-        # 2. Exclusion partielle
+        # Partial exclusion
         for partial in self.exclusions["partial"]:
             if partial in term_lower:
                 return True, f"partial_match: {partial}"
 
-        # 3. Extensions de fichiers
+        # File extensions
         if term_lower in self.exclusions["extensions"]:
             return True, "file_extension"
 
-        # 4. Termes de base de données
+        # Database terms
         if term_lower in self.exclusions["database"]:
             return True, "database_term"
 
-        # 5. Termes API
+        # API terms
         if term_lower in self.exclusions["api"]:
             return True, "api_term"
 
-        # 6. Patterns spéciaux avicoles
-
-        # Format "lignée + nombre" (ex: "ross308", "cobb500")
+        # Special poultry patterns (e.g. "ross308", "cobb500")
         if re.match(r"^[a-z]+\d+$", term_lower):
             return True, "genetic_line_pattern"
 
-        # Format "mot_technique" (ex: "feed_conversion", "body_weight")
+        # Technical compound words (e.g. "feed_conversion", "body_weight")
         if "_" in term_lower:
             parts = term_lower.split("_")
             if any(part in self.exclusions["exact"] for part in parts):
                 return True, "technical_compound"
 
-        # Codes courts techniques (2-4 lettres majuscules)
+        # Short technical codes (2-4 capital letters)
         if re.match(r"^[A-Z]{2,4}$", term) and len(term) <= 4:
             return True, "technical_code"
 
         return False, ""
 
     def _validate_setup(self) -> None:
-        """CORRECTION: Valide la configuration initiale avec gestion variable d'environnement"""
+        """
+        Validate initial configuration with environment variable handling
+        """
         if not self.dict_path.exists():
-            logger.warning(f"Répertoire dictionnaires non trouvé: {self.dict_path}")
-            # Créer le répertoire s'il n'existe pas
+            logger.warning(f"Dictionary directory not found: {self.dict_path}")
             self.dict_path.mkdir(parents=True, exist_ok=True)
 
         if self.enable_google_fallback:
             if not GOOGLE_TRANSLATE_AVAILABLE:
                 logger.error(
-                    "Google Translate demandé mais google-cloud-translate non installé"
+                    "Google Translate requested but google-cloud-translate not installed"
                 )
                 self.enable_google_fallback = False
             else:
-                # CORRECTION: Vérifier la clé depuis variables d'environnement
+                # Check API key from environment variables
                 import os
 
                 api_key = self.google_api_key or os.getenv("GOOGLE_TRANSLATE_API_KEY")
 
                 if not api_key:
-                    logger.debug("Google Translate activé mais aucune clé API trouvée")
+                    logger.debug("Google Translate enabled but no API key found")
                     self.enable_google_fallback = False
                 elif api_key.startswith("AIza"):
-                    logger.debug("Clé API Google Translate détectée")
+                    logger.debug("Google Translate API key detected")
                 elif os.path.isfile(api_key):
-                    logger.debug("Fichier service account Google détecté")
+                    logger.debug("Google service account file detected")
                 else:
-                    logger.debug(f"Format de clé API non reconnu: {api_key[:10]}...")
+                    logger.debug(f"Unrecognized API key format: {api_key[:10]}...")
                     self.enable_google_fallback = False
 
         logger.info(
-            f"Service traduction initialisé - Répertoire: {self.dict_path}, Google: {self.enable_google_fallback}, Exclusions techniques: {self.enable_technical_exclusion}"
+            f"Translation service initialized - Directory: {self.dict_path}, Google: {self.enable_google_fallback}, Technical exclusions: {self.enable_technical_exclusion}"
         )
 
     def _load_language_dictionary(self, language: str) -> Dict[str, Any]:
-        """Charge le dictionnaire pour une langue spécifique avec fallback"""
-        # Vérifier si déjà chargé
+        """
+        Load dictionary for specific language with fallback
+        """
+        # Check if already loaded
         if language in self._language_dictionaries:
             return self._language_dictionaries[language]
 
         with self._dictionary_lock:
-            # Double-check après acquisition du verrou
+            # Double-check after lock acquisition
             if language in self._language_dictionaries:
                 return self._language_dictionaries[language]
 
-            # Construire le chemin du fichier
+            # Build file path
             file_path = self.dict_path / f"{DICTIONARY_PREFIX}_{language}.json"
 
             try:
@@ -369,27 +366,26 @@ class UniversalTranslationService:
                     dictionary_data = json.load(f)
                     self._language_dictionaries[language] = dictionary_data
                     logger.info(
-                        f"Dictionnaire {language} chargé: {len(dictionary_data.get('domains', {}))} domaines"
+                        f"Dictionary {language} loaded: {len(dictionary_data.get('domains', {}))} domains"
                     )
                     return dictionary_data
 
             except FileNotFoundError:
-                logger.warning(f"Dictionnaire {language} non trouvé: {file_path}")
+                logger.warning(f"Dictionary {language} not found: {file_path}")
 
-                # Fallback vers langue par défaut si différente
+                # Fallback to default language
                 if language != FALLBACK_LANGUAGE:
-                    logger.info(f"Fallback vers dictionnaire {FALLBACK_LANGUAGE}")
+                    logger.info(f"Fallback to {FALLBACK_LANGUAGE} dictionary")
                     try:
                         fallback_dict = self._load_language_dictionary(
                             FALLBACK_LANGUAGE
                         )
-                        # Mettre en cache pour éviter les re-tentatives
                         self._language_dictionaries[language] = fallback_dict
                         return fallback_dict
                     except Exception as e:
-                        logger.error(f"Erreur fallback vers {FALLBACK_LANGUAGE}: {e}")
+                        logger.error(f"Fallback error to {FALLBACK_LANGUAGE}: {e}")
 
-                # Dictionnaire vide en dernier recours
+                # Empty dictionary as last resort
                 empty_dict = {
                     "domains": {},
                     "metadata": {
@@ -402,8 +398,7 @@ class UniversalTranslationService:
                 return empty_dict
 
             except Exception as e:
-                logger.error(f"Erreur chargement dictionnaire {language}: {e}")
-                # Dictionnaire vide en cas d'erreur
+                logger.error(f"Error loading dictionary {language}: {e}")
                 empty_dict = {
                     "domains": {},
                     "metadata": {
@@ -416,14 +411,14 @@ class UniversalTranslationService:
                 return empty_dict
 
     def _get_language_dictionary(self, language: str) -> Dict[str, Any]:
-        """Récupère le dictionnaire pour une langue (avec chargement lazy)"""
+        """Retrieves dictionary for a language (with lazy loading)"""
         if language not in self._language_dictionaries:
             return self._load_language_dictionary(language)
         return self._language_dictionaries[language]
 
     @property
     def google_client(self):
-        """CORRECTION: Google Client avec nouvelle API compatible"""
+        """CORRECTION: Google Client with new compatible API"""
         if not self.enable_google_fallback:
             return None
 
@@ -433,18 +428,18 @@ class UniversalTranslationService:
                     try:
                         import os
 
-                        # CORRECTION: Récupérer la clé depuis les variables d'environnement
+                        # CORRECTION: Retrieve key from environment variables
                         api_key = self.google_api_key or os.getenv(
                             "GOOGLE_TRANSLATE_API_KEY"
                         )
 
                         if api_key and api_key.startswith("AIza"):
-                            # CORRECTION CRITIQUE: Nouvelle méthode compatible
+                            # CRITICAL CORRECTION: New compatible method
                             logger.debug(
-                                "Configuration Google Translate avec clé API directe"
+                                "Configuring Google Translate with direct API key"
                             )
 
-                            # Utilisation de l'API REST directe pour éviter les problèmes de version
+                            # Using direct REST API to avoid version issues
                             import requests
 
                             class SimpleGoogleTranslateClient:
@@ -458,7 +453,7 @@ class UniversalTranslationService:
                                     target_language="en",
                                     source_language=None,
                                 ):
-                                    """Traduction via API REST Google"""
+                                    """Translation via Google REST API"""
                                     params = {
                                         "q": text,
                                         "target": target_language,
@@ -492,7 +487,7 @@ class UniversalTranslationService:
                                             }
                                     except Exception as e:
                                         logger.warning(
-                                            f"Erreur API Google Translate: {e}"
+                                            f"Google Translate API error: {e}"
                                         )
                                         return None
 
@@ -504,9 +499,9 @@ class UniversalTranslationService:
                             )
 
                         elif api_key and os.path.isfile(api_key):
-                            # Fichier de service account JSON (méthode standard)
+                            # JSON service account file (standard method)
                             logger.debug(
-                                "Configuration Google Translate avec service account"
+                                "Configuring Google Translate with service account"
                             )
                             try:
                                 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = api_key
@@ -515,12 +510,12 @@ class UniversalTranslationService:
                                     "Google Translate client initialisé avec service account"
                                 )
                             except Exception as e:
-                                logger.debug(f"Erreur service account: {e}")
+                                logger.debug(f"Service account error: {e}")
                                 self.enable_google_fallback = False
                                 return None
 
                         else:
-                            # Pas de clé valide trouvée
+                            # No valid key found
                             if api_key:
                                 logger.debug(
                                     f"Format de clé API non reconnu: {api_key[:10]}..."
@@ -534,7 +529,7 @@ class UniversalTranslationService:
                             return None
 
                     except Exception as e:
-                        logger.debug(f"Erreur initialisation Google Translate: {e}")
+                        logger.debug(f"Google Translate initialization error: {e}")
                         logger.info(
                             "Google Translate non disponible - fonctionnement en mode local"
                         )
@@ -543,7 +538,7 @@ class UniversalTranslationService:
         return self._google_client
 
     def _update_stats(self, source: str, cached: bool = False) -> None:
-        """Met à jour les statistiques thread-safe"""
+        """Updates statistics thread-safe"""
         with self._stats_lock:
             if cached:
                 self.stats.hits += 1
@@ -566,7 +561,7 @@ class UniversalTranslationService:
             )
 
     def _get_from_cache(self, key: str) -> Optional[TranslationResult]:
-        """Récupère depuis le cache mémoire"""
+        """Retrieves from memory cache"""
         if key in self._memory_cache:
             result = self._memory_cache[key]
             result.cached = True
@@ -575,7 +570,7 @@ class UniversalTranslationService:
         return None
 
     def _cache_result(self, key: str, result: TranslationResult) -> None:
-        """Met en cache un résultat"""
+        """Caches a result"""
         self._memory_cache[key] = result
 
     def _search_local_dictionary(
@@ -586,27 +581,27 @@ class UniversalTranslationService:
         domain: Optional[str] = None,
     ) -> Optional[TranslationResult]:
         """
-        MÉTHODE REÉCRITE: Recherche avec une langue par fichier via clés canonical communes
+        REWRITTEN METHOD: Search with one language per file via common canonical keys
 
-        Logique:
-        1. Charger le dictionnaire de la langue source (ou toutes si non spécifiée)
-        2. Trouver le terme dans canonical ou variants
-        3. Récupérer la clé canonical commune
-        4. Charger le dictionnaire de la langue cible
-        5. Trouver le même canonical dans la langue cible
-        6. Retourner le canonical ou premier variant de la langue cible
+        Logic:
+        1. Load source language dictionary (or all if not specified)
+        2. Find term in canonical or variants
+        3. Retrieve common canonical key
+        4. Load target language dictionary
+        5. Find same canonical in target language
+        6. Return canonical or first variant of target language
         """
         start_time = time.time()
         term_lower = term.lower().strip()
 
-        # Déterminer les langues à examiner pour la recherche
+        # Determine languages to examine for search
         search_languages = []
         if source_lang and source_lang != "auto":
             search_languages.append(source_lang)
         else:
             search_languages.extend(self.supported_languages)
 
-        # Étape 1: Trouver le canonical dans la langue source
+        # Step 1: Find canonical in source language
         found_canonical = None
         found_domain = None
         found_confidence = 0.9
@@ -615,7 +610,7 @@ class UniversalTranslationService:
             source_dict = self._get_language_dictionary(search_lang)
             domains_data = source_dict.get("domains", {})
 
-            # Recherche par domaine si spécifié
+            # Search by domain if specified
             domains_to_search = [domain] if domain else domains_data.keys()
 
             for domain_key in domains_to_search:
@@ -624,12 +619,12 @@ class UniversalTranslationService:
 
                 domain_data = domains_data[domain_key]
 
-                # Parcourir tous les termes du domaine
+                # Iterate through all domain terms
                 for canonical_key, term_data in domain_data.items():
                     if not isinstance(term_data, dict):
                         continue
 
-                    # Vérifier le canonical lui-même
+                    # Check canonical itself
                     canonical = term_data.get("canonical", canonical_key)
                     if canonical.lower() == term_lower:
                         found_canonical = canonical_key
@@ -637,7 +632,7 @@ class UniversalTranslationService:
                         found_confidence = term_data.get("confidence", 0.9)
                         break
 
-                    # Vérifier dans les variants
+                    # Check in variants
                     variants = term_data.get("variants", [])
                     if isinstance(variants, list):
                         for variant in variants:
@@ -653,15 +648,15 @@ class UniversalTranslationService:
             if found_canonical:
                 break
 
-        # Si terme non trouvé dans les dictionnaires source
+        # If term not found in source dictionaries
         if not found_canonical:
             return None
 
-        # Étape 2: Charger le dictionnaire de la langue cible
+        # Step 2: Load target language dictionary
         target_dict = self._get_language_dictionary(target_lang)
         target_domains = target_dict.get("domains", {})
 
-        # Étape 3: Trouver le même canonical dans la langue cible
+        # Step 3: Find same canonical in target language
         if found_domain not in target_domains:
             logger.debug(
                 f"Domaine {found_domain} non trouvé dans langue cible {target_lang}"
@@ -678,11 +673,11 @@ class UniversalTranslationService:
 
         target_term_data = target_domain_data[found_canonical]
 
-        # Étape 4: Récupérer la traduction (canonical ou premier variant)
+        # Step 4: Retrieve translation (canonical or first variant)
         target_canonical = target_term_data.get("canonical", found_canonical)
         target_variants = target_term_data.get("variants", [])
 
-        # Choisir le meilleur terme à retourner
+        # Choose best term to return
         if (
             target_variants
             and isinstance(target_variants, list)
@@ -705,14 +700,14 @@ class UniversalTranslationService:
     def _translate_with_google(
         self, term: str, target_lang: str, source_lang: str = "auto"
     ) -> Optional[TranslationResult]:
-        """Traduction via Google Translate avec gestion d'erreurs"""
+        """Translation via Google Translate with error handling"""
         if not self.google_client:
             return None
 
         start_time = time.time()
 
         try:
-            # Normalisation codes langues Google
+            # Normalize Google language codes
             google_target = self._normalize_google_lang_code(target_lang)
             google_source = (
                 self._normalize_google_lang_code(source_lang)
@@ -720,7 +715,7 @@ class UniversalTranslationService:
                 else "auto"
             )
 
-            # Appel API Google
+            # Google API call
             result = self.google_client.translate(
                 term,
                 target_language=google_target,
@@ -732,17 +727,17 @@ class UniversalTranslationService:
 
             processing_time = int((time.time() - start_time) * 1000)
 
-            # Extraction résultat
+            # Extract result
             translated_text = result.get("translatedText", term)
 
-            # Score de confiance basique (Google ne fournit pas de score explicite)
-            confidence = 0.8  # Confiance par défaut Google
+            # Basic confidence score (Google doesn't provide explicit score)
+            confidence = 0.8  # Google default confidence
 
-            # Ajustements heuristiques
+            # Heuristic adjustments
             if translated_text.lower() == term.lower():
-                confidence = 0.6  # Pas de changement = moins fiable
+                confidence = 0.6  # No change = less reliable
             elif len(translated_text) < 2:
-                confidence = 0.5  # Résultat trop court
+                confidence = 0.5  # Result too short
 
             self._update_stats("google")
 
@@ -755,17 +750,18 @@ class UniversalTranslationService:
             )
 
         except Exception as e:
-            logger.warning(f"Erreur Google Translate {term} -> {target_lang}: {e}")
+            logger.warning(f"Google Translate error {term} -> {target_lang}: {e}")
             return None
 
     def _normalize_google_lang_code(self, lang_code: str) -> str:
-        """Normalise les codes langue pour Google Translate"""
-        # Mappings spéciaux
+        """
+        Normalize language codes for Google Translate
+        """
         google_mappings = {
-            "zh": "zh-cn",  # Chinois simplifié par défaut
-            "hi": "hi",  # Hindi
-            "th": "th",  # Thaï
-            "id": "id",  # Indonésien
+            "zh": "zh-cn",
+            "hi": "hi",
+            "th": "th",
+            "id": "id",
         }
 
         return google_mappings.get(lang_code, lang_code)
@@ -778,51 +774,51 @@ class UniversalTranslationService:
         domain: Optional[str] = None,
     ) -> TranslationResult:
         """
-        Traduit un terme avec logique de fallback intelligente et exclusion technique
-        1. Vérification exclusion technique (NOUVEAU)
-        2. Cache mémoire
-        3. Dictionnaire local (chargement dynamique par langue)
-        4. Google Translate (si activé)
-        5. Fallback (terme original)
+        Translate term with intelligent fallback:
+        1. Technical exclusion check
+        2. Memory cache
+        3. Local dictionary
+        4. Google Translate (if enabled)
+        5. Fallback (original term)
         """
 
-        # Validation entrée
+        # Validate input
         if not term or not term.strip():
             return TranslationResult(
                 text="", source="fallback", confidence=0.0, language=target_language
             )
 
-        # CORRECTION CRITIQUE: Vérifier exclusion technique EN PREMIER
+        # Check technical exclusion first
         is_technical, exclusion_reason = self._is_technical_term(term)
         if is_technical:
             self._update_stats("excluded")
             logger.debug(
-                f"Terme technique exclu de la traduction: '{term}' (raison: {exclusion_reason})"
+                f"Technical term excluded from translation: '{term}' (reason: {exclusion_reason})"
             )
 
             return TranslationResult(
-                text=term,  # Retourner le terme original non traduit
+                text=term,
                 source="excluded",
-                confidence=1.0,  # Confiance maximale pour exclusion
-                language=source_language or "en",  # Garder langue source
+                confidence=1.0,
+                language=source_language or "en",
                 exclusion_reason=exclusion_reason,
             )
 
         if target_language not in self.supported_languages:
-            logger.warning(f"Langue non supportée: {target_language}")
+            logger.warning(f"Unsupported language: {target_language}")
             return TranslationResult(
                 text=term, source="fallback", confidence=0.0, language=target_language
             )
 
-        # Clé de cache
+        # Generate cache key
         cache_key = f"{term.lower()}:{target_language}:{source_language or 'auto'}:{domain or 'general'}"
 
-        # 2. Vérification cache
+        # Check cache
         cached_result = self._get_from_cache(cache_key)
         if cached_result:
             return cached_result
 
-        # 3. Recherche dictionnaire local (avec chargement dynamique)
+        # Search local dictionary
         local_result = self._search_local_dictionary(
             term, target_language, source_language, domain
         )
@@ -831,7 +827,7 @@ class UniversalTranslationService:
             self._update_stats("local")
             return local_result
 
-        # 4. Google Translate fallback
+        # Google Translate fallback
         if self.enable_google_fallback:
             google_result = self._translate_with_google(
                 term, target_language, source_language
@@ -840,12 +836,12 @@ class UniversalTranslationService:
                 self._cache_result(cache_key, google_result)
                 return google_result
 
-        # 5. Fallback - terme original avec score minimal
+        # Final fallback with original term
         fallback_result = TranslationResult(
             text=term, source="fallback", confidence=0.3, language=target_language
         )
 
-        # Cache même les fallbacks pour éviter les re-tentatives
+        # Cache fallbacks to avoid retries
         self._cache_result(cache_key, fallback_result)
         self._update_stats("fallback")
 
@@ -858,13 +854,14 @@ class UniversalTranslationService:
         source_language: Optional[str] = None,
         domain: Optional[str] = None,
     ) -> List[TranslationResult]:
-        """Traduction batch avec optimisations"""
+        """
+        Batch translation with sequential processing
+        """
         if not terms:
             return []
 
         results = []
 
-        # Traduction séquentielle (optimisations possibles: async batch)
         for term in terms:
             result = self.translate_term(term, target_language, source_language, domain)
             results.append(result)
@@ -873,19 +870,20 @@ class UniversalTranslationService:
 
     def reload_exclusions(self) -> bool:
         """
-        NOUVELLE MÉTHODE: Recharge les exclusions depuis le fichier JSON
-        Utile après modification du fichier technical_exclusions.json
+        Reload exclusions from JSON file
         """
         try:
             self.exclusions = self._load_technical_exclusions()
-            logger.info("Exclusions techniques rechargées avec succès depuis JSON")
+            logger.info("Technical exclusions reloaded successfully from JSON")
             return True
         except Exception as e:
-            logger.error(f"Erreur rechargement exclusions: {e}")
+            logger.error(f"Error reloading exclusions: {e}")
             return False
 
     def get_domain_terms(self, domain: str, language: str) -> List[str]:
-        """Récupère tous les termes d'un domaine pour une langue"""
+        """
+        Retrieve all terms from domain for language
+        """
         lang_dict = self._get_language_dictionary(language)
         domain_data = lang_dict.get("domains", {}).get(domain, {})
         terms = []
@@ -898,15 +896,17 @@ class UniversalTranslationService:
                 if isinstance(variants, list):
                     terms.extend(variants)
 
-        return list(set(terms))  # Déduplication
+        return list(set(terms))
 
     def get_available_domains(self, language: Optional[str] = None) -> List[str]:
-        """Retourne la liste des domaines disponibles pour une langue"""
+        """
+        Return list of available domains for language
+        """
         if language:
             lang_dict = self._get_language_dictionary(language)
             return list(lang_dict.get("domains", {}).keys())
         else:
-            # Agréger les domaines de toutes les langues chargées
+            # Aggregate domains from all loaded languages
             all_domains = set()
             for lang in self.supported_languages:
                 if lang in self._language_dictionaries:
@@ -915,29 +915,35 @@ class UniversalTranslationService:
             return list(all_domains)
 
     def get_loaded_languages(self) -> List[str]:
-        """Retourne la liste des langues dont le dictionnaire est chargé"""
+        """
+        Return list of languages with loaded dictionaries
+        """
         return list(self._language_dictionaries.keys())
 
     def preload_languages(self, languages: List[str]) -> Dict[str, bool]:
-        """Précharge les dictionnaires pour plusieurs langues"""
+        """
+        Preload dictionaries for multiple languages
+        """
         results = {}
         for lang in languages:
             if lang in self.supported_languages:
                 try:
                     self._load_language_dictionary(lang)
                     results[lang] = True
-                    logger.info(f"Dictionnaire {lang} préchargé")
+                    logger.info(f"Dictionary {lang} preloaded")
                 except Exception as e:
-                    logger.error(f"Erreur préchargement {lang}: {e}")
+                    logger.error(f"Preload error {lang}: {e}")
                     results[lang] = False
             else:
                 results[lang] = False
-                logger.warning(f"Langue non supportée pour préchargement: {lang}")
+                logger.warning(f"Unsupported language for preload: {lang}")
 
         return results
 
     def get_cache_stats(self) -> CacheStats:
-        """Retourne les statistiques du cache avec exclusions techniques"""
+        """
+        Return cache statistics with technical exclusions
+        """
         with self._stats_lock:
             return CacheStats(
                 hits=self.stats.hits,
@@ -951,7 +957,9 @@ class UniversalTranslationService:
             )
 
     def get_exclusion_stats(self) -> Dict[str, Any]:
-        """NOUVEAU: Statistiques détaillées des exclusions techniques"""
+        """
+        Detailed statistics of technical exclusions
+        """
         with self._stats_lock:
             total_processed = (
                 self.stats.hits
@@ -977,36 +985,42 @@ class UniversalTranslationService:
             }
 
     def clear_cache(self) -> None:
-        """Vide le cache mémoire"""
+        """
+        Clear memory cache
+        """
         self._memory_cache.clear()
-        logger.info("Cache traduction vidé")
+        logger.info("Translation cache cleared")
 
     def reload_language_dictionary(self, language: str) -> bool:
-        """Recharge le dictionnaire d'une langue spécifique"""
+        """
+        Reload dictionary for specific language
+        """
         try:
             with self._dictionary_lock:
-                # Supprimer l'ancien dictionnaire du cache
+                # Remove old dictionary from cache
                 if language in self._language_dictionaries:
                     del self._language_dictionaries[language]
 
-                # Recharger
+                # Reload
                 self._load_language_dictionary(language)
 
-                # Vider le cache mémoire pour cette langue
+                # Clear memory cache for this language
                 keys_to_remove = [
                     k for k in self._memory_cache.keys() if f":{language}:" in k
                 ]
                 for key in keys_to_remove:
                     del self._memory_cache[key]
 
-                logger.info(f"Dictionnaire {language} rechargé")
+                logger.info(f"Dictionary {language} reloaded")
                 return True
         except Exception as e:
-            logger.error(f"Erreur rechargement dictionnaire {language}: {e}")
+            logger.error(f"Error reloading dictionary {language}: {e}")
             return False
 
     def reload_all_dictionaries(self) -> Dict[str, bool]:
-        """Recharge tous les dictionnaires chargés"""
+        """
+        Reload all loaded dictionaries
+        """
         loaded_languages = list(self._language_dictionaries.keys())
         results = {}
 
@@ -1023,12 +1037,14 @@ class UniversalTranslationService:
         language: str,
         confidence: float = 0.9,
     ) -> bool:
-        """Ajoute un terme validé au dictionnaire d'une langue spécifique"""
+        """
+        Add validated term to dictionary for specific language
+        """
         try:
-            # Charger le dictionnaire de la langue si nécessaire
+            # Load language dictionary
             lang_dict = self._get_language_dictionary(language)
 
-            # Mise à jour du dictionnaire en mémoire
+            # Update in-memory dictionary
             if "domains" not in lang_dict:
                 lang_dict["domains"] = {}
 
@@ -1045,26 +1061,25 @@ class UniversalTranslationService:
             }
 
             logger.info(
-                f"Terme ajouté: {term} dans domaine {domain} (langue: {language})"
+                f"Term added: {term} in domain {domain} (language: {language})"
             )
             return True
 
         except Exception as e:
-            logger.error(f"Erreur ajout terme {term} (langue: {language}): {e}")
+            logger.error(f"Error adding term {term} (language: {language}): {e}")
             return False
 
     def is_healthy(self) -> bool:
-        """Vérifie l'état de santé du service"""
+        """
+        Check service health status
+        """
         try:
-            # Test répertoire dictionnaires
             dict_path_ok = self.dict_path.exists()
 
-            # Test Google si activé
             google_ok = True
             if self.enable_google_fallback:
                 google_ok = self.google_client is not None
 
-            # Test chargement au moins une langue
             at_least_one_dict = len(self._language_dictionaries) > 0
 
             return dict_path_ok and google_ok and at_least_one_dict
@@ -1073,7 +1088,7 @@ class UniversalTranslationService:
             return False
 
 
-# ===== FACTORY FUNCTION =====
+# Factory function
 def create_translation_service(
     dict_path: str,
     supported_languages: Set[str],
@@ -1084,7 +1099,9 @@ def create_translation_service(
     confidence_threshold: float = 0.7,
     enable_technical_exclusion: bool = True,
 ) -> UniversalTranslationService:
-    """Factory pour créer le service de traduction avec exclusion technique"""
+    """
+    Factory to create translation service with technical exclusion
+    """
     return UniversalTranslationService(
         dict_path=dict_path,
         supported_languages=supported_languages,
@@ -1097,18 +1114,22 @@ def create_translation_service(
     )
 
 
-# ===== INSTANCE GLOBALE (SINGLETON PATTERN) =====
+# Global instance (singleton pattern)
 _global_translation_service: Optional[UniversalTranslationService] = None
 _service_lock = threading.Lock()
 
 
 def get_translation_service() -> Optional[UniversalTranslationService]:
-    """Récupère l'instance globale du service de traduction"""
+    """
+    Retrieve global translation service instance
+    """
     return _global_translation_service
 
 
 def init_global_translation_service(**kwargs) -> UniversalTranslationService:
-    """Initialise le service global de traduction avec exclusion technique"""
+    """
+    Initialize global translation service with technical exclusion
+    """
     global _global_translation_service
 
     with _service_lock:
@@ -1118,9 +1139,11 @@ def init_global_translation_service(**kwargs) -> UniversalTranslationService:
         return _global_translation_service
 
 
-# CORRECTION CRITIQUE: Fonction utilitaire pour éviter la traduction des termes techniques
+# Utility function to check if term should be translated
 def should_translate_term(term: str) -> bool:
-    """Vérifie rapidement si un terme doit être traduit ou préservé"""
+    """
+    Check if term should be translated or preserved as technical term
+    """
 
     temp_service = UniversalTranslationService(
         dict_path="", supported_languages={"fr", "en"}, enable_technical_exclusion=True

@@ -3,7 +3,26 @@
     "allow": [
       "Bash(Question: \"{query}\")",
       "Bash(ssh root@intelia.com \"docker logs llm --tail 200 2>&1 | grep -E ''(LLM|OOD|Composants de base|Error|Exception)''\")",
-      "Bash(curl -X GET \"https://api.digitalocean.com/v2/apps/3aa3bd51-6e68-4e5a-9bed-05ffdc1c6b9f/deployments\" -H \"Authorization: Bearer $DIGITALOCEAN_TOKEN\" -s)"
+      "Bash(curl -X GET \"https://api.digitalocean.com/v2/apps/3aa3bd51-6e68-4e5a-9bed-05ffdc1c6b9f/deployments\" -H \"Authorization: Bearer $DIGITALOCEAN_TOKEN\" -s)",
+      "Bash(xargs ls:*)",
+      "Bash(python:*)",
+      "Bash(pip show:*)",
+      "Bash(cat:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Optimize RAG Faithfulness from 36% to 72% (+97%)\n\nMAJOR ACHIEVEMENT: Faithfulness 71.57% (target 70-80% achieved!)\n\nKEY OPTIMIZATIONS:\n1. Verbatim Extraction Framework (Priority 1)\n   - Added 4-rule framework to hierarchical prompts\n   - CITE context VERBATIM for technical terms\n   - DO NOT add disclaimers/comparisons/general knowledge\n   - Answer ONLY what is asked\n\n2. Disabled Automatic Disclaimers\n   - Removed veterinary disclaimers (lines 1042-1049)\n   - Trade-off: Faithfulness gain vs legal safety\n   - Reduced response dilution by 20-30%\n\n3. Cohere Re-Ranker Independence (from previous work)\n   - Moved outside Intelligent RRF block\n   - 100% utilization on all queries\n   - +8.99 points Faithfulness contribution\n\n4. TOP_K Optimization\n   - Increased from 120 to 135 (sweet spot)\n   - Tested 150 (caused timeouts)\n   - +1.93 points Faithfulness\n\nRAGAS METRICS (20251009_215708):\n- Overall Score:      85.82% (Très Bon: 80-90%)\n- Faithfulness:       71.57% (+35.25 from 36.32% baseline)\n- Context Precision:  90.00%\n- Context Recall:     85.00%\n- Answer Relevancy:   96.71%\n- Duration:           136.1s\n\nTEMPERATURE TESTING:\n- Tested 0.05 → caused RAGAS timeouts\n- Reverted to 0.1 → optimal balance\n\nFILES CHANGED:\n- generation/generators.py: Verbatim prompts + disabled disclaimers\n- retrieval/weaviate/core.py: Independent re-ranker\n- config/config.py: TOP_K=135\n- scripts/detailed_faithfulness_report.txt: Analysis document\n\nMETHODOLOGY:\n- Deep analysis of 10 test cases\n- Identified 4 error patterns (disclaimers, reformulation, etc.)\n- Data-driven prioritization of fixes\n- Systematic testing and validation\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(pip install:*)",
+      "Bash(ruff check:*)",
+      "Bash(tee:*)",
+      "Bash(black:*)",
+      "Bash(pyright:*)",
+      "Bash(bandit:*)",
+      "Bash(pip-audit:*)",
+      "Bash(pip uninstall:*)",
+      "Bash(for file in retrieval/enhanced_rrf_fusion.py retrieval/weaviate/core.py utils/llm_translator.py security/guardrails/cache.py)",
+      "Bash(do )",
+      "Bash(echo:*)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

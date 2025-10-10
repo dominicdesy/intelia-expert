@@ -24,10 +24,9 @@ import ast
 import json
 import time
 import hashlib
-import subprocess
 from pathlib import Path
 from collections import defaultdict, Counter
-from typing import Dict, List, Set, Tuple, Any
+from typing import List
 from datetime import datetime
 import re
 
@@ -561,7 +560,7 @@ class DeepCodeAnalyzer:
         print(f"💯 Health score: {summary['health_score']:.1f}/100")
         print(f"!  Total issues found: {summary['total_issues_found']}")
 
-        print(f"\n🎯 TOP PRIORITIES:")
+        print("\n🎯 TOP PRIORITIES:")
         for priority in summary['top_priorities']:
             print(f"  [{priority['priority']}] {priority['category']}: {priority['action']}")
             print(f"         Impact: {priority['impact']}")

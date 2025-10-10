@@ -181,8 +181,16 @@ class ResponseGenerator:
             ]
 
             # Generate response via Multi-LLM Router
+            # max_tokens=None → use adaptive calculation based on query complexity
             generated_response = await self.llm_router.generate(
-                provider=provider, messages=messages, temperature=0.1, max_tokens=900
+                provider=provider,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=None,  # Let adaptive length calculate optimal value
+                query=query,
+                entities=intent_result.get("entities") if intent_result else None,
+                query_type=intent_result.get("query_type") if intent_result else None,
+                context_docs=context_dicts,
             )
 
             # Post-process response

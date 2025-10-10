@@ -6,12 +6,11 @@ Runs autonomously without user interaction
 """
 
 import os
-import sys
 import ast
 import json
 import hashlib
 from pathlib import Path
-from collections import defaultdict, Counter
+from collections import defaultdict
 from datetime import datetime
 
 def log(message):

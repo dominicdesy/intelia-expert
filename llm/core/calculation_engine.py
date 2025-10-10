@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-calculation_engine.py - Moteur de calculs et projections sur les métriques
-Gère les calculs complexes, projections et planification de troupeaux
+calculation_engine.py - Calculation and projection engine for metrics
+Handles complex calculations, projections and flock planning
 """
 
 import logging
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CalculationResult:
-    """Résultat d'un calcul"""
+    """Calculation result"""
 
     value: float
     unit: str
@@ -23,12 +23,12 @@ class CalculationResult:
 
 
 class CalculationEngine:
-    """Moteur de calculs avancés sur les métriques avicoles"""
+    """Advanced calculation engine for poultry metrics"""
 
     def __init__(self, db_pool):
         """
         Args:
-            db_pool: Pool de connexions PostgreSQL (asyncpg)
+            db_pool: PostgreSQL connection pool (asyncpg)
         """
         self.db_pool = db_pool
 
@@ -36,29 +36,29 @@ class CalculationEngine:
         self, breed: str, sex: str, age_start: int, age_end: int
     ) -> CalculationResult:
         """
-        Projette le poids futur basé sur le taux de croissance moyen
+        Projects future weight based on average growth rate
 
         Args:
-            breed: Nom de la souche (ex: "308/308 FF", "500")
-            sex: Sexe ("male", "female", "as_hatched")
-            age_start: Âge de départ (jours)
-            age_end: Âge cible (jours)
+            breed: Strain name (e.g. "308/308 FF", "500")
+            sex: Sex ("male", "female", "as_hatched")
+            age_start: Starting age (days)
+            age_end: Target age (days)
 
         Returns:
-            CalculationResult avec poids projeté
+            CalculationResult with projected weight
         """
         try:
             async with self.db_pool.acquire() as conn:
-                # Récupérer poids et gains entre age_start et age_end
+                # Get weights and gains between age_start and age_end
                 query = """
-                SELECT 
+                SELECT
                     m.age_min,
                     m.value_numeric as weight,
                     m2.value_numeric as daily_gain
                 FROM metrics m
                 JOIN documents d ON m.document_id = d.id
                 JOIN strains s ON d.strain_id = s.id
-                LEFT JOIN metrics m2 ON m2.document_id = m.document_id 
+                LEFT JOIN metrics m2 ON m2.document_id = m.document_id
                     AND m2.age_min = m.age_min
                     AND m2.metric_name LIKE 'daily_gain for %'
                 WHERE s.strain_name = $1
@@ -76,11 +76,11 @@ class CalculationEngine:
                         value=0,
                         unit="g",
                         calculation_type="projection_weight",
-                        details={"error": "Aucune données trouvées"},
+                        details={"error": "No data found"},
                         confidence=0.0,
                     )
 
-                # Calculer taux de croissance moyen
+                # Calculate average growth rate
                 total_gain = sum(row["daily_gain"] for row in rows if row["daily_gain"])
                 days_with_data = len([r for r in rows if r["daily_gain"]])
 
@@ -89,10 +89,10 @@ class CalculationEngine:
                 else:
                     avg_growth_rate = total_gain / days_with_data
 
-                # Poids au départ
+                # Starting weight
                 weight_start = rows[0]["weight"]
 
-                # Projection linéaire
+                # Linear projection
                 days_to_project = age_end - age_start
                 projected_weight = weight_start + (avg_growth_rate * days_to_project)
 
@@ -111,7 +111,7 @@ class CalculationEngine:
                 )
 
         except Exception as e:
-            logger.error(f"Erreur projection poids: {e}")
+            logger.error(f"Weight projection error: {e}")
             return CalculationResult(
                 value=0,
                 unit="g",
@@ -124,33 +124,33 @@ class CalculationEngine:
         self, breed: str, sex: str, age_start: int, age_end: int, target_weight: float = None
     ) -> CalculationResult:
         """
-        Calcule la consommation totale d'aliment entre deux âges
+        Calculates total feed consumption between two ages
 
-        Méthode: Additionner les daily_intake jour par jour
+        Method: Sum daily_intake day by day
 
-        Note: Pour chaque âge, il y a 2 valeurs feed_intake:
-        - MIN = daily intake (consommation quotidienne, ex: 93g)
-        - MAX = cumulative intake (consommation cumulée, ex: 878g)
-        On utilise MIN (daily) et on additionne.
+        Note: For each age, there are 2 feed_intake values:
+        - MIN = daily intake (e.g. 93g)
+        - MAX = cumulative intake (e.g. 878g)
+        We use MIN (daily) and sum them.
 
-        Interpolation: Si target_weight est fourni et atteint pendant le dernier jour,
-        la consommation du dernier jour est ajustée proportionnellement.
+        Interpolation: If target_weight is provided and reached during the last day,
+        the last day's consumption is adjusted proportionally.
 
         Args:
-            breed: Nom de la souche
-            sex: Sexe
-            age_start: Âge de départ (jours)
-            age_end: Âge final (jours)
-            target_weight: Poids cible en grammes (optionnel, pour interpolation)
+            breed: Strain name
+            sex: Sex
+            age_start: Starting age (days)
+            age_end: Final age (days)
+            target_weight: Target weight in grams (optional, for interpolation)
 
         Returns:
-            CalculationResult avec consommation totale
+            CalculationResult with total consumption
         """
         try:
             async with self.db_pool.acquire() as conn:
-                # Récupérer tous les daily_intake entre age_start et age_end
-                # MIN(value_numeric) = daily intake (la plus petite des 2 valeurs par jour)
-                # Filtre >= 10 pour exclure valeurs impériales
+                # Get all daily_intake between age_start and age_end
+                # MIN(value_numeric) = daily intake (the smaller of 2 values per day)
+                # Filter >= 10 to exclude imperial values
                 query = """
                 SELECT
                     m.age_min,
@@ -172,13 +172,13 @@ class CalculationEngine:
                 rows = await conn.fetch(query, breed, sex, age_start, age_end)
 
                 if not rows or len(rows) == 0:
-                    logger.warning(f"❌ Aucune donnée daily_intake trouvée entre jour {age_start} et {age_end}")
+                    logger.warning(f"❌ No daily_intake data found between day {age_start} and {age_end}")
                     return CalculationResult(
                         value=0,
                         unit="g",
                         calculation_type="total_feed",
                         details={
-                            "error": "Aucune donnée disponible",
+                            "error": "No data available",
                             "breed": breed,
                             "sex": sex,
                             "age_start": age_start,
@@ -190,12 +190,12 @@ class CalculationEngine:
                 actual_age_start = rows[0]["age_min"]
                 actual_age_end = rows[-1]["age_min"]
 
-                # Interpolation proportionnelle si target_weight fourni
+                # Proportional interpolation if target_weight provided
                 interpolation_applied = False
                 interpolation_ratio = 1.0
 
                 if target_weight and len(rows) >= 2:
-                    # Récupérer poids du jour précédent et du dernier jour
+                    # Get weight from previous day and last day
                     query_weights = """
                     SELECT
                         m.age_min,
@@ -220,36 +220,36 @@ class CalculationEngine:
                         weight_previous = weight_rows[0]["body_weight"]
                         weight_final = weight_rows[1]["body_weight"]
 
-                        # Si target_weight est entre les deux poids, interpoler
+                        # If target_weight is between the two weights, interpolate
                         if weight_previous < target_weight <= weight_final:
                             interpolation_ratio = (target_weight - weight_previous) / (weight_final - weight_previous)
                             interpolation_applied = True
 
                             logger.info(
-                                f"🎯 Interpolation: target {target_weight}g entre jour {actual_age_end-1} "
-                                f"({weight_previous}g) et jour {actual_age_end} ({weight_final}g) "
+                                f"🎯 Interpolation: target {target_weight}g between day {actual_age_end-1} "
+                                f"({weight_previous}g) and day {actual_age_end} ({weight_final}g) "
                                 f"→ ratio={interpolation_ratio:.2%}"
                             )
 
-                # Calculer total avec interpolation du dernier jour si applicable
+                # Calculate total with last day interpolation if applicable
                 if interpolation_applied:
-                    # Sommer tous les jours sauf le dernier (convert Decimal to float)
+                    # Sum all days except last (convert Decimal to float)
                     total_feed_full_days = sum(float(row["daily_intake"]) for row in rows[:-1])
-                    # Ajouter fraction du dernier jour (convert Decimal to float)
+                    # Add fraction of last day (convert Decimal to float)
                     last_day_intake = float(rows[-1]["daily_intake"])
                     last_day_adjusted = last_day_intake * interpolation_ratio
                     total_feed = total_feed_full_days + last_day_adjusted
 
                     logger.info(
-                        f"📊 Feed total: {len(rows)-1} jours complets ({total_feed_full_days}g) + "
-                        f"{interpolation_ratio:.1%} du jour {actual_age_end} ({last_day_adjusted:.1f}g) "
+                        f"📊 Total feed: {len(rows)-1} full days ({total_feed_full_days}g) + "
+                        f"{interpolation_ratio:.1%} of day {actual_age_end} ({last_day_adjusted:.1f}g) "
                         f"= {total_feed:.1f}g"
                     )
                 else:
-                    # Pas d'interpolation, sommer normalement (convert Decimal to float)
+                    # No interpolation, sum normally (convert Decimal to float)
                     total_feed = sum(float(row["daily_intake"]) for row in rows)
                     logger.info(
-                        f"📊 Feed calculation: {len(rows)} jours complets de {actual_age_start}→{actual_age_end}, "
+                        f"📊 Feed calculation: {len(rows)} full days from {actual_age_start}→{actual_age_end}, "
                         f"total={total_feed}g ({round(total_feed/1000, 2)}kg)"
                     )
 
@@ -275,7 +275,7 @@ class CalculationEngine:
                 )
 
         except Exception as e:
-            logger.error(f"❌ Erreur calcul consommation: {e}", exc_info=True)
+            logger.error(f"❌ Feed calculation error: {e}", exc_info=True)
             return CalculationResult(
                 value=0,
                 unit="g",
@@ -288,15 +288,15 @@ class CalculationEngine:
         self, breed: str, sex: str, age_start: int, age_end: int
     ) -> CalculationResult:
         """
-        Calcule le taux de croissance moyen entre deux âges
+        Calculates average growth rate between two ages
 
         Returns:
-            CalculationResult avec taux en g/jour
+            CalculationResult with rate in g/day
         """
         try:
             async with self.db_pool.acquire() as conn:
                 query = """
-                SELECT 
+                SELECT
                     m.age_min,
                     m.value_numeric as weight
                 FROM metrics m
@@ -314,9 +314,9 @@ class CalculationEngine:
                 if len(rows) < 2:
                     return CalculationResult(
                         value=0,
-                        unit="g/jour",
+                        unit="g/day",
                         calculation_type="growth_rate",
-                        details={"error": "Données insuffisantes"},
+                        details={"error": "Insufficient data"},
                         confidence=0.0,
                     )
 
@@ -328,7 +328,7 @@ class CalculationEngine:
 
                 return CalculationResult(
                     value=round(growth_rate, 2),
-                    unit="g/jour",
+                    unit="g/day",
                     calculation_type="growth_rate",
                     details={
                         "weight_start": weight_start,
@@ -340,10 +340,10 @@ class CalculationEngine:
                 )
 
         except Exception as e:
-            logger.error(f"Erreur calcul croissance: {e}")
+            logger.error(f"Growth calculation error: {e}")
             return CalculationResult(
                 value=0,
-                unit="g/jour",
+                unit="g/day",
                 calculation_type="growth_rate",
                 details={"error": str(e)},
                 confidence=0.0,
@@ -353,15 +353,15 @@ class CalculationEngine:
         self, breed: str, sex: str, age: int
     ) -> CalculationResult:
         """
-        Calcule l'efficacité alimentaire: grammes de viande par kg d'aliment
+        Calculates feed efficiency: grams of meat per kg of feed
 
         Returns:
-            CalculationResult avec efficacité en g viande / kg aliment
+            CalculationResult with efficiency in g meat / kg feed
         """
         try:
             async with self.db_pool.acquire() as conn:
                 query = """
-                SELECT 
+                SELECT
                     m.value_numeric as weight,
                     m2.value_numeric as cumulative_intake
                 FROM metrics m
@@ -381,9 +381,9 @@ class CalculationEngine:
                 if not row or not row["cumulative_intake"]:
                     return CalculationResult(
                         value=0,
-                        unit="g viande / kg aliment",
+                        unit="g meat / kg feed",
                         calculation_type="feed_efficiency",
-                        details={"error": "Données insuffisantes"},
+                        details={"error": "Insufficient data"},
                         confidence=0.0,
                     )
 
@@ -394,7 +394,7 @@ class CalculationEngine:
 
                 return CalculationResult(
                     value=round(efficiency, 1),
-                    unit="g viande / kg aliment",
+                    unit="g meat / kg feed",
                     calculation_type="feed_efficiency",
                     details={
                         "weight_g": weight,
@@ -405,10 +405,10 @@ class CalculationEngine:
                 )
 
         except Exception as e:
-            logger.error(f"Erreur calcul efficacité: {e}")
+            logger.error(f"Feed efficiency calculation error: {e}")
             return CalculationResult(
                 value=0,
-                unit="g viande / kg aliment",
+                unit="g meat / kg feed",
                 calculation_type="feed_efficiency",
                 details={"error": str(e)},
                 confidence=0.0,
@@ -423,22 +423,22 @@ class CalculationEngine:
         mortality_pct: float = 0.0,
     ) -> Dict:
         """
-        Calcule les totaux pour un troupeau de X oiseaux
+        Calculates totals for a flock of X birds
 
         Args:
-            breed: Nom de la souche
-            sex: Sexe
-            age: Âge (jours)
-            flock_size: Nombre d'oiseaux
-            mortality_pct: Taux de mortalité (%)
+            breed: Strain name
+            sex: Sex
+            age: Age (days)
+            flock_size: Number of birds
+            mortality_pct: Mortality rate (%)
 
         Returns:
-            Dict avec poids total, aliment total, etc.
+            Dict with total weight, total feed, etc.
         """
         try:
             async with self.db_pool.acquire() as conn:
                 query = """
-                SELECT 
+                SELECT
                     m.value_numeric as weight,
                     m2.value_numeric as cumulative_intake
                 FROM metrics m
@@ -456,9 +456,9 @@ class CalculationEngine:
                 row = await conn.fetchrow(query, breed, sex, age)
 
                 if not row:
-                    return {"error": "Données non disponibles", "confidence": 0.0}
+                    return {"error": "Data not available", "confidence": 0.0}
 
-                # Ajustement mortalité
+                # Mortality adjustment
                 surviving_birds = flock_size * (1 - mortality_pct / 100)
 
                 # Convert Decimal to float for calculations
@@ -468,7 +468,7 @@ class CalculationEngine:
                 )
 
                 total_weight_kg = (weight_per_bird * surviving_birds) / 1000
-                total_feed_kg = (intake_per_bird * flock_size) / 1000  # Tous consomment
+                total_feed_kg = (intake_per_bird * flock_size) / 1000  # All birds consume
 
                 return {
                     "flock_size": flock_size,
@@ -488,5 +488,5 @@ class CalculationEngine:
                 }
 
         except Exception as e:
-            logger.error(f"Erreur calcul troupeau: {e}")
+            logger.error(f"Flock calculation error: {e}")
             return {"error": str(e), "confidence": 0.0}

@@ -11,7 +11,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from retrieval.postgresql.router import QueryRouter
-from retrieval.postgresql.models import QueryType
 
 
 def analyze_routing_gaps():

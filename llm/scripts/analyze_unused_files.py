@@ -17,11 +17,9 @@ import os
 import ast
 import sys
 import json
-import importlib.util
 from pathlib import Path
 from collections import defaultdict
 from typing import Dict, List, Set, Tuple
-import re
 
 # Add llm directory to Python path
 llm_dir = Path(__file__).parent.parent
@@ -299,13 +297,13 @@ class CodebaseAnalyzer:
         print(f"📋 Unused config files found: {report['summary']['unused_config_files']}")
 
         if unused_files:
-            print(f"\n🗑️ TOP 10 LARGEST UNUSED FILES:")
+            print("\n🗑️ TOP 10 LARGEST UNUSED FILES:")
             for path, reason in unused_files[:10]:
                 size_kb = path.stat().st_size / 1024
                 print(f"  - {path.relative_to(self.root_dir)} ({size_kb:.1f} KB) - {reason}")
 
         if dead_code:
-            print(f"\n💀 SAMPLE DEAD CODE (first 10):")
+            print("\n💀 SAMPLE DEAD CODE (first 10):")
             for file, item_type, name in dead_code[:10]:
                 print(f"  - {file}: {item_type} '{name}'")
 

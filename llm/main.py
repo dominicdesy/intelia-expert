@@ -36,7 +36,7 @@ from utils.utilities import setup_logging
 from api.endpoints import create_router
 
 # === VERSION TRACKING ===
-from version import get_version_string, BUILD_ID
+from version import get_version_string
 
 # === DEBUG DEPLOYMENT - MESSAGES VISIBLES ===
 print("=" * 80)

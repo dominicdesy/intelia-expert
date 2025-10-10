@@ -7,7 +7,6 @@ Automatically infers:
 - difficulty: from category and question complexity
 """
 
-import re
 from golden_dataset_intelia import get_intelia_test_dataset
 
 
@@ -130,11 +129,11 @@ def main():
     print("\n" + "=" * 80)
     print("STATISTICS")
     print("=" * 80)
-    print(f"\nLanguages:")
+    print("\nLanguages:")
     for lang, count in stats["lang"].items():
         print(f"  {lang}: {count}")
 
-    print(f"\nDifficulty:")
+    print("\nDifficulty:")
     for diff, count in sorted(stats["difficulty"].items()):
         print(f"  {diff}: {count}")
 

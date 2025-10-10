@@ -406,10 +406,10 @@ class RAGCacheManager(InitializableMixin):
             content = json.dumps(
                 [doc.get("content", "")[:100] for doc in documents], sort_keys=True
             )
-            return hashlib.md5(content.encode()).hexdigest()[:16]
+            return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:16]
         except Exception as e:
             logger.warning(f"Erreur generate_context_hash: {e}")
-            return hashlib.md5(str(len(documents)).encode()).hexdigest()[:16]
+            return hashlib.md5(str(len(documents)).encode(), usedforsecurity=False).hexdigest()[:16]
 
     async def invalidate_pattern(self, pattern: str, namespace: str = "default"):
         """Invalide les clés correspondant à un pattern"""

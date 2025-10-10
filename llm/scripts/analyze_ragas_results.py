@@ -6,7 +6,6 @@ Compare les résultats avant/après les corrections et génère un rapport déta
 """
 
 import json
-import sys
 from pathlib import Path
 
 def load_results(filepath):
@@ -149,7 +148,7 @@ def analyze_successes(results, title):
     # Trier par score décroissant
     test_scores.sort(key=lambda x: x[2], reverse=True)
 
-    print(f"\n🏆 Top 5 meilleurs tests:")
+    print("\n🏆 Top 5 meilleurs tests:")
     for idx, test_case, avg_score in test_scores[:5]:
         query = test_case.get('query', 'N/A')[:80]
         scores = test_case.get('scores', {})

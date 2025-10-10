@@ -26,14 +26,15 @@ class ContentSegmenter:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-        # CORRECTION CIBLÉE: Limites ajustées mais fonctions conservées
-        self.min_chunk_words = 20  # Réduit de 50 à 20
-        self.max_chunk_words = 3000  # Augmenté de 500 à 3000 (au lieu de 2000)
-        self.overlap_words = 50  # Augmenté pour meilleur contexte
+        # 🆕 OPTIMIZED CHUNKING PARAMETERS (2025-10-09)
+        # Test 1200 mots: sweet spot entre 600 (trop petit, fragmentation) et 3000 (trop large, dilution sémantique)
+        self.min_chunk_words = 50    # Éviter micro-chunks non informatifs (était 20)
+        self.max_chunk_words = 1200  # Compromis pour embeddings + préservation contexte (était 600)
+        self.overlap_words = 240     # 20% overlap standard (était 120)
 
         # Options pour préservation des chunks existants
-        self.preserve_large_chunks = True  # Préserver chunks > 3000 mots
-        self.smart_splitting = True  # Division intelligente si nécessaire
+        self.preserve_large_chunks = False  # FORCER division pour embeddings optimaux (était True)
+        self.smart_splitting = True         # Division intelligente si nécessaire
 
     def create_semantic_segments(
         self,

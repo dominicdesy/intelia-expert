@@ -1,24 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 llm_translator.py - LLM-Based Translation Service
-Version 1.0 - Traduction robuste via OpenAI GPT-4o-mini
-
-Avantages vs dictionnaires de traduction:
-- Qualité native (pas de "perpourmance" ou fragments non traduits)
-- Zéro maintenance (pas de dictionnaires à maintenir)
-- Support automatique de toutes les langues
-- Préserve structure Markdown et formatage
-- Rapide (<100ms avec gpt-4o-mini)
-- Peu coûteux (~0.0001$ par traduction)
-
-Exemples:
-✅ EN → FR: "To analyze performance of Ross 308, I need to know:"
-           → "Pour analyser la performance du Ross 308, j'ai besoin de savoir:"
-✅ EN → TH: "Please specify **the breed**. For example: Ross 308..."
-           → "กรุณาระบุ **สายพันธุ์** ตัวอย่างเช่น: Ross 308..."
+High-quality translation via OpenAI GPT-4o-mini with Redis cache support
+Preserves Markdown structure and provides fast, cost-effective translations
 """
 
 import logging
+import hashlib
 from typing import Optional
 from openai import OpenAI
 
@@ -27,13 +15,13 @@ logger = logging.getLogger(__name__)
 
 class LLMTranslator:
     """
-    Traducteur basé sur LLM pour traductions robustes et de haute qualité
+    LLM-based translator for robust and high-quality translations
 
-    Utilise gpt-4o-mini pour:
-    - Traductions rapides (<100ms)
-    - Faible coût (~0.0001$ par traduction)
-    - Qualité native (comprend contexte et nuances)
-    - Préservation du formatage Markdown
+    Uses gpt-4o-mini for:
+    - Fast translations (<100ms)
+    - Low cost (~$0.0001 per translation)
+    - Native quality (understands context and nuances)
+    - Markdown formatting preservation
     """
 
     TRANSLATION_PROMPT = """Translate the following text from {source_lang} to {target_lang}.
@@ -53,7 +41,7 @@ Text to translate:
 
 Translation in {target_lang}:"""
 
-    # Noms de langues pour le prompt
+    # Language names for prompt
     LANGUAGE_NAMES = {
         "en": "English",
         "fr": "French",
@@ -78,56 +66,78 @@ Translation in {target_lang}:"""
         self,
         openai_api_key: Optional[str] = None,
         model: str = "gpt-4o-mini",
-        cache_enabled: bool = True
+        cache_enabled: bool = True,
+        redis_cache=None
     ):
         """
-        Initialize LLM-based translator
+        Initialize LLM-based translator with Redis cache support
 
         Args:
             openai_api_key: OpenAI API key (if None, uses env var OPENAI_API_KEY)
             model: OpenAI model to use (default: gpt-4o-mini for speed/cost)
             cache_enabled: Enable caching for identical translations
+            redis_cache: Optional Redis cache manager (RAGCacheManager instance)
         """
         self.client = OpenAI(api_key=openai_api_key) if openai_api_key else OpenAI()
         self.model = model
         self.cache_enabled = cache_enabled
-        self.cache = {}  # Simple cache: (text, target_lang) → translation
+        self.redis_cache = redis_cache
+        self.memory_cache = {}  # Fallback in-memory cache
 
-        logger.info(f"✅ LLMTranslator initialized with model={model}, cache={cache_enabled}")
+        cache_type = "Redis" if redis_cache else "memory"
+        logger.info(f"✅ LLMTranslator initialized with model={model}, cache={cache_type}")
 
-    def translate(
+    def _generate_cache_key(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Generate a unique cache key for translation"""
+        content = f"{source_lang}:{target_lang}:{text}"
+        return f"translation:{hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()}"
+
+    async def translate_async(
         self,
         text: str,
         target_language: str,
         source_language: str = "en"
     ) -> str:
         """
-        Traduit un texte vers la langue cible via LLM
+        Async translation with Redis cache support
 
         Args:
-            text: Texte à traduire
-            target_language: Code langue cible (fr, es, th, etc.)
-            source_language: Code langue source (default: en)
+            text: Text to translate
+            target_language: Target language code (fr, es, th, etc.)
+            source_language: Source language code (default: en)
 
         Returns:
-            Texte traduit (ou texte original si target_language == source_language)
+            Translated text (or original if same language)
         """
-        # Si même langue, retourner directement
+        # If same language, return directly
         if target_language == source_language:
             return text
 
-        # Si texte vide, retourner vide
+        # If empty text, return empty
         if not text or not text.strip():
             return text
 
-        # Check cache
-        cache_key = (text, source_language, target_language)
-        if self.cache_enabled and cache_key in self.cache:
-            logger.debug(f"📦 Cache hit for translation to {target_language}")
-            return self.cache[cache_key]
+        # Generate cache key
+        cache_key = self._generate_cache_key(text, source_language, target_language)
+
+        # Check Redis cache first
+        if self.cache_enabled and self.redis_cache:
+            try:
+                cached = await self.redis_cache.get(cache_key)
+                if cached:
+                    logger.debug(f"📦 Redis cache hit for translation to {target_language}")
+                    return cached.decode('utf-8')
+            except Exception as e:
+                logger.warning(f"Redis cache read error: {e}")
+
+        # Fallback to memory cache
+        memory_key = (text, source_language, target_language)
+        if self.cache_enabled and memory_key in self.memory_cache:
+            logger.debug(f"📦 Memory cache hit for translation to {target_language}")
+            return self.memory_cache[memory_key]
 
         try:
-            # Construire le prompt
+            # Build prompt
             source_lang_name = self.LANGUAGE_NAMES.get(source_language, source_language)
             target_lang_name = self.LANGUAGE_NAMES.get(target_language, target_language)
 
@@ -137,34 +147,34 @@ Translation in {target_lang}:"""
                 text=text
             )
 
-            # Appel OpenAI
+            # OpenAI call
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": "You are a professional translator specializing in poultry production terminology."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3,  # Bas pour cohérence, mais pas 0 pour naturel
-                max_tokens=500,   # Suffisant pour messages de clarification
+                temperature=0.3,  # Low for consistency, but not 0 for naturalness
+                max_tokens=500,   # Sufficient for clarification messages
                 timeout=5.0       # 5s timeout
             )
 
-            # Extraire traduction
+            # Extract translation
             translation = response.choices[0].message.content.strip()
 
-            # Nettoyer si LLM a ajouté des quotes (TOUTES les variantes)
-            # Enlever quotes triples
+            # Clean if LLM added quotes (all variants)
+            # Remove triple quotes
             if translation.startswith('"""') and translation.endswith('"""'):
                 translation = translation[3:-3].strip()
             elif translation.startswith("'''") and translation.endswith("'''"):
                 translation = translation[3:-3].strip()
-            # Enlever quotes doubles
+            # Remove double quotes
             elif translation.startswith('"') and translation.endswith('"'):
                 translation = translation[1:-1].strip()
             elif translation.startswith("'") and translation.endswith("'"):
                 translation = translation[1:-1].strip()
 
-            # Nettoyer les quotes vides résiduelles
+            # Clean residual empty quotes
             translation = translation.replace('""', '').replace("''", '')
 
             # Log
@@ -173,27 +183,84 @@ Translation in {target_lang}:"""
                 f"'{text[:50]}...' → '{translation[:50]}...'"
             )
 
-            # Cache result
+            # Cache result in Redis (async)
             if self.cache_enabled:
-                self.cache[cache_key] = translation
+                # Store in memory cache
+                self.memory_cache[memory_key] = translation
+
+                # Store in Redis if available
+                if self.redis_cache:
+                    try:
+                        await self.redis_cache.set(
+                            cache_key,
+                            translation.encode('utf-8'),
+                            ttl=86400  # 24 hours
+                        )
+                        logger.debug(f"💾 Translation cached in Redis: {cache_key[:50]}...")
+                    except Exception as e:
+                        logger.warning(f"Redis cache write error: {e}")
 
             return translation
 
         except Exception as e:
             logger.error(f"❌ LLM translation error ({source_language}→{target_language}): {e}")
 
-            # Fallback: retourner texte original
+            # Fallback: return original text
             logger.warning("⚠️ Fallback to original text due to translation error")
             return text
 
+    def translate(
+        self,
+        text: str,
+        target_language: str,
+        source_language: str = "en"
+    ) -> str:
+        """
+        Synchronous wrapper for translate_async (for backward compatibility)
+
+        Args:
+            text: Text to translate
+            target_language: Target language code
+            source_language: Source language code (default: en)
+
+        Returns:
+            Translated text
+        """
+        import asyncio
+
+        # If same language, return directly
+        if target_language == source_language:
+            return text
+
+        try:
+            # Try to use existing event loop
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're already in async context, create task
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        asyncio.run,
+                        self.translate_async(text, target_language, source_language)
+                    )
+                    return future.result(timeout=10)
+            else:
+                # No running loop, use asyncio.run
+                return asyncio.run(
+                    self.translate_async(text, target_language, source_language)
+                )
+        except Exception as e:
+            logger.error(f"Sync translation wrapper error: {e}")
+            return text
+
     def clear_cache(self):
-        """Vide le cache de traductions"""
-        self.cache.clear()
-        logger.info("🗑️ Translation cache cleared")
+        """Clear translation cache (memory only)"""
+        self.memory_cache.clear()
+        logger.info("🗑️ Translation memory cache cleared")
 
     def get_cache_size(self) -> int:
-        """Retourne la taille du cache"""
-        return len(self.cache)
+        """Return memory cache size"""
+        return len(self.memory_cache)
 
 
 # Factory singleton
@@ -205,14 +272,14 @@ def get_llm_translator(
     model: str = "gpt-4o-mini"
 ) -> LLMTranslator:
     """
-    Récupère l'instance singleton du LLMTranslator
+    Get LLMTranslator singleton instance
 
     Args:
         openai_api_key: OpenAI API key (optional)
         model: Model to use (default: gpt-4o-mini)
 
     Returns:
-        Instance LLMTranslator
+        LLMTranslator instance
     """
     global _llm_translator_instance
 
@@ -225,14 +292,14 @@ def get_llm_translator(
     return _llm_translator_instance
 
 
-# Tests unitaires
+# Unit tests
 if __name__ == "__main__":
     import sys
 
-    # Configuration logging
+    # Configure logging
     logging.basicConfig(level=logging.INFO)
 
-    # Créer traducteur
+    # Create translator
     translator = LLMTranslator()
 
     print("\n" + "=" * 80)
@@ -241,35 +308,35 @@ if __name__ == "__main__":
 
     # Test cases
     test_cases = [
-        # Cas 1: Message de clarification simple
+        # Case 1: Simple clarification message
         (
             "To analyze performance of Ross 308, I need to know:",
             "fr",
             "Pour analyser la performance du Ross 308, j'ai besoin de savoir"
         ),
 
-        # Cas 2: Message avec Markdown
+        # Case 2: Message with Markdown
         (
             "Please specify **the breed**. For example: Ross 308, Cobb 500.",
             "fr",
             "Veuillez préciser **la race**. Par exemple : Ross 308, Cobb 500."
         ),
 
-        # Cas 3: Message avec liste
+        # Case 3: Message with list
         (
             "To help you best, I need details on:\n- **Breed**: Ross 308, Cobb 500, other?\n- **Age**: in days or weeks?",
             "fr",
             "Pour mieux vous aider, j'ai besoin de détails sur :\n- **Race** : Ross 308, Cobb 500, autre ?\n- **Âge** : en jours ou semaines ?"
         ),
 
-        # Cas 4: Traduction vers Thai
+        # Case 4: Translation to Thai
         (
             "Please specify **the age** of the flock. For example: 21 days, 35 days.",
             "th",
             "กรุณาระบุ **อายุ** ของฝูง ตัวอย่างเช่น: 21 วัน, 35 วัน"
         ),
 
-        # Cas 5: Traduction vers Espagnol
+        # Case 5: Translation to Spanish
         (
             "To recommend a treatment for Newcastle disease, I need to know:",
             "es",
@@ -288,8 +355,8 @@ if __name__ == "__main__":
 
         print(f"Output: {translation[:80]}...")
 
-        # Vérifier que la traduction contient des mots clés de la langue cible
-        # (pas de vérification exacte car LLM peut légèrement varier)
+        # Verify translation contains target language keywords
+        # (no exact verification as LLM can slightly vary)
         if translation and translation != text_en and len(translation) > 10:
             print("✅ PASS - Translation successful")
             passed += 1

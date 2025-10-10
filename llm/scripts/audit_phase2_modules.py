@@ -20,8 +20,8 @@ print("-" * 60)
 try:
     from utils.clarification_helper import get_clarification_helper
     helper = get_clarification_helper()
-    print(f"   Status: IMPLEMENTED")
-    print(f"   File: utils/clarification_helper.py (407 lines)")
+    print("   Status: IMPLEMENTED")
+    print("   File: utils/clarification_helper.py (407 lines)")
     print(f"   Ambiguity types: {len(helper.ambiguity_types)}")
     print(f"   Types: {list(helper.ambiguity_types.keys())[:3]}...")
 
@@ -38,14 +38,12 @@ print()
 print("2. MODULE CALCULATION")
 print("-" * 60)
 try:
-    from core.calculation_engine import CalculationEngine
-    from core.handlers.calculation_handler import CalculationQueryHandler
 
-    print(f"   Status: IMPLEMENTED")
-    print(f"   Files:")
-    print(f"      - core/calculation_engine.py")
-    print(f"      - core/handlers/calculation_handler.py")
-    print(f"   Integration: handlers/__init__.py")
+    print("   Status: IMPLEMENTED")
+    print("   Files:")
+    print("      - core/calculation_engine.py")
+    print("      - core/handlers/calculation_handler.py")
+    print("   Integration: handlers/__init__.py")
 except Exception as e:
     print(f"   Status: ERROR - {e}")
 
@@ -57,13 +55,13 @@ print("-" * 60)
 try:
     from processing.query_expander import QueryExpander
 
-    print(f"   Status: IMPLEMENTED")
-    print(f"   File: processing/query_expander.py")
-    print(f"   Integration: processing/__init__.py")
+    print("   Status: IMPLEMENTED")
+    print("   File: processing/query_expander.py")
+    print("   Integration: processing/__init__.py")
 
     # Test basic functionality
     expander = QueryExpander()
-    print(f"   Test: Initialized successfully")
+    print("   Test: Initialized successfully")
 except Exception as e:
     print(f"   Status: ERROR - {e}")
 
@@ -73,11 +71,10 @@ print()
 print("4. MODULE SEMANTIC CACHE")
 print("-" * 60)
 try:
-    from cache.cache_semantic import SemanticCacheManager
 
-    print(f"   Status: IMPLEMENTED")
-    print(f"   File: cache/cache_semantic.py")
-    print(f"   Class: SemanticCacheManager")
+    print("   Status: IMPLEMENTED")
+    print("   File: cache/cache_semantic.py")
+    print("   Class: SemanticCacheManager")
 except Exception as e:
     print(f"   Status: ERROR - {e}")
 
@@ -90,8 +87,8 @@ try:
     from processing.context_manager import get_context_manager
 
     manager = get_context_manager()
-    print(f"   Status: IMPLEMENTED")
-    print(f"   File: processing/context_manager.py (290 lines)")
+    print("   Status: IMPLEMENTED")
+    print("   File: processing/context_manager.py (290 lines)")
 
     # Test
     manager.update_context("Ross 308 à 35 jours")
@@ -111,8 +108,8 @@ try:
     router = QueryRouter(use_context_manager=True)
     stats = router.get_routing_stats()
 
-    print(f"   Status: IMPLEMENTED")
-    print(f"   File: retrieval/postgresql/router.py")
+    print("   Status: IMPLEMENTED")
+    print("   File: retrieval/postgresql/router.py")
     print(f"   Version: {stats.get('version', 'N/A')}")
     print(f"   METRICS keywords: {stats.get('metric_keywords_count', 0)}")
     print(f"   KNOWLEDGE keywords: {stats.get('knowledge_keywords_count', 0)}")

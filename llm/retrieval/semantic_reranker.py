@@ -79,7 +79,7 @@ class SemanticReRanker:
                 from sentence_transformers import CrossEncoder
                 logger.info(f"📥 Loading cross-encoder model: {self.model_name}...")
                 self._model = CrossEncoder(self.model_name)
-                logger.info(f"✅ Cross-encoder loaded successfully")
+                logger.info("✅ Cross-encoder loaded successfully")
             except ImportError:
                 logger.error(
                     "❌ sentence-transformers not installed! "

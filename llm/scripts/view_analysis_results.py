@@ -7,7 +7,6 @@ Quick script to view the results of overnight analysis runs.
 """
 
 import json
-import sys
 from pathlib import Path
 from datetime import datetime
 
@@ -126,7 +125,7 @@ def view_deep_optimization():
     # Error handling
     error_handling = analyses.get('error_handling', {})
     if error_handling.get('bare_except_count', 0) > 0:
-        print(f"\nERROR HANDLING ISSUES:")
+        print("\nERROR HANDLING ISSUES:")
         print(f"  Bare except clauses: {error_handling['bare_except_count']}")
         for exc in error_handling.get('bare_excepts', [])[:5]:
             print(f"    - {exc['file']}:{exc['line']}")

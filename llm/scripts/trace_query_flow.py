@@ -59,7 +59,6 @@ print()
 print("3. INTENT CLASSIFIER")
 print("-" * 60)
 try:
-    from processing.intent_classifier import IntentClassifier
     modules_active['IntentClassifier'] = True
     print("   [OK] IntentClassifier imported")
 except Exception as e:
@@ -90,7 +89,6 @@ print()
 print("5. QUERY HANDLERS")
 print("-" * 60)
 try:
-    from core.handlers import CalculationQueryHandler
     modules_active['CalculationHandler'] = True
     print("   [OK] CalculationQueryHandler imported")
 except Exception as e:
@@ -115,7 +113,7 @@ try:
     helper = get_clarification_helper()
     modules_active['ClarificationHelper'] = True
 
-    print(f"   [OK] ClarificationHelper loaded")
+    print("   [OK] ClarificationHelper loaded")
     print(f"   Ambiguity types: {len(helper.ambiguity_types)}")
     print(f"   Types: {list(helper.ambiguity_types.keys())[:3]}...")
 
@@ -137,13 +135,13 @@ try:
     manager = get_context_manager()
     modules_active['ContextManager'] = True
 
-    print(f"   [OK] ContextManager loaded")
+    print("   [OK] ContextManager loaded")
 
     # Test
     manager.update_context("Ross 308 à 35 jours")
     expanded = manager.expand_query("Et pour les femelles?")
-    print(f"   Test expansion:")
-    print(f"      Original: 'Et pour les femelles?'")
+    print("   Test expansion:")
+    print("      Original: 'Et pour les femelles?'")
     print(f"      Expanded: '{expanded}'")
 except Exception as e:
     modules_active['ContextManager'] = False

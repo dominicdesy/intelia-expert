@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-query_router.py - Router Intelligent 100% Config-Driven
-Point d'entrée unique pour TOUT le traitement de requêtes
+query_router.py - Intelligent 100% Config-Driven Router
+Single entry point for ALL query processing
 
-REMPLACE:
+REPLACES:
 - query_preprocessor.py
 - rag_postgresql_validator.py
-- query_classifier.py (partiel)
-- validation_core.py (partiel)
-- conversation_context.py (logique)
+- query_classifier.py (partial)
+- validation_core.py (partial)
+- conversation_context.py (logic)
 
-VERSION 1.0 - Architecture simplifiée config-driven
-- Charge TOUS les patterns depuis config/*.json
-- Gère le contexte conversationnel (stockage + merge)
-- Extrait entités via regex compilés (pas d'OpenAI)
-- Valide complétude basée sur intents.json
-- Route vers PostgreSQL/Weaviate/Hybrid
-- ZÉRO hardcoding - tout vient des fichiers JSON
+VERSION 1.0 - Simplified config-driven architecture
+- Loads ALL patterns from config/*.json
+- Manages conversational context (storage + merge)
+- Extracts entities via compiled regex (no OpenAI)
+- Validates completeness based on intents.json
+- Routes to PostgreSQL/Weaviate/Hybrid
+- ZERO hardcoding - everything from JSON files
 """
 
 import re
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class QueryRoute(SerializableMixin):
-    """Résultat du routing avec toutes les informations nécessaires"""
+    """Routing result with all necessary information"""
 
     destination: str  # 'postgresql' | 'weaviate' | 'hybrid' | 'needs_clarification'
     entities: Dict[str, Any]
@@ -50,15 +50,15 @@ class QueryRoute(SerializableMixin):
     confidence: float = 1.0
     missing_fields: List[str] = field(default_factory=list)
     validation_details: Dict[str, Any] = field(default_factory=dict)
-    query_type: str = "standard"  # Type de query pour logging/tracking
-    detected_domain: str = None  # 🆕 Domaine détecté (genetics, metrics, health, etc.)
+    query_type: str = "standard"  # Query type for logging/tracking
+    detected_domain: str = None  # Detected domain (genetics, metrics, health, etc.)
 
     # to_dict() now inherited from SerializableMixin (removed 12 lines)
 
 
 @dataclass
 class ConversationContext:
-    """Contexte conversationnel stocké"""
+    """Stored conversational context"""
 
     entities: Dict[str, Any]
     query: str
@@ -66,27 +66,27 @@ class ConversationContext:
     language: str
 
     def is_expired(self, timeout_seconds: int = 300) -> bool:
-        """Vérifie si le contexte a expiré (5 min par défaut)"""
+        """Checks if context has expired (default 5 min)"""
         return (time.time() - self.timestamp) > timeout_seconds
 
 
 # ============================================================================
-# CONFIG MANAGER - Charge et indexe TOUS les fichiers JSON
+# CONFIG MANAGER - Loads and indexes ALL JSON files
 # ============================================================================
 
 
 class ConfigManager:
     """
-    Gestionnaire centralisé de TOUTES les configurations
-    Charge et indexe les fichiers JSON pour accès O(1)
+    Centralized manager for ALL configurations
+    Loads and indexes JSON files for O(1) access
 
-    Source unique de vérité pour:
-    - Breeds (races) et aliases
+    Single source of truth for:
+    - Breeds and aliases
     - Sex variants
-    - Metrics et keywords
+    - Metrics and keywords
     - Routing keywords (PostgreSQL vs Weaviate)
-    - Patterns contextuels multilingues
-    - Age ranges et phases
+    - Multilingual contextual patterns
+    - Age ranges and phases
     - Species mapping (broiler/layer/breeder)
     """
 
@@ -99,49 +99,49 @@ class ConfigManager:
         self.universal_terms = {}
         self.domain_keywords = {}
 
-        # Index pour recherche rapide
+        # Index for fast lookup
         self.breed_index = {}
         self.sex_index = {}
         self.metric_index = {}
         self.routing_keywords = {"postgresql": [], "weaviate": []}
 
-        # Chargement + indexation
+        # Load and index configs
         self._load_all_configs()
         self._build_indexes()
 
     def _load_all_configs(self):
-        """Charge TOUS les fichiers de configuration"""
+        """Loads ALL configuration files"""
 
-        # 1. INTENTS.JSON - Source de vérité principale
+        # 1. INTENTS.JSON - Main source of truth
         intents_path = self.config_dir / "intents.json"
         if intents_path.exists():
             with open(intents_path, "r", encoding="utf-8") as f:
                 self.intents = json.load(f)
-            logger.info(f"✅ intents.json chargé: {intents_path}")
+            logger.info(f"✅ intents.json loaded: {intents_path}")
         else:
-            logger.error(f"❌ intents.json manquant: {intents_path}")
-            raise FileNotFoundError(f"Configuration critique manquante: {intents_path}")
+            logger.error(f"❌ intents.json missing: {intents_path}")
+            raise FileNotFoundError(f"Critical configuration missing: {intents_path}")
 
         # 2. ENTITY_DESCRIPTIONS.JSON (optionnel)
         desc_path = self.config_dir / "entity_descriptions.json"
         if desc_path.exists():
             with open(desc_path, "r", encoding="utf-8") as f:
                 self.entity_descriptions = json.load(f)
-            logger.info("✅ entity_descriptions.json chargé")
+            logger.info("✅ entity_descriptions.json loaded")
 
-        # 3. SYSTEM_PROMPTS.JSON (optionnel)
+        # 3. SYSTEM_PROMPTS.JSON (optional)
         prompts_path = self.config_dir / "system_prompts.json"
         if prompts_path.exists():
             with open(prompts_path, "r", encoding="utf-8") as f:
                 self.system_prompts = json.load(f)
-            logger.info("✅ system_prompts.json chargé")
+            logger.info("✅ system_prompts.json loaded")
 
-        # 4. LANGUAGES.JSON (optionnel)
+        # 4. LANGUAGES.JSON (optional)
         lang_path = self.config_dir / "languages.json"
         if lang_path.exists():
             with open(lang_path, "r", encoding="utf-8") as f:
                 self.languages = json.load(f)
-            logger.info("✅ languages.json chargé")
+            logger.info("✅ languages.json loaded")
 
         # 5. UNIVERSAL_TERMS par langue
         lang_codes = [
@@ -164,26 +164,26 @@ class ConfigManager:
                 with open(term_path, "r", encoding="utf-8") as f:
                     self.universal_terms[lang_code] = json.load(f)
 
-        logger.info(f"✅ {len(self.universal_terms)} fichiers universal_terms chargés")
+        logger.info(f"✅ {len(self.universal_terms)} universal_terms files loaded")
 
-        # 6. DOMAIN_KEYWORDS.JSON (nouveau)
+        # 6. DOMAIN_KEYWORDS.JSON (new)
         domain_path = self.config_dir / "domain_keywords.json"
         if domain_path.exists():
             with open(domain_path, "r", encoding="utf-8") as f:
                 self.domain_keywords = json.load(f)
-            logger.info("✅ domain_keywords.json chargé")
+            logger.info("✅ domain_keywords.json loaded")
         else:
-            logger.warning(f"domain_keywords.json non trouvé: {domain_path}")
+            logger.warning(f"domain_keywords.json not found: {domain_path}")
 
     def _build_indexes(self):
-        """Construit des index pour recherche rapide O(1)"""
+        """Builds indexes for fast O(1) lookup"""
 
-        # INDEX BREEDS - Tous les aliases depuis intents.json
+        # INDEX BREEDS - All aliases from intents.json
         line_aliases = self.intents.get("aliases", {}).get("line", {})
         for canonical, aliases in line_aliases.items():
-            # Nom canonique
+            # Canonical name
             self.breed_index[canonical.lower()] = canonical
-            # Tous les aliases
+            # All aliases
             if isinstance(aliases, list):
                 for alias in aliases:
                     self.breed_index[alias.lower()] = canonical
@@ -206,7 +206,7 @@ class ConfigManager:
         for lang_code, lang_terms in self.universal_terms.items():
             domains = lang_terms.get("domains", {})
 
-            # PostgreSQL keywords (métriques chiffrées)
+            # PostgreSQL keywords (numeric metrics)
             metrics_domain = domains.get("metrics", {})
             if metrics_domain:
                 for metric_key, metric_data in metrics_domain.items():
@@ -220,7 +220,7 @@ class ConfigManager:
                     if isinstance(metric_data, dict) and "variants" in metric_data:
                         self.routing_keywords["postgresql"].extend(metric_data["variants"])
 
-            # Weaviate keywords (santé, environnement)
+            # Weaviate keywords (health, environment)
             health_domain = domains.get("health", {})
             if health_domain:
                 for health_key, health_data in health_domain.items():
@@ -233,18 +233,18 @@ class ConfigManager:
                     if isinstance(env_data, dict) and "variants" in env_data:
                         self.routing_keywords["weaviate"].extend(env_data["variants"])
 
-        # Dédupliquer
+        # Deduplicate
         self.routing_keywords["postgresql"] = list(
             set(self.routing_keywords["postgresql"])
         )
         self.routing_keywords["weaviate"] = list(set(self.routing_keywords["weaviate"]))
 
-        # ✅ NOUVEAU: Index des espèces
+        # ✅ NEW: Species index
         self.species_index = self._build_species_index()
         logger.info(f"✅ Species index built: {len(self.species_index)} mappings")
 
         logger.info(
-            f"✅ Index construits: {len(self.breed_index)} breeds, "
+            f"✅ Indexes built: {len(self.breed_index)} breeds, "
             f"{len(self.sex_index)} sex variants, "
             f"{len(self.metric_index)} metrics, "
             f"{len(self.routing_keywords['postgresql'])} PG keywords, "
@@ -253,17 +253,17 @@ class ConfigManager:
 
     def _build_species_index(self) -> Dict[str, str]:
         """
-        Construit index variant → database_value pour species
+        Builds variant → database_value index for species
 
         Returns:
             {"broiler": "broiler", "meat chicken": "broiler",
-             "pondeuse": "layer", ...}
+             "layer": "layer", ...}
         """
         index = {}
 
-        # Charger depuis universal_terms si disponible
+        # Load from universal_terms if available
         for lang_code, lang_terms in self.universal_terms.items():
-            # ✅ CORRECTION: Accéder à domains.species
+            # ✅ FIX: Access domains.species
             domains = lang_terms.get("domains", {})
             species_terms = domains.get("species", {})
 
@@ -278,11 +278,11 @@ class ConfigManager:
                 canonical = data.get("canonical", species_key)
                 variants = data.get("variants", [])
 
-                # Ajouter canonical
+                # Add canonical
                 if canonical:
                     index[canonical.lower()] = database_value
 
-                # Ajouter toutes les variantes
+                # Add all variants
                 if isinstance(variants, list):
                     for variant in variants:
                         if variant:
@@ -297,13 +297,13 @@ class ConfigManager:
 
     def get_species_from_text(self, text: str) -> Optional[str]:
         """
-        Détecte l'espèce dans un texte via l'index
+        Detects species in text via index
 
         Args:
-            text: Texte à analyser
+            text: Text to analyze
 
         Returns:
-            database_value de l'espèce ("broiler", "layer", "breeder") ou None
+            Species database_value ("broiler", "layer", "breeder") or None
         """
         if not hasattr(self, "species_index"):
             logger.warning("Species index not initialized")
@@ -311,7 +311,7 @@ class ConfigManager:
 
         text_lower = text.lower()
 
-        # Chercher correspondance exacte d'abord
+        # Look for exact match first
         for variant, database_value in self.species_index.items():
             if variant in text_lower:
                 return database_value
@@ -320,21 +320,21 @@ class ConfigManager:
 
     @lru_cache(maxsize=1000)
     def get_breed_canonical(self, breed_text: str) -> Optional[str]:
-        """Retourne le nom canonique d'une race"""
+        """Returns canonical breed name"""
         return self.breed_index.get(breed_text.lower())
 
     @lru_cache(maxsize=100)
     def get_sex_canonical(self, sex_text: str) -> Optional[str]:
-        """Retourne le sexe canonique"""
+        """Returns canonical sex"""
         return self.sex_index.get(sex_text.lower())
 
     @lru_cache(maxsize=100)
     def get_metric_category(self, metric_text: str) -> Optional[str]:
-        """Retourne la catégorie de métrique"""
+        """Returns metric category"""
         return self.metric_index.get(metric_text.lower())
 
     def get_age_range(self, phase: str) -> Optional[Tuple[int, int]]:
-        """Retourne la tranche d'âge pour une phase"""
+        """Returns age range for a phase"""
         age_ranges = self.intents.get("age_ranges", {})
         range_data = age_ranges.get(phase)
         if isinstance(range_data, list) and len(range_data) == 2:
@@ -343,22 +343,22 @@ class ConfigManager:
 
     def get_contextual_patterns(self, language: str) -> List[str]:
         """
-        Retourne les patterns contextuels pour une langue depuis universal_terms
+        Returns contextual patterns for a language from universal_terms
 
-        Extrait tous les variants de contextual_references pour construire
-        les patterns regex de détection contextuelle
+        Extracts all variants from contextual_references to build
+        regex patterns for contextual detection
         """
         lang_terms = self.universal_terms.get(language, {})
         contextual = lang_terms.get("domains", {}).get("contextual_references", {})
 
-        # Extraire tous les variants de toutes les clés (same, and_for, females, etc.)
+        # Extract all variants from all keys (same, and_for, females, etc.)
         patterns = []
         for key, term_data in contextual.items():
             if isinstance(term_data, dict) and "variants" in term_data:
                 variants = term_data["variants"]
-                # Convertir variants en regex patterns avec word boundaries
+                # Convert variants to regex patterns with word boundaries
                 for variant in variants:
-                    # Échapper les caractères spéciaux regex, puis ajouter word boundaries
+                    # Escape special regex chars, then add word boundaries
                     escaped = re.escape(variant)
                     patterns.append(rf"\b{escaped}\b")
 
@@ -370,71 +370,71 @@ class ConfigManager:
         return patterns
 
     def should_route_to_postgresql(self, query: str, language: str = None) -> bool:
-        """Détermine si la query doit aller vers PostgreSQL"""
+        """Determines if query should route to PostgreSQL"""
         query_lower = query.lower()
         pg_keywords = self.routing_keywords.get("postgresql", [])
         return any(kw in query_lower for kw in pg_keywords)
 
     def should_route_to_weaviate(self, query: str, language: str = None) -> bool:
-        """Détermine si la query doit aller vers Weaviate"""
+        """Determines if query should route to Weaviate"""
         query_lower = query.lower()
         wv_keywords = self.routing_keywords.get("weaviate", [])
         return any(kw in query_lower for kw in wv_keywords)
 
     def get_all_breeds(self) -> Set[str]:
-        """Retourne tous les noms canoniques de races"""
+        """Returns all canonical breed names"""
         line_aliases = self.intents.get("aliases", {}).get("line", {})
         return set(line_aliases.keys())
 
     def get_species(self, breed: str) -> Optional[str]:
-        """Retourne l'espèce d'une race (broiler/layer/breeder)"""
+        """Returns species of a breed (broiler/layer/breeder)"""
         breed_registry = self.intents.get("breed_registry", {})
         species_mapping = breed_registry.get("species_mapping", {})
         return species_mapping.get(breed)
 
 
 # ============================================================================
-# QUERY ROUTER - Point d'entrée unique
+# QUERY ROUTER - Single entry point
 # ============================================================================
 
 
 class QueryRouter:
     """
-    Router intelligent 100% config-driven
+    Intelligent 100% config-driven router
 
-    Responsabilités:
-    1. Charger/stocker contexte conversationnel
-    2. Détecter références contextuelles
-    3. Extraire entités (regex compilés depuis config)
-    4. Merger entités avec contexte si nécessaire
-    5. Valider complétude
-    6. Router vers destination appropriée
+    Responsibilities:
+    1. Load/store conversational context
+    2. Detect contextual references
+    3. Extract entities (compiled regex from config)
+    4. Merge entities with context if needed
+    5. Validate completeness
+    6. Route to appropriate destination
     """
 
     def __init__(self, config_dir: str = "config"):
         self.config = ConfigManager(config_dir)
         self.context_store: Dict[str, ConversationContext] = {}
 
-        # Compiler les patterns regex depuis config
+        # Compile regex patterns from config
         self._compile_patterns()
 
         # Initialize hybrid entity extractor
         self.hybrid_extractor = create_hybrid_extractor(config_dir)
 
-        # Initialize LLM Query Classifier (remplace patterns fragiles)
+        # Initialize LLM Query Classifier (replaces fragile patterns)
         from core.llm_query_classifier import get_llm_query_classifier
         self.llm_classifier = get_llm_query_classifier()
 
         logger.info(
-            "✅ QueryRouter initialisé (100% config-driven + hybrid extraction + LLM classification)"
+            "✅ QueryRouter initialized (100% config-driven + hybrid extraction + LLM classification)"
         )
 
     def _compile_patterns(self):
-        """Compile les regex depuis les configs pour performance"""
+        """Compiles regex from configs for performance"""
 
-        # BREEDS - Pattern dynamique depuis index
+        # BREEDS - Dynamic pattern from index
         if self.config.breed_index:
-            # Trier par longueur décroissante pour matcher les plus longs d'abord
+            # Sort by descending length to match longest first
             breed_aliases = sorted(
                 self.config.breed_index.keys(), key=len, reverse=True
             )
@@ -443,25 +443,25 @@ class QueryRouter:
         else:
             self.breed_regex = None
 
-        # COMPARISON - Pattern pour détecter comparaisons multi-races
+        # COMPARISON - Pattern to detect multi-breed comparisons
         self.comparison_regex = re.compile(
             r"\b(vs\.?|versus|compar[ae]|compare[zr]?|et|and|ou|or)\b",
             re.IGNORECASE
         )
 
-        # AGE - Pattern universel multi-langues
+        # AGE - Universal multi-language pattern
         self.age_regex = re.compile(
             r"\b(\d+)\s*(jour|day|semaine|week|día|días|tag|tage|settimana|settimane|"
             r"semana|semanas|j\b|d\b|sem|wk|w\b)s?\b",
             re.IGNORECASE,
         )
 
-        # SEMAINES - Priorité sur jours (conversion x7)
+        # WEEKS - Priority over days (conversion x7)
         self.weeks_regex = re.compile(
             r"\b(\d+)\s*(semaine|week|semana|settimana|woche|wk|w\b)s?\b", re.IGNORECASE
         )
 
-        # SEX - Pattern dynamique depuis index
+        # SEX - Dynamic pattern from index
         if self.config.sex_index:
             sex_aliases = sorted(self.config.sex_index.keys(), key=len, reverse=True)
             sex_pattern = "|".join(re.escape(alias) for alias in sex_aliases)
@@ -469,18 +469,18 @@ class QueryRouter:
         else:
             self.sex_regex = None
 
-        logger.debug("✅ Patterns regex compilés depuis config")
+        logger.debug("✅ Regex patterns compiled from config")
 
     def detect_domain(self, query: str, language: str = "fr") -> str:
         """
-        Détecte le domaine de la query pour sélection du prompt
+        Detects query domain for prompt selection
 
         Args:
-            query: Question de l'utilisateur
-            language: Langue (fr/en)
+            query: User question
+            language: Language (fr/en)
 
         Returns:
-            prompt_key du domaine détecté ou 'general_poultry'
+            Detected domain prompt_key or 'general_poultry'
         """
         if not self.config.domain_keywords or "domains" not in self.config.domain_keywords:
             return "general_poultry"
@@ -488,7 +488,7 @@ class QueryRouter:
         query_lower = query.lower()
         domain_scores = {}
 
-        # Compter les keywords matchés par domaine
+        # Count matched keywords per domain
         for domain_name, domain_data in self.config.domain_keywords["domains"].items():
             keywords = domain_data.get("keywords", {}).get(language, [])
             if not keywords:
@@ -501,22 +501,22 @@ class QueryRouter:
                     "prompt_key": domain_data.get("prompt_key", "general_poultry"),
                 }
 
-        # Pas de match: fallback
+        # No match: fallback
         if not domain_scores:
             logger.debug(
-                f"Aucun domaine détecté pour '{query}', fallback general_poultry"
+                f"No domain detected for '{query}', fallback to general_poultry"
             )
             return "general_poultry"
 
-        # Prendre le domaine avec le plus de matches
+        # Take domain with most matches
         best_domain = max(domain_scores.items(), key=lambda x: x[1]["score"])
         prompt_key = best_domain[1]["prompt_key"]
 
         logger.info(
-            f"Domaine détecté: {best_domain[0]} (score={best_domain[1]['score']}) → prompt={prompt_key}"
+            f"Domain detected: {best_domain[0]} (score={best_domain[1]['score']}) → prompt={prompt_key}"
         )
 
-        # Appliquer règles de priorité si plusieurs domaines
+        # Apply priority rules if multiple domains
         if len(domain_scores) > 1:
             prompt_key = self._apply_priority_rules(domain_scores, prompt_key)
 
@@ -524,14 +524,14 @@ class QueryRouter:
 
     def _apply_priority_rules(self, domain_scores: Dict, current_prompt: str) -> str:
         """
-        Applique les règles de priorité entre domaines
+        Applies priority rules between domains
 
         Args:
-            domain_scores: Scores par domaine
-            current_prompt: Prompt actuellement sélectionné
+            domain_scores: Scores by domain
+            current_prompt: Currently selected prompt
 
         Returns:
-            Prompt ajusté selon règles de priorité
+            Adjusted prompt according to priority rules
         """
         priority_rules = self.config.domain_keywords.get("priority_rules", {}).get("rules", [])
 
@@ -539,13 +539,13 @@ class QueryRouter:
             condition = rule.get("condition", "")
             domains_in_condition = [d.strip() for d in condition.split("+")]
 
-            # Vérifier si les 2 domaines sont présents
+            # Check if both domains are present
             if all(d in domain_scores for d in domains_in_condition):
                 priority_domain = rule.get("priority")
                 if priority_domain in domain_scores:
                     new_prompt = domain_scores[priority_domain]["prompt_key"]
                     logger.info(
-                        f"Priorité appliquée: {condition} → {priority_domain} ({rule.get('reason')})"
+                        f"Priority applied: {condition} → {priority_domain} ({rule.get('reason')})"
                     )
                     return new_prompt
 
@@ -560,60 +560,59 @@ class QueryRouter:
         override_domain: str = None,
     ) -> QueryRoute:
         """
-        Point d'entrée UNIQUE - fait TOUT en une passe
+        SINGLE entry point - does EVERYTHING in one pass
 
         Args:
-            query: Requête utilisateur
-            user_id: Identifiant utilisateur/tenant
-            language: Langue détectée
-            preextracted_entities: Entités déjà extraites du contexte (optionnel)
-            override_domain: Domaine forcé (pour réutilisation après clarification)
+            query: User query
+            user_id: User/tenant identifier
+            language: Detected language
+            preextracted_entities: Already extracted entities from context (optional)
+            override_domain: Forced domain (for reuse after clarification)
 
         Returns:
-            QueryRoute avec destination + entités complètes
+            QueryRoute with destination + complete entities
         """
 
         start_time = time.time()
 
-        # 1. CONTEXTE: Charger si existe
+        # Load conversation context if available
         previous_context = self.context_store.get(user_id)
 
-        # Nettoyer contextes expirés
+        # Clean expired contexts
         if previous_context and previous_context.is_expired():
             logger.info(f"🗑️ Contexte expiré pour {user_id}, suppression")
             del self.context_store[user_id]
             previous_context = None
 
-        # 2. DÉTECTION CONTEXTUELLE
+        # Detect contextual references
         is_contextual = self._is_contextual(query, language)
 
-        # 2a. DÉTECTION COMPARATIVE (multi-breed comparisons)
+        # Detect multi-breed comparisons
         is_comparative = self._is_comparative(query)
 
-        # 2.5. DÉTECTION DOMAINE (needed for hybrid extraction)
-        # 🆕 Réutiliser domaine sauvegardé si clarification response
+        # Detect domain for hybrid extraction (reuse forced domain after clarification)
         if override_domain:
             detected_domain = override_domain
             logger.info(f"♻️ Domaine forcé (clarification): {detected_domain}")
         else:
             detected_domain = self.detect_domain(query, language)
 
-        # 3. EXTRACTION ENTITÉS (Basic regex - breed, age, sex)
+        # Extract basic entities (breed, age, sex)
         entities = self._extract_entities(query, language)
 
-        # 3b. HYBRID EXTRACTION (Advanced entities - numeric, health, etc.)
+        # Extract advanced entities (numeric, health, etc.)
         hybrid_entities = self.hybrid_extractor.extract_all(
             query=query,
             language=language,
             domain=detected_domain,
             existing_entities=entities,
         )
-        # Merge hybrid entities (don't override basic entities)
+        # Merge hybrid entities without overriding basic entities
         for key, value in hybrid_entities.items():
             if key not in entities or not entities[key]:
                 entities[key] = value
 
-        # 3c. EXTRACTION MULTI-BREEDS si comparatif détecté
+        # Extract multi-breed entities for comparisons
         comparison_entities = []
         if is_comparative:
             all_breeds = self._extract_all_breeds(query)
@@ -621,14 +620,14 @@ class QueryRouter:
             if len(all_breeds) >= 2:
                 logger.info(f"🔀 Comparaison multi-races détectée: {all_breeds}")
 
-                # Créer entités de comparaison pour chaque breed
+                # Create comparison entity for each breed
                 for breed in all_breeds:
                     comp_entity = {
                         "breed": breed,
                         "_comparison_label": breed,
                     }
 
-                    # Hériter age, sex, metric des entités principales
+                    # Inherit age, sex, metric from main entities
                     if entities.get("age_days"):
                         comp_entity["age_days"] = entities["age_days"]
                     if entities.get("sex"):
@@ -638,7 +637,7 @@ class QueryRouter:
 
                     comparison_entities.append(comp_entity)
 
-                # Stocker dans entities pour transmission
+                # Store in entities for transmission
                 entities["comparison_entities"] = comparison_entities
                 entities["is_comparative"] = True
                 logger.info(f"📊 {len(comparison_entities)} entités comparatives créées")
@@ -646,13 +645,13 @@ class QueryRouter:
                 logger.debug(f"⚠️ Pattern comparatif détecté mais < 2 breeds: {all_breeds}")
                 is_comparative = False
 
-        # 3d. MERGE avec entités pré-extraites si disponibles
+        # Merge with pre-extracted entities if available
         if preextracted_entities:
             logger.info(
                 f"📦 Merging preextracted entities: {list(preextracted_entities.keys())}"
             )
 
-            # VALIDATION: Détecter changement de contexte (breed différente)
+            # Detect breed context change
             current_breed = entities.get("breed")
             context_breed = preextracted_entities.get("breed")
 
@@ -663,16 +662,15 @@ class QueryRouter:
                 logger.info(
                     "🔒 Blocking context merge - different breed detected (new conversation context)"
                 )
-                # Ne merger QUE la breed de la query actuelle, pas les autres entités
-                # Cela force le système à demander clarification pour age/sex
+                # Only merge current query's breed, force clarification for age/sex
             else:
-                # Breeds compatibles ou pas de breed dans query → merger contexte
+                # Breeds compatible or no breed in query - merge context
                 for key, value in preextracted_entities.items():
                     if key not in entities or not entities[key]:
                         entities[key] = value
                         logger.debug(f"   Added {key}={value} from context")
 
-        # 4. MERGE si contextuel
+        # Merge with conversation context if contextual query
         if is_contextual and previous_context:
             original_entities = entities.copy()
             entities = self._merge_with_context(entities, previous_context.entities)
@@ -681,7 +679,7 @@ class QueryRouter:
             logger.debug(f"   Previous: {previous_context.entities}")
             logger.debug(f"   Merged: {entities}")
 
-        # 5. VALIDATION COMPLÉTUDE
+        # Validate entity completeness
         is_complete, missing, validation_details = self._validate_completeness(
             entities, query, language
         )
@@ -696,19 +694,18 @@ class QueryRouter:
                 is_contextual=is_contextual,
                 confidence=0.5,
                 query_type="clarification_needed",
-                detected_domain=detected_domain,  # 🆕 Inclure domaine dans clarification
+                detected_domain=detected_domain,
             )
 
-        # 6. ROUTING INTELLIGENT
-        # Récupérer intent depuis validation_details (stocké par _validate_completeness)
+        # Intelligent routing based on LLM intent
         intent = validation_details.get("llm_intent", "general_knowledge")
 
-        # 🧮 Si calcul multi-étapes, router vers "calculation"
+        # Route to calculation handler for multi-step calculations
         if intent == "calculation_query":
             destination = "calculation"
             reason = "calculation_query_detected"
             logger.info(f"🧮 Routing vers calculation handler: {entities.get('calculation_type')}")
-        # 🔀 Si comparaison multi-races, router vers "comparative"
+        # Route to comparative handler for multi-breed comparisons
         elif is_comparative and entities.get("comparison_entities"):
             destination = "comparative"
             reason = "multi_breed_comparison_detected"
@@ -716,7 +713,7 @@ class QueryRouter:
         else:
             destination, reason = self._determine_destination(query, entities, language, validation_details)
 
-        # 7. STOCKAGE CONTEXTE (si succès)
+        # Store conversation context
         self.context_store[user_id] = ConversationContext(
             entities=entities, query=query, timestamp=time.time(), language=language
         )
@@ -728,10 +725,10 @@ class QueryRouter:
             f"Temps: {processing_time:.3f}s"
         )
 
-        # Ajouter domain dans validation_details pour utilisation par generators
+        # Add domain to validation_details for use by generators
         validation_details["detected_domain"] = detected_domain
 
-        # Déterminer query_type basé sur destination et domaine
+        # Determine query_type based on destination and domain
         query_type = self._determine_query_type(destination, detected_domain, entities)
 
         return QueryRoute(
@@ -747,12 +744,9 @@ class QueryRouter:
 
     def _is_contextual(self, query: str, language: str) -> bool:
         """
-        Détection de références contextuelles via universal_terms
-
-        Charge dynamiquement les patterns depuis universal_terms_XX.json
-        au lieu d'utiliser du texte hardcodé
+        Detects contextual references using patterns from universal_terms configuration
         """
-        # Récupérer patterns depuis universal_terms
+        # Retrieve patterns from universal_terms
         patterns = self.config.get_contextual_patterns(language)
 
         if not patterns:
@@ -772,22 +766,16 @@ class QueryRouter:
 
     def _is_comparative(self, query: str) -> bool:
         """
-        Détecte si la query est une comparaison multi-entités
+        Detects multi-entity comparison queries with strict validation for generic conjunctions
 
-        Patterns: "vs", "versus", "compare", "comparer"
-
-        Validation stricte pour "et/and": doit avoir breed avant ET après
-        pour éviter faux positifs comme "poids ET fcr du Ross 308"
-
-        Returns:
-            True si pattern de comparaison détecté
+        Returns True if comparison pattern detected with breeds on both sides of keyword
         """
         if not self.comparison_regex:
             return False
 
         query_lower = query.lower()
 
-        # Détecter pattern de comparaison
+        # Detect comparison pattern
         comparison_match = self.comparison_regex.search(query_lower)
 
         if not comparison_match:
@@ -795,19 +783,17 @@ class QueryRouter:
 
         keyword = comparison_match.group().lower()
 
-        # 🔧 VALIDATION STRICTE pour "et/and/ou/or" (mots génériques)
-        # Vérifier qu'il y a une breed AVANT et APRÈS le mot de comparaison
+        # Strict validation for generic conjunctions to avoid false positives
         if keyword in ["et", "and", "ou", "or"]:
-            # Extraire toutes les breeds dans la query
+            # Extract all breeds in query
             all_breeds = self._extract_all_breeds(query)
 
-            # Si moins de 2 breeds, c'est un faux positif
+            # Less than 2 breeds means false positive
             if len(all_breeds) < 2:
                 logger.debug(f"⚠️ '{keyword}' détecté mais < 2 breeds → pas comparatif")
                 return False
 
-            # Vérifier que les breeds sont de part et d'autre du mot comparatif
-            # Sinon "Ross 308 et femelle" serait détecté comme comparatif
+            # Verify breeds exist on both sides of comparison keyword
             keyword_pos = query_lower.find(keyword)
             text_before = query_lower[:keyword_pos]
             text_after = query_lower[keyword_pos + len(keyword):]
@@ -824,22 +810,16 @@ class QueryRouter:
 
     def _extract_all_breeds(self, query: str) -> List[str]:
         """
-        Extrait TOUTES les races mentionnées dans la query (pas juste la première)
+        Extracts all breed mentions for comparative queries
 
-        Utilisé pour les queries comparatives comme "Ross 308 vs Cobb 500"
-
-        Args:
-            query: Texte de la requête
-
-        Returns:
-            Liste des noms canoniques de races trouvées
+        Returns list of canonical breed names found in query
         """
         if not self.breed_regex:
             return []
 
         breeds_found = []
 
-        # Trouver toutes les occurrences (pas juste la première)
+        # Find all occurrences, not just first match
         for match in self.breed_regex.finditer(query):
             breed_text = match.group(1)
             canonical = self.config.get_breed_canonical(breed_text)
@@ -850,7 +830,7 @@ class QueryRouter:
         return breeds_found
 
     def _extract_entities(self, query: str, language: str) -> Dict[str, Any]:
-        """Extraction via regex compilés - PAS d'appel OpenAI"""
+        """Extraction via compiled regex - NO OpenAI calls"""
 
         entities = {}
         query_lower = query.lower()
@@ -920,7 +900,7 @@ class QueryRouter:
         return entities
 
     def _calculate_confidence(self, entities: Dict) -> float:
-        """Calcule la confiance d'extraction"""
+        """Calculates extraction confidence"""
         score = 0.0
 
         if entities.get("breed"):
@@ -938,11 +918,11 @@ class QueryRouter:
         self, new_entities: Dict[str, Any], previous_entities: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Merge intelligent: nouvelles valeurs OVERRIDE anciennes
+        Intelligent merge: new values OVERRIDE old
 
-        Logique:
-        - Si nouvelle entité présente → utiliser nouvelle
-        - Si nouvelle entité absente → hériter de l'ancienne
+        Logic:
+        - If new entity present → use new
+        - If new entity absent → inherit from old
         """
 
         merged = previous_entities.copy()
@@ -958,7 +938,7 @@ class QueryRouter:
         self, entities: Dict[str, Any], query: str, language: str
     ) -> Tuple[bool, List[str], Dict]:
         """
-        Validation basée sur LLM classification (remplace patterns regex fragiles)
+        Validation based on LLM classification (replaces fragile regex patterns)
 
         Returns:
             (is_complete, missing_fields, validation_details)
@@ -1085,10 +1065,10 @@ class QueryRouter:
         self, query: str, entities: Dict[str, Any], language: str
     ) -> List[str]:
         """
-        Détecte si une question Weaviate est trop ambiguë
+        Detects if a Weaviate question is too ambiguous
 
         Returns:
-            Liste des champs manquants ou []
+            List of missing fields or []
         """
         query_lower = query.lower()
         missing = []
@@ -1165,13 +1145,13 @@ class QueryRouter:
         self, query: str, entities: Dict[str, Any], language: str, validation_details: Dict[str, Any] = None
     ) -> Tuple[str, str]:
         """
-        Routing intelligent basé sur LLM classifier (priorité) puis keywords fallback
+        Intelligent routing based on LLM classifier (priority) then keyword fallback
 
         Args:
-            query: Question utilisateur
-            entities: Entités extraites
-            language: Langue détectée
-            validation_details: Détails de validation contenant llm_routing_target
+            query: User question
+            entities: Extracted entities
+            language: Detected language
+            validation_details: Validation details containing llm_routing_target
 
         Returns:
             (destination, reason)
@@ -1210,15 +1190,15 @@ class QueryRouter:
         self, destination: str, detected_domain: str, entities: Dict[str, Any]
     ) -> str:
         """
-        Détermine le type de query pour logging/tracking
+        Determines query type for logging/tracking
 
         Args:
-            destination: Destination routée (postgresql/weaviate/hybrid/calculation)
-            detected_domain: Domaine détecté (genetics_performance, health, etc.)
-            entities: Entités extraites
+            destination: Routed destination (postgresql/weaviate/hybrid/calculation)
+            detected_domain: Detected domain (genetics_performance, health, etc.)
+            entities: Extracted entities
 
         Returns:
-            Type de query (metric_query, health_query, comparison, calculation, etc.)
+            Query type (metric_query, health_query, comparison, calculation, etc.)
         """
         # Si calcul multi-étapes détecté
         if destination == "calculation":
@@ -1247,17 +1227,17 @@ class QueryRouter:
             return "standard"
 
     def clear_context(self, user_id: str):
-        """Efface le contexte conversationnel d'un utilisateur"""
+        """Clears user's conversational context"""
         if user_id in self.context_store:
             del self.context_store[user_id]
             logger.info(f"🗑️ Contexte effacé pour {user_id}")
 
     def get_context(self, user_id: str) -> Optional[ConversationContext]:
-        """Récupère le contexte conversationnel"""
+        """Retrieves conversational context"""
         return self.context_store.get(user_id)
 
     def get_stats(self) -> Dict:
-        """Statistiques du router"""
+        """Router statistics"""
         active_contexts = sum(
             1 for ctx in self.context_store.values() if not ctx.is_expired()
         )
@@ -1280,12 +1260,12 @@ class QueryRouter:
 
 
 def create_query_router(config_dir: str = "config") -> QueryRouter:
-    """Factory pour créer une instance QueryRouter"""
+    """Factory to create a QueryRouter instance"""
     return QueryRouter(config_dir)
 
 
 def test_query_router():
-    """Tests unitaires intégrés"""
+    """Integrated unit tests"""
 
     print("=" * 70)
     print("TESTS QUERY ROUTER")

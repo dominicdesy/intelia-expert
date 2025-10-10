@@ -17,7 +17,7 @@ Version: 1.0 (Phase 3.2)
 
 import logging
 from typing import Dict, List, Optional, Any
-from utils.clarification_helper import ClarificationHelper, get_clarification_helper
+from utils.clarification_helper import get_clarification_helper
 
 logger = logging.getLogger(__name__)
 
