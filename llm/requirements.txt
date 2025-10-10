@@ -23,7 +23,7 @@ weaviate-client==4.16.10
 
 # === REDIS CACHE - Performance optimisée ===
 redis[hiredis]==6.4.0
-hiredis==2.3.2
+hiredis==3.2.0
 
 # === BASE DE DONNÉES POSTGRESQL ===
 # Support PostgreSQL pour données structurées et performance records
