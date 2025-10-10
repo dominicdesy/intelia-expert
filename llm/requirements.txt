@@ -2,6 +2,10 @@
 # Version 4.1 - Système RAG JSON Core (Dépendances Essentielles)
 # Optimized for Digital Ocean - Lightweight language detection
 
+# === COMPATIBILITÉ PYTHON - DOIT ÊTRE INSTALLÉ EN PREMIER ===
+# typing-extensions avec Sentinel (requis par pydantic-core)
+typing-extensions>=4.12.0
+
 # === CORE FASTAPI - Versions stables ===
 fastapi==0.112.2
 uvicorn[standard]==0.37.0
@@ -159,9 +163,6 @@ asyncio-throttle==1.0.2
 
 # === PARALLÉLISATION ESSENTIELLE ===
 joblib==1.3.2
-
-# === COMPATIBILITÉ PYTHON 3.13 ===
-typing-extensions>=4.8.0
 
 # === CONTRAINTES SÉCURITÉ ===
 urllib3>=2.0.0,<3.0.0
