@@ -212,14 +212,14 @@ class CacheInterface(ABC):
         """
         pass
 
-    def get_cache_stats_object(self) -> CacheStats:
+    async def get_cache_stats_object(self) -> CacheStats:
         """
         Get cache statistics as CacheStats object
 
         Returns:
             CacheStats instance
         """
-        stats = self.get_cache_stats()
+        stats = await self.get_cache_stats()
         return CacheStats(**stats)
 
 
