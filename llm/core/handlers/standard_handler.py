@@ -73,12 +73,12 @@ class StandardQueryHandler(BaseQueryHandler):
 
     async def handle(
         self,
-        preprocessed_data: Dict[str, Any] = None,
-        start_time: float = None,
-        query: str = None,
-        entities: Dict[str, Any] = None,
-        original_query: str = None,
-        preprocessing_result: Dict[str, Any] = None,
+        preprocessed_data: Optional[Dict[str, Any]] = None,
+        start_time: Optional[float] = None,
+        query: Optional[str] = None,
+        entities: Optional[Dict[str, Any]] = None,
+        original_query: Optional[str] = None,
+        preprocessing_result: Optional[Dict[str, Any]] = None,
         language: str = "fr",
     ) -> RAGResult:
         """Process standard query with intelligent routing"""
@@ -103,6 +103,10 @@ class StandardQueryHandler(BaseQueryHandler):
 
         if entities is None:
             entities = {}
+
+        # Ensure query is never None (should always be provided or extracted from preprocessed_data)
+        if query is None:
+            query = ""
 
         filters = self._extract_filters_from_entities(entities)
         (preprocessed_data.get("contextual_history", "") if preprocessed_data else "")
@@ -222,7 +226,7 @@ class StandardQueryHandler(BaseQueryHandler):
         filters: Dict[str, Any],
         top_k: int,
         language: str,
-        preprocessed_data: Dict[str, Any],
+        preprocessed_data: Optional[Dict[str, Any]],
         start_time: float,
     ) -> Optional[RAGResult]:
         """Handle PostgreSQL routing with validation"""
@@ -354,7 +358,7 @@ class StandardQueryHandler(BaseQueryHandler):
         top_k: int,
         is_optimization: bool,
         language: str = "fr",
-        filters: Dict[str, Any] = None,
+        filters: Optional[Dict[str, Any]] = None,
     ) -> Optional[RAGResult]:
         """Execute single PostgreSQL search"""
         if filters is None:
@@ -398,8 +402,8 @@ class StandardQueryHandler(BaseQueryHandler):
         is_optimization: bool,
         start_time: float,
         language: str = "fr",
-        filters: Dict[str, Any] = None,
-        preprocessed_data: Dict[str, Any] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        preprocessed_data: Optional[Dict[str, Any]] = None,
     ) -> RAGResult:
         """Direct Weaviate search"""
         if filters is None:
