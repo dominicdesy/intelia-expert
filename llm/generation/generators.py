@@ -618,13 +618,14 @@ class EnhancedResponseGenerator:
             system_prompt_parts = []
 
             # ✅ Instructions de langue EN TÊTE (UNE SEULE FOIS)
-            # 🌍 ALWAYS generate in English - translation to target language happens post-generation
+            # 🌍 Generate response directly in target language (no post-translation)
 
             # 🎯 HIERARCHICAL RAG PROMPT - Adapts to context source
             if context_source == "postgresql":
                 # STRICTEST: PostgreSQL = authoritative data - ABSOLUTE faithfulness required
-                language_instruction = """You are an expert in poultry production.
-CRITICAL: Respond EXCLUSIVELY in ENGLISH.
+                language_name = self.language_display_names.get(language, language.upper())
+                language_instruction = f"""You are an expert in poultry production.
+CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 
 🎯 HIERARCHICAL RAG GUIDELINES - LEVEL 1: AUTHORITATIVE DATA (PostgreSQL)
 
@@ -656,8 +657,9 @@ FORMATTING RULES - CLEAN & MODERN:
 """
             elif context_source == "weaviate":
                 # MODERATE: Weaviate = documentation - strict extraction with minor flexibility
-                language_instruction = """You are an expert in poultry production.
-CRITICAL: Respond EXCLUSIVELY in ENGLISH.
+                language_name = self.language_display_names.get(language, language.upper())
+                language_instruction = f"""You are an expert in poultry production.
+CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 
 🎯 HIERARCHICAL RAG GUIDELINES - LEVEL 2: DOCUMENTATION (Weaviate)
 
@@ -688,8 +690,9 @@ FORMATTING RULES - CLEAN & MODERN:
 """
             else:
                 # FLEXIBLE: Unknown/general - allow general knowledge as last resort
-                language_instruction = """You are an expert in poultry production.
-CRITICAL: Respond EXCLUSIVELY in ENGLISH.
+                language_name = self.language_display_names.get(language, language.upper())
+                language_instruction = f"""You are an expert in poultry production.
+CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 
 🎯 HIERARCHICAL RAG GUIDELINES - LEVEL 3: GENERAL KNOWLEDGE (Fallback)
 
@@ -907,9 +910,10 @@ YOUR RESPONSE LANGUAGE MUST BE: ENGLISH
             logger.warning(f"Invalid language '{language}', using {FALLBACK_LANGUAGE}")
             language = FALLBACK_LANGUAGE
 
-        # 🌍 ALWAYS generate in English - translation to target language happens post-generation
+        # Generate dynamic language instruction
+        language_name = self.language_display_names.get(language, language.upper())
         return f"""You are an expert in poultry production.
-CRITICAL: Respond EXCLUSIVELY in ENGLISH.
+CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 
 CONTEXTE MÉTIER:
 {enrichment.entity_context}
