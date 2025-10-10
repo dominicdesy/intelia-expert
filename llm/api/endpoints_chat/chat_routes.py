@@ -107,10 +107,11 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             # Détection automatique de la langue
             language_result = detect_language_enhanced(message)
-            detected_language = (
+            # Extract string from LanguageDetectionResult or use string directly
+            detected_language: str = (
                 language_result.language
                 if hasattr(language_result, "language")
-                else language_result
+                else str(language_result)
             )
 
             logger.info(
