@@ -587,7 +587,20 @@ class ProactiveAssistant:
 
         # Get metric name in target language
         metric_type = entities.get("metric_type", "")
-        metric_name = metric_names.get(language, {}).get(metric_type, metric_type)
+
+        # Normalize metric type (handle variations)
+        metric_mapping = {
+            "weight": "body_weight",
+            "fcr": "feed_conversion_ratio",
+            "gain": "daily_gain",
+            "mortality": "mortality",
+            "livability": "livability",
+            "feed": "feed_intake",
+            "water": "water_intake",
+        }
+        normalized_metric = metric_mapping.get(metric_type.lower(), metric_type) if metric_type else metric_type
+
+        metric_name = metric_names.get(language, {}).get(normalized_metric, metric_type)
 
         # Replace placeholders
         filled = template.replace("{metric}", metric_name)
