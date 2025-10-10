@@ -707,17 +707,29 @@ class RAGQueryProcessor:
             interpolation_applied = details.get("interpolation_applied", False)
 
             if language == "en":
-                answer = f"To reach a target weight of {target_weight}g at day {age_end}, "
-                answer += f"you will need {total_kg} kg of feed per bird "
-                answer += f"from day {age_start} to day {age_end}"
+                if target_weight:
+                    # Weight-based calculation
+                    answer = f"To reach a target weight of {target_weight}g at day {age_end}, "
+                    answer += f"you will need {total_kg} kg of feed per bird "
+                    answer += f"from day {age_start} to day {age_end}"
+                else:
+                    # Time-based calculation
+                    answer = f"From day {age_start} to day {age_end}, "
+                    answer += f"you will need {total_kg} kg of feed per bird"
                 if interpolation_applied:
                     ratio = details.get("interpolation_ratio", 1.0)
                     answer += f" (with proportional adjustment of {ratio:.1%} for the final day)"
                 answer += "."
             else:
-                answer = f"Pour atteindre un poids cible de {target_weight}g au jour {age_end}, "
-                answer += f"vous aurez besoin de {total_kg} kg d'aliment par poulet "
-                answer += f"entre le jour {age_start} et le jour {age_end}"
+                if target_weight:
+                    # Weight-based calculation
+                    answer = f"Pour atteindre un poids cible de {target_weight}g au jour {age_end}, "
+                    answer += f"vous aurez besoin de {total_kg} kg d'aliment par poulet "
+                    answer += f"entre le jour {age_start} et le jour {age_end}"
+                else:
+                    # Time-based calculation
+                    answer = f"Du jour {age_start} au jour {age_end}, "
+                    answer += f"vous aurez besoin de {total_kg} kg d'aliment par poulet"
                 if interpolation_applied:
                     ratio = details.get("interpolation_ratio", 1.0)
                     answer += f" (avec ajustement proportionnel de {ratio:.1%} pour le dernier jour)"
