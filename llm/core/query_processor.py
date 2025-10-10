@@ -21,7 +21,15 @@ structured_logger = structlog.get_logger()
 class RAGQueryProcessor:
     """Processes queries through the RAG pipeline"""
 
-    def __init__(self, query_router, handlers, conversation_memory=None, ood_detector=None):
+    def __init__(
+        self,
+        query_router,
+        handlers,
+        conversation_memory=None,
+        ood_detector=None,
+        weaviate_client=None,
+        enable_external_sources=False
+    ):
         """
         Initialize query processor
 
@@ -30,6 +38,8 @@ class RAGQueryProcessor:
             handlers: Dict of handler instances (temporal, comparative, standard, calculation)
             conversation_memory: Optional ConversationMemory instance
             ood_detector: Optional OOD detector instance
+            weaviate_client: Optional Weaviate client for document ingestion
+            enable_external_sources: Enable external sources search (default: False)
         """
         self.query_router = query_router
         self.temporal_handler = handlers.get("temporal")
@@ -44,6 +54,34 @@ class RAGQueryProcessor:
         # Initialize LLM translator for multilingual support
         self.translator = LLMTranslator(cache_enabled=True)
         logger.info("✅ LLMTranslator initialized for query translation")
+
+        # 🆕 Initialize external sources system (query-driven document ingestion)
+        self.external_manager = None
+        self.ingestion_service = None
+
+        if enable_external_sources and weaviate_client:
+            try:
+                from external_sources import ExternalSourceManager
+                from external_sources.ingestion_service import DocumentIngestionService
+
+                self.external_manager = ExternalSourceManager(
+                    enable_semantic_scholar=True,
+                    enable_pubmed=True,
+                    enable_europe_pmc=True,
+                    enable_fao=False  # FAO is placeholder
+                )
+
+                self.ingestion_service = DocumentIngestionService(
+                    weaviate_client=weaviate_client
+                )
+
+                logger.info("✅ External sources system initialized (query-driven ingestion)")
+            except Exception as e:
+                logger.warning(f"⚠️ External sources initialization failed: {e}")
+                self.external_manager = None
+                self.ingestion_service = None
+        else:
+            logger.info("ℹ️ External sources system disabled")
 
     async def process_query(
         self,
@@ -419,6 +457,77 @@ class RAGQueryProcessor:
             route, preprocessed_data, start_time, language
         )
         step6_duration = time.time() - step6_start
+
+        # Step 6.5: 🆕 Try external sources if low confidence and system enabled
+        EXTERNAL_SEARCH_THRESHOLD = 0.7  # TODO: Move to config
+
+        if (self.external_manager and
+            hasattr(result, 'confidence') and
+            result.confidence < EXTERNAL_SEARCH_THRESHOLD and
+            route.destination == "weaviate"):  # Only for knowledge queries
+
+            logger.info(
+                f"🔍 Low confidence ({result.confidence:.2f}), searching external sources..."
+            )
+
+            try:
+                # Search external sources
+                external_start = time.time()
+                external_result = await self.external_manager.search(
+                    query=query_for_routing,
+                    language=language,
+                    max_results_per_source=5,
+                    min_year=2015
+                )
+                external_duration = time.time() - external_start
+
+                if external_result.has_answer():
+                    best_doc = external_result.best_document
+
+                    logger.info(
+                        f"✅ Found external document: '{best_doc.title[:60]}...' "
+                        f"(score={best_doc.composite_score:.3f}, source={best_doc.source})"
+                    )
+
+                    # Check if document already exists
+                    doc_exists = self.ingestion_service.check_document_exists(best_doc)
+
+                    if not doc_exists:
+                        # Ingest into Weaviate for future queries
+                        logger.info(f"📥 Ingesting document into Weaviate...")
+                        success = await self.ingestion_service.ingest_document(
+                            document=best_doc,
+                            query_context=query,
+                            language=language
+                        )
+
+                        if success:
+                            logger.info("✅ Document ingested successfully")
+                        else:
+                            logger.warning("⚠️ Document ingestion failed")
+                    else:
+                        logger.info("ℹ️ Document already exists in Weaviate")
+
+                    # Return answer from external source
+                    result = self._format_external_answer(best_doc, language, query)
+
+                    # Log external search success
+                    structured_logger.info(
+                        "external_search_success",
+                        request_id=request_id,
+                        source=best_doc.source,
+                        document_title=best_doc.title[:100],
+                        composite_score=best_doc.composite_score,
+                        relevance_score=best_doc.relevance_score,
+                        external_duration_ms=external_duration * 1000,
+                        doc_ingested=not doc_exists
+                    )
+                else:
+                    logger.info("ℹ️ No relevant external documents found")
+
+            except Exception as e:
+                logger.error(f"❌ External sources search failed: {e}", exc_info=True)
+                # Continue with original result (fail gracefully)
 
         # Structured logging: Query completed
         structured_logger.info(
@@ -921,3 +1030,78 @@ class RAGQueryProcessor:
         })
 
         return contexts
+
+    def _format_external_answer(
+        self,
+        document,
+        language: str,
+        query: str
+    ) -> RAGResult:
+        """
+        Format answer from external document
+
+        Args:
+            document: ExternalDocument from external sources
+            language: Query language
+            query: Original query
+
+        Returns:
+            RAGResult with formatted answer
+        """
+        # Build citation
+        if len(document.authors) > 0:
+            if len(document.authors) == 1:
+                citation = f"{document.authors[0]} ({document.year})"
+            elif len(document.authors) == 2:
+                citation = f"{document.authors[0]} & {document.authors[1]} ({document.year})"
+            else:
+                citation = f"{document.authors[0]} et al. ({document.year})"
+        else:
+            citation = f"({document.year})"
+
+        # Build answer with abstract and citation
+        if language == "fr":
+            answer = f"{document.abstract}\n\n**Source:** {citation}"
+            if document.journal:
+                answer += f" - {document.journal}"
+            if document.url:
+                answer += f"\n**Lien:** {document.url}"
+        else:
+            answer = f"{document.abstract}\n\n**Source:** {citation}"
+            if document.journal:
+                answer += f" - {document.journal}"
+            if document.url:
+                answer += f"\n**Link:** {document.url}"
+
+        # Build context docs for RAGAS evaluation
+        context_docs = [{
+            "content": document.abstract,
+            "metadata": {
+                "source": document.source,
+                "title": document.title,
+                "authors": ", ".join(document.authors),
+                "year": document.year,
+                "citations": document.citation_count,
+                "url": document.url
+            }
+        }]
+
+        return RAGResult(
+            source=RAGSource.RETRIEVAL_SUCCESS,
+            answer=answer,
+            confidence=document.composite_score,
+            context_docs=context_docs,
+            metadata={
+                "query_type": "external_document",
+                "external_source": document.source,
+                "document_title": document.title,
+                "document_year": document.year,
+                "citation_count": document.citation_count,
+                "relevance_score": document.relevance_score,
+                "composite_score": document.composite_score,
+                "url": document.url,
+                "journal": document.journal,
+                "original_query": query,
+                "language": language
+            }
+        )
