@@ -605,6 +605,7 @@ class PostgreSQLRetriever(InitializableMixin):
 
             # Calculs finaux
             total_feed_kg_per_bird = total_feed_grams / 1000
+            total_feed_tonnes = None  # Initialize before conditional use
 
             # ✅ FORMATAGE RÉSULTAT
             context_text = f"""Feed calculation for {strain_name} ({actual_sex}, {actual_species}) from day {start_age} to day {target_age}:
