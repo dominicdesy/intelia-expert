@@ -150,29 +150,26 @@ jobs:
               if (highCount > 0) {
                 const repoFullName = context.repo.owner + '/' + context.repo.repo;
                 const runId = context.runId;
-                const issueBody = `## 🚨 Security Audit Alert
+                const auditDate = new Date().toISOString().split('T')[0];
 
-**Monthly security audit found ${highCount} HIGH severity issue(s)**
-
-### Action Required
-Please review the security audit reports in the workflow artifacts:
-- [Workflow Run](https://github.com/${repoFullName}/actions/runs/${runId})
-
-### Next Steps
-1. Download and review the security reports
-2. Assess each HIGH severity issue
-3. Create tickets for remediation
-4. Update security documentation
-
-**Audit Date:** ${new Date().toISOString().split('T')[0]}
-**Workflow:** Monthly Security Audit
-
-_This issue was automatically created by the security audit workflow._`;
+                const issueBody = '## 🚨 Security Audit Alert\n\n' +
+                  '**Monthly security audit found ' + highCount + ' HIGH severity issue(s)**\n\n' +
+                  '### Action Required\n' +
+                  'Please review the security audit reports in the workflow artifacts:\n' +
+                  '- [Workflow Run](https://github.com/' + repoFullName + '/actions/runs/' + runId + ')\n\n' +
+                  '### Next Steps\n' +
+                  '1. Download and review the security reports\n' +
+                  '2. Assess each HIGH severity issue\n' +
+                  '3. Create tickets for remediation\n' +
+                  '4. Update security documentation\n\n' +
+                  '**Audit Date:** ' + auditDate + '\n' +
+                  '**Workflow:** Monthly Security Audit\n\n' +
+                  '_This issue was automatically created by the security audit workflow._';
 
                 await github.rest.issues.create({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  title: `Security Audit: ${highCount} HIGH severity issue(s) found`,
+                  title: 'Security Audit: ' + highCount + ' HIGH severity issue(s) found',
                   body: issueBody,
                   labels: ['security', 'high-priority']
                 });
