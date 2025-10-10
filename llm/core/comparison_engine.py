@@ -717,6 +717,11 @@ class ComparisonEngine:
 
         data = comparison_result.comparison_data
 
+        # Ensure data is not None (should never happen if success=True, but type safety)
+        if data is None:
+            logger.error("comparison_data is None despite success=True")
+            return self._generate_error_response(comparison_result, language)
+
         # Tentative enrichissement OpenAI
         if use_openai:
             try:
