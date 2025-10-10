@@ -66,6 +66,15 @@ OUT-OF-DOMAIN includes:
 - Technology unrelated to poultry
 - Entertainment, sports, culture
 
+IMPORTANT CLARIFICATIONS:
+- Questions about vaccines, treatments, diseases, feed, housing, etc. are IN-DOMAIN even without explicit mention of "poultry" or "chicken"
+- Assume the context is poultry production unless clearly stated otherwise
+- Examples of IN-DOMAIN questions:
+  * "Can I use a vaccine after its expiry date?" → YES (poultry vaccination)
+  * "What is the ideal temperature?" → YES (poultry housing)
+  * "How to store feed?" → YES (poultry nutrition)
+  * "What causes mortality?" → YES (poultry health)
+
 Question: "{query}"
 
 Is this question about POULTRY PRODUCTION or POULTRY VALUE CHAIN?
