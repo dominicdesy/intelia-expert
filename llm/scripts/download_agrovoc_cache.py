@@ -5,7 +5,7 @@ Download AGROVOC poultry terms cache for all supported languages
 This script downloads all poultry-related terms from AGROVOC FAO database
 for the 10 languages supported by AGROVOC (fr, en, es, de, it, pt, pl, hi, th, zh).
 
-Output: agrovoc_poultry_cache.json
+Output: llm/services/agrovoc_poultry_cache.json
 """
 
 import requests
@@ -124,8 +124,14 @@ def download_agrovoc_cache() -> Dict[str, List[str]]:
     return cache
 
 
-def save_cache(cache: Dict[str, bool], filename: str = "agrovoc_poultry_cache.json"):
-    """Save cache to JSON file"""
+def save_cache(cache: Dict[str, bool], filename: str = None):
+    """Save cache to JSON file in services/ directory"""
+    if filename is None:
+        # Save in llm/services/ directory
+        from pathlib import Path
+        services_dir = Path(__file__).parent.parent / "services"
+        filename = str(services_dir / "agrovoc_poultry_cache.json")
+
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(cache, f, indent=2, ensure_ascii=False)
 

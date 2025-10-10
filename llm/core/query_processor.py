@@ -470,6 +470,12 @@ class RAGQueryProcessor:
                 f"🔍 Low confidence ({result.confidence:.2f}), searching external sources..."
             )
 
+            # Track ingestion timing
+            ingestion_duration_ms = None
+            doc_ingested = False
+            doc_exists = False
+            best_doc = None
+
             try:
                 # Search external sources
                 external_start = time.time()
@@ -480,6 +486,12 @@ class RAGQueryProcessor:
                     min_year=2015
                 )
                 external_duration = time.time() - external_start
+
+                # Extract sources queried
+                sources_queried = []
+                if hasattr(external_result, 'results_by_source'):
+                    sources_queried = list(external_result.results_by_source.keys())
+                total_docs_found = len(external_result.all_documents) if external_result else 0
 
                 if external_result.has_answer():
                     best_doc = external_result.best_document
@@ -495,14 +507,17 @@ class RAGQueryProcessor:
                     if not doc_exists:
                         # Ingest into Weaviate for future queries
                         logger.info(f"📥 Ingesting document into Weaviate...")
+                        ingestion_start = time.time()
                         success = await self.ingestion_service.ingest_document(
                             document=best_doc,
                             query_context=query,
                             language=language
                         )
+                        ingestion_duration_ms = (time.time() - ingestion_start) * 1000
 
                         if success:
                             logger.info("✅ Document ingested successfully")
+                            doc_ingested = True
                         else:
                             logger.warning("⚠️ Document ingestion failed")
                     else:
@@ -511,7 +526,7 @@ class RAGQueryProcessor:
                     # Return answer from external source
                     result = self._format_external_answer(best_doc, language, query)
 
-                    # Log external search success
+                    # Log external search success (structured logging)
                     structured_logger.info(
                         "external_search_success",
                         request_id=request_id,
@@ -520,10 +535,48 @@ class RAGQueryProcessor:
                         composite_score=best_doc.composite_score,
                         relevance_score=best_doc.relevance_score,
                         external_duration_ms=external_duration * 1000,
-                        doc_ingested=not doc_exists
+                        doc_ingested=doc_ingested
+                    )
+
+                    # 🆕 Log to external sources activity logger
+                    from external_sources.activity_logger import log_external_search
+                    log_external_search(
+                        request_id=request_id,
+                        query=query,
+                        language=language,
+                        weaviate_confidence=result.confidence if hasattr(result, 'confidence') else 0.0,
+                        triggered_reason="low_confidence",
+                        sources_queried=sources_queried,
+                        total_documents_found=total_docs_found,
+                        search_duration_ms=external_duration * 1000,
+                        best_document=best_doc,
+                        document_ingested=doc_ingested,
+                        document_already_existed=doc_exists,
+                        ingestion_duration_ms=ingestion_duration_ms,
+                        tenant_id=tenant_id,
+                        session_id=request_id,
                     )
                 else:
                     logger.info("ℹ️ No relevant external documents found")
+
+                    # 🆕 Log no results to activity logger
+                    from external_sources.activity_logger import log_external_search
+                    log_external_search(
+                        request_id=request_id,
+                        query=query,
+                        language=language,
+                        weaviate_confidence=result.confidence if hasattr(result, 'confidence') else 0.0,
+                        triggered_reason="low_confidence",
+                        sources_queried=sources_queried,
+                        total_documents_found=total_docs_found,
+                        search_duration_ms=external_duration * 1000,
+                        best_document=None,
+                        document_ingested=False,
+                        document_already_existed=False,
+                        ingestion_duration_ms=None,
+                        tenant_id=tenant_id,
+                        session_id=request_id,
+                    )
 
             except Exception as e:
                 logger.error(f"❌ External sources search failed: {e}", exc_info=True)

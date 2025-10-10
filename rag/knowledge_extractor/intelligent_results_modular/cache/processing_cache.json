@@ -122,14 +122,14 @@
     },
     "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\Broiler-Guide_English-2021-min_extracted.json": {
       "file_hash": "ef9520be3da4d1fd47f447883a2d1601bca14e780d629fa8e8a48c034b98bb6a",
-      "last_processed": "2025-10-09T13:34:24.349741",
+      "last_processed": "2025-10-10T17:07:46.844659",
       "success": true,
-      "segments_created": 125,
-      "injection_success": 125,
+      "segments_created": 35,
+      "injection_success": 35,
       "injection_errors": 0,
-      "final_conformity_score": 0.93,
+      "final_conformity_score": 1.0,
       "partial_success": false,
-      "report_path": "intelligent_results_modular\\report_Broiler-Guide_English-2021-min_extracted_20251009_133424.json",
+      "report_path": "intelligent_results_modular\\report_Broiler-Guide_English-2021-min_extracted_20251010_170746.json",
       "error": null
     },
     "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\Cobb-Male-Supplement_extracted.json": {
@@ -242,14 +242,14 @@
     },
     "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\Hatchery-Guide-Layout-R4-min_extracted.json": {
       "file_hash": "9bb04ccf5a55c7116c8f55e84b8a6623fb88ac14a54354372dcc487fd4fbb52f",
-      "last_processed": "2025-10-09T13:40:45.164461",
+      "last_processed": "2025-10-10T17:08:17.358857",
       "success": true,
-      "segments_created": 110,
-      "injection_success": 110,
+      "segments_created": 30,
+      "injection_success": 30,
       "injection_errors": 0,
-      "final_conformity_score": 0.8227272727272728,
+      "final_conformity_score": 1.0,
       "partial_success": false,
-      "report_path": "intelligent_results_modular\\report_Hatchery-Guide-Layout-R4-min_extracted_20251009_134045.json",
+      "report_path": "intelligent_results_modular\\report_Hatchery-Guide-Layout-R4-min_extracted_20251010_170817.json",
       "error": null
     },
     "C:\\intelia_gpt\\intelia-expert\\rag\\documents\\Knowledge\\Hyline Brown - Alternative - Performance Sell Sheet ENG_extracted.json": {
@@ -601,6 +601,6 @@
       "error": null
     }
   },
-  "last_update": "2025-10-09T13:58:24.848481",
+  "last_update": "2025-10-10T17:08:17.358857",
   "version": "1.0"
 }

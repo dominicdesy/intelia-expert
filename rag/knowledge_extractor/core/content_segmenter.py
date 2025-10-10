@@ -14,10 +14,8 @@ from typing import List, Dict, Any
 from datetime import datetime
 from core.models import DocumentContext
 
-# Add llm directory to path for ChunkingService import
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../llm')))
-
-from core.chunking_service import ChunkingService, ChunkConfig
+# Import ChunkingService (now in same core directory)
+from .chunking_service import ChunkingService, ChunkConfig
 
 # Gestion robuste des encodages
 try:

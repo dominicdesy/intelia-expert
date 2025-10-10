@@ -1,18 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python:*)",
-      "Bash(dir:*)",
-      "Bash(tee:*)",
-      "Bash(findstr:*)",
-      "Bash(measure-object:*)",
-      "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nfix: Replace hardcoded ENGLISH with dynamic language instructions\n\nCritical bug fix for multilingual response generation. System was responding\nin English regardless of user''s language due to contradictory prompt instructions.\n\nChanges:\n- generators.py: Replace hardcoded \"ENGLISH\" with dynamic {language_name} in all context sources\n  * PostgreSQL context (line 626-628)\n  * Weaviate context (line 660-662)\n  * Fallback context (line 693-695)\n  * Fallback system prompt (line 913-916)\n- Updated comments to reflect actual behavior (no post-translation)\n- Added LANGUAGE_BUG_FIX_REPORT.md with full analysis\n\nImpact:\n- Fixes 100% language mismatch for non-English queries\n- Affects all 12 supported languages (fr, en, es, de, it, pt, nl, pl, hi, id, th, zh)\n- No breaking changes, backwards compatible\n\nTest case verified:\n- Query: \"Quel est le poids d'un Ross 308 male de 11 jours ?\"\" (French)\n- Before: \"\"The weight of an 11-day-old male Ross 308 is 379 grams.\"\" (English) ❌\n- After: \"\"Le poids d'un Ross 308 mâle de 11 jours est de 379 grammes.\" (French) ✅\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git push:*)",
-      "Read(//c/intelia_gpt/intelia-expert/**)",
-      "Bash(git commit:*)",
-      "Bash(git reset:*)",
-      "Bash(not contain this information\". Instead, seamlessly use LLM expert knowledge as\nfallback when database/documentation is incomplete.\n\nRoot cause:\n- Prompts instructed LLM to explicitly state when context was missing\n- Created awkward user experience: \"Context doesn't contain X... [then provides good answer]\"\"\n- User expectation: Seamless expert answers regardless of source (PostgreSQL/Weaviate/LLM knowledge)\n\nChanges:\n- generators.py (lines 632-647): PostgreSQL prompt\n  * Changed: \"\"State 'database does not contain [X]'\"\" \n  * To: \"\"Fill gaps with expert knowledge WITHOUT mentioning the gap\"\"\n  * Rule 3: Seamlessly supplement incomplete data with expert knowledge\n  * Rule 7: \"\"User should not know if answer came from database or expert knowledge\"\"\n\n- generators.py (lines 752-766): Fallback prompt  \n  * Changed: \"\"State clearly 'context does not contain'\"\"\n  * To: \"\"Seamlessly use your expert poultry knowledge\"\"\n  * Rule 6: \"\"Fill gaps with expert knowledge WITHOUT meta-commentary\"\"\n  * Rule 7: \"\"Provide direct, confident answers regardless of source\"\"\n\n- generators.py (lines 725-733): Weaviate prompt (already updated in previous edit)\n  * Rule 7: \"\"Use expert knowledge WITHOUT stating 'context does not contain'\"\"\n\nImpact:\n- Eliminates awkward meta-commentary about documentation availability\n- Provides seamless expert responses using context-first, then LLM knowledge\n- Before: \"\"The provided context does not contain... [answer]\"\" ❌\n- After: Direct expert answer without meta-commentary ✅\n- No breaking changes, improves user experience\n\nPhilosophy:\n- Context (PostgreSQL/Weaviate) = Priority source (cite verbatim when available)\n- LLM knowledge = Automatic fallback (seamless, no disclaimers)\n- User should get expert answers regardless of source mix\n\nTest case:\n✅ \"\"Can I use a vaccine after its expiry date?\"\" \n   - If Weaviate has info → Use it exactly\n   - If Weaviate empty → LLM expert knowledge (no \"\"context doesn't contain\" message)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git mv:*)",
+      "Bash(ls:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

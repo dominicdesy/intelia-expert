@@ -189,6 +189,9 @@ class InteliaRAGEngine(InitializableMixin):
             await self._configure_handlers()
 
             # Initialize processors after handlers are configured
+            # 🆕 Enable external sources if Weaviate is available
+            enable_external = bool(self.weaviate_core)
+
             self.query_processor = RAGQueryProcessor(
                 query_router=self.query_router,
                 handlers={
@@ -199,7 +202,14 @@ class InteliaRAGEngine(InitializableMixin):
                 },
                 conversation_memory=self.conversation_memory,
                 ood_detector=self.weaviate_core.ood_detector if self.weaviate_core else None,
+                weaviate_client=self.weaviate_core.client if self.weaviate_core else None,
+                enable_external_sources=enable_external,
             )
+
+            if enable_external:
+                logger.info("✅ External sources system ENABLED (Semantic Scholar, PubMed, Europe PMC)")
+            else:
+                logger.info("ℹ️ External sources system DISABLED (Weaviate not available)")
 
             self.response_generator = RAGResponseGenerator(
                 llm_generator=self.core.generator

@@ -81,6 +81,14 @@ out/
 **/*.npz
 
 # ------------------------------
+# Analysis outputs (generated locally)
+# ------------------------------
+llm/tools/analysis_outputs/*.txt
+llm/tools/analysis_outputs/*.json
+llm/tools/analysis_outputs/*.csv
+!llm/tools/analysis_outputs/.gitignore
+
+# ------------------------------
 # Docker / déploiement
 # ------------------------------
 docker-data/

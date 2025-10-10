@@ -45,9 +45,9 @@ class AGROVOCService:
 
     def _get_default_cache_path(self) -> str:
         """Get default path to AGROVOC cache"""
-        # Cache is in llm/agrovoc_poultry_cache.json
-        llm_dir = Path(__file__).parent.parent
-        return str(llm_dir / "agrovoc_poultry_cache.json")
+        # Cache is in llm/services/agrovoc_poultry_cache.json
+        services_dir = Path(__file__).parent
+        return str(services_dir / "agrovoc_poultry_cache.json")
 
     def _load_cache(self) -> dict:
         """Load AGROVOC cache from JSON file"""

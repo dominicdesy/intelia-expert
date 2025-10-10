@@ -1,0 +1,5 @@
+# Analysis output files - generated locally, not committed
+*.txt
+*.json
+*.csv
+*.log
