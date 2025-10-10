@@ -5,6 +5,7 @@ Extrait de utilities.py pour modularisation
 """
 
 import logging
+from typing import Optional
 from utils.language_detection import normalize_language_code
 from config.config import (
     DEFAULT_LANGUAGE,
@@ -59,7 +60,7 @@ def get_translation_service():
 
 
 def get_universal_translation(
-    term: str, target_language: str, domain: str = None
+    term: str, target_language: str, domain: Optional[str] = None
 ) -> str:
     """Interface unifiée vers le service de traduction"""
     translation_service = get_translation_service()
@@ -81,7 +82,7 @@ def get_universal_translation(
 # ============================================================================
 
 
-def get_out_of_domain_message(language: str = None) -> str:
+def get_out_of_domain_message(language: Optional[str] = None) -> str:
     """
     Message hors domaine traduit - UTILISE config/messages.py
     """
@@ -105,7 +106,7 @@ def get_out_of_domain_message(language: str = None) -> str:
             return "Je me spécialise dans l'aviculture. Comment puis-je vous aider ?"
 
 
-def get_system_message(message_type: str, language: str = None, **kwargs) -> str:
+def get_system_message(message_type: str, language: Optional[str] = None, **kwargs) -> str:
     """
     Interface générique pour récupérer n'importe quel message système
 
@@ -135,7 +136,7 @@ def get_system_message(message_type: str, language: str = None, **kwargs) -> str
         return f"[System message: {message_type}]"
 
 
-def get_aviculture_response(message: str, language: str = None) -> str:
+def get_aviculture_response(message: str, language: Optional[str] = None) -> str:
     """Génère une réponse aviculture multilingue si le RAG échoue"""
     from utils.language_detection import detect_language_enhanced
 
