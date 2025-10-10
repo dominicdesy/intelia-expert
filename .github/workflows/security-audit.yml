@@ -1,0 +1,190 @@
+name: Monthly Security Audit
+
+on:
+  schedule:
+    # Run on the 1st of every month at 9:00 AM UTC
+    - cron: '0 9 1 * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  security-audit:
+    name: Comprehensive Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies and security tools
+        run: |
+          pip install --upgrade pip
+          cd llm
+          pip install -r requirements.txt
+          pip install bandit pip-audit safety semgrep
+
+      - name: Run Bandit (Full Security Scan)
+        run: |
+          cd llm
+          echo "Running comprehensive Bandit security scan..."
+          bandit -r . -f json -o bandit_full_report.json -ll || true
+          bandit -r . -f txt -o bandit_full_report.txt -ll || true
+
+          echo "Bandit scan completed"
+          cat bandit_full_report.txt
+
+      - name: Run pip-audit (CVE Vulnerabilities)
+        run: |
+          cd llm
+          echo "Checking dependencies for known CVEs..."
+          pip-audit --format json --output pip_audit_full.json || true
+          pip-audit --format markdown --output pip_audit_full.md || true
+
+          echo "pip-audit completed"
+
+      - name: Run Safety (Dependency Security)
+        run: |
+          cd llm
+          echo "Running Safety dependency security check..."
+          safety check --json --output safety_report.json || true
+          safety check --output safety_report.txt || true
+
+          echo "Safety scan completed"
+        continue-on-error: true
+
+      - name: Run Semgrep (SAST Analysis)
+        run: |
+          cd llm
+          echo "Running Semgrep static analysis..."
+          semgrep --config=auto --json --output=semgrep_report.json . || true
+          semgrep --config=auto --output=semgrep_report.txt . || true
+
+          echo "Semgrep analysis completed"
+        continue-on-error: true
+
+      - name: Check for secrets in code
+        run: |
+          cd llm
+          echo "Scanning for potential secrets..."
+
+          # Look for common secret patterns
+          echo "Checking for API keys..."
+          grep -r "api[_-]key.*=.*['\"]" --include="*.py" . || echo "No API keys found"
+
+          echo "Checking for passwords..."
+          grep -r "password.*=.*['\"]" --include="*.py" . || echo "No hardcoded passwords found"
+
+          echo "Checking for tokens..."
+          grep -r "token.*=.*['\"]" --include="*.py" . || echo "No tokens found"
+
+          echo "Secret scan completed"
+        continue-on-error: true
+
+      - name: Analyze security report
+        run: |
+          cd llm
+
+          echo "=================================="
+          echo "SECURITY AUDIT SUMMARY"
+          echo "=================================="
+
+          # Bandit summary
+          if [ -f bandit_full_report.json ]; then
+            HIGH=$(cat bandit_full_report.json | grep -c '"issue_severity": "HIGH"' || echo "0")
+            MEDIUM=$(cat bandit_full_report.json | grep -c '"issue_severity": "MEDIUM"' || echo "0")
+            LOW=$(cat bandit_full_report.json | grep -c '"issue_severity": "LOW"' || echo "0")
+
+            echo ""
+            echo "BANDIT SECURITY SCAN:"
+            echo "  HIGH:   $HIGH issues"
+            echo "  MEDIUM: $MEDIUM issues"
+            echo "  LOW:    $LOW issues"
+
+            if [ "$HIGH" -gt 0 ]; then
+              echo ""
+              echo "⚠️  WARNING: HIGH severity issues found!"
+            fi
+          fi
+
+          # pip-audit summary
+          if [ -f pip_audit_full.json ]; then
+            echo ""
+            echo "DEPENDENCY CVE SCAN:"
+            cat pip_audit_full.md || echo "  No vulnerabilities found"
+          fi
+
+          echo ""
+          echo "=================================="
+          echo "Full reports uploaded as artifacts"
+          echo "=================================="
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-audit-reports-${{ github.run_number }}
+          path: |
+            llm/bandit_full_report.*
+            llm/pip_audit_full.*
+            llm/safety_report.*
+            llm/semgrep_report.*
+          retention-days: 90
+
+      - name: Create issue if HIGH severity found
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            try {
+              const banditReport = fs.readFileSync('llm/bandit_full_report.json', 'utf8');
+              const highCount = (banditReport.match(/"issue_severity": "HIGH"/g) || []).length;
+
+              if (highCount > 0) {
+                const issueBody = `## 🚨 Security Audit Alert
+
+**Monthly security audit found ${highCount} HIGH severity issue(s)**
+
+### Action Required
+Please review the security audit reports in the workflow artifacts:
+- [Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+### Next Steps
+1. Download and review the security reports
+2. Assess each HIGH severity issue
+3. Create tickets for remediation
+4. Update security documentation
+
+**Audit Date:** ${new Date().toISOString().split('T')[0]}
+**Workflow:** Monthly Security Audit
+
+_This issue was automatically created by the security audit workflow._`;
+
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `Security Audit: ${highCount} HIGH severity issue(s) found`,
+                  body: issueBody,
+                  labels: ['security', 'high-priority']
+                });
+              }
+            } catch (error) {
+              console.log('No HIGH severity issues found or unable to read report');
+            }
+
+      - name: Notify on Slack (optional)
+        if: failure()
+        run: |
+          echo "Security audit completed with issues"
+          echo "Configure SLACK_WEBHOOK_URL secret to enable Slack notifications"
+          # Uncomment and configure if you use Slack:
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"Security Audit Failed: Check GitHub Actions"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,0 +1,148 @@
+name: Code Quality Checks
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'llm/**/*.py'
+      - 'rag/**/*.py'
+      - 'llm/requirements.txt'
+      - 'llm/pyproject.toml'
+      - '.github/workflows/quality-checks.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'llm/**/*.py'
+      - 'rag/**/*.py'
+      - 'llm/requirements.txt'
+      - 'llm/pyproject.toml'
+
+jobs:
+  quality-checks:
+    name: Quality & Linting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install quality tools
+        run: |
+          pip install --upgrade pip
+          pip install ruff black pyright bandit pip-audit
+
+      - name: Run Ruff (Linting)
+        run: |
+          cd llm
+          ruff check . --output-format=github
+        continue-on-error: false
+
+      - name: Run Black (Formatting Check)
+        run: |
+          cd llm
+          black --check --diff .
+        continue-on-error: false
+
+      - name: Run Pyright (Type Checking)
+        run: |
+          cd llm
+          pyright --outputjson > pyright_report.json || true
+          echo "Type checking completed (informational only)"
+          cat pyright_report.json | grep -o '"errorCount":[0-9]*' || echo "No errors found"
+        continue-on-error: true
+
+      - name: Run Bandit (Security Scan)
+        run: |
+          cd llm
+          bandit -r . -f json -o bandit_report.json --exclude './tests/*,./scripts/*' || true
+          echo "Security scan completed"
+
+          # Check for HIGH severity issues
+          HIGH_COUNT=$(cat bandit_report.json | grep -c '"issue_severity": "HIGH"' || echo "0")
+          echo "HIGH severity issues: $HIGH_COUNT"
+
+          if [ "$HIGH_COUNT" -gt 0 ]; then
+            echo "ERROR: Found HIGH severity security issues!"
+            cat bandit_report.json | grep -A 5 '"issue_severity": "HIGH"'
+            exit 1
+          fi
+        continue-on-error: false
+
+      - name: Run pip-audit (CVE Check)
+        run: |
+          cd llm
+          pip install -r requirements.txt --quiet
+          pip-audit --format json --output pip_audit_report.json || true
+
+          # Check for vulnerabilities
+          if [ -f pip_audit_report.json ]; then
+            VULN_COUNT=$(cat pip_audit_report.json | grep -c '"vulnerabilities"' || echo "0")
+            echo "Dependencies checked for CVEs"
+
+            if [ "$VULN_COUNT" -gt 0 ]; then
+              echo "WARNING: Found vulnerabilities in dependencies"
+              cat pip_audit_report.json
+            fi
+          fi
+        continue-on-error: true
+
+      - name: Upload quality reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-reports
+          path: |
+            llm/pyright_report.json
+            llm/bandit_report.json
+            llm/pip_audit_report.json
+          retention-days: 30
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let comment = '## 🔍 Code Quality Report\n\n';
+            comment += '### ✅ All critical checks passed!\n\n';
+            comment += '**Checks performed:**\n';
+            comment += '- ✓ Ruff linting\n';
+            comment += '- ✓ Black formatting\n';
+            comment += '- ✓ Bandit security scan (no HIGH severity issues)\n';
+            comment += '- ℹ️ Pyright type checking (informational)\n';
+            comment += '- ℹ️ pip-audit CVE check (informational)\n\n';
+            comment += '_Reports available in workflow artifacts._';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  summary:
+    name: Quality Summary
+    runs-on: ubuntu-latest
+    needs: quality-checks
+    if: always()
+
+    steps:
+      - name: Check quality status
+        run: |
+          echo "Quality checks completed!"
+          echo "Status: ${{ needs.quality-checks.result }}"
+
+          if [ "${{ needs.quality-checks.result }}" != "success" ]; then
+            echo "❌ Quality checks failed - please review errors above"
+            exit 1
+          else
+            echo "✅ All quality checks passed!"
+          fi
