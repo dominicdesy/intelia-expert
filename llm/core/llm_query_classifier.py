@@ -163,7 +163,8 @@ Return a JSON object with this EXACT structure:
     "reason": "brief explanation"
   }},
   "missing_entities": ["list of missing required entities"],
-  "is_complete": true/false
+  "is_complete": true/false,
+  "clarification_message": "string or null - If is_complete=false, generate a SHORT, CONTEXT-SPECIFIC clarification question in {language} asking for missing entities. Use farm context (broiler/layer/hatchery) detected from query to ask specific sub-questions. Max 3 sentences. Example: For 'Temperature seems off' → 'Are you in a broiler house or hatchery? Broiler: ambient air/litter/heating? Hatchery: incubation/hatcher/chick holding?'"
 }}"""
 
     def __init__(
@@ -290,7 +291,8 @@ Return a JSON object with this EXACT structure:
                 "reason": "default routing"
             },
             "missing_entities": [],
-            "is_complete": True
+            "is_complete": True,
+            "clarification_message": None
         }
 
         # Merge with defaults
@@ -362,7 +364,8 @@ Return a JSON object with this EXACT structure:
                 "reason": "fallback - LLM classification failed"
             },
             "missing_entities": [],
-            "is_complete": True
+            "is_complete": True,
+            "clarification_message": None
         }
 
     def clear_cache(self):

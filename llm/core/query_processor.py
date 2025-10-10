@@ -484,13 +484,20 @@ class RAGQueryProcessor:
         """Build clarification result with intelligent contextual messages"""
         logger.info(f"Clarification needed - missing fields: {route.missing_fields}")
 
-        # Utiliser le clarification helper pour message contextuel
-        clarification_message = self.clarification_helper.build_clarification_message(
-            missing_fields=route.missing_fields,
-            language=language,
-            query=query,
-            entities=route.entities,
-        )
+        # 🆕 Priorité 1: Utiliser message LLM-generated si disponible
+        llm_clarification = route.validation_details.get("generated_clarification")
+        if llm_clarification:
+            clarification_message = llm_clarification
+            logger.info(f"✅ Using LLM-generated clarification message: {clarification_message[:100]}...")
+        else:
+            # Fallback: Utiliser le clarification helper traditionnel
+            logger.info(f"⚠️ No LLM clarification available, using template-based helper")
+            clarification_message = self.clarification_helper.build_clarification_message(
+                missing_fields=route.missing_fields,
+                language=language,
+                query=query,
+                entities=route.entities,
+            )
 
         return RAGResult(
             source=RAGSource.NEEDS_CLARIFICATION,
@@ -503,6 +510,7 @@ class RAGQueryProcessor:
                 "language": language,
                 "tenant_id": tenant_id,
                 "original_query": query,
+                "clarification_source": "llm" if llm_clarification else "template",
             },
         )
 

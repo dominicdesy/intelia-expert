@@ -685,6 +685,12 @@ class QueryRouter:
         )
 
         if not is_complete:
+            # Extract LLM-generated clarification message if available
+            llm_clarification = validation_details.get("clarification_message")
+            if llm_clarification:
+                logger.info(f"✅ Using LLM-generated clarification message")
+                validation_details["generated_clarification"] = llm_clarification
+
             return QueryRoute(
                 destination="needs_clarification",
                 entities=entities,
@@ -1022,6 +1028,10 @@ class QueryRouter:
             validation_details["llm_routing_target"] = routing.get("target", "weaviate")
             validation_details["llm_confidence"] = routing.get("confidence", 0.5)
             validation_details["llm_intent"] = intent
+
+            # 🆕 Add LLM-generated clarification message
+            if "clarification_message" in classification:
+                validation_details["clarification_message"] = classification["clarification_message"]
 
         except Exception as e:
             logger.error(f"❌ LLM classification failed: {e}")
