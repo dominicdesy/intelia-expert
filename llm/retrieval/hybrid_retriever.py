@@ -7,7 +7,7 @@ CORRIGÉ: Ajout fonction hybrid_search globale pour import depuis rag_engine.py
 
 import asyncio
 import logging
-from utils.types import Dict, List
+from utils.types import Dict, List, Optional
 import anyio
 
 # === NOUVEAU: Import RRF Intelligent ===
@@ -56,9 +56,9 @@ class OptimizedHybridRetriever:
         query_vector: List[float],
         query_text: str,
         top_k: int = 15,
-        where_filter: Dict = None,
+        where_filter: Optional[Dict] = None,
         alpha: float = 0.7,
-        query_context: Dict = None,
+        query_context: Optional[Dict] = None,
         intent_result=None,
     ) -> List[Dict]:
         """
@@ -613,9 +613,9 @@ async def hybrid_search(
     client,
     collection_name: str = "InteliaExpertKnowledge",
     top_k: int = 15,
-    where_filter: Dict = None,
+    where_filter: Optional[Dict] = None,
     alpha: float = 0.7,
-    query_context: Dict = None,
+    query_context: Optional[Dict] = None,
     intent_result=None,
 ) -> List[Dict]:
     """
