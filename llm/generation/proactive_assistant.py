@@ -294,6 +294,28 @@ class ProactiveAssistant:
         # Determine assistance context
         context = self._identify_context(query, response, intent_result, entities)
 
+        # 🆕 CRITICAL: Do NOT generate optimization follow-up if user ALREADY asked for optimization
+        # This prevents redundant "Would you like to optimize?" after "How to optimize?"
+        if context == AssistanceContext.OPTIMIZATION:
+            query_lower = query.lower()
+            optimization_request_keywords = [
+                "optimiser", "optimize", "optimizar",
+                "améliorer", "improve", "mejorar",
+                "augmenter", "increase", "aumentar",
+                "comment", "how", "cómo", "wie",
+                "stratégies", "strategies", "estrategias",
+                "conseils", "advice", "recomendaciones"
+            ]
+            is_already_optimization_request = any(
+                keyword in query_lower for keyword in optimization_request_keywords
+            )
+
+            if is_already_optimization_request:
+                logger.info(
+                    f"⚠️ Follow-up suppressed: User query is already an optimization request ('{query[:50]}...')"
+                )
+                return ""
+
         # 🆕 ONLY generate follow-ups for specific contexts (not for simple data lookup)
         enabled_contexts = [
             AssistanceContext.PERFORMANCE_ISSUE,
