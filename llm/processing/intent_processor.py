@@ -16,6 +16,12 @@ from dataclasses import dataclass
 # Imports modulaires corrigés pour la nouvelle architecture
 from processing.intent_types import IntentType, IntentResult
 
+# Import AGROVOCService for poultry term detection
+from services.agrovoc_service import get_agrovoc_service
+
+# Import language detection for AGROVOC
+from utils.language_detection import detect_language_enhanced
+
 logger = logging.getLogger(__name__)
 
 
@@ -379,6 +385,15 @@ class IntentProcessor:
         # Initialisation avec validation stricte
         try:
             self._load_and_validate_config()
+
+            # Initialize AGROVOC service for poultry term detection
+            try:
+                self.agrovoc_service = get_agrovoc_service()
+                logger.info("✅ AGROVOCService initialized successfully")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not initialize AGROVOCService: {e}")
+                self.agrovoc_service = None
+
             self.is_initialized = True
             logger.info(
                 f"IntentProcessor initialisé avec succès: {self._get_config_summary()}"
@@ -551,7 +566,7 @@ class IntentProcessor:
 
         return None
 
-    def _detect_general_poultry_terms(self, query: str) -> bool:
+    def _detect_general_poultry_terms(self, query: str, language: str = "en") -> bool:
         """
         Détecte si la requête contient des termes généraux d'aviculture
 
@@ -561,12 +576,35 @@ class IntentProcessor:
         Exemples:
         - "Is it safe to use AI to raise poultry?" ✅ (contient "raise", "poultry")
         - "How to improve chicken farming?" ✅ (contient "chicken", "farming")
+        - "What is Spaghetti breast?" ✅ (modern meat quality defect - AGROVOC Level 2)
         - "What is the best temperature for broilers?" ✅ (already detected via entities)
         - "What is artificial intelligence?" ❌ (pas d'aviculture)
+
+        Uses AGROVOCService with 3-level detection:
+        - Level 1: AGROVOC cache (2,390+ terms in 10 languages)
+        - Level 2: Manual terms (nl, id + modern defects like "spaghetti breast")
+        - Level 3: Universal fallback (basic terms)
 
         Returns:
             True si la requête contient des termes généraux d'aviculture
         """
+        # Use AGROVOCService if available
+        if hasattr(self, 'agrovoc_service') and self.agrovoc_service is not None:
+            # If language not specified, detect it from query
+            if language == "en":  # default, might not be accurate
+                lang_result = detect_language_enhanced(query)
+                detected_language = lang_result.language
+                logger.debug(f"Language detected for AGROVOC: {detected_language} (confidence: {lang_result.confidence:.2f})")
+            else:
+                detected_language = language
+
+            is_poultry = self.agrovoc_service.detect_poultry_terms_in_query(query, detected_language)
+            if is_poultry:
+                logger.debug(f"🐔 Poultry terms detected via AGROVOC service ({detected_language})")
+            return is_poultry
+
+        # Fallback to legacy hardcoded terms if AGROVOC not available
+        logger.warning("AGROVOCService not available, using legacy hardcoded terms")
         query_lower = self._safe_string_lower(query) or ""
 
         # Charger les termes universels si disponibles
