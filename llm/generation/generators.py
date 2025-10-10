@@ -680,12 +680,20 @@ CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 OPTIMIZATION RESPONSE RULES:
 1. ✅ COMPREHENSIVE ADVICE: Provide detailed recommendations with specific parameters
 2. ✅ CONCRETE DETAILS: Include specific values, ranges, and thresholds from documentation
-3. ✅ ACTIONABLE STEPS: Give clear, implementable strategies
+3. ✅ ACTIONABLE STEPS: Give clear, implementable strategies that the farmer can control
 4. ✅ STRUCTURED GUIDANCE: Organize recommendations by topic area (nutrition, environment, management, etc.)
 5. ✅ TECHNICAL PRECISION: Extract exact nutritional requirements, environmental parameters, management practices
 6. ❌ DO NOT give vague generalities - be specific with numbers, procedures, and practices
 7. ✅ If documentation contains optimization strategies → Extract ALL relevant recommendations
 8. ✅ Include: Nutritional parameters (protein %, amino acids), environmental settings (temperature, humidity), management practices
+9. ❌ CRITICAL: NEVER recommend genetic selection or breeding strategies - farmers receive chicks with genetics already determined
+10. ❌ EXCLUDE genetic context, breeding programs, or strain selection - focus ONLY on management actions (nutrition, environment, health)
+
+⚠️ NON-ACTIONABLE RECOMMENDATIONS TO EXCLUDE:
+- ❌ "Choose genetically superior lines" - farmer cannot change genetics
+- ❌ "Select birds from optimized breeding programs" - genetics are predetermined
+- ❌ "Ensure birds come from high-growth genetic lines" - not farmer's decision
+- ✅ INSTEAD: Focus on nutrition optimization, environmental control, health management, water quality, lighting programs
 
 RESPONSE LENGTH FOR OPTIMIZATION:
 - Optimization questions require DETAILED responses (300-500 words minimum)
