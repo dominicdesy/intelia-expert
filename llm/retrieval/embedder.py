@@ -5,9 +5,16 @@ embedder.py - Embedder OpenAI avec cache Redis externe optimisé - CORRIGÉ
 
 import logging
 import os
+from typing import TYPE_CHECKING
 from utils.types import List
 from utils.utilities import METRICS
 from utils.imports_and_dependencies import AsyncOpenAI
+
+# Type-only import for annotations
+if TYPE_CHECKING:
+    from openai import AsyncOpenAI as AsyncOpenAIType
+else:
+    AsyncOpenAIType = AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +24,7 @@ class OpenAIEmbedder:
 
     def __init__(
         self,
-        client: AsyncOpenAI,
+        client: AsyncOpenAIType,
         cache_manager=None,
         model: str = None,
     ):

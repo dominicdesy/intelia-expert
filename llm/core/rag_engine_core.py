@@ -4,6 +4,7 @@ rag_engine_core.py - RAG Engine core functionalities
 """
 
 import logging
+from typing import TYPE_CHECKING
 from utils.types import Optional
 from .base import InitializableMixin
 
@@ -13,6 +14,12 @@ except ImportError:
     OPENAI_AVAILABLE = False
     AsyncOpenAI = None
 
+# Type-only import for annotations
+if TYPE_CHECKING:
+    from openai import AsyncOpenAI as AsyncOpenAIType
+else:
+    AsyncOpenAIType = AsyncOpenAI
+
 from config.config import OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
@@ -21,7 +28,7 @@ logger = logging.getLogger(__name__)
 class RAGEngineCore(InitializableMixin):
     """RAG Engine core with OpenAI management and response generator"""
 
-    def __init__(self, openai_client: AsyncOpenAI = None):
+    def __init__(self, openai_client: Optional[AsyncOpenAIType] = None):
         """Initialize core with all required components"""
         super().__init__()
 
@@ -53,7 +60,7 @@ class RAGEngineCore(InitializableMixin):
             logger.error(f"❌ Generator initialization failed: {e}")
             self.generator = None
 
-    def _build_openai_client(self) -> Optional[AsyncOpenAI]:
+    def _build_openai_client(self) -> Optional[AsyncOpenAIType]:
         """Build OpenAI client with optimized configuration"""
         if not OPENAI_AVAILABLE or not AsyncOpenAI:
             logger.warning("OpenAI not available")

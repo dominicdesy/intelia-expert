@@ -11,6 +11,7 @@ import logging
 import asyncio
 import pickle
 import zlib
+from typing import TYPE_CHECKING
 from utils.types import Dict, Optional, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -25,6 +26,15 @@ try:
 except ImportError:
     REDIS_AVAILABLE = False
     redis = None
+
+# Type-only import for annotations
+if TYPE_CHECKING:
+    from redis.asyncio import Redis as RedisType
+else:
+    if REDIS_AVAILABLE:
+        from redis.asyncio import Redis as RedisType
+    else:
+        RedisType = None
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +146,7 @@ class RedisCacheCore(InitializableMixin):
     def __init__(self, config: Optional[CacheConfig] = None):
         super().__init__()
         self.config = config or CacheConfig.from_env()
-        self.client: Optional[redis.Redis] = None
+        self.client: Optional[RedisType] = None
         self.status = CacheStatus.DISABLED
         self.stats = CacheStats()
         self.enabled = (

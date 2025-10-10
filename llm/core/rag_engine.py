@@ -10,6 +10,7 @@ VERSION 5.0 - REFACTORED FOR MAINTAINABILITY:
 
 import logging
 import time
+from typing import TYPE_CHECKING
 from utils.types import Dict, List, Optional, Any
 
 from config.config import RAG_ENABLED
@@ -25,6 +26,12 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
     AsyncOpenAI = None
+
+# Type-only import for annotations
+if TYPE_CHECKING:
+    from openai import AsyncOpenAI as AsyncOpenAIType
+else:
+    AsyncOpenAIType = AsyncOpenAI
 
 # Import modular components
 from .rag_engine_core import RAGEngineCore
@@ -100,7 +107,7 @@ class InteliaRAGEngine(InitializableMixin):
     - Delegate to specialized processors for actual work
     """
 
-    def __init__(self, openai_client: AsyncOpenAI = None):
+    def __init__(self, openai_client: Optional[AsyncOpenAIType] = None):
         """Initialize RAG engine with modular components"""
         super().__init__()
 
