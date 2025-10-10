@@ -99,7 +99,12 @@ class ConversationalQueryEnricher:
 
         Returns enriched query if confirmation detected, None otherwise
         """
+        logger.debug(f"🔍 DEBUG: _handle_followup_confirmation called")
+        logger.debug(f"🔍 DEBUG: query='{query}', language='{language}'")
+        logger.debug(f"🔍 DEBUG: contextual_history length={len(contextual_history) if contextual_history else 0}")
+
         query_lower = query.lower().strip()
+        logger.debug(f"🔍 DEBUG: query_lower='{query_lower}'")
 
         # Check if query is a short confirmation (yes/oui/ok)
         confirmation_words = {
@@ -114,19 +119,34 @@ class ConversationalQueryEnricher:
             for word in confirmation_words.get(language, confirmation_words['fr'])
         )
 
+        logger.debug(f"🔍 DEBUG: is_confirmation={is_confirmation}")
+
         if not is_confirmation:
+            logger.debug("❌ DEBUG: Not a confirmation word - returning None (checkpoint 1)")
             return None
 
         # Check if history contains a proactive follow-up with optimization/improvement
         history_lower = contextual_history.lower()
+        logger.debug(f"🔍 DEBUG: history_lower preview='{history_lower[:200]}...'")
 
         # Extract the follow-up question from history
         # Format: [Follow-up: Question here...]
         followup_match = re.search(r'\[follow-up:\s*(.+?)\]', history_lower, re.IGNORECASE)
+        logger.debug(f"🔍 DEBUG: followup_match found={followup_match is not None}")
+
         if not followup_match:
-            return None
+            # Try alternative patterns
+            followup_match_alt = re.search(r'\[follow-up:\s*(.+?)\.\.\.', history_lower, re.IGNORECASE)
+            logger.debug(f"🔍 DEBUG: followup_match_alt (with ...) found={followup_match_alt is not None}")
+
+            if not followup_match_alt:
+                logger.debug("❌ DEBUG: No follow-up pattern found in history - returning None (checkpoint 2)")
+                return None
+
+            followup_match = followup_match_alt
 
         followup_text = followup_match.group(1).strip()
+        logger.debug(f"🔍 DEBUG: followup_text='{followup_text}'")
 
         # Check if follow-up is about optimization/improvement
         optimization_keywords = {
@@ -136,16 +156,25 @@ class ConversationalQueryEnricher:
             'de': ['optimieren', 'verbessern', 'erhöhen', 'ratschläge', 'strategien'],
         }
 
+        keywords_to_check = optimization_keywords.get(language, optimization_keywords['fr'])
+        logger.debug(f"🔍 DEBUG: keywords_to_check={keywords_to_check}")
+
         is_optimization_followup = any(
             keyword in followup_text
-            for keyword in optimization_keywords.get(language, optimization_keywords['fr'])
+            for keyword in keywords_to_check
         )
 
+        logger.debug(f"🔍 DEBUG: is_optimization_followup={is_optimization_followup}")
+
         if not is_optimization_followup:
+            logger.debug("❌ DEBUG: Not an optimization follow-up - returning None (checkpoint 3)")
             return None
+
+        logger.debug("✅ DEBUG: All checks passed - extracting entities")
 
         # Extract entities from history (breed, age, metric)
         entities = self.extract_entities_from_context(contextual_history, language)
+        logger.debug(f"🔍 DEBUG: entities extracted={entities}")
 
         # Build optimization question
         metric = entities.get('metric_type', 'performance')
@@ -186,6 +215,8 @@ class ConversationalQueryEnricher:
         }
 
         metric_display = metric_translations.get(language, {}).get(metric, metric)
+        logger.debug(f"🔍 DEBUG: metric='{metric}', metric_display='{metric_display}'")
+        logger.debug(f"🔍 DEBUG: breed='{breed}', age='{age}', sex='{sex}'")
 
         # Build enriched query based on language
         if language == 'fr':
@@ -233,6 +264,7 @@ class ConversationalQueryEnricher:
                 enriched += f" for {breed}"
             enriched += "?"
 
+        logger.debug(f"✅ DEBUG: Returning enriched query: '{enriched}'")
         return enriched
 
     def _is_followup_question(self, query: str, language: str) -> bool:
