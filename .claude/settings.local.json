@@ -23,7 +23,9 @@
       "WebFetch(domain:www.figma.com)",
       "Bash(npm run type-check:*)",
       "Bash(npm run lint)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Read(//c/Users/desy.dominic/OneDrive - Intelia Technologies/Desktop/**)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []
