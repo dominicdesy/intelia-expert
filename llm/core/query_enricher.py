@@ -63,6 +63,13 @@ class ConversationalQueryEnricher:
         if not query or not contextual_history:
             return query
 
+        # 🆕 STEP 0: Check if this is a confirmation to a specific follow-up question
+        # If user says "Yes" to "Can I help you optimize weight?", reformulate as optimization request
+        enriched_from_followup = self._handle_followup_confirmation(query, contextual_history, language)
+        if enriched_from_followup:
+            logger.info(f"Follow-up confirmation enriched: '{query}' → '{enriched_from_followup}'")
+            return enriched_from_followup
+
         # 1. Détecter question de suivi
         if not self._is_followup_question(query, language):
             return query
@@ -80,6 +87,151 @@ class ConversationalQueryEnricher:
 
         if enriched != query:
             logger.info(f"Query enrichie: '{query}' → '{enriched}'")
+
+        return enriched
+
+    def _handle_followup_confirmation(self, query: str, contextual_history: str, language: str) -> str:
+        """
+        Handle user confirmation to a proactive follow-up question
+
+        If user says "Yes" to "Can I help you optimize weight?", reformulate as
+        "How to optimize weight for Ross 308 at 16 days?"
+
+        Returns enriched query if confirmation detected, None otherwise
+        """
+        query_lower = query.lower().strip()
+
+        # Check if query is a short confirmation (yes/oui/ok)
+        confirmation_words = {
+            'fr': ['oui', 'ouais', 'd\'accord', 'ok', 'okay', 'bien sûr', 'volontiers', 'oui,'],
+            'en': ['yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'please', 'yup', 'yes,'],
+            'es': ['sí', 'si', 'vale', 'ok', 'okay', 'claro', 'por supuesto'],
+            'de': ['ja', 'okay', 'ok', 'gerne', 'klar'],
+        }
+
+        is_confirmation = any(
+            query_lower == word or query_lower.startswith(word + ' ')
+            for word in confirmation_words.get(language, confirmation_words['fr'])
+        )
+
+        if not is_confirmation:
+            return None
+
+        # Check if history contains a proactive follow-up with optimization/improvement
+        history_lower = contextual_history.lower()
+
+        # Extract the follow-up question from history
+        # Format: [Follow-up: Question here...]
+        followup_match = re.search(r'\[follow-up:\s*(.+?)\]', history_lower, re.IGNORECASE)
+        if not followup_match:
+            return None
+
+        followup_text = followup_match.group(1).strip()
+
+        # Check if follow-up is about optimization/improvement
+        optimization_keywords = {
+            'fr': ['optimiser', 'améliorer', 'augmenter', 'conseils', 'stratégies'],
+            'en': ['optimize', 'improve', 'increase', 'advice', 'strategies'],
+            'es': ['optimizar', 'mejorar', 'aumentar', 'consejos', 'estrategias'],
+            'de': ['optimieren', 'verbessern', 'erhöhen', 'ratschläge', 'strategien'],
+        }
+
+        is_optimization_followup = any(
+            keyword in followup_text
+            for keyword in optimization_keywords.get(language, optimization_keywords['fr'])
+        )
+
+        if not is_optimization_followup:
+            return None
+
+        # Extract entities from history (breed, age, metric)
+        entities = self.extract_entities_from_context(contextual_history, language)
+
+        # Build optimization question
+        metric = entities.get('metric_type', 'performance')
+        breed = entities.get('breed', '')
+        age = entities.get('age_days', '')
+        sex = entities.get('sex', '')
+
+        # Translate metric to readable form
+        metric_translations = {
+            'fr': {
+                'weight': 'poids',
+                'fcr': 'FCR',
+                'feed_consumption': 'consommation d\'aliment',
+                'mortality': 'mortalité',
+                'performance': 'performances',
+            },
+            'en': {
+                'weight': 'weight',
+                'fcr': 'FCR',
+                'feed_consumption': 'feed consumption',
+                'mortality': 'mortality',
+                'performance': 'performance',
+            },
+            'es': {
+                'weight': 'peso',
+                'fcr': 'FCR',
+                'feed_consumption': 'consumo de alimento',
+                'mortality': 'mortalidad',
+                'performance': 'rendimiento',
+            },
+            'de': {
+                'weight': 'Gewicht',
+                'fcr': 'Futterverwertung',
+                'feed_consumption': 'Futterverbrauch',
+                'mortality': 'Mortalität',
+                'performance': 'Leistung',
+            },
+        }
+
+        metric_display = metric_translations.get(language, {}).get(metric, metric)
+
+        # Build enriched query based on language
+        if language == 'fr':
+            enriched = f"Comment améliorer le {metric_display}"
+            if breed:
+                enriched += f" pour {breed}"
+            if age:
+                enriched += f" à {age} jours"
+            if sex and sex != 'mixed':
+                sex_fr = {'male': 'mâle', 'female': 'femelle'}.get(sex, sex)
+                enriched += f" ({sex_fr})"
+            enriched += " ?"
+        elif language == 'en':
+            enriched = f"How to improve {metric_display}"
+            if breed:
+                enriched += f" for {breed}"
+            if age:
+                enriched += f" at {age} days"
+            if sex and sex != 'mixed':
+                enriched += f" ({sex})"
+            enriched += "?"
+        elif language == 'es':
+            enriched = f"Cómo mejorar el {metric_display}"
+            if breed:
+                enriched += f" para {breed}"
+            if age:
+                enriched += f" a los {age} días"
+            if sex and sex != 'mixed':
+                sex_es = {'male': 'macho', 'female': 'hembra'}.get(sex, sex)
+                enriched += f" ({sex_es})"
+            enriched += "?"
+        elif language == 'de':
+            enriched = f"Wie kann man das {metric_display} verbessern"
+            if breed:
+                enriched += f" für {breed}"
+            if age:
+                enriched += f" am Tag {age}"
+            if sex and sex != 'mixed':
+                sex_de = {'male': 'männlich', 'female': 'weiblich'}.get(sex, sex)
+                enriched += f" ({sex_de})"
+            enriched += "?"
+        else:
+            enriched = f"How to improve {metric_display}"
+            if breed:
+                enriched += f" for {breed}"
+            enriched += "?"
 
         return enriched
 
