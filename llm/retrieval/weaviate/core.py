@@ -663,6 +663,59 @@ class WeaviateCore(InitializableMixin):
                     },
                 )
 
+            # 🔄 COHERE RE-RANKING (independent of Intelligent RRF)
+            if (
+                self.reranker
+                and self.reranker.is_enabled()
+                and len(filtered_docs) > 1
+            ):
+                try:
+                    logger.info(
+                        f"🔄 Applying Cohere reranking on {len(filtered_docs)} filtered documents"
+                    )
+
+                    # Convert Documents to dicts for reranker
+                    docs_for_rerank = [
+                        {
+                            "content": doc.content,
+                            "metadata": doc.metadata,
+                            "score": doc.score,
+                        }
+                        for doc in filtered_docs
+                    ]
+
+                    # Rerank documents (respects top_k)
+                    reranked_dicts = await self.reranker.rerank(
+                        query=query,
+                        documents=docs_for_rerank,
+                        top_n=min(10, len(filtered_docs)),  # Top 10 or less
+                    )
+
+                    # Convert back to Documents
+                    filtered_docs = []
+                    for reranked_dict in reranked_dicts:
+                        doc = Document(
+                            content=reranked_dict["content"],
+                            metadata=reranked_dict["metadata"],
+                            score=reranked_dict["score"],  # Reranked score
+                            explain_score=reranked_dict.get("explain_score"),
+                        )
+                        filtered_docs.append(doc)
+
+                    logger.info(
+                        f"✅ Cohere reranking applied: {len(filtered_docs)} docs "
+                        f"(top score: {filtered_docs[0].score:.3f})"
+                    )
+
+                    # Update statistics
+                    self.optimization_stats["cohere_reranking_used"] += 1
+
+                except Exception as rerank_error:
+                    logger.error(
+                        f"Reranking error (using original results): {rerank_error}"
+                    )
+                    # Fallback: keep original filtered docs
+
             # ✅ MODIFICATION CRITIQUE: Génération de la réponse AVEC contexte conversationnel
             if self.generator:
                 response_text = await self.generator.generate_response(

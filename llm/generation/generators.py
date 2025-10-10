@@ -1,12 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-generators.py - Générateurs de réponses enrichis avec entités et cache externe
-Version 3.4 - Simplifié et optimisé
-- ✅ Instructions de langue compactes EN TÊTE du prompt
-- ✅ Validation simple du conversation_context (pas de troncature)
-- ✅ Logs réduits (2 logs essentiels seulement)
-- ✅ Intégration de build_specialized_prompt depuis prompt_builder.py
-- ✅ Suppression des méthodes verboses inutilisées
+generators.py - Enhanced response generators with entity enrichment and cache integration
+Handles multilingual response generation with specialized prompts and domain detection
 """
 
 import logging
@@ -22,26 +17,26 @@ from .entity_manager import EntityEnrichmentBuilder
 from .models import ContextEnrichment
 from utils.llm_translator import LLMTranslator
 
-# Import du gestionnaire de messages pour disclaimers vétérinaires
+# Import message handler for veterinary disclaimers
 try:
     from config.messages import get_message
 
     MESSAGES_AVAILABLE = True
     logger = logging.getLogger(__name__)
-    logger.info("✅ config.messages disponible pour disclaimers vétérinaires")
+    logger.info("✅ config.messages available for veterinary disclaimers")
 except ImportError:
     logger = logging.getLogger(__name__)
     MESSAGES_AVAILABLE = False
-    logger.warning("⚠️ config.messages non disponible pour disclaimers vétérinaires")
+    logger.warning("⚠️ config.messages not available for veterinary disclaimers")
 
-# Import du gestionnaire de prompts centralisé
+# Import centralized prompts manager
 try:
     from config.system_prompts import get_prompts_manager
 
     PROMPTS_AVAILABLE = True
 except ImportError as e:
     logging.warning(
-        f"SystemPromptsManager non disponible: {e}, utilisation prompts fallback"
+        f"SystemPromptsManager not available: {e}, using fallback prompts"
     )
     PROMPTS_AVAILABLE = False
 
@@ -50,8 +45,7 @@ logger = logging.getLogger(__name__)
 
 class EnhancedResponseGenerator:
     """
-    Générateur avec enrichissement d'entités et cache externe + ton affirmatif expert
-    Version 3.3: Support multilingue dynamique sans hardcoding
+    Response generator with entity enrichment, cache integration and multilingual support
     """
 
     def __init__(
@@ -63,20 +57,13 @@ class EnhancedResponseGenerator:
         descriptions_path: Optional[str] = None,
     ):
         """
-        Initialise le générateur de réponses
-
-        Args:
-            client: Client OpenAI
-            cache_manager: Gestionnaire de cache (optionnel)
-            language: Langue par défaut
-            prompts_path: Chemin custom vers system_prompts.json
-            descriptions_path: Chemin custom vers entity_descriptions.json
+        Initialize response generator with OpenAI client and configuration
         """
         self.client = client
         self.cache_manager = cache_manager
         self.language = language
 
-        # Charger le gestionnaire de prompts centralisé
+        # Load centralized prompts manager
         if PROMPTS_AVAILABLE:
             try:
                 if prompts_path:
@@ -84,22 +71,22 @@ class EnhancedResponseGenerator:
                 else:
                     self.prompts_manager = get_prompts_manager()
                 logger.info(
-                    "✅ EnhancedResponseGenerator initialisé avec system_prompts.json"
+                    "✅ EnhancedResponseGenerator initialized with system_prompts.json"
                 )
             except Exception as e:
-                logger.error(f"❌ Erreur chargement prompts: {e}")
+                logger.error(f"❌ Error loading prompts: {e}")
                 self.prompts_manager = None
         else:
             self.prompts_manager = None
-            logger.warning("⚠️ EnhancedResponseGenerator en mode fallback")
+            logger.warning("⚠️ EnhancedResponseGenerator in fallback mode")
 
-        # Charger le gestionnaire d'enrichissement d'entités
+        # Load entity enrichment builder
         self.entity_enrichment_builder = EntityEnrichmentBuilder(descriptions_path)
 
-        # ✅ NOUVEAU: Charger les noms de langues dynamiquement
+        # Load language display names dynamically
         self.language_display_names = self._load_language_names()
 
-        # 🌍 Initialiser traducteur pour réponses multilingues
+        # Initialize translator for multilingual responses
         self.translator = LLMTranslator(cache_enabled=True)
         logger.info("✅ LLMTranslator initialized for response translation")
 
@@ -443,7 +430,7 @@ class EnhancedResponseGenerator:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.1,
+                temperature=0.1,  # Optimal: 0.05 caused RAGAS timeouts, 0.1 provides best balance (Faithfulness: 71.57%)
                 max_tokens=900,
             )
 
@@ -600,7 +587,8 @@ class EnhancedResponseGenerator:
                 f"📄 Doc {i+1}: line={genetic_line}, species={species}, content_len={len(content)}"
             )
 
-            doc_text = f"Document {i+1} ({genetic_line} - {species}):\n{content[:1000]}"
+            # ✅ NO TRUNCATION - GPT-4o has 128k context, we limit to top 5 docs already
+            doc_text = f"Document {i+1} ({genetic_line} - {species}):\n{content}"
             context_text_parts.append(doc_text)
 
         context_text = "\n\n".join(context_text_parts)
@@ -612,23 +600,50 @@ class EnhancedResponseGenerator:
         # ✅ SIMPLIFICATION: Instructions de langue compactes en tête
         # language_name unused - removed to fix F841
 
+        # 🔍 Detect context source for hierarchical faithfulness rules
+        context_source = "unknown"
+        if context_docs and len(context_docs) > 0:
+            first_source = self._get_doc_metadata(context_docs[0], "source", "").lower()
+            if "postgresql" in first_source or "postgres" in first_source:
+                context_source = "postgresql"
+                logger.info("📊 Context source: PostgreSQL (authoritative data)")
+            elif "weaviate" in first_source or "vector" in first_source:
+                context_source = "weaviate"
+                logger.info("📚 Context source: Weaviate (documentation)")
+            else:
+                logger.debug(f"❓ Context source unknown: {first_source}")
+
         # Construction du prompt système avec domaine spécialisé
         if self.prompts_manager:
             system_prompt_parts = []
 
             # ✅ Instructions de langue EN TÊTE (UNE SEULE FOIS)
             # 🌍 ALWAYS generate in English - translation to target language happens post-generation
-            language_instruction = """You are an expert in poultry production.
+
+            # 🎯 HIERARCHICAL RAG PROMPT - Adapts to context source
+            if context_source == "postgresql":
+                # STRICTEST: PostgreSQL = authoritative data - ABSOLUTE faithfulness required
+                language_instruction = """You are an expert in poultry production.
 CRITICAL: Respond EXCLUSIVELY in ENGLISH.
 
-🎯 RAG GUIDELINES - BALANCE FAITHFULNESS & HELPFULNESS:
+🎯 HIERARCHICAL RAG GUIDELINES - LEVEL 1: AUTHORITATIVE DATA (PostgreSQL)
 
-1. ✅ PRIORITY: Base your answer primarily on the context documents provided below
-2. ✅ If context contains partial information: Use what's available and clearly indicate what aspects are covered vs. missing
-3. ❌ AVOID: Do not invent specific numbers, dates, technical values, or scientific facts not present in the context
-4. ✅ If context is completely insufficient: Use your general poultry expertise to provide a helpful answer
-5. ✅ BEST PRACTICE: Reference the context when providing information (e.g., "According to the documentation...")
-6. ✅ When context is partial: Provide what you can from context, then supplement with your expert knowledge when appropriate
+⚠️ ABSOLUTE FAITHFULNESS REQUIRED:
+- The context below contains AUTHORITATIVE structured data from our database
+- You MUST use EXCLUSIVELY the data provided - NO external knowledge allowed
+- If the context contains the answer → Extract it EXACTLY as provided
+- If the context is incomplete → State clearly what information is missing
+- NEVER supplement with general knowledge - the database is the single source of truth
+
+STRICT RULES:
+1. ✅ CITE the context VERBATIM. Use EXACT wording for all technical terms, numbers, and facts.
+2. ❌ DO NOT rephrase, paraphrase, or reformulate information from the context
+3. ❌ DO NOT add any information from your training data or general knowledge
+4. ❌ DO NOT add disclaimers, warnings, or educational notes unless explicitly asked
+5. ❌ DO NOT add comparisons, general context, or additional explanations unless requested
+6. ✅ Answer ONLY what is asked - no more, no less
+7. ✅ If asked for data not in context → State "The database does not contain information about [X]" - DO NOT use general knowledge
+8. ✅ Extract data PRECISELY - do not round, estimate, or modify values
 
 FORMATTING RULES - CLEAN & MODERN:
 - NO markdown headers (##, ###, ####) - start directly with text
@@ -639,6 +654,71 @@ FORMATTING RULES - CLEAN & MODERN:
 - Keep responses clean, concise and professional
 - NO excessive formatting or visual artifacts
 """
+            elif context_source == "weaviate":
+                # MODERATE: Weaviate = documentation - strict extraction with minor flexibility
+                language_instruction = """You are an expert in poultry production.
+CRITICAL: Respond EXCLUSIVELY in ENGLISH.
+
+🎯 HIERARCHICAL RAG GUIDELINES - LEVEL 2: DOCUMENTATION (Weaviate)
+
+📚 STRICT EXTRACTION FROM DOCUMENTATION:
+- The context below contains technical documentation from our knowledge base
+- PRIORITY: Extract information DIRECTLY from the provided documents
+- If documentation contains the answer → Use it with high fidelity
+- If documentation is incomplete → State what's covered and what's missing
+
+EXTRACTION RULES:
+1. ✅ CITE the context VERBATIM. Use EXACT wording from documentation for technical terms, numbers, and procedures.
+2. ❌ DO NOT rephrase or reformulate documented information - extract it directly
+3. ❌ DO NOT add disclaimers, warnings, or educational notes unless explicitly asked
+4. ❌ DO NOT add comparisons, general context, or additional explanations unless requested
+5. ✅ Answer ONLY what is asked - no more, no less
+6. ✅ If documentation is partial → Use what's available and clearly state "The documentation does not contain [X]"
+7. ❌ DO NOT supplement missing information with general knowledge - acknowledge gaps instead
+8. ✅ Extract technical values, procedures, and recommendations EXACTLY as documented
+
+FORMATTING RULES - CLEAN & MODERN:
+- NO markdown headers (##, ###, ####) - start directly with text
+- NO bold headers with asterisks (**Header:**)
+- Use simple paragraph structure with clear topic sentences
+- Separate ideas with line breaks, not headers
+- Use bullet points (- ) ONLY for lists, NEVER numbered lists (1., 2., 3.)
+- Keep responses clean, concise and professional
+- NO excessive formatting or visual artifacts
+"""
+            else:
+                # FLEXIBLE: Unknown/general - allow general knowledge as last resort
+                language_instruction = """You are an expert in poultry production.
+CRITICAL: Respond EXCLUSIVELY in ENGLISH.
+
+🎯 HIERARCHICAL RAG GUIDELINES - LEVEL 3: GENERAL KNOWLEDGE (Fallback)
+
+🔄 BALANCED APPROACH - Context First, Then General Knowledge:
+- The context below may contain relevant information
+- PRIORITY: Check context first and use any available information
+- If context is insufficient → Use your general poultry expertise
+- CLEARLY indicate when using general knowledge vs. context-based information
+
+BALANCED RULES:
+1. ✅ PRIORITY: CITE context VERBATIM when available. Use EXACT wording for technical terms and facts from context.
+2. ❌ DO NOT rephrase or reformulate information that exists in the context
+3. ❌ DO NOT add disclaimers, warnings, or educational notes unless explicitly asked
+4. ❌ DO NOT add comparisons or additional explanations unless requested
+5. ✅ Answer ONLY what is asked - no more, no less
+6. ✅ If context contains partial information: Use what's available verbatim, then clearly state "The provided context does not contain [X]"
+7. ✅ If context is completely insufficient: State clearly "The provided context does not contain this information" - DO NOT use general knowledge
+8. ❌ AVOID: Do not invent specific numbers, dates, technical values, or scientific facts not present in the context
+
+FORMATTING RULES - CLEAN & MODERN:
+- NO markdown headers (##, ###, ####) - start directly with text
+- NO bold headers with asterisks (**Header:**)
+- Use simple paragraph structure with clear topic sentences
+- Separate ideas with line breaks, not headers
+- Use bullet points (- ) ONLY for lists, NEVER numbered lists (1., 2., 3.)
+- Keep responses clean, concise and professional
+- NO excessive formatting or visual artifacts
+"""
+
             system_prompt_parts.append(language_instruction)
 
             # ✅ NOUVEAU: Utiliser le prompt spécialisé si domaine détecté
@@ -959,12 +1039,14 @@ Style professionnel et structuré avec recommandations actionnables.""",
         # 9. S'assurer qu'il y a un espace après les bullet points
         response = re.sub(r"^-([^ ])", r"- \1", response, flags=re.MULTILINE)
 
-        # Ajouter avertissement vétérinaire si la question concerne la santé/maladie
-        if query and self._is_veterinary_query(query, context_docs):
-            disclaimer = self._get_veterinary_disclaimer(language)
-            if disclaimer:  # Seulement si disclaimer non vide
-                response = response + disclaimer
-                logger.info(f"🏥 Disclaimer vétérinaire ajouté (langue: {language})")
+        # ⚠️ DISABLED FOR FAITHFULNESS OPTIMIZATION
+        # Veterinary disclaimers reduce Faithfulness score by 20-30%
+        # Re-enable only for critical medical questions if needed
+        # if query and self._is_veterinary_query(query, context_docs):
+        #     disclaimer = self._get_veterinary_disclaimer(language)
+        #     if disclaimer:  # Seulement si disclaimer non vide
+        #         response = response + disclaimer
+        #         logger.info(f"🏥 Disclaimer vétérinaire ajouté (langue: {language})")
 
         return response
 

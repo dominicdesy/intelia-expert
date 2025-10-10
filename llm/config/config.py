@@ -293,10 +293,10 @@ DO_APP_TIER = os.getenv("DO_APP_TIER", "basic")
 
 # Configuration dynamique selon l'environnement DO
 if DO_APP_TIER == "professional":
-    RAG_SIMILARITY_TOP_K = 120  # INCREASED: Was 20, now 120 for better re-ranker performance
+    RAG_SIMILARITY_TOP_K = 135  # INCREASED: Was 120, now 135 (sweet spot: performance vs latency)
     RRF_CACHE_SIZE = 2000
 elif DO_APP_TIER == "basic":
-    RAG_SIMILARITY_TOP_K = 120  # INCREASED: Was 12, now 120 for better re-ranker performance
+    RAG_SIMILARITY_TOP_K = 135  # INCREASED: Was 120, now 135 (sweet spot: performance vs latency)
     RRF_CACHE_SIZE = 500
 
 

@@ -1,0 +1,318 @@
+================================================================================
+RAPPORT D'ANALYSE APPROFONDIE - PROBLEMES DE FAITHFULNESS
+================================================================================
+Date: 2025-10-09
+Configuration: TOP_K=135, Cohere Re-Ranker actif, Prompts hierarchiques
+
+SYNTHESE GLOBALE:
+  - Faithfulness moyenne: 55.97%
+  - 3 cas < 50% (30%)
+  - 5 cas 50-80% (50%)
+  - 2 cas >= 80% (20%)
+
+OBJECTIF: Comprendre pourquoi 8/10 cas ont Faithfulness < 80%
+
+================================================================================
+ANALYSE DES 3 PIRES CAS
+================================================================================
+
+CAS #1 - Faithfulness: 0.0% (Context Precision: 0%, Context Recall: 0%)
+--------------------------------------------------------------------------------
+QUESTION: How does Infectious Laryngotracheitis (ILT) spread between flocks?
+
+REPONSE ATTENDUE:
+  "ILT spreads through respiratory and ocular routes. The latent carrier
+  (recovered or vaccinated birds) can shed virus for periods up to 16 months.
+  Transmission occurs from acutely infected birds and is associated with
+  breakdown in biosecurity including movement of personnel, dead bird disposal,
+  manure disposal, and exchanging farm equipment."
+
+REPONSE GENEREE:
+  "Infectious Laryngotracheitis (ILT) spreads primarily through the respiratory
+  tract and ocular route. The virus is transmitted laterally or horizontally,
+  meaning it spreads from bird to bird within a flock rather than through eggs.
+  The spread is generally slower compared to other respiratory viruses like
+  IBV or NDV..."
+
+CONTEXTE DISPONIBLE (3 docs):
+  - Document parlait de ILT
+  - Informations sur transmission disponibles
+
+PROBLEMES IDENTIFIES:
+  ✗ Context Precision = 0% : Les documents récupérés n'étaient PAS pertinents
+  ✗ Context Recall = 0% : Le contexte ne contenait PAS les infos nécessaires
+  ✗ Le LLM a utilisé ses connaissances générales (IBV, NDV, etc.)
+  ✗ Comparaison non demandée avec d'autres virus
+
+CAUSE RACINE:
+  → ECHEC DE RETRIEVAL - Les bons documents n'ont PAS été récupérés
+  → Le LLM a compensé avec ses connaissances générales
+  → Ce n'est PAS un problème de prompt, mais de recherche documentaire
+
+
+CAS #2 - Faithfulness: 20.0% (Context Precision: 100%, Context Recall: 100%)
+--------------------------------------------------------------------------------
+QUESTION: What is the scientific name for ascites in broiler chickens?
+
+REPONSE ATTENDUE:
+  "Pulmonary hypertension syndrome. Ascites refers to the fluid accumulated
+  in the abdominal cavity (waterbelly) as a consequence of heart failure."
+
+REPONSE GENEREE:
+  "The scientific name for ascites in broiler chickens is pulmonary
+  hypertension syndrome.
+
+  **Important**: This information is provided for educational purposes.
+  For any questions regarding your animals' health, consult a qualified
+  veterinarian who can provide an accurate diagnosis and appropriate treatment."
+
+CONTEXTE DISPONIBLE (5 docs):
+  - Contenait: "The disease is more scientifically known as pulmonary
+    hypertension syndrome"
+  - Contenait: "ascites refers to the fluid accumulated in abdominal cavity"
+
+PROBLEMES IDENTIFIES:
+  ✓ Context Precision = 100% : Documents pertinents récupérés
+  ✓ Context Recall = 100% : Toutes les infos disponibles
+  ✓ Réponse factuelle CORRECTE
+  ✗ MAIS: Ajout d'un disclaimer non demandé (50% de la réponse!)
+
+CAUSE RACINE:
+  → Le LLM ajoute systématiquement des disclaimers
+  → Prompt trop "prudent" ou comportement par défaut du LLM
+  → Ce disclaimer DILUE la réponse factuelle
+  → Faithfulness pénalisée pour information non présente dans le contexte
+
+
+CAS #3 - Faithfulness: 25.0% (Context Precision: 100%, Context Recall: 66.7%)
+--------------------------------------------------------------------------------
+QUESTION: Why is ILT vaccination in broilers considered risky?
+
+REPONSE ATTENDUE:
+  "CEO (Chicken Embryo Origin) vaccines can revert back to virulence -
+  research shows increased virulence after 10th passage. Vaccinated birds
+  become latent carriers and can shed vaccine virus. The vaccination
+  procedure can reduce production efficiencies..."
+
+REPONSE GENEREE:
+  "ILT vaccination in broilers is considered risky due to several factors:
+  - The vaccine virus has a tendency to persist in the environment
+  - The vaccination procedure can reduce production efficiencies
+  - Potential interference with other respiratory vaccines, such as IBV
+    and NDV..."
+
+CONTEXTE DISPONIBLE (5 docs):
+  - Documents sur ILT présents
+  - Mais informations spécifiques sur vaccination manquantes
+
+PROBLEMES IDENTIFIES:
+  ✓ Context Precision = 100% : Documents pertinents
+  ✗ Context Recall = 66.7% : Seulement 2/3 des infos nécessaires
+  ✗ Le LLM REFORMULE au lieu de CITER
+  ✗ "tendency to persist" vs "can revert back to virulence" (différent!)
+  ✗ Ajoute "interference with IBV and NDV" (NON dans contexte)
+
+CAUSE RACINE:
+  → Contexte incomplet (Context Recall 66%)
+  → Le LLM comble les trous avec des connaissances générales
+  → Paraphrase excessive au lieu d'extraction verbatim
+
+
+================================================================================
+PATTERNS D'ERREURS COMMUNS
+================================================================================
+
+PATTERN #1: AJOUT DE DISCLAIMERS SYSTEMATIQUES
+Détecté dans: 3-4 cas sur 10
+
+Comportement:
+  - "This information is provided for educational purposes"
+  - "Consult a qualified veterinarian"
+  - "For any questions regarding your animals' health"
+
+Impact:
+  - Dilue la réponse factuelle
+  - Ajoute ~30-50% de texte non présent dans le contexte
+  - Faithfulness pénalisée injustement
+
+Solution:
+  ✓ Modifier le prompt: "DO NOT add disclaimers unless explicitly asked"
+  ✓ Ou accepter que c'est une bonne pratique (débattable)
+
+
+PATTERN #2: REFORMULATION AU LIEU D'EXTRACTION VERBATIM
+Détecté dans: 6-7 cas sur 10
+
+Comportement:
+  - Contexte dit: "revert back to virulence"
+  - LLM dit: "has a tendency to persist"
+  - Sens légèrement différent → Faithfulness réduite
+
+Impact:
+  - Perte de précision terminologique
+  - Informations "presque correctes" mais pas exactes
+  - RAGAS pénalise ces différences
+
+Solution:
+  ✓ Modifier prompt: "CITE the context VERBATIM when possible"
+  ✓ "Use EXACT wording from the context for technical terms"
+  ✓ Réduire température (0.1 → 0.05)
+
+
+PATTERN #3: AJOUT DE CONTEXTE GENERAL NON DEMANDE
+Détecté dans: 4-5 cas sur 10
+
+Comportement:
+  - Question: "Why is X risky?"
+  - LLM ajoute: "compared to other methods..." (non demandé)
+  - LLM ajoute: "in general practice..." (non demandé)
+
+Impact:
+  - Ajout d'informations non présentes dans le contexte
+  - Faithfulness pénalisée pour sur-génération
+
+Solution:
+  ✓ Renforcer prompt: "Answer ONLY what is asked"
+  ✓ "Do NOT add comparisons unless requested"
+
+
+PATTERN #4: ECHECS DE RETRIEVAL (Context Precision/Recall = 0%)
+Détecté dans: 1 cas sur 10 (CAS #1)
+
+Comportement:
+  - Les bons documents ne sont PAS récupérés
+  - Context Precision = 0%, Context Recall = 0%
+  - Le LLM compense avec connaissances générales
+
+Impact:
+  - Faithfulness = 0% (normal, pas de contexte pertinent!)
+  - Ce n'est PAS un problème de génération mais de RETRIEVAL
+
+Solution:
+  ✓ Améliorer la recherche Weaviate
+  ✓ Augmenter TOP_K encore (135 → 150?)
+  ✓ Vérifier les seuils de confiance
+  ✓ Améliorer les embeddings ou la requête de recherche
+
+
+================================================================================
+DIAGNOSTIC PRINCIPAL
+================================================================================
+
+Le LLM agit comme un "EXPERT QUI EXPLIQUE" au lieu d'un "EXTRACTEUR FIDELE"
+
+Comportements observés:
+  1. Reformulation avec ses propres mots (perte de précision)
+  2. Ajout de contexte général non demandé (sur-génération)
+  3. Ajout de disclaimers systématiques (dilution)
+  4. Organisation de l'information (au lieu de citation directe)
+
+Ces comportements sont NORMAUX pour un LLM assistant général
+MAIS ils sont PENALISES par RAGAS Faithfulness
+
+Le LLM essaie d'être "utile" et "complet"
+RAGAS veut qu'il soit "fidèle" et "minimal"
+
+
+================================================================================
+IMPACT RELATIF DES PROBLEMES
+================================================================================
+
+Problèmes de RETRIEVAL (Context Precision/Recall faibles):
+  - 1 cas sur 10 (10%)
+  - Impact: Faithfulness = 0% pour ces cas
+  - Solution: Améliorer Weaviate search, pas le prompt
+
+Problèmes de GENERATION (ajouts, reformulations):
+  - 9 cas sur 10 (90%)
+  - Impact: Faithfulness réduite de 20-60%
+  - Solution: Modifier prompts + température
+
+
+================================================================================
+RECOMMANDATIONS PRIORISEES
+================================================================================
+
+PRIORITE 1 - MODIFIER LE PROMPT RAG (Impact attendu: +10-15% Faithfulness)
+--------------------------------------------------------------------------
+Ajouter ces contraintes explicites:
+
+  1. "CITE the context VERBATIM. Use EXACT wording for technical terms."
+
+  2. "DO NOT add disclaimers, warnings, or educational notes unless
+      explicitly asked."
+
+  3. "Answer ONLY what is asked. DO NOT add comparisons, general context,
+      or additional explanations."
+
+  4. "If the context doesn't contain the answer, say 'The provided context
+      does not contain this information' - DO NOT use general knowledge."
+
+
+PRIORITE 2 - REDUIRE LA TEMPERATURE (Impact attendu: +5-8% Faithfulness)
+--------------------------------------------------------------------------
+  - Passer de temperature=0.1 à temperature=0.05 ou 0.03
+  - Favorise les réponses plus déterministes et conservatrices
+  - Réduit la tendance à reformuler et à ajouter du contexte
+
+
+PRIORITE 3 - AMELIORER LE RETRIEVAL (Impact attendu: +5% Faithfulness)
+--------------------------------------------------------------------------
+  - 1 cas sur 10 a Context Precision = 0%
+  - Augmenter TOP_K de 135 à 150 (si latence acceptable)
+  - Vérifier les seuils de confiance RAG
+  - Analyser pourquoi certains documents pertinents ne sont pas récupérés
+
+
+PRIORITE 4 - ACCEPTER LES DISCLAIMERS (Décision stratégique)
+--------------------------------------------------------------------------
+  - Les disclaimers sont une BONNE PRATIQUE médicale
+  - Ils protègent légalement
+  - Mais ils réduisent le score Faithfulness
+
+  Options:
+    A. Les retirer pour maximiser Faithfulness (risque légal)
+    B. Les garder et accepter un score Faithfulness ~50-60% (plus sûr)
+    C. Les ajouter UNIQUEMENT pour questions médicales critiques
+
+
+================================================================================
+GAIN ESTIME SI TOUTES LES RECOMMANDATIONS SONT APPLIQUEES
+================================================================================
+
+Configuration actuelle:
+  - Faithfulness: 55.97%
+
+Après Priorité 1 (Prompt verbatim):
+  - Faithfulness estimée: 65-70%
+
+Après Priorité 2 (Température 0.05):
+  - Faithfulness estimée: 70-75%
+
+Après Priorité 3 (Retrieval amélioré):
+  - Faithfulness estimée: 75-80%
+
+OBJECTIF REALISTE: 70-80% Faithfulness
+OBJECTIF OPTIMISTE: 80-85% Faithfulness
+
+
+================================================================================
+CONCLUSION
+================================================================================
+
+Les problèmes de Faithfulness sont principalement dus à:
+
+1. Le LLM agit comme un assistant utile (reformule, ajoute du contexte)
+   → Au lieu d'un extracteur fidèle (cite verbatim)
+
+2. Ajout systématique de disclaimers médicaux
+   → Bonne pratique MAIS pénalisée par RAGAS
+
+3. Un cas d'échec de retrieval (10%)
+   → Problème de recherche Weaviate, pas de génération
+
+Les solutions sont SIMPLES mais nécessitent des ajustements au prompt
+pour changer le "mode" du LLM: d'assistant → extracteur.
+
+La question stratégique est: Voulons-nous maximiser Faithfulness (extracteur)
+ou garder un assistant utile avec disclaimers (plus sûr légalement)?
