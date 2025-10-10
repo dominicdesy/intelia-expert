@@ -8,6 +8,7 @@ import re
 import time
 import logging
 from dataclasses import dataclass
+from typing import Optional
 from utils.mixins import SerializableMixin
 
 # Imports conditionnels pour détection de langue
@@ -97,7 +98,7 @@ class LanguageDetectionResult(SerializableMixin):
 # ============================================================================
 
 
-def _detect_with_universal_patterns(text: str) -> str:
+def _detect_with_universal_patterns(text: str) -> Optional[str]:
     """Détection de langue via patterns universels du dictionnaire"""
     # Import local pour éviter la circularité
     try:
@@ -149,7 +150,7 @@ def _detect_with_universal_patterns(text: str) -> str:
     return None
 
 
-def detect_language_enhanced(text: str, default: str = None) -> LanguageDetectionResult:
+def detect_language_enhanced(text: str, default: Optional[str] = None) -> LanguageDetectionResult:
     """
     Détection de langue multilingue sans compilation FastText
     Version optimisée pour Digital Ocean App Platform
