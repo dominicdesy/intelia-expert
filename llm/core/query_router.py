@@ -987,6 +987,10 @@ class QueryRouter:
                     entities["target_weight"] = llm_entities["target_weight"]
                     logger.debug(f"✅ LLM target_weight extraction: {llm_entities['target_weight']}g")
 
+                if llm_entities.get("age_end") is not None:
+                    entities["age_end"] = llm_entities["age_end"]
+                    logger.info(f"✅ LLM age_end extraction: {llm_entities['age_end']} days")
+
                 if llm_entities.get("calculation_type"):
                     entities["calculation_type"] = llm_entities["calculation_type"]
                     logger.debug(f"✅ LLM calculation_type: {llm_entities['calculation_type']}")

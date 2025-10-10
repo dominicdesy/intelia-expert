@@ -135,10 +135,16 @@ class CalculationQueryHandler(BaseQueryHandler):
         1. Reverse lookup pour trouver âge final (si target_weight fourni)
         2. Calcul consommation cumulée entre age_start et age_end
         """
+        # DEBUG: Log exact entities received
+        logger.debug(f"🔍 DEBUG _handle_cumulative_feed: entities = {entities}")
+        logger.debug(f"🔍 DEBUG: entities.keys() = {list(entities.keys())}")
+
         breed = entities.get("breed")
         sex = entities.get("sex", "as_hatched")
         age_start = entities.get("age_days")
         target_weight = entities.get("target_weight")
+
+        logger.debug(f"🔍 DEBUG: breed={breed}, age_start={age_start}, target_weight={target_weight}")
 
         if not breed or not age_start:
             return {
@@ -169,7 +175,12 @@ class CalculationQueryHandler(BaseQueryHandler):
         else:
             # Si pas de target_weight, besoin d'un age_end explicite
             age_end = entities.get("age_end")
+            logger.debug(f"🔍 DEBUG: age_end from entities.get('age_end') = {age_end}, type = {type(age_end)}")
+            logger.debug(f"🔍 DEBUG: 'age_end' in entities = {'age_end' in entities}")
+
             if not age_end:
+                logger.error(f"❌ age_end check failed! entities.keys() = {list(entities.keys())}")
+                logger.error(f"❌ Full entities dict: {entities}")
                 return {
                     "error": "Need either target_weight or age_end",
                     "needs_clarification": True
