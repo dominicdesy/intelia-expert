@@ -148,13 +148,15 @@ jobs:
               const highCount = (banditReport.match(/"issue_severity": "HIGH"/g) || []).length;
 
               if (highCount > 0) {
+                const repoFullName = context.repo.owner + '/' + context.repo.repo;
+                const runId = context.runId;
                 const issueBody = `## 🚨 Security Audit Alert
 
 **Monthly security audit found ${highCount} HIGH severity issue(s)**
 
 ### Action Required
 Please review the security audit reports in the workflow artifacts:
-- [Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+- [Workflow Run](https://github.com/${repoFullName}/actions/runs/${runId})
 
 ### Next Steps
 1. Download and review the security reports
