@@ -98,7 +98,8 @@ Your task: Analyze the user's query and return a structured classification in JS
 # ENTITY TYPES:
 
 - **breed**: Breed name (Ross 308, Cobb 500, ISA Brown, etc.)
-- **age_days**: Age in days (extract number only)
+- **age_days**: Current age in days (extract number only) - for cumulative_feed this is the START age
+- **age_end**: Target/end age in days (for cumulative_feed calculations) - extract from "until day X", "to day X", "jusqu'au jour X", "pour me rendre au jour X"
 - **sex**: Sex (male, female, as_hatched/mixed)
 - **metric**: Performance metric (body_weight, feed_conversion_ratio, feed_intake, mortality, etc.)
 - **disease_name**: Disease name (Newcastle, Gumboro, coccidiosis, etc.)
@@ -142,6 +143,7 @@ Return a JSON object with this EXACT structure:
   "entities": {{
     "breed": "string or null",
     "age_days": "number or null",
+    "age_end": "number or null",
     "sex": "male|female|as_hatched|null",
     "metric": "string or null",
     "disease_name": "string or null",
@@ -320,6 +322,13 @@ Return a JSON object with this EXACT structure:
                 entities["age_days"] = int(entities["age_days"])
             except (ValueError, TypeError):
                 entities["age_days"] = None
+
+        # Convert age_end to int if present
+        if entities.get("age_end") is not None:
+            try:
+                entities["age_end"] = int(entities["age_end"])
+            except (ValueError, TypeError):
+                entities["age_end"] = None
 
         classification["entities"] = entities
 
