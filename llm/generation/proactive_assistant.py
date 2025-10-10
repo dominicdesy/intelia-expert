@@ -473,7 +473,7 @@ class ProactiveAssistant:
             }
             return generic_templates.get(language, generic_templates["fr"])
 
-        # Metric name mapping by language
+        # Metric name mapping by language (all 12 supported languages)
         metric_names = {
             "fr": {
                 "body_weight": "poids",
@@ -501,6 +501,87 @@ class ProactiveAssistant:
                 "livability": "viabilidad",
                 "feed_intake": "consumo de alimento",
                 "water_intake": "consumo de agua",
+            },
+            "de": {
+                "body_weight": "Gewicht",
+                "feed_conversion_ratio": "Futterverwertung",
+                "daily_gain": "tägliche Zunahme",
+                "mortality": "Mortalität",
+                "livability": "Lebensfähigkeit",
+                "feed_intake": "Futteraufnahme",
+                "water_intake": "Wasseraufnahme",
+            },
+            "it": {
+                "body_weight": "peso",
+                "feed_conversion_ratio": "conversione alimentare",
+                "daily_gain": "crescita giornaliera",
+                "mortality": "mortalità",
+                "livability": "vivibilità",
+                "feed_intake": "consumo di mangime",
+                "water_intake": "consumo di acqua",
+            },
+            "pt": {
+                "body_weight": "peso",
+                "feed_conversion_ratio": "conversão alimentar",
+                "daily_gain": "ganho diário",
+                "mortality": "mortalidade",
+                "livability": "viabilidade",
+                "feed_intake": "consumo de ração",
+                "water_intake": "consumo de água",
+            },
+            "pl": {
+                "body_weight": "waga",
+                "feed_conversion_ratio": "współczynnik konwersji paszy",
+                "daily_gain": "przyrost dzienny",
+                "mortality": "śmiertelność",
+                "livability": "żywotność",
+                "feed_intake": "spożycie paszy",
+                "water_intake": "spożycie wody",
+            },
+            "nl": {
+                "body_weight": "gewicht",
+                "feed_conversion_ratio": "voederconversie",
+                "daily_gain": "dagelijkse groei",
+                "mortality": "mortaliteit",
+                "livability": "levensvatbaarheid",
+                "feed_intake": "voeropname",
+                "water_intake": "wateropname",
+            },
+            "id": {
+                "body_weight": "berat",
+                "feed_conversion_ratio": "konversi pakan",
+                "daily_gain": "pertambahan harian",
+                "mortality": "mortalitas",
+                "livability": "kelayakan hidup",
+                "feed_intake": "konsumsi pakan",
+                "water_intake": "konsumsi air",
+            },
+            "hi": {
+                "body_weight": "वजन",
+                "feed_conversion_ratio": "चारा रूपांतरण अनुपात",
+                "daily_gain": "दैनिक वृद्धि",
+                "mortality": "मृत्यु दर",
+                "livability": "जीवित रहने की क्षमता",
+                "feed_intake": "चारा खपत",
+                "water_intake": "पानी की खपत",
+            },
+            "zh": {
+                "body_weight": "体重",
+                "feed_conversion_ratio": "饲料转化率",
+                "daily_gain": "日增重",
+                "mortality": "死亡率",
+                "livability": "成活率",
+                "feed_intake": "采食量",
+                "water_intake": "饮水量",
+            },
+            "th": {
+                "body_weight": "น้ำหนัก",
+                "feed_conversion_ratio": "อัตราการแปลงอาหาร",
+                "daily_gain": "การเพิ่มน้ำหนักรายวัน",
+                "mortality": "อัตราการตาย",
+                "livability": "อัตราการอยู่รอด",
+                "feed_intake": "การบริโภคอาหาร",
+                "water_intake": "การบริโภคน้ำ",
             },
         }
 
