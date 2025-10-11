@@ -61,7 +61,6 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
       setError(null);
 
       const params: any = {
-        token,
         page: currentPage,
         limit,
       };
@@ -73,7 +72,7 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
 
       const [qaData, statsData] = await Promise.all([
         getProblematicQA(params),
-        getQualityStats({ token, days: 30 }),
+        getQualityStats({ days: 30 }),
       ]);
 
       setProblematicQA(qaData.problematic_qa);
@@ -135,7 +134,7 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
 
     try {
       setIsAnalyzing(true);
-      const result = await analyzeBatch({ token, limit: 50 });
+      const result = await analyzeBatch({ limit: 50 });
       alert(
         `Analyse terminée!\n\n` +
           `✅ ${result.analyzed_count} Q&A analysées\n` +
@@ -154,7 +153,6 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
   const handleReview = async (qa: ProblematicQA, falsePositive: boolean = false) => {
     try {
       await reviewQA({
-        token,
         checkId: qa.id,
         data: {
           reviewed: true,
