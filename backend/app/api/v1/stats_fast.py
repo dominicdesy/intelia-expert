@@ -112,18 +112,15 @@ async def get_billing_plans_data() -> Dict[str, Any]:
         with get_pg_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
-                # Top utilisateurs depuis PostgreSQL (conversations uniquement)
+                # Top utilisateurs depuis PostgreSQL (conversations + messages)
                 cur.execute(
                     """
                     SELECT
                         user_id,
                         COUNT(*) as question_count
-                    FROM conversations
+                    FROM user_questions_complete
                     WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
                         AND user_id IS NOT NULL
-                        AND question IS NOT NULL
-                        AND response IS NOT NULL
-                        AND status = 'active'
                     GROUP BY user_id
                     ORDER BY question_count DESC
                     LIMIT 10
@@ -190,7 +187,7 @@ async def get_enhanced_usage_stats() -> Dict[str, Any]:
         with get_pg_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
-                # Stats principales
+                # Stats principales depuis user_questions_complete
                 cur.execute(
                     """
                     SELECT
@@ -198,24 +195,24 @@ async def get_enhanced_usage_stats() -> Dict[str, Any]:
                         COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as questions_today,
                         COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as questions_this_month,
                         COUNT(DISTINCT user_id) as unique_users
-                    FROM conversations
+                    FROM user_questions_complete
                     WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-                        AND status = 'active'
+                        AND status = 'success'
                     """
                 )
 
                 main_result = cur.fetchone()
 
-                # Distribution des sources
+                # Distribution des sources depuis user_questions_complete
                 cur.execute(
                     """
                     SELECT
                         response_source,
                         COUNT(*) as count
-                    FROM conversations
+                    FROM user_questions_complete
                     WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
                         AND response_source IS NOT NULL
-                        AND status = 'active'
+                        AND status = 'success'
                     GROUP BY response_source
                     ORDER BY count DESC
                     """
@@ -233,15 +230,15 @@ async def get_enhanced_usage_stats() -> Dict[str, Any]:
                     else:
                         source_distribution[source] = row["count"]
 
-                # Monthly breakdown
+                # Monthly breakdown depuis user_questions_complete
                 cur.execute(
                     """
                     SELECT
                         TO_CHAR(created_at, 'YYYY-MM') as month,
                         COUNT(*) as count
-                    FROM conversations
+                    FROM user_questions_complete
                     WHERE created_at >= CURRENT_DATE - INTERVAL '6 months'
-                        AND status = 'active'
+                        AND status = 'success'
                     GROUP BY TO_CHAR(created_at, 'YYYY-MM')
                     ORDER BY month DESC
                     """
@@ -288,10 +285,10 @@ async def get_performance_stats() -> Dict[str, Any]:
                         MAX(processing_time_ms / 1000.0) as max_response_time,
                         PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY processing_time_ms / 1000.0) as median_response_time,
                         COUNT(*) as response_time_count
-                    FROM conversations
+                    FROM user_questions_complete
                     WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
                         AND processing_time_ms IS NOT NULL
-                        AND status = 'active'
+                        AND status = 'success'
                     """
                 )
 
