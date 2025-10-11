@@ -474,8 +474,6 @@ async def get_questions(
                         response_source,
                         response_confidence,
                         COALESCE(processing_time_ms, 1000.0) as processing_time_ms,
-                        sources,
-                        mode,
                         title,
                         preview,
                         last_message_preview,
@@ -505,8 +503,8 @@ async def get_questions(
                         "response_source": row["response_source"],
                         "response_confidence": float(row["response_confidence"] or 0.85),
                         "processing_time_ms": float(row["processing_time_ms"] or 1000.0),
-                        "sources": row["sources"] or [],
-                        "mode": row["mode"] or "broiler",
+                        "sources": row.get("sources", []) or [],  # Column doesn't exist, use empty default
+                        "mode": row.get("mode", "broiler") or "broiler",  # Column doesn't exist, use default
                         "title": row["title"],
                         "preview": row["preview"],
                         "last_message_preview": row["last_message_preview"],
