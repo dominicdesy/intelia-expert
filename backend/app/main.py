@@ -252,9 +252,20 @@ async def lifespan(app: FastAPI):
     logger.info(f"📦 VERSION: {VERSION} | BUILD: {BUILD} | COMMIT: {COMMIT}")
     logger.info("=" * 80)
 
-    # ========== INITIALISATION DES SERVICES ==========
+    # ========== INITIALISATION DES BASES DE DONNÉES ==========
     try:
-        logger.info("Initialisation des services analytics et facturation...")
+        logger.info("Initialisation des connexions aux bases de données...")
+
+        # Initialiser PostgreSQL + Supabase
+        from app.core.database import init_all_databases
+        db_init_success = init_all_databases()
+
+        if db_init_success:
+            logger.info("✅ Bases de données PostgreSQL et Supabase initialisées")
+        else:
+            logger.warning("⚠️ Erreur initialisation des bases de données")
+
+        # ========== INITIALISATION DES SERVICES ==========
         database_url = os.getenv("DATABASE_URL")
         if database_url:
             logger.info("DATABASE_URL configuree")
@@ -341,6 +352,14 @@ async def lifespan(app: FastAPI):
 
     # ========== NETTOYAGE A L'ARRET ==========
     logger.info("Arret du backend Expert API")
+
+    # Fermer les connexions DB
+    try:
+        from app.core.database import close_all_databases
+        close_all_databases()
+        logger.info("✅ Connexions bases de données fermées")
+    except Exception as e:
+        logger.error(f"Erreur fermeture DB: {e}")
 
     if monitoring_task:
         try:
