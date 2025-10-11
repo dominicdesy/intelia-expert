@@ -425,8 +425,14 @@ async def get_questions(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentification requise")
 
-    user_id = current_user.get("sub") or current_user.get("id")
+    # Essayer plusieurs clés possibles pour user_id
+    user_id = (
+        current_user.get("user_id") or  # Clé utilisée par get_current_user
+        current_user.get("sub") or      # Clé standard JWT
+        current_user.get("id")          # Fallback
+    )
     if not user_id:
+        logger.error(f"❌ [QUESTIONS] User ID manquant. current_user keys: {list(current_user.keys())}")
         raise HTTPException(status_code=400, detail="User ID manquant")
 
     logger.info(f"🔍 [QUESTIONS] Fetching questions for user_id: {user_id}")
