@@ -71,7 +71,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white border border-gray-200 p-4">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Invitations Envoyées</p>
+            <p className="text-sm text-gray-600 mb-1">Invitations envoyées</p>
             <p className="text-2xl font-semibold text-gray-900">
               {invitationStats.total_invitations_sent}
             </p>
@@ -85,7 +85,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
 
         <div className="bg-white border border-gray-200 p-4">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Invitations Acceptées</p>
+            <p className="text-sm text-gray-600 mb-1">Invitations acceptées</p>
             <p className="text-2xl font-semibold text-green-600">
               {invitationStats.total_invitations_accepted}
             </p>
@@ -99,7 +99,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
 
         <div className="bg-white border border-gray-200 p-4">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Utilisateurs Inviteurs</p>
+            <p className="text-sm text-gray-600 mb-1">Utilisateurs inviteurs</p>
             <p className="text-2xl font-semibold text-gray-900">
               {invitationStats.unique_inviters}
             </p>
@@ -111,7 +111,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
 
         <div className="bg-white border border-gray-200 p-4">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Taux d'Acceptation</p>
+            <p className="text-sm text-gray-600 mb-1">Taux d'acceptation</p>
             <p className="text-2xl font-semibold text-blue-600">
               {invitationStats.acceptance_rate.toFixed(1)}%
             </p>
@@ -129,7 +129,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-medium text-gray-900">
-                Top 5 - Invitations Envoyées
+                Top 5 - Invitations envoyées
               </h3>
               {cacheStatus && (
                 <span
@@ -246,7 +246,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
           <div className="px-4 py-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-medium text-gray-900">
-                Top 5 - Invitations Acceptées
+                Top 5 - Invitations acceptées
               </h3>
               {cacheStatus && cacheStatus.is_available && (
                 <span className="text-xs text-green-600">
@@ -364,7 +364,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
         <div className="px-4 py-3 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-medium text-gray-900">
-              Export des Statistiques d'Invitations
+              Export des statistiques d'invitations
             </h3>
             {cacheStatus?.is_available && (
               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
@@ -379,7 +379,7 @@ export const InvitationStatsComponent: React.FC<InvitationStatsProps> = ({
             <div className="bg-white border border-gray-200 p-4 flex flex-col justify-between h-full">
               <div>
                 <h4 className="text-base font-medium text-gray-900 mb-1">
-                  Export CSV Complet
+                  Export CSV complet
                 </h4>
                 <p className="text-sm text-gray-600 mb-3">
                   Toutes les statistiques au format CSV

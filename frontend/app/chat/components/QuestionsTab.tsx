@@ -476,7 +476,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <h3 className="text-base font-medium text-gray-900">
-              Analyse des Commentaires
+              Analyse des commentaires
             </h3>
           </div>
           <div className="p-4">
@@ -485,13 +485,13 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                 <div className="text-xl font-semibold text-green-600">
                   {feedbackStats.positive}
                 </div>
-                <div className="text-xs text-green-700">Feedback Positifs</div>
+                <div className="text-xs text-green-700">Feedback positifs</div>
               </div>
               <div className="text-center p-3 bg-red-50 border border-red-200">
                 <div className="text-xl font-semibold text-red-600">
                   {feedbackStats.negative}
                 </div>
-                <div className="text-xs text-red-700">Feedback Négatifs</div>
+                <div className="text-xs text-red-700">Feedback négatifs</div>
               </div>
             </div>
 
@@ -533,7 +533,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
             {/* Commentaires récents */}
             <div className="border-t border-gray-200 pt-3">
               <h4 className="text-sm font-medium text-gray-800 mb-2">
-                Commentaires Récents
+                Commentaires récents
               </h4>
               <div className="space-y-2 max-h-32 overflow-y-auto">
                 {questionLogs
@@ -585,7 +585,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200">
           <h3 className="text-base font-medium text-gray-900">
-            Export des Données
+            Export des données
           </h3>
         </div>
         <div className="p-4">
@@ -679,7 +679,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       <div className="bg-white border border-gray-200">
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-base font-medium text-gray-900">
-            Questions et Réponses
+            Questions et réponses
           </h3>
           <span className="text-sm text-gray-500">
             {filteredQuestions.length} questions affichées
