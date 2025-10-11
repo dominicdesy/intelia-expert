@@ -202,7 +202,7 @@ class InteliaRAGEngine(InitializableMixin):
                 },
                 conversation_memory=self.conversation_memory,
                 ood_detector=self.weaviate_core.ood_detector if self.weaviate_core else None,
-                weaviate_client=self.weaviate_core.client if self.weaviate_core else None,
+                weaviate_client=self.weaviate_core.weaviate_client if self.weaviate_core else None,
                 enable_external_sources=enable_external,
             )
 
