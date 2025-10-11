@@ -256,7 +256,7 @@ async def get_billing_plans_data() -> Dict[str, Any]:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
-                # Top utilisateurs avec leur plan - JOIN avec public.users
+                # Top utilisateurs avec leur plan - JOIN avec users (sans préfixe schema)
                 cur.execute(
                     """
                     SELECT
@@ -266,7 +266,7 @@ async def get_billing_plans_data() -> Dict[str, Any]:
                         COUNT(*) as question_count,
                         'free' as plan
                     FROM conversations c
-                    LEFT JOIN public.users u ON u.id = c.user_id
+                    LEFT JOIN users u ON u.id = c.user_id
                     WHERE c.created_at >= CURRENT_DATE - INTERVAL '30 days'
                         AND c.user_id IS NOT NULL
                         AND c.question IS NOT NULL
