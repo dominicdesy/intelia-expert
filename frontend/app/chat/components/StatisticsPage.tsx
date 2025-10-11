@@ -204,7 +204,7 @@ interface QuestionLog {
 
 export const StatisticsPage: React.FC = () => {
   const currentUser = useRobustAuth(); // ✅ Hook simplifié
-  const { isAuthenticated, hasHydrated, getToken } = useAuthStore(); // ✅ Store unifié
+  const { isAuthenticated, hasHydrated, getAuthToken } = useAuthStore(); // ✅ Store unifié
 
   const [authStatus, setAuthStatus] = useState<
     "initializing" | "checking" | "ready" | "unauthorized" | "forbidden"
@@ -253,6 +253,7 @@ export const StatisticsPage: React.FC = () => {
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionLog | null>(
     null,
   );
+  const [authToken, setAuthToken] = useState<string>("");
 
   // Références pour éviter les chargements multiples
   const authCheckRef = useRef<boolean>(false);
@@ -270,6 +271,17 @@ export const StatisticsPage: React.FC = () => {
     questionsLoadedRef.current.clear();
     invitationsLoadedRef.current = false;
   }, []);
+
+  // ✅ Récupérer le token pour QualityIssuesTab
+  useEffect(() => {
+    const fetchToken = async () => {
+      if (isAuthenticated) {
+        const token = await getAuthToken();
+        setAuthToken(token || "");
+      }
+    };
+    fetchToken();
+  }, [isAuthenticated, getAuthToken]);
 
   // ✅ LOGIQUE D'AUTHENTIFICATION SIMPLIFIÉE - Store unifié uniquement
   useEffect(() => {
@@ -1025,7 +1037,7 @@ export const StatisticsPage: React.FC = () => {
             }
           />
         ) : activeTab === "quality" ? (
-          <QualityIssuesTab token={getToken() || ""} />
+          <QualityIssuesTab token={authToken} />
         ) : activeTab === "invitations" ? (
           <>
             {invitationLoading && !invitationStats ? (
