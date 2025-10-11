@@ -543,12 +543,53 @@ async def get_questions(
 
                 logger.info(f"✅ [QUESTIONS] Returning {len(conversations)}/{total} conversations")
 
+                # Transformer conversations en format QuestionLog pour le frontend
+                questions = []
+                for conv in conversations:
+                    # Extraire le premier message user et le premier message assistant
+                    user_msg = next((m for m in conv["messages"] if m["role"] == "user"), None)
+                    assistant_msg = next((m for m in conv["messages"] if m["role"] == "assistant"), None)
+
+                    if user_msg and assistant_msg:
+                        # Récupérer les infos utilisateur depuis Supabase
+                        user_info = get_user_from_supabase(user_id)
+
+                        questions.append({
+                            "id": conv["id"],
+                            "timestamp": conv["created_at"],
+                            "user_email": user_info.get("email", "") if user_info else "",
+                            "user_name": f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip() if user_info else "",
+                            "question": user_msg["content"],
+                            "response": assistant_msg["content"],
+                            "response_source": assistant_msg.get("response_source", ""),
+                            "confidence_score": assistant_msg.get("response_confidence"),
+                            "response_time": assistant_msg.get("processing_time_ms"),
+                            "language": conv.get("language", ""),
+                            "session_id": conv["session_id"],
+                            "feedback": assistant_msg.get("feedback"),
+                            "feedback_comment": assistant_msg.get("feedback_comment")
+                        })
+
+                # Calculer le nombre de pages
+                pages = (total + limit - 1) // limit
+
                 return {
-                    "conversations": conversations,
-                    "total": total,
-                    "page": page,
-                    "limit": limit,
-                    "has_more": (offset + limit) < total
+                    "cache_info": {
+                        "is_available": True,
+                        "last_update": datetime.now().isoformat(),
+                        "cache_age_minutes": 0,
+                        "performance_gain": "N/A",
+                        "next_update": datetime.now().isoformat()
+                    },
+                    "questions": questions,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total,
+                        "pages": pages,
+                        "has_next": (offset + limit) < total,
+                        "has_prev": page > 1
+                    }
                 }
 
     except Exception as e:
