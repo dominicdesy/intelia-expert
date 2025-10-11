@@ -23,19 +23,8 @@ export const LoadingMessage: React.FC<LoadingMessageProps> = ({
     [language]
   );
 
-  const [dots, setDots] = useState("");
-
-  // Animation des points
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDots((prev) => {
-        if (prev === "...") return "";
-        return prev + ".";
-      });
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, []);
+  // Diviser le texte en caractères pour l'animation wave
+  const characters = useMemo(() => loadingText.split(""), [loadingText]);
 
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
@@ -46,26 +35,47 @@ export const LoadingMessage: React.FC<LoadingMessageProps> = ({
         <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
       </div>
 
-      {/* Texte avec animation de fondu */}
-      <span className="text-sm text-gray-600 animate-pulse font-medium">
-        {loadingText}
-        <span className="inline-block w-6 text-left">{dots}</span>
+      {/* Texte avec animation wave */}
+      <span className="text-sm font-medium flex">
+        {characters.map((char, index) => (
+          <span
+            key={index}
+            className="animate-wave inline-block"
+            style={{
+              animationDelay: `${index * 0.1}s`,
+              color: char === " " ? "transparent" : undefined,
+            }}
+          >
+            {char === " " ? "\u00A0" : char}
+          </span>
+        ))}
       </span>
 
       {/* Style CSS pour l'animation personnalisée */}
       <style jsx>{`
-        @keyframes fadeInOut {
+        @keyframes wave {
           0%,
           100% {
-            opacity: 0.4;
+            transform: translateY(0) scale(1);
+            color: #4b5563;
+          }
+          25% {
+            transform: translateY(-4px) scale(1.1);
+            color: #3b82f6;
           }
           50% {
-            opacity: 1;
+            transform: translateY(-6px) scale(1.15);
+            color: #2563eb;
+          }
+          75% {
+            transform: translateY(-4px) scale(1.1);
+            color: #3b82f6;
           }
         }
 
-        .animate-pulse {
-          animation: fadeInOut 2s ease-in-out infinite;
+        .animate-wave {
+          animation: wave 2s ease-in-out infinite;
+          display: inline-block;
         }
 
         @keyframes bounce {
