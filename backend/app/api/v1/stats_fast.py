@@ -257,21 +257,22 @@ async def get_billing_plans_data() -> Dict[str, Any]:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
                 # Top utilisateurs avec leur plan - JOIN via conversations.user_id
+                # Essayer d'abord auth.users (Supabase), sinon public.users
                 cur.execute(
                     """
                     SELECT
                         COALESCE(u.email, c.user_id::text) as email,
-                        COALESCE(u.first_name, '') as first_name,
-                        COALESCE(u.last_name, '') as last_name,
+                        COALESCE(u.raw_user_meta_data->>'first_name', '') as first_name,
+                        COALESCE(u.raw_user_meta_data->>'last_name', '') as last_name,
                         COUNT(*) as question_count,
                         'free' as plan
                     FROM conversations c
-                    LEFT JOIN users u ON u.id::text = c.user_id
+                    LEFT JOIN auth.users u ON u.id::text = c.user_id
                     WHERE c.created_at >= CURRENT_DATE - INTERVAL '30 days'
                         AND c.user_id IS NOT NULL
                         AND c.status = 'active'
                         AND c.question IS NOT NULL
-                    GROUP BY c.user_id, u.email, u.first_name, u.last_name
+                    GROUP BY c.user_id, u.email, u.raw_user_meta_data
                     ORDER BY question_count DESC
                     LIMIT 10
                 """
