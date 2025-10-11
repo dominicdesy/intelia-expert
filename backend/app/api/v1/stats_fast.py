@@ -396,7 +396,7 @@ async def get_dashboard_fast(
 
 
 # ============================================================================
-# QUESTIONS ENDPOINT - Pour l'onglet Q&A
+# QUESTIONS ENDPOINT - Pour l'onglet Q&A (NOUVELLE ARCHITECTURE)
 # ============================================================================
 
 @router.get("/questions")
@@ -406,16 +406,30 @@ async def get_questions(
     current_user: dict = Depends(get_current_user) if AUTH_AVAILABLE else None,
 ) -> Dict[str, Any]:
     """
-    Récupère l'historique des questions pour l'utilisateur connecté
+    Récupère l'historique des conversations pour l'utilisateur connecté
+    NOUVELLE ARCHITECTURE: Retourne les conversations avec leurs messages
 
     Args:
         page: Numéro de page (commence à 1)
         limit: Nombre de résultats par page
-        current_user: Utilisateur authentifié (injecté par dependency)
+        current_user: Utilisateur authentifié
 
     Returns:
         {
-            "questions": [...],
+            "conversations": [
+                {
+                    "id": "uuid",
+                    "title": "Première question...",
+                    "message_count": 4,
+                    "messages": [
+                        {"role": "user", "content": "Question"},
+                        {"role": "assistant", "content": "Réponse"},
+                        ...
+                    ],
+                    "created_at": "2025-10-11T...",
+                    "last_activity_at": "2025-10-11T..."
+                }
+            ],
             "total": int,
             "page": int,
             "limit": int,
@@ -425,101 +439,115 @@ async def get_questions(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentification requise")
 
-    # Essayer plusieurs clés possibles pour user_id
     user_id = (
-        current_user.get("user_id") or  # Clé utilisée par get_current_user
-        current_user.get("sub") or      # Clé standard JWT
-        current_user.get("id")          # Fallback
+        current_user.get("user_id") or
+        current_user.get("sub") or
+        current_user.get("id")
     )
     if not user_id:
-        logger.error(f"❌ [QUESTIONS] User ID manquant. current_user keys: {list(current_user.keys())}")
+        logger.error(f"❌ [QUESTIONS] User ID manquant")
         raise HTTPException(status_code=400, detail="User ID manquant")
 
-    logger.info(f"🔍 [QUESTIONS] Fetching questions for user_id: {user_id}")
-    logger.info(f"🔍 [QUESTIONS] Current user data: {current_user}")
+    logger.info(f"🔍 [QUESTIONS] Fetching conversations for user_id: {user_id}")
 
     try:
         with get_pg_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-
-                # Calculer l'offset
                 offset = (page - 1) * limit
 
-                # Compter le total
-                logger.info(f"🔍 [QUESTIONS] Counting conversations for user_id: {user_id}")
+                # Compter le total de conversations
                 cur.execute(
                     """
                     SELECT COUNT(*) as total
                     FROM conversations
-                    WHERE user_id = %s
-                        AND status = 'active'
+                    WHERE user_id = %s AND status = 'active'
                     """,
                     (user_id,)
                 )
+                total = cur.fetchone()["total"]
 
-                total_result = cur.fetchone()
-                total = total_result["total"] if total_result else 0
-                logger.info(f"✅ [QUESTIONS] Found {total} total conversations for user_id: {user_id}")
+                logger.info(f"✅ [QUESTIONS] Found {total} conversations")
 
-                # Récupérer les questions paginées
-                logger.info(f"🔍 [QUESTIONS] Fetching paginated questions (page={page}, limit={limit}, offset={offset})")
+                # Récupérer les conversations paginées
                 cur.execute(
                     """
                     SELECT
-                        id::text as id,
-                        session_id,
-                        user_id::text as user_email,
-                        question,
-                        response as response_text,
-                        response_source,
-                        response_confidence,
-                        COALESCE(processing_time_ms, 1000.0) as processing_time_ms,
-                        title,
-                        preview,
-                        last_message_preview,
-                        message_count,
-                        language,
-                        feedback,
-                        feedback_comment,
-                        created_at,
-                        updated_at
-                    FROM conversations
-                    WHERE user_id = %s
-                        AND status = 'active'
-                    ORDER BY created_at DESC
+                        c.id::text as id,
+                        c.session_id::text as session_id,
+                        c.title,
+                        c.language,
+                        c.message_count,
+                        c.first_message_preview,
+                        c.last_message_preview,
+                        c.created_at,
+                        c.updated_at,
+                        c.last_activity_at
+                    FROM conversations c
+                    WHERE c.user_id = %s AND c.status = 'active'
+                    ORDER BY c.last_activity_at DESC
                     LIMIT %s OFFSET %s
                     """,
                     (user_id, limit, offset)
                 )
 
-                questions = []
-                for row in cur.fetchall():
-                    questions.append({
-                        "id": row["id"],
-                        "session_id": str(row["session_id"]),
-                        "user_email": row["user_email"],
-                        "question": row["question"],
-                        "response_text": row["response_text"],
-                        "response_source": row["response_source"],
-                        "response_confidence": float(row["response_confidence"] or 0.85),
-                        "processing_time_ms": float(row["processing_time_ms"] or 1000.0),
-                        "sources": row.get("sources", []) or [],  # Column doesn't exist, use empty default
-                        "mode": row.get("mode", "broiler") or "broiler",  # Column doesn't exist, use default
-                        "title": row["title"],
-                        "preview": row["preview"],
-                        "last_message_preview": row["last_message_preview"],
-                        "message_count": row["message_count"] or 1,
-                        "language": row["language"] or "fr",
-                        "feedback": row["feedback"],
-                        "feedback_comment": row["feedback_comment"],
-                        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                        "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None
+                conversations = []
+                for conv_row in cur.fetchall():
+                    conversation_id = conv_row["id"]
+
+                    # Récupérer les messages de cette conversation
+                    cur.execute(
+                        """
+                        SELECT
+                            id::text as id,
+                            role,
+                            content,
+                            response_source,
+                            response_confidence,
+                            processing_time_ms,
+                            sequence_number,
+                            feedback,
+                            feedback_comment,
+                            created_at
+                        FROM messages
+                        WHERE conversation_id = %s
+                        ORDER BY sequence_number ASC
+                        """,
+                        (conversation_id,)
+                    )
+
+                    messages = []
+                    for msg_row in cur.fetchall():
+                        messages.append({
+                            "id": msg_row["id"],
+                            "role": msg_row["role"],
+                            "content": msg_row["content"],
+                            "response_source": msg_row["response_source"],
+                            "response_confidence": msg_row["response_confidence"],
+                            "processing_time_ms": msg_row["processing_time_ms"],
+                            "sequence_number": msg_row["sequence_number"],
+                            "feedback": msg_row["feedback"],
+                            "feedback_comment": msg_row["feedback_comment"],
+                            "created_at": msg_row["created_at"].isoformat() if msg_row["created_at"] else None
+                        })
+
+                    conversations.append({
+                        "id": conversation_id,
+                        "session_id": conv_row["session_id"],
+                        "title": conv_row["title"],
+                        "language": conv_row["language"],
+                        "message_count": conv_row["message_count"],
+                        "first_message_preview": conv_row["first_message_preview"],
+                        "last_message_preview": conv_row["last_message_preview"],
+                        "messages": messages,
+                        "created_at": conv_row["created_at"].isoformat() if conv_row["created_at"] else None,
+                        "updated_at": conv_row["updated_at"].isoformat() if conv_row["updated_at"] else None,
+                        "last_activity_at": conv_row["last_activity_at"].isoformat() if conv_row["last_activity_at"] else None
                     })
 
-                logger.info(f"Questions récupérées pour {user_id}: {len(questions)}/{total}")
+                logger.info(f"✅ [QUESTIONS] Returning {len(conversations)}/{total} conversations")
 
                 return {
-                    "questions": questions,
+                    "conversations": conversations,
                     "total": total,
                     "page": page,
                     "limit": limit,
@@ -527,8 +555,8 @@ async def get_questions(
                 }
 
     except Exception as e:
-        logger.error(f"Erreur récupération questions: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur récupération questions: {str(e)}")
+        logger.error(f"❌ [QUESTIONS] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================
