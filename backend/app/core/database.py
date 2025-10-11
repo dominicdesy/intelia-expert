@@ -142,7 +142,7 @@ def get_user_from_supabase(user_id: str) -> Optional[dict]:
     Récupère les informations utilisateur depuis Supabase.
 
     Args:
-        user_id: UUID de l'utilisateur
+        user_id: UUID de l'utilisateur (auth_user_id)
 
     Returns:
         dict avec email, first_name, last_name, user_type, plan ou None
@@ -152,12 +152,20 @@ def get_user_from_supabase(user_id: str) -> Optional[dict]:
         supabase = get_supabase_client()
         logger.info(f"🔍 [SUPABASE] Supabase client URL: {supabase.supabase_url}")
 
-        response = supabase.table("users").select("*").eq("id", user_id).single().execute()
-        logger.info(f"🔍 [SUPABASE] Query response: {response}")
+        # Essayer d'abord par auth_user_id (cas le plus probable)
+        response = supabase.table("users").select("*").eq("auth_user_id", user_id).execute()
+        logger.info(f"🔍 [SUPABASE] Query by auth_user_id response: {response}")
 
-        if response.data:
-            logger.info(f"✅ [SUPABASE] User data found: {response.data}")
-            return response.data
+        # Si aucun résultat, essayer par id (fallback)
+        if not response.data or len(response.data) == 0:
+            logger.info(f"🔍 [SUPABASE] No user found by auth_user_id, trying by id")
+            response = supabase.table("users").select("*").eq("id", user_id).execute()
+            logger.info(f"🔍 [SUPABASE] Query by id response: {response}")
+
+        if response.data and len(response.data) > 0:
+            user_data = response.data[0]
+            logger.info(f"✅ [SUPABASE] User data found: {user_data}")
+            return user_data
         else:
             logger.warning(f"❌ [SUPABASE] No data found for user_id: {user_id}")
             return None
