@@ -51,6 +51,8 @@ interface BillingStats {
   total_revenue: number;
   top_users: Array<{
     email: string;
+    first_name?: string;
+    last_name?: string;
     question_count: number;
     plan: string;
   }>;
@@ -156,7 +158,13 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                    Utilisateur
+                    Prénom
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Nom
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Courriel
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Questions
@@ -172,6 +180,12 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                     key={user.email || `user-${index}`}
                     className="hover:bg-gray-50"
                   >
+                    <td className="px-4 py-2 text-sm text-gray-900">
+                      {user.first_name || "-"}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-900">
+                      {user.last_name || "-"}
+                    </td>
                     <td className="px-4 py-2 text-sm text-gray-900 max-w-48">
                       <div
                         className="truncate"
@@ -202,7 +216,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
                   billingStats.top_users.length === 0) && (
                   <tr>
                     <td
-                      colSpan={3}
+                      colSpan={5}
                       className="px-4 py-8 text-center text-gray-500"
                     >
                       <div className="text-gray-400 text-2xl mb-2">👥</div>

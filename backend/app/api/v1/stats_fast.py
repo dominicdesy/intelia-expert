@@ -256,17 +256,21 @@ async def get_billing_plans_data() -> Dict[str, Any]:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
 
-                # Top utilisateurs avec leur plan
+                # Top utilisateurs avec leur plan - AVEC JOIN vers table users
                 cur.execute(
                     """
-                    SELECT 
-                        user_email,
+                    SELECT
+                        uqc.user_email as user_id,
+                        COALESCE(u.email, uqc.user_email) as email,
+                        COALESCE(u.first_name, '') as first_name,
+                        COALESCE(u.last_name, '') as last_name,
                         COUNT(*) as question_count,
                         'free' as plan
-                    FROM user_questions_complete 
-                    WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-                        AND user_email IS NOT NULL 
-                    GROUP BY user_email
+                    FROM user_questions_complete uqc
+                    LEFT JOIN users u ON uqc.user_email = u.id::text
+                    WHERE uqc.created_at >= CURRENT_DATE - INTERVAL '30 days'
+                        AND uqc.user_email IS NOT NULL
+                    GROUP BY uqc.user_email, u.email, u.first_name, u.last_name
                     ORDER BY question_count DESC
                     LIMIT 10
                 """
@@ -276,8 +280,10 @@ async def get_billing_plans_data() -> Dict[str, Any]:
                 for row in cur.fetchall():
                     user_data = {
                         "email": (
-                            row["user_email"][:50] if row["user_email"] else "unknown"
+                            row["email"][:50] if row["email"] else "unknown"
                         ),
+                        "first_name": (row["first_name"] or "")[:50],
+                        "last_name": (row["last_name"] or "")[:50],
                         "question_count": row["question_count"],
                         "plan": row["plan"],
                     }
