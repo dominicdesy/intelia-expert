@@ -557,6 +557,7 @@ except ImportError as e:
         ("billing_openai", "/billing", "billing-openai"),
         ("stats_fast", "", "statistics-fast"),
         ("webhooks", "", "webhooks"),  # 🔧 AJOUT DU ROUTER WEBHOOKS
+        ("qa_quality", "", "qa-quality"),  # 🔧 AJOUT DU ROUTER QA QUALITY
     ]
 
     if STATS_CACHE_AVAILABLE:
