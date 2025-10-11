@@ -749,16 +749,6 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span
-                          className={`inline-flex items-center px-2 py-1 text-xs font-medium ${getSourceColor(question.response_source)}`}
-                        >
-                          {getSourceLabel(question.response_source)}
-                        </span>
-                        <span
-                          className={`inline-flex items-center px-2 py-1 text-xs font-medium ${getConfidenceColor(question.confidence_score)}`}
-                        >
-                          {(question.confidence_score * 100).toFixed(0)}%
-                        </span>
                         <span className="text-lg">
                           {getFeedbackIcon(question.feedback)}
                         </span>
