@@ -34,10 +34,9 @@ logger = logging.getLogger(__name__)
 JWT_SECRETS = []
 
 # 1. Secret auth-temp (utilisé par vos endpoints /auth-temp/*)
-auth_temp_secret = (
-    os.getenv("SUPABASE_JWT_SECRET") or os.getenv("JWT_SECRET") or "fallback-secret"
-)
-JWT_SECRETS.append(("AUTH_TEMP", auth_temp_secret))
+auth_temp_secret = os.getenv("SUPABASE_JWT_SECRET") or os.getenv("JWT_SECRET")
+if auth_temp_secret:
+    JWT_SECRETS.append(("AUTH_TEMP", auth_temp_secret))
 
 # 2. Secrets Supabase traditionnels
 supabase_jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
@@ -52,10 +51,13 @@ service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 if service_role_key and service_role_key not in [s[1] for s in JWT_SECRETS]:
     JWT_SECRETS.append(("SUPABASE_SERVICE_ROLE_KEY", service_role_key))
 
-# Fallback
+# SÉCURITÉ: Crash si aucun secret configuré
 if not JWT_SECRETS:
-    JWT_SECRETS.append(("FALLBACK", "development-secret-change-in-production-12345"))
-    logger.error("Aucun JWT secret configuré - utilisation fallback")
+    raise RuntimeError(
+        "❌ FATAL: Aucun JWT secret configuré. "
+        "Définissez SUPABASE_JWT_SECRET, JWT_SECRET, SUPABASE_ANON_KEY ou SUPABASE_SERVICE_ROLE_KEY "
+        "dans les variables d'environnement. L'application ne peut pas démarrer."
+    )
 
 logger.info(f"JWT Secrets configurés: {len(JWT_SECRETS)} secrets disponibles")
 logger.info(f"Secrets types: {[s[0] for s in JWT_SECRETS]}")

@@ -1,6 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from typing import Dict, Any
 import os
 from datetime import datetime
+from app.api.v1.auth import get_current_user
 
 router = APIRouter(prefix="/system")
 
@@ -23,8 +25,19 @@ async def health_check():
 
 
 @router.get("/metrics")
-async def get_metrics():
-    """Get system performance metrics."""
+async def get_metrics(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Get system performance metrics.
+    ⚠️ SÉCURISÉ: Accès admin uniquement
+    """
+    # Vérifier les droits admin
+    user_type = current_user.get("user_type", "user")
+    if user_type not in ["admin", "super_admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Accès refusé. Droits administrateur requis."
+        )
+
     return {
         "status": "active",
         "metrics": {

@@ -3,7 +3,7 @@
 Corrige définitivement les timeouts et rate limiting OpenAI
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timedelta
 import logging
 from typing import Dict, Any, Optional
@@ -11,9 +11,25 @@ import os
 import requests
 import asyncio
 from app.api.v1.utils.openai_utils import _get_api_key
+from app.api.v1.auth import get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# ==================== HELPER POUR VÉRIFICATION ADMIN ====================
+def verify_admin_access(current_user: Dict[str, Any]):
+    """
+    Vérifie que l'utilisateur a les droits admin
+    Lève une HTTPException si ce n'est pas le cas
+    """
+    user_type = current_user.get("user_type", "user")
+    if user_type not in ["admin", "super_admin"]:
+        logger.warning(f"Tentative d'accès non autorisé par {current_user.get('email')} (type: {user_type})")
+        raise HTTPException(
+            status_code=403,
+            detail="Accès refusé. Droits administrateur requis."
+        )
+    return True
 
 # ==================== CACHE GLOBAL ====================
 USAGE_CACHE = {}
@@ -243,10 +259,12 @@ def estimate_cost_by_model(model_name: str, tokens: int) -> float:
 
 
 @router.get("/openai-usage/last-week")
-async def get_last_week_openai_usage():
+async def get_last_week_openai_usage(current_user: Dict[str, Any] = Depends(get_current_user)):
     """
     🚀 NOUVEAU: Récupère les coûts des 7 derniers jours (RAPIDE)
+    ⚠️ SÉCURISÉ: Accès admin uniquement
     """
+    verify_admin_access(current_user)
     try:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=7)
@@ -272,10 +290,12 @@ async def get_last_week_openai_usage():
 
 
 @router.get("/openai-usage/current-month-light")
-async def get_current_month_openai_usage_light():
+async def get_current_month_openai_usage_light(current_user: Dict[str, Any] = Depends(get_current_user)):
     """
     🚀 VERSION LÉGÈRE: Seulement les 10 derniers jours du mois
+    ⚠️ SÉCURISÉ: Accès admin uniquement
     """
+    verify_admin_access(current_user)
     try:
         now = datetime.now()
         # Prendre seulement les 10 derniers jours pour éviter rate limiting
@@ -310,10 +330,12 @@ async def get_current_month_openai_usage_light():
 
 
 @router.get("/openai-usage/fallback")
-async def get_openai_usage_fallback():
+async def get_openai_usage_fallback(current_user: Dict[str, Any] = Depends(get_current_user)):
     """
     🚀 FALLBACK: Retourne des données simulées en cas de problème API
+    ⚠️ SÉCURISÉ: Accès admin uniquement
     """
+    verify_admin_access(current_user)
     try:
         # Simuler des données basées sur votre usage typique
         fallback_data = {
@@ -353,8 +375,12 @@ async def get_openai_usage_fallback():
 
 
 @router.delete("/openai-usage/clear-cache")
-async def clear_openai_cache():
-    """🗑️ Vide le cache OpenAI (utile pour les tests)"""
+async def clear_openai_cache(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    🗑️ Vide le cache OpenAI (utile pour les tests)
+    ⚠️ SÉCURISÉ: Accès admin uniquement
+    """
+    verify_admin_access(current_user)
     global USAGE_CACHE, CACHE_EXPIRY
 
     cache_size = len(USAGE_CACHE)

@@ -39,9 +39,6 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth/register",
     "/api/v1/auth/reset-password",
     "/api/v1/auth/confirm-email",
-    "/api/v1/auth/debug/jwt-config",
-    "/api/v1/auth/debug/reset-config",
-    "/api/v1/auth/debug/oauth-config",
     # === ENDPOINTS OAUTH PUBLICS ===
     "/api/v1/auth/oauth/linkedin/login",
     "/api/v1/auth/oauth/facebook/login",
@@ -49,9 +46,8 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth/oauth/facebook/callback",
     # === ENDPOINTS CACHE PUBLICS ===
     "/api/v1/stats-fast/health",
-    # === SYSTEM ENDPOINTS ===
+    # === SYSTEM ENDPOINTS (health et status publics uniquement) ===
     "/api/v1/system/health",
-    "/api/v1/system/metrics",
     "/api/v1/system/status",
     # === ENDPOINTS SANS PREFIX /api ===
     "/",
@@ -74,6 +70,7 @@ PROTECTED_PATTERNS = [
     "/api/v1/billing/invoices",
     "/api/v1/billing/quotas",
     "/api/v1/billing/generate-invoice",
+    "/api/v1/billing/openai-usage/",  # 🔒 NOUVEAU: Tous les endpoints OpenAI usage
     # === ENDPOINTS ADMIN STRICTS ===
     "/api/v1/logging/questions",
     "/api/v1/admin/",
@@ -85,6 +82,9 @@ PROTECTED_PATTERNS = [
     "/api/v1/stats-admin/status",
     # === ENDPOINTS AUTH PROTÉGÉS (admin only) ===
     "/api/v1/auth/delete-data",
+    "/api/v1/auth/debug/",  # 🔒 NOUVEAU: Tous les endpoints debug auth
+    # === ENDPOINTS SYSTEM PROTÉGÉS (admin only) ===
+    "/api/v1/system/metrics",  # 🔒 NOUVEAU: Métriques système
 ]
 
 # PATTERNS POUR UTILISATEURS AUTHENTIFIÉS (niveau intermédiaire)
@@ -127,14 +127,12 @@ EXTENDED_PUBLIC_PATTERNS = [
     "/api/v1/auth/register",
     "/api/v1/auth/reset-password",
     "/api/v1/auth/confirm-email",
-    "/api/v1/auth/debug",
     "/api/v1/auth/oauth/",
     "/api/v1/stats-fast/health",
     "/api/v1/billing/plans",
     "/api/docs",
     "/api/redoc",
     "/api/openapi.json",
-    "/api/v1/system",
     "/api/v1/debug",
 ]
 

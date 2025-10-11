@@ -1536,8 +1536,11 @@ async def get_enhanced_global_stats(current_user=Depends(get_current_user)):
 
 
 @router.get("/stats/summary-all")
-async def get_all_invitation_summary():
-    """Résumé rapide des invitations (endpoint public pour les stats générales)"""
+async def get_all_invitation_summary(current_user=Depends(get_current_user)):
+    """
+    Résumé rapide des invitations (stats générales)
+    ⚠️ SÉCURISÉ: Accès authentifié uniquement
+    """
     try:
         client = get_supabase_anon_client()
 

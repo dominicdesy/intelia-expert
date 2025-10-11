@@ -159,23 +159,26 @@ async def supabase_auth_webhook(
     # Vérifier la signature du webhook (sécurité)
     webhook_secret = os.getenv("SUPABASE_WEBHOOK_SECRET")
 
-    # MODE PERMISSIF TEMPORAIRE POUR DEBUG
+    # ⚠️ SÉCURITÉ: Mode strict activé - vérification obligatoire de la signature
     if webhook_secret and x_supabase_signature:
         is_valid = verify_supabase_webhook_signature(
             body_bytes, x_supabase_signature, webhook_secret
         )
         if not is_valid:
-            logger.warning("[Webhook] Invalid signature - continuing anyway (permissive mode)")
-            # Ne pas bloquer en mode permissif
-            # raise HTTPException(status_code=401, detail="Invalid webhook signature")
+            logger.error("[Webhook] ❌ Invalid signature - rejecting request")
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid webhook signature. Request rejected for security."
+            )
+        logger.info("[Webhook] ✅ Signature verified successfully")
     elif webhook_secret and not x_supabase_signature:
-        logger.warning(
-            "[Webhook] No signature provided but secret is configured - continuing anyway (permissive mode)"
+        logger.error("[Webhook] ❌ No signature provided but secret is configured - rejecting request")
+        raise HTTPException(
+            status_code=401,
+            detail="Missing webhook signature. Request rejected for security."
         )
-        # Ne pas bloquer en mode permissif
-        # raise HTTPException(status_code=401, detail="Missing webhook signature")
     else:
-        logger.info("[Webhook] No webhook secret configured - skipping signature verification")
+        logger.warning("[Webhook] ⚠️ No webhook secret configured - signature verification skipped (configure SUPABASE_WEBHOOK_SECRET)")
 
     # Parser le payload
     try:
