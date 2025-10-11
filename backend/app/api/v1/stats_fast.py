@@ -67,11 +67,15 @@ def enrich_users_data(user_ids: list[str]) -> Dict[str, Dict]:
     Returns:
         Dict[user_id, {email, first_name, last_name, plan}]
     """
+    logger.info(f"🔍 [ENRICHMENT] Starting enrichment for {len(user_ids)} user IDs: {user_ids}")
     users_data = {}
 
     for user_id in user_ids:
+        logger.info(f"🔍 [ENRICHMENT] Fetching user data for user_id: {user_id}")
         user = get_user_from_supabase(user_id)
+
         if user:
+            logger.info(f"✅ [ENRICHMENT] User found: {user}")
             users_data[user_id] = {
                 "email": user.get("email", ""),
                 "first_name": user.get("first_name", ""),
@@ -79,7 +83,9 @@ def enrich_users_data(user_ids: list[str]) -> Dict[str, Dict]:
                 "plan": user.get("plan", "free"),
                 "user_type": user.get("user_type", "user")
             }
+            logger.info(f"✅ [ENRICHMENT] Enriched data for {user_id}: {users_data[user_id]}")
         else:
+            logger.warning(f"❌ [ENRICHMENT] User NOT found in Supabase for user_id: {user_id}")
             users_data[user_id] = {
                 "email": user_id,  # Fallback: utiliser l'ID
                 "first_name": "",
@@ -87,7 +93,9 @@ def enrich_users_data(user_ids: list[str]) -> Dict[str, Dict]:
                 "plan": "free",
                 "user_type": "user"
             }
+            logger.warning(f"⚠️ [ENRICHMENT] Using fallback data for {user_id}: {users_data[user_id]}")
 
+    logger.info(f"🔍 [ENRICHMENT] Enrichment complete. Returning {len(users_data)} users")
     return users_data
 
 

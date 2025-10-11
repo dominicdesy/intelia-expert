@@ -148,14 +148,23 @@ def get_user_from_supabase(user_id: str) -> Optional[dict]:
         dict avec email, first_name, last_name, user_type, plan ou None
     """
     try:
+        logger.info(f"🔍 [SUPABASE] Fetching user from Supabase for user_id: {user_id}")
         supabase = get_supabase_client()
+        logger.info(f"🔍 [SUPABASE] Supabase client URL: {supabase.supabase_url}")
+
         response = supabase.table("users").select("*").eq("id", user_id).single().execute()
+        logger.info(f"🔍 [SUPABASE] Query response: {response}")
 
         if response.data:
+            logger.info(f"✅ [SUPABASE] User data found: {response.data}")
             return response.data
-        return None
+        else:
+            logger.warning(f"❌ [SUPABASE] No data found for user_id: {user_id}")
+            return None
     except Exception as e:
-        logger.error(f"Error fetching user from Supabase: {e}")
+        logger.error(f"❌ [SUPABASE] Error fetching user from Supabase for {user_id}: {e}")
+        logger.error(f"❌ [SUPABASE] Error type: {type(e).__name__}")
+        logger.error(f"❌ [SUPABASE] Error details: {str(e)}")
         return None
 
 
