@@ -85,6 +85,8 @@ PROTECTED_PATTERNS = [
     "/api/v1/auth/debug/",  # 🔒 NOUVEAU: Tous les endpoints debug auth
     # === ENDPOINTS SYSTEM PROTÉGÉS (admin only) ===
     "/api/v1/system/metrics",  # 🔒 NOUVEAU: Métriques système
+    # === ENDPOINTS QA QUALITY (admin only) ===
+    "/api/v1/qa-quality/",  # 🔒 NOUVEAU: Monitoring de qualité Q&A
 ]
 
 # PATTERNS POUR UTILISATEURS AUTHENTIFIÉS (niveau intermédiaire)
