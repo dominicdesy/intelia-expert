@@ -31,6 +31,7 @@ import { HistoryMenu } from "./components/HistoryMenu";
 import { UserMenuButton } from "./components/UserMenuButton";
 import { ZohoSalesIQ } from "./components/ZohoSalesIQ";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
+import { LoadingMessage } from "./components/LoadingMessage";
 
 // Composant ChatInput optimisé avec React.memo
 const ChatInput = React.memo(
@@ -137,6 +138,7 @@ const MessageList = React.memo(
     getUserInitials,
     user,
     t,
+    currentLanguage,
   }: {
     processedMessages: any[];
     isLoadingChat: boolean;
@@ -147,6 +149,7 @@ const MessageList = React.memo(
     getUserInitials: (user: any) => string;
     user: any;
     t: (key: string) => string;
+    currentLanguage: string;
   }) => {
     const messageComponents = useMemo(() => {
       return processedMessages.map((message, index) => (
@@ -304,17 +307,7 @@ const MessageList = React.memo(
               <InteliaLogo className="h-8 w-auto" />
             </div>
             <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3 max-w-[85%] sm:max-w-none break-words">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                <div
-                  className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.1s" }}
-                ></div>
-                <div
-                  className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                ></div>
-              </div>
+              <LoadingMessage language={currentLanguage} />
             </div>
           </div>
         )}
@@ -1303,6 +1296,7 @@ function ChatInterface() {
                 getUserInitials={getUserInitials}
                 user={user}
                 t={t}
+                currentLanguage={currentLanguage}
               />
 
               <div ref={messagesEndRef} />
