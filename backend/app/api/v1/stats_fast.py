@@ -49,7 +49,7 @@ def get_local_cache(key: str) -> Optional[Any]:
     """Récupère du cache local si valide"""
     if key not in _local_cache or key not in _cache_timestamps:
         return None
-    if datetime.now() - _cache_timestamps[key] > timedelta(minutes=ttl_minutes):
+    if datetime.now() - _cache_timestamps[key] > timedelta(minutes=5):
         _local_cache.pop(key, None)
         _cache_timestamps.pop(key, None)
         return None
