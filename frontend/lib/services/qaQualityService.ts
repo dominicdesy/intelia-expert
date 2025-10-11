@@ -10,7 +10,8 @@ import type {
   ReviewQAResponse,
 } from "../../types/qa-quality";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.expert.intelia.com";
+// Use base URL without /api suffix since we'll add it in each endpoint
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/api$/, '') || "https://expert.intelia.com";
 
 /**
  * Récupère les Q&A problématiques avec filtres et pagination
