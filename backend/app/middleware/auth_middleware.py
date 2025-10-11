@@ -49,6 +49,8 @@ PUBLIC_ENDPOINTS = {
     # === SYSTEM ENDPOINTS (health et status publics uniquement) ===
     "/api/v1/system/health",
     "/api/v1/system/status",
+    # === ENDPOINTS QA QUALITY PUBLICS (cron avec secret) ===
+    "/api/v1/qa-quality/cron",
     # === ENDPOINTS SANS PREFIX /api ===
     "/",
     "/docs",
