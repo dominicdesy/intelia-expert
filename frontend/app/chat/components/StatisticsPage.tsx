@@ -4,6 +4,7 @@ import { apiClient } from "@/lib/api/client";
 import { StatisticsDashboard } from "./StatisticsDashboard";
 import { QuestionsTab } from "./QuestionsTab";
 import { InvitationStatsComponent } from "./InvitationStats";
+import { QualityIssuesTab } from "./QualityIssuesTab";
 
 // ✅ HOOK SIMPLIFIÉ - Plus de fallback localStorage/Supabase
 const useRobustAuth = () => {
@@ -203,7 +204,7 @@ interface QuestionLog {
 
 export const StatisticsPage: React.FC = () => {
   const currentUser = useRobustAuth(); // ✅ Hook simplifié
-  const { isAuthenticated, hasHydrated } = useAuthStore(); // ✅ Store unifié
+  const { isAuthenticated, hasHydrated, getToken } = useAuthStore(); // ✅ Store unifié
 
   const [authStatus, setAuthStatus] = useState<
     "initializing" | "checking" | "ready" | "unauthorized" | "forbidden"
@@ -238,7 +239,7 @@ export const StatisticsPage: React.FC = () => {
     "day" | "week" | "month" | "year"
   >("month");
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "questions" | "invitations"
+    "dashboard" | "questions" | "invitations" | "quality"
   >("dashboard");
   const [questionFilters, setQuestionFilters] = useState({
     search: "",
@@ -352,7 +353,7 @@ export const StatisticsPage: React.FC = () => {
 
   // Reset des références quand on change d'onglet
   const handleTabChange = (
-    newTab: "dashboard" | "questions" | "invitations",
+    newTab: "dashboard" | "questions" | "invitations" | "quality",
   ) => {
     if (newTab !== activeTab) {
       console.log(
@@ -871,6 +872,16 @@ export const StatisticsPage: React.FC = () => {
                   Questions & Réponses
                 </button>
                 <button
+                  onClick={() => handleTabChange("quality")}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    activeTab === "quality"
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Quality Issues
+                </button>
+                <button
                   onClick={() => handleTabChange("invitations")}
                   className={`px-3 py-2 text-sm font-medium transition-colors ${
                     activeTab === "invitations"
@@ -1013,6 +1024,8 @@ export const StatisticsPage: React.FC = () => {
                 : null
             }
           />
+        ) : activeTab === "quality" ? (
+          <QualityIssuesTab token={getToken() || ""} />
         ) : activeTab === "invitations" ? (
           <>
             {invitationLoading && !invitationStats ? (
