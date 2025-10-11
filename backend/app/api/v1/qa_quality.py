@@ -258,7 +258,7 @@ async def analyze_batch(
                     WHERE c.status = 'active'
                         {exclude_clause}
                     ORDER BY
-                        CASE WHEN m_assistant.feedback = -1 THEN 0 ELSE 1 END,
+                        CASE WHEN m_assistant.feedback = '-1' THEN 0 ELSE 1 END,
                         COALESCE(m_assistant.response_confidence, 0) ASC,
                         c.created_at DESC
                     LIMIT %s
@@ -274,7 +274,7 @@ async def analyze_batch(
                     try:
                         # Déterminer le trigger
                         trigger = "batch"
-                        if qa["feedback"] == -1:
+                        if qa["feedback"] == "-1" or qa["feedback"] == -1:
                             trigger = "negative_feedback"
                         elif qa.get("response_confidence", 1.0) < 0.3:
                             trigger = "low_confidence"
@@ -603,7 +603,7 @@ async def cron_analyze_batch(
                             SELECT conversation_id FROM qa_quality_checks
                         )
                     ORDER BY
-                        CASE WHEN m_assistant.feedback = -1 THEN 0 ELSE 1 END,
+                        CASE WHEN m_assistant.feedback = '-1' THEN 0 ELSE 1 END,
                         COALESCE(m_assistant.response_confidence, 0) ASC,
                         c.created_at DESC
                     LIMIT 100
@@ -619,7 +619,7 @@ async def cron_analyze_batch(
                     try:
                         # Déterminer le trigger
                         trigger = "cron_automatic"
-                        if qa["feedback"] == -1:
+                        if qa["feedback"] == "-1" or qa["feedback"] == -1:
                             trigger = "cron_negative_feedback"
                         elif qa.get("response_confidence", 1.0) < 0.3:
                             trigger = "cron_low_confidence"
