@@ -113,7 +113,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
         {/* Utilisateurs Actifs */}
         <div className="bg-white border border-gray-200 p-6 relative">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Utilisateurs Actifs</p>
+            <p className="text-sm text-gray-600 mb-1">Utilisateurs actifs</p>
             <p className="text-3xl font-semibold text-gray-900">
               {usageStats?.unique_users || 0}
             </p>
@@ -150,7 +150,7 @@ export const StatisticsDashboard: React.FC<StatisticsDashboardProps> = ({
         <div className="bg-white border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-200">
             <h3 className="text-base font-medium text-gray-900">
-              Utilisateurs les Plus Actifs
+              Utilisateurs les plus actifs
             </h3>
           </div>
           <div className="overflow-hidden">
