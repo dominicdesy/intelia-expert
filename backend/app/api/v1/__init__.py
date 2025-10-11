@@ -302,6 +302,24 @@ except Exception as e:
     webhooks_router = None
     logger.error("ERREUR import webhooks router: %s", e)
 
+# QA Quality router (monitoring de qualité Q&A)
+QA_QUALITY_AVAILABLE = False
+try:
+    from .qa_quality import router as qa_quality_router
+
+    QA_QUALITY_AVAILABLE = True
+    logger.info(
+        "QA Quality router importé avec %d routes", len(qa_quality_router.routes)
+    )
+except ImportError:
+    QA_QUALITY_AVAILABLE = False
+    qa_quality_router = None
+    logger.warning("QA Quality router non disponible (normal si pas encore créé)")
+except Exception as e:
+    QA_QUALITY_AVAILABLE = False
+    qa_quality_router = None
+    logger.error("ERREUR import qa_quality router: %s", e)
+
 # Création du router principal
 logger.info("Création du router principal v1...")
 router = APIRouter(prefix="/v1")
@@ -448,6 +466,14 @@ if WEBHOOKS_AVAILABLE and webhooks_router:
 else:
     logger.warning("Webhooks router non monté (module non disponible)")
 
+# QA Quality (monitoring de qualité Q&A)
+if QA_QUALITY_AVAILABLE and qa_quality_router:
+    router.include_router(qa_quality_router, tags=["QA-Quality"])
+    logger.info("QA Quality router monté")
+    logger.info("QA Quality router maintenant disponible sur /v1/qa-quality/*")
+else:
+    logger.warning("QA Quality router non monté (module non disponible)")
+
 # Résumé final
 total_routes = len(router.routes)
 logger.info("Router v1 créé avec %d routes au total", total_routes)
@@ -534,6 +560,8 @@ system_status = {
     "stats_fast": STATS_FAST_AVAILABLE,
     "stats_admin": STATS_ADMIN_AVAILABLE,
     "conversations": CONVERSATIONS_AVAILABLE,
+    "webhooks": WEBHOOKS_AVAILABLE,
+    "qa_quality": QA_QUALITY_AVAILABLE,
     "total_routes": total_routes,
     "users_routes": users_route_count,
     "cache_routes": stats_route_count,
