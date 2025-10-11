@@ -1,8 +1,8 @@
 """
 Configuration des connexions aux bases de données
 =================================================
-- PostgreSQL (DigitalOcean): conversations, feedback, invitations
-- Supabase: auth.users, public.users
+- PostgreSQL (DigitalOcean): conversations, messages, analytics, billing
+- Supabase: auth.users, public.users, invitations
 """
 
 import os

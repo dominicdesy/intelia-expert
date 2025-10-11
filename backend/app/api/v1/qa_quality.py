@@ -532,4 +532,180 @@ async def get_qa_quality_stats(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============================================================================
+# CRON ENDPOINT - AUTOMATIC ANALYSIS
+# ============================================================================
+
+@router.post("/cron")
+async def cron_analyze_batch(
+    cron_secret: str = Query(..., description="Secret pour authentifier le cron job")
+) -> Dict[str, Any]:
+    """
+    Endpoint pour analyse automatique via cron job (2h AM et 2h PM)
+
+    Sécurité: Vérifie le secret CRON_SECRET dans les variables d'environnement
+
+    Stratégie d'analyse:
+    - 100 Q&A par exécution
+    - Priorité: feedback négatif > faible confidence > récentes
+    - Skip les Q&A déjà analysées
+
+    Returns:
+        Statistiques de l'analyse automatique
+    """
+    import os
+
+    # Vérifier le secret du cron
+    expected_secret = os.getenv("CRON_SECRET")
+    if not expected_secret:
+        logger.error("❌ [QA_QUALITY_CRON] CRON_SECRET non configuré dans l'environnement")
+        raise HTTPException(
+            status_code=500,
+            detail="CRON_SECRET not configured on server"
+        )
+
+    if cron_secret != expected_secret:
+        logger.warning(f"❌ [QA_QUALITY_CRON] Tentative d'accès avec secret invalide")
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid cron secret"
+        )
+
+    # Lancer l'analyse automatique
+    try:
+        logger.info("🤖 [QA_QUALITY_CRON] Démarrage analyse automatique (cron trigger)")
+
+        analyzed_count = 0
+        problematic_found = 0
+        errors = 0
+
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Sélectionner 100 Q&A non analysées
+                query = """
+                    SELECT
+                        c.id::text as conversation_id,
+                        c.user_id::text as user_id,
+                        m_user.id::text as user_message_id,
+                        m_user.content as question,
+                        m_assistant.id::text as assistant_message_id,
+                        m_assistant.content as response,
+                        m_assistant.response_source,
+                        m_assistant.response_confidence,
+                        m_assistant.feedback
+                    FROM conversations c
+                    JOIN messages m_user ON m_user.conversation_id = c.id AND m_user.role = 'user'
+                    JOIN messages m_assistant ON m_assistant.conversation_id = c.id
+                        AND m_assistant.role = 'assistant'
+                        AND m_assistant.sequence_number = m_user.sequence_number + 1
+                    WHERE c.status = 'active'
+                        AND c.id NOT IN (
+                            SELECT conversation_id FROM qa_quality_checks
+                        )
+                    ORDER BY
+                        CASE WHEN m_assistant.feedback = -1 THEN 0 ELSE 1 END,
+                        COALESCE(m_assistant.response_confidence, 0) ASC,
+                        c.created_at DESC
+                    LIMIT 100
+                """
+
+                cur.execute(query)
+                qa_to_analyze = cur.fetchall()
+
+                logger.info(f"📊 [QA_QUALITY_CRON] {len(qa_to_analyze)} Q&A sélectionnées pour analyse")
+
+                # Analyser chaque Q&A
+                for qa in qa_to_analyze:
+                    try:
+                        # Déterminer le trigger
+                        trigger = "cron_automatic"
+                        if qa["feedback"] == -1:
+                            trigger = "cron_negative_feedback"
+                        elif qa.get("response_confidence", 1.0) < 0.3:
+                            trigger = "cron_low_confidence"
+
+                        # Analyser
+                        analysis_result = await qa_analyzer.analyze_qa(
+                            question=qa["question"],
+                            response=qa["response"],
+                            response_source=qa.get("response_source"),
+                            response_confidence=qa.get("response_confidence"),
+                            trigger=trigger
+                        )
+
+                        # Sauvegarder les résultats
+                        if not analysis_result.get("error"):
+                            cur.execute(
+                                """
+                                INSERT INTO qa_quality_checks (
+                                    conversation_id,
+                                    message_id,
+                                    user_id,
+                                    question,
+                                    response,
+                                    response_source,
+                                    response_confidence,
+                                    quality_score,
+                                    is_problematic,
+                                    problem_category,
+                                    problems,
+                                    recommendation,
+                                    analysis_confidence,
+                                    analysis_trigger,
+                                    analysis_model,
+                                    analysis_prompt_version
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """,
+                                (
+                                    qa["conversation_id"],
+                                    qa["assistant_message_id"],
+                                    qa["user_id"],
+                                    qa["question"],
+                                    qa["response"],
+                                    qa.get("response_source"),
+                                    qa.get("response_confidence"),
+                                    analysis_result["quality_score"],
+                                    analysis_result["is_problematic"],
+                                    analysis_result["problem_category"],
+                                    json.dumps(analysis_result["problems"]),
+                                    analysis_result["recommendation"],
+                                    analysis_result["analysis_confidence"],
+                                    analysis_result["analysis_trigger"],
+                                    analysis_result["analysis_model"],
+                                    analysis_result["analysis_prompt_version"]
+                                )
+                            )
+                            conn.commit()
+
+                            analyzed_count += 1
+                            if analysis_result["is_problematic"]:
+                                problematic_found += 1
+                        else:
+                            errors += 1
+                            logger.error(f"❌ [QA_QUALITY_CRON] Analysis error for {qa['conversation_id']}")
+
+                    except Exception as e:
+                        errors += 1
+                        logger.error(f"❌ [QA_QUALITY_CRON] Error analyzing {qa.get('conversation_id')}: {e}")
+                        continue
+
+        logger.info(
+            f"✅ [QA_QUALITY_CRON] Analyse automatique terminée: "
+            f"{analyzed_count} analysées, {problematic_found} anomalies détectées, {errors} erreurs"
+        )
+
+        return {
+            "status": "completed",
+            "trigger": "cron_automatic",
+            "analyzed_count": analyzed_count,
+            "problematic_found": problematic_found,
+            "errors": errors,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"❌ [QA_QUALITY_CRON] Erreur critique: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 logger.info("✅ qa_quality.py loaded")

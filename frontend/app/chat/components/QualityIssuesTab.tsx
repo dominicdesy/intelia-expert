@@ -1,5 +1,5 @@
 /**
- * Onglet Quality Issues pour le monitoring de qualité Q&A
+ * Onglet Anomalies potentielles pour le monitoring de qualité Q&A
  * Affiche les Q&A problématiques détectées par l'IA
  */
 
@@ -212,7 +212,7 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
               />
             </svg>
-            <h2 className="text-lg font-medium text-gray-900">Problèmes de Qualité</h2>
+            <h2 className="text-lg font-medium text-gray-900">Anomalies potentielles</h2>
           </div>
           <button
             onClick={handleAnalyzeBatch}
@@ -337,7 +337,7 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
         {problematicQA.length === 0 ? (
           <div className="p-8 text-center">
             <div className="text-gray-400 text-4xl mb-4">✅</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun problème détecté</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune anomalie détectée</h3>
             <p className="text-gray-500">
               Toutes les Q&A analysées sont de bonne qualité!
             </p>
@@ -466,7 +466,7 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Détails du problème</h3>
+                <h3 className="text-xl font-bold text-gray-900">Détails de l'anomalie</h3>
                 <button
                   onClick={() => setSelectedQA(null)}
                   className="text-gray-400 hover:text-gray-600"
