@@ -429,6 +429,9 @@ async def get_questions(
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID manquant")
 
+    logger.info(f"🔍 [QUESTIONS] Fetching questions for user_id: {user_id}")
+    logger.info(f"🔍 [QUESTIONS] Current user data: {current_user}")
+
     try:
         with get_pg_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -437,6 +440,7 @@ async def get_questions(
                 offset = (page - 1) * limit
 
                 # Compter le total
+                logger.info(f"🔍 [QUESTIONS] Counting conversations for user_id: {user_id}")
                 cur.execute(
                     """
                     SELECT COUNT(*) as total
@@ -449,8 +453,10 @@ async def get_questions(
 
                 total_result = cur.fetchone()
                 total = total_result["total"] if total_result else 0
+                logger.info(f"✅ [QUESTIONS] Found {total} total conversations for user_id: {user_id}")
 
                 # Récupérer les questions paginées
+                logger.info(f"🔍 [QUESTIONS] Fetching paginated questions (page={page}, limit={limit}, offset={offset})")
                 cur.execute(
                     """
                     SELECT
