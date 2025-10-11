@@ -1,18 +1,19 @@
 # app/api/v1/conversations.py
 """
 Router pour la gestion des conversations avec nouvelle architecture.
-VERSION ADAPTÉE pour table conversations avec colonnes enrichies.
+Architecture: conversations (metadata) + messages (individual messages)
 """
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 import logging
-import os
 from datetime import datetime
-import psycopg2
-from psycopg2.extras import RealDictCursor
+from uuid import uuid4
 
-# Import authentification pour certains endpoints protégés
+# Import conversation service
+from app.services.conversation_service import conversation_service
+
+# Import authentification
 from app.api.v1.auth import get_current_user
 
 logger = logging.getLogger("app.api.v1.conversations")
@@ -21,67 +22,49 @@ router = APIRouter()
 
 # ===== Modèles Pydantic pour validation =====
 class ConversationSaveRequest(BaseModel):
-    conversation_id: str
+    """Requête pour sauvegarder une nouvelle conversation"""
+    conversation_id: str  # session_id
     question: str
     response: str
     user_id: str
     timestamp: Optional[str] = None
-    source: Optional[str] = "llm_streaming_agent"
+    source: Optional[str] = "rag"
+    confidence: Optional[float] = 0.85
+    processing_time_ms: Optional[int] = None
+    language: Optional[str] = "fr"
     metadata: Optional[Dict[str, Any]] = {}
 
 
-# ===== Fonctions utilitaires pour formatage =====
-def generate_title_from_question(question: str) -> str:
-    """Génère un titre à partir de la première ligne de la question."""
-    if not question or not question.strip():
-        return "Conversation sans titre"
-
-    # Prendre la première ligne ou les premiers 100 caractères
-    first_line = question.strip().split("\n")[0]
-    if len(first_line) > 100:
-        return first_line[:97] + "..."
-    return first_line
+class MessageAddRequest(BaseModel):
+    """Requête pour ajouter un message à une conversation existante"""
+    conversation_id: str
+    role: str  # 'user' or 'assistant'
+    content: str
+    response_source: Optional[str] = None
+    response_confidence: Optional[float] = None
+    processing_time_ms: Optional[int] = None
 
 
-def generate_preview_from_question(question: str) -> str:
-    """Génère un aperçu à partir de la question complète."""
-    if not question or not question.strip():
-        return "Aucun aperçu disponible"
-
-    if len(question) > 300:
-        return question[:297] + "..."
-    return question.strip()
-
-
-def generate_last_message_preview(response: str) -> str:
-    """Génère un aperçu du dernier message (réponse)."""
-    if not response or not response.strip():
-        return "Aucune réponse"
-
-    if len(response) > 300:
-        return response[:297] + "..."
-    return response.strip()
+class FeedbackRequest(BaseModel):
+    """Requête pour ajouter un feedback à un message"""
+    feedback: int  # 1 (positive), -1 (negative), 0 (neutral)
+    feedback_comment: Optional[str] = None
 
 
 # ===== ENDPOINTS PUBLICS =====
 
-
 @router.get("/health")
 async def health_check() -> Dict[str, Any]:
-    """Check de santé du service conversations avec nouvelle architecture."""
+    """Check de santé du service conversations."""
     try:
-        # Test de connexion à la base de données
-        with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) FROM conversations")
-                total_conversations = cur.fetchone()[0]
+        from app.core.database import check_databases_health
+        health = check_databases_health()
 
         return {
-            "status": "healthy",
+            "status": "healthy" if health["postgresql"]["status"] == "healthy" else "unhealthy",
             "backend": "postgresql",
-            "total_conversations": total_conversations,
-            "architecture": "nouvelle_structure",
-            "table": "conversations",
+            "architecture": "conversations + messages",
+            "databases": health,
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
@@ -98,15 +81,14 @@ async def test_public() -> Dict[str, Any]:
     """Test endpoint public pour vérifier le fonctionnement."""
     return {
         "status": "success",
-        "message": "Conversations router avec nouvelle architecture!",
+        "message": "Conversations router with new architecture!",
         "router": "conversations",
-        "architecture": "table_conversations_enrichie",
+        "architecture": "conversations + messages",
         "timestamp": datetime.utcnow().isoformat(),
     }
 
 
-# ===== ENDPOINT SAVE MODIFIÉ =====
-
+# ===== ENDPOINT SAVE - NOUVELLE ARCHITECTURE =====
 
 @router.post("/save")
 async def save_conversation(
@@ -114,19 +96,18 @@ async def save_conversation(
     current_user: dict = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
-    Sauvegarde une conversation dans la nouvelle structure de table.
+    Sauvegarde une conversation dans la nouvelle architecture.
+    Crée une conversation avec le premier échange Q&R ou ajoute des messages.
     """
     try:
         logger.info(
             f"save_conversation: user={current_user.get('email', 'unknown')}, "
-            f"conv_id={conversation_data.conversation_id[:8]}..."
+            f"session_id={conversation_data.conversation_id[:8]}..."
         )
 
         # Vérification sécurité - Comparer les UUID
         requester_id = current_user.get("user_id", "")
-        if conversation_data.user_id != requester_id and not current_user.get(
-            "is_admin", False
-        ):
+        if conversation_data.user_id != requester_id and not current_user.get("is_admin", False):
             logger.warning(
                 f"Tentative sauvegarde non autorisée: {requester_id} ({current_user.get('email')}) → {conversation_data.user_id}"
             )
@@ -135,90 +116,73 @@ async def save_conversation(
                 detail="Vous ne pouvez sauvegarder que vos propres conversations",
             )
 
-        # Connexion à la base de données
-        with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Vérifier si la conversation existe déjà par session_id
+        existing_conv = conversation_service.get_conversation_by_session(
+            conversation_data.conversation_id
+        )
 
-                # Vérifier si la conversation existe déjà
-                cur.execute(
-                    "SELECT id FROM conversations WHERE id = %s OR session_id = %s",
-                    [
-                        conversation_data.conversation_id,
-                        conversation_data.conversation_id,
-                    ],
-                )
-                existing = cur.fetchone()
+        if existing_conv:
+            # Conversation existante - ajouter les nouveaux messages
+            logger.info(f"Conversation existante trouvée: {existing_conv['id']}")
 
-                if existing:
-                    # Mettre à jour la conversation existante
-                    cur.execute(
-                        """
-                        UPDATE conversations SET
-                            question = %s,
-                            response = %s,
-                            title = %s,
-                            preview = %s,
-                            last_message_preview = %s,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s OR session_id = %s
-                        """,
-                        [
-                            conversation_data.question,
-                            conversation_data.response,
-                            generate_title_from_question(conversation_data.question),
-                            generate_preview_from_question(conversation_data.question),
-                            generate_last_message_preview(conversation_data.response),
-                            conversation_data.conversation_id,
-                            conversation_data.conversation_id,
-                        ],
-                    )
+            # Ajouter le message user
+            user_msg = conversation_service.add_message(
+                conversation_id=existing_conv["id"],
+                role="user",
+                content=conversation_data.question
+            )
 
-                    logger.info(
-                        f"Conversation mise à jour: {conversation_data.conversation_id}"
-                    )
+            # Ajouter la réponse assistant
+            assistant_msg = conversation_service.add_message(
+                conversation_id=existing_conv["id"],
+                role="assistant",
+                content=conversation_data.response,
+                response_source=conversation_data.source,
+                response_confidence=conversation_data.confidence,
+                processing_time_ms=conversation_data.processing_time_ms
+            )
 
-                    return {
-                        "status": "updated",
-                        "conversation_id": conversation_data.conversation_id,
-                        "user_id": conversation_data.user_id,
-                        "action": "conversation_updated",
-                        "timestamp": datetime.utcnow().isoformat(),
-                    }
+            logger.info(
+                f"Messages ajoutés: user={user_msg['sequence_number']}, "
+                f"assistant={assistant_msg['sequence_number']}"
+            )
 
-                else:
-                    # Créer une nouvelle conversation
-                    cur.execute(
-                        """
-                        INSERT INTO conversations (
-                            id, session_id, user_id, question, response, 
-                            title, preview, last_message_preview, created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        """,
-                        [
-                            conversation_data.conversation_id,
-                            conversation_data.conversation_id,
-                            conversation_data.user_id,
-                            conversation_data.question,
-                            conversation_data.response,
-                            generate_title_from_question(conversation_data.question),
-                            generate_preview_from_question(conversation_data.question),
-                            generate_last_message_preview(conversation_data.response),
-                            conversation_data.timestamp
-                            or datetime.utcnow().isoformat(),
-                        ],
-                    )
+            return {
+                "status": "updated",
+                "conversation_id": existing_conv["id"],
+                "session_id": conversation_data.conversation_id,
+                "user_id": conversation_data.user_id,
+                "message_count": existing_conv["message_count"] + 2,
+                "action": "messages_added",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
 
-                    logger.info(
-                        f"Nouvelle conversation créée: {conversation_data.conversation_id}"
-                    )
+        else:
+            # Nouvelle conversation - créer avec le premier échange
+            logger.info("Création d'une nouvelle conversation")
 
-                    return {
-                        "status": "created",
-                        "conversation_id": conversation_data.conversation_id,
-                        "user_id": conversation_data.user_id,
-                        "action": "conversation_created",
-                        "timestamp": datetime.utcnow().isoformat(),
-                    }
+            result = conversation_service.create_conversation(
+                session_id=conversation_data.conversation_id,
+                user_id=conversation_data.user_id,
+                user_message=conversation_data.question,
+                assistant_response=conversation_data.response,
+                language=conversation_data.language or "fr",
+                response_source=conversation_data.source,
+                response_confidence=conversation_data.confidence,
+                processing_time_ms=conversation_data.processing_time_ms
+            )
+
+            logger.info(f"Nouvelle conversation créée: {result['conversation_id']}")
+
+            return {
+                "status": "created",
+                "conversation_id": result["conversation_id"],
+                "session_id": result["session_id"],
+                "user_id": conversation_data.user_id,
+                "message_count": result["message_count"],
+                "action": "conversation_created",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
 
     except HTTPException:
         raise
@@ -227,22 +191,23 @@ async def save_conversation(
             f"Erreur sauvegarde conversation {conversation_data.conversation_id}: {e}"
         )
         raise HTTPException(
-            status_code=500, detail=f"Erreur interne lors de la sauvegarde: {str(e)}"
+            status_code=500,
+            detail=f"Erreur interne lors de la sauvegarde: {str(e)}"
         )
 
 
-# ===== ENDPOINT LECTURE MODIFIÉ =====
-
+# ===== ENDPOINT LECTURE - NOUVELLE ARCHITECTURE =====
 
 @router.get("/user/{user_id}")
-async def get_user_conversations(
+async def get_user_conversations_endpoint(
     user_id: str,
-    limit: int = Query(default=20, ge=1, le=999),
+    limit: int = Query(default=50, ge=1, le=999),
     offset: int = Query(default=0, ge=0),
+    status: str = Query(default="active"),
     current_user: dict = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
-    Récupère les conversations d'un utilisateur depuis la nouvelle structure.
+    Récupère les conversations d'un utilisateur depuis la nouvelle architecture.
     """
     try:
         logger.info(
@@ -254,20 +219,6 @@ async def get_user_conversations(
         requester_id = current_user.get("user_id", "")
         is_admin = current_user.get("user_type") == "admin" or current_user.get("is_admin", False)
 
-        # DEBUG: Log pour comprendre le problème 403
-        logger.info(
-            f"[DEBUG 403] user_id from URL: {user_id} (type: {type(user_id)})"
-        )
-        logger.info(
-            f"[DEBUG 403] requester_id from token: {requester_id} (type: {type(requester_id)})"
-        )
-        logger.info(
-            f"[DEBUG 403] current_user keys: {list(current_user.keys())}"
-        )
-        logger.info(
-            f"[DEBUG 403] Match: {user_id == requester_id}, is_admin: {is_admin}"
-        )
-
         if user_id != requester_id and not is_admin:
             logger.warning(
                 f"Tentative d'accès non autorisé: {requester_id} ({current_user.get('email')}) → {user_id}"
@@ -277,78 +228,26 @@ async def get_user_conversations(
                 detail="Vous ne pouvez accéder qu'à vos propres conversations",
             )
 
-        # Connexion à la base de données
-        with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Récupérer les conversations via le service
+        result = conversation_service.get_user_conversations(
+            user_id=user_id,
+            limit=limit,
+            offset=offset,
+            status=status
+        )
 
-                # Compter le total
-                cur.execute(
-                    "SELECT COUNT(*) as total FROM conversations WHERE user_id = %s AND status = 'active'",
-                    [user_id],
-                )
-                total_result = cur.fetchone()
-                total_count = total_result["total"] if total_result else 0
+        logger.info(f"Conversations trouvées pour {user_id}: {result['total']}")
 
-                # Récupérer les conversations avec pagination
-                cur.execute(
-                    """
-                    SELECT 
-                        id,
-                        session_id,
-                        title,
-                        preview,
-                        message_count,
-                        created_at,
-                        updated_at,
-                        language,
-                        last_message_preview,
-                        status,
-                        feedback,
-                        feedback_comment
-                    FROM conversations 
-                    WHERE user_id = %s AND status = 'active'
-                    ORDER BY updated_at DESC
-                    LIMIT %s OFFSET %s
-                    """,
-                    [user_id, limit, offset],
-                )
-
-                conversations_raw = cur.fetchall()
-
-                # Formater les conversations pour le frontend
-                conversations = []
-                for row in conversations_raw:
-                    conversation = {
-                        "id": row["id"],
-                        "title": row["title"] or "Conversation",
-                        "preview": row["preview"] or "Aucun aperçu",
-                        "message_count": row["message_count"] or 2,
-                        "created_at": (
-                            row["created_at"].isoformat() if row["created_at"] else None
-                        ),
-                        "updated_at": (
-                            row["updated_at"].isoformat() if row["updated_at"] else None
-                        ),
-                        "language": row["language"] or "fr",
-                        "last_message_preview": row["last_message_preview"] or "",
-                        "status": row["status"] or "active",
-                        "feedback": row["feedback"],
-                        "feedback_comment": row["feedback_comment"],
-                    }
-                    conversations.append(conversation)
-
-                logger.info(f"Conversations trouvées pour {user_id}: {total_count}")
-
-                return {
-                    "status": "success",
-                    "user_id": user_id,
-                    "conversations": conversations,
-                    "total_count": total_count,
-                    "limit": limit,
-                    "offset": offset,
-                    "source": "postgresql_nouvelle_architecture",
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "conversations": result["conversations"],
+            "total_count": result["total"],
+            "limit": result["limit"],
+            "offset": result["offset"],
+            "source": "postgresql_conversations_messages",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
 
     except HTTPException:
         raise
@@ -360,12 +259,287 @@ async def get_user_conversations(
         )
 
 
+# ===== ENDPOINT RÉCUPÉRATION MESSAGES D'UNE CONVERSATION =====
+
+@router.get("/{conversation_id}/messages")
+async def get_conversation_messages_endpoint(
+    conversation_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Récupère tous les messages d'une conversation.
+    """
+    try:
+        logger.info(
+            f"get_conversation_messages: conversation_id={conversation_id}, "
+            f"requester={current_user.get('email', 'unknown')}"
+        )
+
+        # Récupérer les messages
+        messages = conversation_service.get_conversation_messages(conversation_id)
+
+        if not messages:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation non trouvée"
+            )
+
+        logger.info(f"Messages récupérés: {len(messages)}")
+
+        return {
+            "status": "success",
+            "conversation_id": conversation_id,
+            "messages": messages,
+            "message_count": len(messages),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Erreur récupération messages pour {conversation_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la récupération: {str(e)}",
+        )
+
+
+# ===== ENDPOINT AJOUT MESSAGE =====
+
+@router.post("/{conversation_id}/messages")
+async def add_message_endpoint(
+    conversation_id: str,
+    message_data: MessageAddRequest,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Ajoute un message à une conversation existante.
+    """
+    try:
+        logger.info(
+            f"add_message: conversation_id={conversation_id}, "
+            f"role={message_data.role}, requester={current_user.get('email', 'unknown')}"
+        )
+
+        # Ajouter le message
+        result = conversation_service.add_message(
+            conversation_id=conversation_id,
+            role=message_data.role,
+            content=message_data.content,
+            response_source=message_data.response_source,
+            response_confidence=message_data.response_confidence,
+            processing_time_ms=message_data.processing_time_ms
+        )
+
+        logger.info(f"Message ajouté: {result['message_id']}, sequence: {result['sequence_number']}")
+
+        return {
+            "status": "success",
+            "message_id": result["message_id"],
+            "sequence_number": result["sequence_number"],
+            "conversation_id": conversation_id,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Erreur ajout message pour {conversation_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'ajout: {str(e)}",
+        )
+
+
+# ===== ENDPOINT FEEDBACK =====
+
+@router.patch("/{conversation_id}/feedback")
+async def add_conversation_feedback(
+    conversation_id: str,
+    feedback_data: FeedbackRequest,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Ajoute un feedback à la dernière réponse assistant d'une conversation.
+    Compatible avec l'ancien endpoint frontend qui envoie le feedback par conversation_id.
+    """
+    try:
+        logger.info(
+            f"add_feedback: conversation_id={conversation_id}, "
+            f"feedback={feedback_data.feedback}"
+        )
+
+        from app.core.database import get_pg_connection
+        from psycopg2.extras import RealDictCursor
+
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Trouver le dernier message assistant de cette conversation
+                cur.execute(
+                    """
+                    SELECT id
+                    FROM messages
+                    WHERE conversation_id = %s AND role = 'assistant'
+                    ORDER BY sequence_number DESC
+                    LIMIT 1
+                    """,
+                    (conversation_id,)
+                )
+
+                result = cur.fetchone()
+
+                if not result:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Aucun message assistant trouvé pour cette conversation"
+                    )
+
+                message_id = result["id"]
+
+                # Mettre à jour le feedback du message
+                # Map 1 -> 'positive', -1 -> 'negative', 0 -> 'neutral'
+                if feedback_data.feedback == 1:
+                    feedback_value = "positive"
+                elif feedback_data.feedback == -1:
+                    feedback_value = "negative"
+                else:
+                    feedback_value = "neutral"
+
+                cur.execute(
+                    """
+                    UPDATE messages
+                    SET feedback = %s, feedback_comment = %s
+                    WHERE id = %s
+                    """,
+                    (
+                        feedback_value,
+                        feedback_data.feedback_comment,
+                        message_id
+                    )
+                )
+
+        logger.info(f"Feedback ajouté au dernier message de conversation: {conversation_id}")
+
+        return {
+            "status": "success",
+            "conversation_id": conversation_id,
+            "message_id": str(message_id),
+            "feedback": feedback_value,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Erreur ajout feedback pour {conversation_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'ajout du feedback: {str(e)}",
+        )
+
+
+@router.patch("/{conversation_id}/messages/{message_id}/feedback")
+async def add_message_feedback(
+    conversation_id: str,
+    message_id: str,
+    feedback_data: FeedbackRequest,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Ajoute un feedback à un message spécifique.
+    """
+    try:
+        logger.info(
+            f"add_feedback: message_id={message_id}, "
+            f"feedback={feedback_data.feedback}"
+        )
+
+        from app.core.database import get_pg_connection
+
+        with get_pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE messages
+                    SET feedback = %s, feedback_comment = %s
+                    WHERE id = %s AND conversation_id = %s
+                    """,
+                    (
+                        feedback_data.feedback,
+                        feedback_data.feedback_comment,
+                        message_id,
+                        conversation_id
+                    )
+                )
+
+                if cur.rowcount == 0:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Message non trouvé"
+                    )
+
+        logger.info(f"Feedback ajouté au message: {message_id}")
+
+        return {
+            "status": "success",
+            "message_id": message_id,
+            "feedback": feedback_data.feedback,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Erreur ajout feedback pour {message_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'ajout du feedback: {str(e)}",
+        )
+
+
 # ===== ENDPOINT SUPPRESSION =====
+
+@router.delete("/{conversation_id}")
+async def delete_conversation_endpoint(
+    conversation_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Supprime (archive) une conversation spécifique.
+    """
+    try:
+        logger.info(f"delete_conversation: conversation_id={conversation_id}")
+
+        # Supprimer via le service
+        success = conversation_service.delete_conversation(conversation_id)
+
+        if success:
+            return {
+                "status": "success",
+                "conversation_id": conversation_id,
+                "message": "Conversation supprimée avec succès",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation non trouvée"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Erreur suppression pour {conversation_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la suppression: {str(e)}",
+        )
 
 
 @router.delete("/user/{user_id}")
 async def delete_all_user_conversations(
-    user_id: str, current_user: dict = Depends(get_current_user)
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
     Supprime toutes les conversations d'un utilisateur.
@@ -381,30 +555,34 @@ async def delete_all_user_conversations(
                 detail="Vous ne pouvez supprimer que vos propres conversations",
             )
 
-        with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
-            with conn.cursor() as cur:
+        from app.core.database import get_pg_connection
 
+        with get_pg_connection() as conn:
+            with conn.cursor() as cur:
                 # Compter avant suppression
                 cur.execute(
-                    "SELECT COUNT(*) FROM conversations WHERE user_id = %s", [user_id]
+                    "SELECT COUNT(*) FROM conversations WHERE user_id = %s AND status != 'deleted'",
+                    (user_id,)
                 )
                 total_found = cur.fetchone()[0]
 
                 # Supprimer (marquer comme supprimé)
                 cur.execute(
-                    "UPDATE conversations SET status = 'deleted' WHERE user_id = %s",
-                    [user_id],
+                    "UPDATE conversations SET status = 'deleted', updated_at = NOW() WHERE user_id = %s AND status != 'deleted'",
+                    (user_id,)
                 )
                 deleted_count = cur.rowcount
 
-                return {
-                    "status": "success",
-                    "user_id": user_id,
-                    "deleted_count": deleted_count,
-                    "total_found": total_found,
-                    "message": f"{deleted_count} conversations supprimées avec succès",
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
+        logger.info(f"Toutes les conversations supprimées pour user: {user_id}, count: {deleted_count}")
+
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "deleted_count": deleted_count,
+            "total_found": total_found,
+            "message": f"{deleted_count} conversations supprimées avec succès",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
 
     except HTTPException:
         raise
