@@ -11,7 +11,7 @@ import re
 import json
 import hashlib
 import logging
-import pickle
+import msgpack
 from utils.types import Dict, List, Optional, Any, Set
 
 # Import centralized serialization utility
@@ -557,7 +557,7 @@ class SemanticCacheManager:
 
                 if cached:
                     decompressed = self.core._decompress_data(cached)
-                    embedding = pickle.loads(decompressed)
+                    embedding = msgpack.unpackb(decompressed, raw=False)
                     self.cache_stats["semantic_hits"] += 1
                     logger.debug(
                         f"Cache HIT (sémantique): embedding pour '{text[:30]}...'"
@@ -570,7 +570,7 @@ class SemanticCacheManager:
 
             if cached:
                 decompressed = self.core._decompress_data(cached)
-                embedding = pickle.loads(decompressed)
+                embedding = msgpack.unpackb(decompressed, raw=False)
                 self.cache_stats["exact_hits"] += 1
                 logger.debug(f"Cache HIT: embedding pour '{text[:30]}...'")
                 return embedding
@@ -582,7 +582,7 @@ class SemanticCacheManager:
                     cached = await self.core.client.get(fallback_key)
                     if cached:
                         decompressed = self.core._decompress_data(cached)
-                        embedding = pickle.loads(decompressed)
+                        embedding = msgpack.unpackb(decompressed, raw=False)
                         self.cache_stats["fallback_hits"] += 1
                         logger.debug(
                             f"Cache HIT (fallback): embedding pour '{text[:30]}...'"
@@ -602,7 +602,7 @@ class SemanticCacheManager:
             return
 
         try:
-            serialized = pickle.dumps(embedding, protocol=pickle.HIGHEST_PROTOCOL)
+            serialized = msgpack.packb(embedding, use_bin_type=True)
             compressed = self.core._compress_data(serialized)
 
             if not await self.core._check_size_and_namespace_quota(
@@ -799,7 +799,7 @@ class SemanticCacheManager:
 
                 if cached:
                     decompressed = self.core._decompress_data(cached)
-                    intent_result = pickle.loads(decompressed)
+                    intent_result = msgpack.unpackb(decompressed, raw=False)
                     self.cache_stats["semantic_hits"] += 1
                     logger.debug(
                         f"Cache HIT (sémantique): intention pour '{query[:30]}...'"
@@ -812,7 +812,7 @@ class SemanticCacheManager:
 
             if cached:
                 decompressed = self.core._decompress_data(cached)
-                intent_result = pickle.loads(decompressed)
+                intent_result = msgpack.unpackb(decompressed, raw=False)
                 self.cache_stats["exact_hits"] += 1
                 logger.debug(f"Cache HIT: analyse d'intention pour '{query[:30]}...'")
                 return intent_result
@@ -845,7 +845,7 @@ class SemanticCacheManager:
             # CORRECTION: Nettoyer les données avec safe_serialize_for_json
             data = safe_serialize_for_json(data)
 
-            serialized = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+            serialized = msgpack.packb(data, use_bin_type=True)
             compressed = self.core._compress_data(serialized)
 
             if not await self.core._check_size_and_namespace_quota(

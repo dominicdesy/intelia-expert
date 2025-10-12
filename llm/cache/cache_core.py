@@ -9,7 +9,7 @@ import os
 import time
 import logging
 import asyncio
-import pickle
+import msgpack
 import zlib
 from typing import TYPE_CHECKING
 from utils.types import Dict, Optional, Any
@@ -341,8 +341,8 @@ class RedisCacheCore(InitializableMixin):
                 else raw_value
             )
 
-            # Désérialisation
-            result = pickle.loads(value)
+            # Désérialisation avec msgpack (sécurisé)
+            result = msgpack.unpackb(value, raw=False)
 
             self.stats.hits += 1
             self._reset_error_backoff()
@@ -371,8 +371,8 @@ class RedisCacheCore(InitializableMixin):
         full_key = self._build_key(key, namespace)
 
         try:
-            # Sérialisation
-            serialized = pickle.dumps(value)
+            # Sérialisation avec msgpack (sécurisé)
+            serialized = msgpack.packb(value, use_bin_type=True)
 
             # Vérification de la taille
             if len(serialized) > self.config.max_value_bytes:
