@@ -8,7 +8,7 @@ Coverage: 35M+ biomedical publications
 """
 
 import logging
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from typing import List, Dict, Any
 from .base_fetcher import BaseFetcher
 from ..models import ExternalDocument

@@ -171,7 +171,7 @@ class DeepCodeAnalyzer:
                 for i in range(len(lines) - 5):
                     block = ''.join(lines[i:i+5]).strip()
                     if len(block) > 50:  # Ignore very short blocks
-                        block_hash = hashlib.md5(block.encode()).hexdigest()
+                        block_hash = hashlib.md5(block.encode(), usedforsecurity=False).hexdigest()
                         code_hashes[block_hash].append({
                             'file': str(file_path.relative_to(self.root_dir)),
                             'line': i + 1,

@@ -44,7 +44,7 @@ def get_ast_hash(node: ast.AST, depth: int = 0, max_depth: int = 5) -> str:
     for child in ast.iter_child_nodes(node):
         parts.append(get_ast_hash(child, depth + 1, max_depth))
 
-    return hashlib.md5("|".join(parts).encode()).hexdigest()
+    return hashlib.md5("|".join(parts).encode(), usedforsecurity=False).hexdigest()
 
 
 def extract_code_blocks(file_path: str) -> List[Dict]:
