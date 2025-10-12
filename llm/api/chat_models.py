@@ -50,45 +50,6 @@ class IngestionRequest(BaseModel):
         return v
 
 
-class ExpertQueryRequest(BaseModel):
-    """Requête d'expertise avicole avec support JSON"""
-
-    question: str = Field(
-        ..., min_length=5, max_length=500, description="Question de l'utilisateur"
-    )
-    language: str = Field(
-        "fr", pattern="^(fr|en|es|zh|ar)$", description="Langue de la réponse"
-    )
-    genetic_line: Optional[str] = Field(None, description="Lignée génétique spécifique")
-    user_id: Optional[str] = Field(None, description="Identifiant utilisateur")
-    context: Optional[Dict[str, Any]] = Field(None, description="Contexte additionnel")
-    response_format: str = Field(
-        "detailed", pattern="^(ultra_concise|concise|standard|detailed)$"
-    )
-    use_json_search: bool = Field(
-        True, description="Utiliser la recherche JSON prioritaire"
-    )
-    performance_metrics: Optional[List[str]] = Field(
-        None, description="Métriques de performance à filtrer"
-    )
-    age_range: Optional[Dict[str, int]] = Field(
-        None, description="Plage d'âge en jours"
-    )
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "question": "Quel est le poids cible à 35 jours pour du Ross 308 mâle?",
-                "language": "fr",
-                "genetic_line": "ross308",
-                "use_json_search": True,
-                "performance_metrics": ["poids", "fcr"],
-                "age_range": {"min": 30, "max": 40},
-            }
-        }
-    }
-
-
 class ChatRequest(BaseModel):
     """Requête de chat étendue avec support JSON"""
 

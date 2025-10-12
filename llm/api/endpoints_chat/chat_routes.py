@@ -1,26 +1,22 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_chat/chat_routes.py - Main chat endpoints
-Version 5.0.1 - Chat and expert chat endpoints with streaming
+Version 5.0.2 - Chat endpoint with streaming
 """
 
 import time
 import uuid
-import asyncio
 import logging
 from utils.types import Any, Callable
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 
-from config.config import BASE_PATH, MAX_REQUEST_SIZE, STREAM_CHUNK_LEN
+from config.config import BASE_PATH, MAX_REQUEST_SIZE
 from utils.utilities import (
     safe_get_attribute,
-    sse_event,
-    smart_chunk_text,
     detect_language_enhanced,
 )
 from ..endpoints import safe_serialize_for_json, metrics_collector
-from ..chat_models import ExpertQueryRequest
 from ..chat_handlers import ChatHandlers
 
 # NOUVEAU: Import du monitoring
@@ -34,13 +30,13 @@ logger = logging.getLogger(__name__)
 
 def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
     """
-    Crée les endpoints de chat principal et expert
+    Crée l'endpoint de chat principal
 
     Args:
         get_service: Fonction pour récupérer un service par nom
 
     Returns:
-        APIRouter configuré avec les endpoints de chat
+        APIRouter configuré avec l'endpoint de chat
     """
     router = APIRouter()
 
@@ -208,123 +204,6 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             return JSONResponse(
                 status_code=500, content={"error": f"Erreur traitement: {str(e)}"}
-            )
-
-    @router.post(f"{BASE_PATH}/chat/expert")
-    async def expert_chat(request: ExpertQueryRequest):
-        """Endpoint de chat expert avec paramètres avancés et streaming"""
-        total_start_time = time.time()
-
-        # Créer chat_handlers ici pour avoir accès aux services
-        health_monitor = get_service("health_monitor")
-        services_dict = {
-            "health_monitor": health_monitor,
-        }
-        chat_handlers = ChatHandlers(services_dict)
-
-        try:
-            performance_context = None
-            if request.performance_metrics or request.age_range:
-                performance_context = {}
-                if request.performance_metrics:
-                    performance_context["metrics"] = request.performance_metrics
-                if request.age_range:
-                    performance_context["age_range"] = request.age_range
-
-            rag_result = await chat_handlers.generate_rag_response(
-                query=request.question,
-                tenant_id=request.user_id or str(uuid.uuid4())[:8],
-                language=request.language,
-                use_json_search=request.use_json_search,
-                genetic_line_filter=request.genetic_line,
-                performance_context=performance_context,
-            )
-
-            if not rag_result:
-                raise HTTPException(status_code=503, detail="RAG Engine non disponible")
-
-            async def generate_expert_response():
-                try:
-                    metadata = safe_get_attribute(rag_result, "metadata", {}) or {}
-
-                    expert_metadata = {
-                        "type": "expert_start",
-                        "question": request.question,
-                        "genetic_line_requested": request.genetic_line,
-                        "performance_metrics": request.performance_metrics,
-                        "age_range": request.age_range,
-                        "response_format": request.response_format,
-                        "json_search_used": request.use_json_search,
-                        "preprocessing_enabled": True,
-                        "router_managed": True,
-                        "confidence": float(
-                            safe_get_attribute(rag_result, "confidence", 0.5)
-                        ),
-                        "json_system": metadata.get("json_system", {}),
-                        "architecture": "query-router-v5.0.1",
-                    }
-
-                    yield sse_event(safe_serialize_for_json(expert_metadata))
-
-                    answer = safe_get_attribute(rag_result, "answer", "")
-                    if answer:
-                        if request.response_format == "ultra_concise":
-                            chunks = smart_chunk_text(
-                                str(answer)[:200] + "...", STREAM_CHUNK_LEN
-                            )
-                        elif request.response_format == "concise":
-                            chunks = smart_chunk_text(
-                                str(answer)[:500] + "...", STREAM_CHUNK_LEN
-                            )
-                        else:
-                            chunks = smart_chunk_text(str(answer), STREAM_CHUNK_LEN)
-
-                        for i, chunk in enumerate(chunks):
-                            yield sse_event(
-                                {
-                                    "type": "expert_chunk",
-                                    "content": chunk,
-                                    "chunk_index": i,
-                                    "format": request.response_format,
-                                }
-                            )
-                            await asyncio.sleep(0.01)
-
-                    end_metadata = {
-                        "type": "expert_end",
-                        "total_time": time.time() - total_start_time,
-                        "documents_used": metadata.get("documents_used", 0),
-                        "json_results_count": metadata.get("json_system", {}).get(
-                            "results_count", 0
-                        ),
-                        "genetic_lines_detected": metadata.get("json_system", {}).get(
-                            "genetic_lines_detected", []
-                        ),
-                        "confidence": float(
-                            safe_get_attribute(rag_result, "confidence", 0.5)
-                        ),
-                        "response_format_applied": request.response_format,
-                        "preprocessing_enabled": True,
-                        "router_managed": True,
-                    }
-
-                    yield sse_event(safe_serialize_for_json(end_metadata))
-
-                except Exception as e:
-                    logger.error(f"Erreur streaming expert: {e}")
-                    yield sse_event({"type": "error", "message": str(e)})
-
-            return StreamingResponse(
-                generate_expert_response(), media_type="text/plain"
-            )
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Erreur expert chat endpoint: {e}")
-            return JSONResponse(
-                status_code=500,
-                content={"error": f"Erreur traitement expert: {str(e)}"},
             )
 
     return router
