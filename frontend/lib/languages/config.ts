@@ -27,6 +27,15 @@ export const detectBrowserLanguage = (): string => {
 // Langues triées par ordre alphabétique du code
 export const availableLanguages: LanguageConfig[] = [
   {
+    code: "ar",
+    name: "Arabic",
+    nativeName: "العربية",
+    region: "Saudi Arabia",
+    flag: "🇸🇦",
+    rtl: true,
+    dateFormat: "ar-SA",
+  },
+  {
     code: "de",
     name: "German",
     nativeName: "Deutsch",
@@ -185,7 +194,7 @@ export const isRTLLanguage = (code: string): boolean => {
 // Groupement des langues par région (mis à jour par ordre alphabétique des noms)
 export const LANGUAGE_REGIONS = {
   europe: ["en", "fr", "de", "it", "nl", "pl", "pt", "es"] as const,
-  asia: ["zh", "hi", "id", "ja", "th", "tr", "vi"] as const,
+  asia: ["ar", "zh", "hi", "id", "ja", "th", "tr", "vi"] as const,
   americas: [] as const, // Si vous ajoutez plus tard pt-BR, en-CA, etc.
   africa: [] as const,
   oceania: [] as const,

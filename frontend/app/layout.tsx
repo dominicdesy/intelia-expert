@@ -125,15 +125,15 @@ const antiFlashScript = `
           const parsed = JSON.parse(zustandData);
           const storedLang = parsed?.state?.currentLanguage;
           
-          if (storedLang && ['en', 'fr', 'es', 'de', 'pt', 'nl', 'pl', 'zh', 'hi', 'th'].includes(storedLang)) {
+          if (storedLang && ['ar', 'en', 'fr', 'es', 'de', 'pt', 'nl', 'pl', 'zh', 'hi', 'th', 'tr', 'vi', 'ja', 'id', 'it'].includes(storedLang)) {
             secureLog.log('[AntiFlash] Langue trouvée dans Zustand:', storedLang);
             return storedLang;
           }
         }
-        
+
         // 2. Fallback: langue du navigateur
         const browserLang = navigator.language.split('-')[0];
-        if (['en', 'fr', 'es', 'de', 'pt', 'nl', 'pl', 'zh', 'hi', 'th'].includes(browserLang)) {
+        if (['ar', 'en', 'fr', 'es', 'de', 'pt', 'nl', 'pl', 'zh', 'hi', 'th', 'tr', 'vi', 'ja', 'id', 'it'].includes(browserLang)) {
           secureLog.log('[AntiFlash] Langue depuis navigateur:', browserLang);
           return browserLang;
         }
@@ -146,12 +146,23 @@ const antiFlashScript = `
       }
     }
 
+    // Fonction pour déterminer si la langue utilise RTL
+    function isRTLLanguage(lang) {
+      const rtlLanguages = ['ar', 'he', 'fa', 'ur'];
+      return rtlLanguages.includes(lang);
+    }
+
     // Initialisation immédiate
     const preferredLang = getPreferredLanguage();
-    
+
     // Marquer la langue détectée
     document.documentElement.setAttribute('lang', preferredLang);
     document.documentElement.setAttribute('data-lang', preferredLang);
+
+    // Définir la direction RTL si nécessaire
+    const direction = isRTLLanguage(preferredLang) ? 'rtl' : 'ltr';
+    document.documentElement.setAttribute('dir', direction);
+    secureLog.log('[AntiFlash] Direction:', direction);
     
     // Timeout de sécurité absolu (3 secondes max)
     const SAFETY_TIMEOUT = 3000;
@@ -415,6 +426,73 @@ export default function RootLayout({
               html:not(.language-ready) body::after {
                 animation: none !important;
               }
+            }
+
+            /* === SUPPORT RTL (Right-to-Left) === */
+            /* Pour l'arabe, l'hébreu, le persan, etc. */
+
+            [dir="rtl"] {
+              direction: rtl;
+              text-align: right;
+            }
+
+            /* Inverser les marges horizontales en RTL */
+            [dir="rtl"] .ml-1 { margin-right: 0.25rem; margin-left: 0; }
+            [dir="rtl"] .mr-1 { margin-left: 0.25rem; margin-right: 0; }
+            [dir="rtl"] .ml-2 { margin-right: 0.5rem; margin-left: 0; }
+            [dir="rtl"] .mr-2 { margin-left: 0.5rem; margin-right: 0; }
+            [dir="rtl"] .ml-3 { margin-right: 0.75rem; margin-left: 0; }
+            [dir="rtl"] .mr-3 { margin-left: 0.75rem; margin-right: 0; }
+            [dir="rtl"] .ml-4 { margin-right: 1rem; margin-left: 0; }
+            [dir="rtl"] .mr-4 { margin-left: 1rem; margin-right: 0; }
+            [dir="rtl"] .ml-6 { margin-right: 1.5rem; margin-left: 0; }
+            [dir="rtl"] .mr-6 { margin-left: 1.5rem; margin-right: 0; }
+            [dir="rtl"] .ml-8 { margin-right: 2rem; margin-left: 0; }
+            [dir="rtl"] .mr-8 { margin-left: 2rem; margin-right: 0; }
+
+            /* Inverser les paddings horizontaux en RTL */
+            [dir="rtl"] .pl-1 { padding-right: 0.25rem; padding-left: 0; }
+            [dir="rtl"] .pr-1 { padding-left: 0.25rem; padding-right: 0; }
+            [dir="rtl"] .pl-2 { padding-right: 0.5rem; padding-left: 0; }
+            [dir="rtl"] .pr-2 { padding-left: 0.5rem; padding-right: 0; }
+            [dir="rtl"] .pl-3 { padding-right: 0.75rem; padding-left: 0; }
+            [dir="rtl"] .pr-3 { padding-left: 0.75rem; padding-right: 0; }
+            [dir="rtl"] .pl-4 { padding-right: 1rem; padding-left: 0; }
+            [dir="rtl"] .pr-4 { padding-left: 1rem; padding-right: 0; }
+            [dir="rtl"] .pl-6 { padding-right: 1.5rem; padding-left: 0; }
+            [dir="rtl"] .pr-6 { padding-left: 1.5rem; padding-right: 0; }
+            [dir="rtl"] .pl-8 { padding-right: 2rem; padding-left: 0; }
+            [dir="rtl"] .pr-8 { padding-left: 2rem; padding-right: 0; }
+
+            /* Inverser left/right en RTL */
+            [dir="rtl"] .left-0 { right: 0; left: auto; }
+            [dir="rtl"] .right-0 { left: 0; right: auto; }
+            [dir="rtl"] .left-4 { right: 1rem; left: auto; }
+            [dir="rtl"] .right-4 { left: 1rem; right: auto; }
+
+            /* Inverser les flexbox en RTL */
+            [dir="rtl"] .flex-row { flex-direction: row-reverse; }
+            [dir="rtl"] .flex-row-reverse { flex-direction: row; }
+
+            /* Inverser text-align en RTL */
+            [dir="rtl"] .text-left { text-align: right; }
+            [dir="rtl"] .text-right { text-align: left; }
+
+            /* Inverser les border-radius en RTL */
+            [dir="rtl"] .rounded-l { border-radius: 0 0.25rem 0.25rem 0; }
+            [dir="rtl"] .rounded-r { border-radius: 0.25rem 0 0 0.25rem; }
+            [dir="rtl"] .rounded-tl { border-top-right-radius: 0.25rem; border-top-left-radius: 0; }
+            [dir="rtl"] .rounded-tr { border-top-left-radius: 0.25rem; border-top-right-radius: 0; }
+            [dir="rtl"] .rounded-bl { border-bottom-right-radius: 0.25rem; border-bottom-left-radius: 0; }
+            [dir="rtl"] .rounded-br { border-bottom-left-radius: 0.25rem; border-bottom-right-radius: 0; }
+
+            /* Inverser les transformations en RTL */
+            [dir="rtl"] .rotate-90 { transform: rotate(-90deg); }
+            [dir="rtl"] .rotate-180 { transform: rotate(180deg); }
+
+            /* Ajustements spécifiques pour les icônes */
+            [dir="rtl"] .rtl-flip {
+              transform: scaleX(-1);
             }
           `,
           }}
