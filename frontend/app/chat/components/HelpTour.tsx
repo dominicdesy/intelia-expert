@@ -24,31 +24,31 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
 
   const steps: HelpStep[] = [
     {
-      target: ".chat-input-fixed input, .chat-input-fixed .w-full",
+      target: "input[placeholder*='question'], input[aria-label*='question'], .chat-input-fixed input, input[type='text']",
       title: t("help.inputTitle"),
       description: t("help.inputDesc"),
       position: "top",
     },
     {
-      target: ".chat-input-fixed button[title*='send'], .chat-input-fixed button[aria-label*='Envoyer']",
+      target: "button[title*='send'], button[aria-label*='Envoyer'], button[title*='Envoyer'], .chat-input-fixed button:last-child",
       title: t("help.sendTitle"),
       description: t("help.sendDesc"),
       position: "left",
     },
     {
-      target: "button[title*='nouvelle conversation'], button[aria-label*='nouvelle conversation']",
+      target: "button[title*='nouvelle conversation'], button[aria-label*='nouvelle conversation'], button[title*='Nouvelle conversation'], header button:first-child",
       title: t("help.newChatTitle"),
       description: t("help.newChatDesc"),
       position: "bottom",
     },
     {
-      target: ".history-menu-container",
+      target: ".history-menu-container, header button:nth-child(2), button[aria-label*='historique']",
       title: t("help.historyTitle"),
       description: t("help.historyDesc"),
       position: "bottom",
     },
     {
-      target: ".user-menu-container",
+      target: ".user-menu-container, header button:last-child, button[aria-label*='utilisateur']",
       title: t("help.profileTitle"),
       description: t("help.profileDesc"),
       position: "bottom",
@@ -57,56 +57,77 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
 
   const updateSpotlight = useCallback(() => {
     const step = steps[currentStep];
-    const element = document.querySelector(step.target);
 
-    if (element) {
-      const rect = element.getBoundingClientRect();
-      setSpotlightRect(rect);
+    // Essayer de trouver l'élément avec chaque sélecteur possible
+    const selectors = step.target.split(',').map(s => s.trim());
+    let element: Element | null = null;
 
-      // Calculer la position de la bulle
-      const bubbleWidth = 320;
-      const bubbleHeight = 150;
-      const padding = 20;
-
-      let top = 0;
-      let left = 0;
-
-      switch (step.position) {
-        case "top":
-          top = rect.top - bubbleHeight - padding;
-          left = rect.left + rect.width / 2 - bubbleWidth / 2;
-          break;
-        case "bottom":
-          top = rect.bottom + padding;
-          left = rect.left + rect.width / 2 - bubbleWidth / 2;
-          break;
-        case "left":
-          top = rect.top + rect.height / 2 - bubbleHeight / 2;
-          left = rect.left - bubbleWidth - padding;
-          break;
-        case "right":
-          top = rect.top + rect.height / 2 - bubbleHeight / 2;
-          left = rect.right + padding;
-          break;
+    for (const selector of selectors) {
+      element = document.querySelector(selector);
+      if (element) {
+        console.log(`[HelpTour] Element trouvé avec: ${selector}`);
+        break;
       }
-
-      // Ajuster si la bulle sort de l'écran
-      if (left < 10) left = 10;
-      if (left + bubbleWidth > window.innerWidth - 10) {
-        left = window.innerWidth - bubbleWidth - 10;
-      }
-      if (top < 10) top = 10;
-      if (top + bubbleHeight > window.innerHeight - 10) {
-        top = window.innerHeight - bubbleHeight - 10;
-      }
-
-      setBubblePosition({ top, left });
     }
+
+    if (!element) {
+      console.warn(`[HelpTour] Aucun élément trouvé pour l'étape ${currentStep + 1}. Sélecteurs essayés:`, selectors);
+      // Mettre une position par défaut temporaire
+      setBubblePosition({ top: 100, left: 100 });
+      return;
+    }
+
+    const rect = element.getBoundingClientRect();
+    console.log(`[HelpTour] Position de l'élément:`, rect);
+    setSpotlightRect(rect);
+
+    // Calculer la position de la bulle
+    const bubbleWidth = 320;
+    const bubbleHeight = 150;
+    const padding = 20;
+
+    let top = 0;
+    let left = 0;
+
+    switch (step.position) {
+      case "top":
+        top = rect.top - bubbleHeight - padding;
+        left = rect.left + rect.width / 2 - bubbleWidth / 2;
+        break;
+      case "bottom":
+        top = rect.bottom + padding;
+        left = rect.left + rect.width / 2 - bubbleWidth / 2;
+        break;
+      case "left":
+        top = rect.top + rect.height / 2 - bubbleHeight / 2;
+        left = rect.left - bubbleWidth - padding;
+        break;
+      case "right":
+        top = rect.top + rect.height / 2 - bubbleHeight / 2;
+        left = rect.right + padding;
+        break;
+    }
+
+    // Ajuster si la bulle sort de l'écran
+    if (left < 10) left = 10;
+    if (left + bubbleWidth > window.innerWidth - 10) {
+      left = window.innerWidth - bubbleWidth - 10;
+    }
+    if (top < 10) top = 10;
+    if (top + bubbleHeight > window.innerHeight - 10) {
+      top = window.innerHeight - bubbleHeight - 10;
+    }
+
+    setBubblePosition({ top, left });
+  }
   }, [currentStep, steps]);
 
   useEffect(() => {
     if (isOpen) {
-      updateSpotlight();
+      // Petit délai pour s'assurer que le DOM est prêt
+      const initialTimeout = setTimeout(() => {
+        updateSpotlight();
+      }, 100);
 
       const handleResize = () => {
         if (animationFrameRef.current) {
@@ -119,6 +140,7 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
       window.addEventListener("scroll", handleResize, true);
 
       return () => {
+        clearTimeout(initialTimeout);
         window.removeEventListener("resize", handleResize);
         window.removeEventListener("scroll", handleResize, true);
         if (animationFrameRef.current) {
@@ -127,6 +149,17 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
       };
     }
   }, [isOpen, updateSpotlight]);
+
+  // Mettre à jour le spotlight quand on change d'étape
+  useEffect(() => {
+    if (isOpen) {
+      // Petit délai pour les animations
+      const timeout = setTimeout(() => {
+        updateSpotlight();
+      }, 50);
+      return () => clearTimeout(timeout);
+    }
+  }, [currentStep, isOpen, updateSpotlight]);
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {

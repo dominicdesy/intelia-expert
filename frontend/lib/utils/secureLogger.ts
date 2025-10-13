@@ -76,6 +76,18 @@ function sanitizeError(error: any): any {
 }
 
 /**
+ * Check if we're in production mode (works in both client and server)
+ */
+const isProduction = (() => {
+  // Server-side check
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env.NODE_ENV === 'production';
+  }
+  // Client-side check using Next.js public env variable
+  return false; // Default to development for client-side
+})();
+
+/**
  * Secure logging utility that redacts sensitive information
  * Only logs in development mode
  */
@@ -84,7 +96,7 @@ export const secureLog = {
    * Log general information (development only)
    */
   log: (message: string, data?: any) => {
-    if (process.env.NODE_ENV === 'production') return;
+    if (isProduction) return;
 
     if (data !== undefined) {
       console.log(message, sanitizeData(data));
@@ -108,7 +120,7 @@ export const secureLog = {
    * Log warnings (development only)
    */
   warn: (message: string, data?: any) => {
-    if (process.env.NODE_ENV === 'production') return;
+    if (isProduction) return;
 
     if (data !== undefined) {
       console.warn(message, sanitizeData(data));
@@ -121,7 +133,7 @@ export const secureLog = {
    * Log debug information (development only)
    */
   debug: (message: string, data?: any) => {
-    if (process.env.NODE_ENV === 'production') return;
+    if (isProduction) return;
 
     if (data !== undefined) {
       console.debug(message, sanitizeData(data));
