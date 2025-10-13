@@ -1,0 +1,40 @@
+{
+  "total_issues": 21,
+  "by_severity": {
+    "MEDIUM": 18,
+    "HIGH": 3
+  },
+  "quick_wins_count": 10,
+  "top_issues": [
+    {
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions",
+      "severity": "MEDIUM",
+      "count": 10
+    },
+    {
+      "test_id": "B301",
+      "test_name": "blacklist",
+      "severity": "MEDIUM",
+      "count": 6
+    },
+    {
+      "test_id": "B324",
+      "test_name": "hashlib",
+      "severity": "HIGH",
+      "count": 3
+    },
+    {
+      "test_id": "B314",
+      "test_name": "blacklist",
+      "severity": "MEDIUM",
+      "count": 1
+    },
+    {
+      "test_id": "B104",
+      "test_name": "hardcoded_bind_all_interfaces",
+      "severity": "MEDIUM",
+      "count": 1
+    }
+  ]
+}

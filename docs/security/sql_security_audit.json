@@ -1,0 +1,92 @@
+[
+  {
+    "file": "retrieval/postgresql/retriever.py",
+    "line": 522,
+    "code_snippet": "extra_params.append(filters[\"species\"].lower())\n            logger.info(\n                f\"\ud83d\udc14 Feed calculation: filtering by species '{filters['species']}'\"\n            )\n\n        sql = f\"\"\"\n            SELECT \n                m.age_min as age_days,\n                m.value_numeric as feed_intake,\n                m.metric_name,\n                s.strain_name,",
+    "risk_level": "LOW",
+    "issues": [
+      "Non-parameterized query with controlled variables"
+    ],
+    "uses_parameters": false,
+    "uses_fstring": true,
+    "uses_format": false,
+    "uses_concat": false,
+    "bandit_finding": {
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "severity": "MEDIUM",
+      "confidence": "LOW"
+    }
+  },
+  {
+    "file": "retrieval/postgresql/retriever.py",
+    "line": 917,
+    "code_snippet": ")\n                logger.info(\"\ud83d\udccf Filtering by IMPERIAL units (lb, oz, in, etc.)\")\n\n        where_clause = \"WHERE \" + \" AND \".join(conditions) if conditions else \"\"\n\n        sql_query = f\"\"\"\n            SELECT\n                c.company_name, b.breed_name, s.strain_name, s.species,\n                m.metric_name, m.value_numeric, m.value_text, m.unit,\n                m.age_min, m.age_max, m.sheet_name,\n                dc.category_name, d.sex, d.housing_system, d.data_type, d.unit_system",
+    "risk_level": "MEDIUM",
+    "issues": [
+      "Dynamic WHERE clause - verify input validation"
+    ],
+    "uses_parameters": false,
+    "uses_fstring": true,
+    "uses_format": false,
+    "uses_concat": true,
+    "bandit_finding": {
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "severity": "MEDIUM",
+      "confidence": "LOW"
+    }
+  },
+  {
+    "file": "retrieval/postgresql/query_builder.py",
+    "line": 483,
+    "code_snippet": "m.age_min ASC,\n            CASE WHEN LOWER(COALESCE(m.sex, 'as_hatched')) IN ('as_hatched', 'mixed') THEN 1 ELSE 2 END,\n            m.value_numeric DESC NULLS LAST\n        \"\"\"\n\n        sql = f\"\"\"\n        SELECT DISTINCT ON (m.age_min, m.metric_name)\n            m.company, m.breed, m.strain, m.species,\n            m.metric_name, m.value_numeric, m.value_text, m.unit,\n            m.age_min, m.age_max, m.sheet_name, m.category,\n            m.sex, m.housing_system, m.data_type, m.metadata",
+    "risk_level": "LOW",
+    "issues": [
+      "Non-parameterized query with controlled variables"
+    ],
+    "uses_parameters": false,
+    "uses_fstring": true,
+    "uses_format": false,
+    "uses_concat": false,
+    "bandit_finding": {
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "severity": "MEDIUM",
+      "confidence": "LOW"
+    }
+  },
+  {
+    "file": "retrieval/postgresql/temporal.py",
+    "line": 202,
+    "code_snippet": ")\n                params.append(entities[\"sex\"].lower())\n\n        # Construction de la requ\u00eate finale\n        sql_conditions = \" AND \".join(conditions)\n        sql_query = f\"\"\"\n            SELECT \n                c.company_name,\n                b.breed_name,\n                s.strain_name,\n                s.species,",
+    "risk_level": "MEDIUM",
+    "issues": [
+      "Dynamic WHERE clause - verify input validation"
+    ],
+    "uses_parameters": false,
+    "uses_fstring": true,
+    "uses_format": false,
+    "uses_concat": false,
+    "bandit_finding": {
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "severity": "MEDIUM",
+      "confidence": "LOW"
+    }
+  },
+  {
+    "file": "generation/generators.py",
+    "line": 669,
+    "code_snippet": "optimization_keywords = ['am\u00e9liorer', 'optimiser', 'augmenter', 'improve', 'optimize', 'increase', 'strategies', 'conseils', 'advice', 'comment faire', 'how to']\n                is_optimization_query = any(keyword in query_lower for keyword in optimization_keywords)\n\n                if is_optimization_query:\n                    # OPTIMIZATION/ADVICE QUERIES - Detailed actionable recommendations\n                    language_instruction = f\"\"\"You are an expert in poultry production.\nCRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).\n\n\ud83c\udfaf HIERARCHICAL RAG GUIDELINES - LEVEL 2A: OPTIMIZATION ADVICE (Weaviate)\n\n\ud83d\udcda DETAILED ACTIONABLE RECOMMENDATIONS:",
+    "risk_level": "LOW",
+    "issues": [
+      "Non-parameterized query with controlled variables"
+    ],
+    "uses_parameters": false,
+    "uses_fstring": true,
+    "uses_format": false,
+    "uses_concat": false,
+    "bandit_finding": {
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "severity": "MEDIUM",
+      "confidence": "LOW"
+    }
+  }
+]
