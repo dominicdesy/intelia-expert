@@ -134,7 +134,7 @@ IMPORTANT:
         try:
             # Appel à Claude Vision API
             message = self.client.messages.create(
-                model="claude-3-5-sonnet-20250318",  # Latest model with vision
+                model="claude-3-5-sonnet-20241022",  # Model with vision (deprecated but works)
                 max_tokens=4096,
                 messages=[
                     {
@@ -332,10 +332,10 @@ IMPORTANT:
     def _generate_sheet_name(self, table: Dict, index: int) -> str:
         """Génère un nom de feuille valide et unique"""
         # Extraire des infos du titre ou métadonnées
-        title = table.get('table_title', '')
-        table_type = table.get('table_type', 'table')
-        table_number = table.get('table_number', '')
-        metadata = table.get('metadata', {})
+        title = table.get('table_title', '') or ''
+        table_type = table.get('table_type', 'table') or 'table'
+        table_number = table.get('table_number', '') or ''
+        metadata = table.get('metadata', {}) or {}
 
         # Nettoyer le numéro de table
         clean_table_num = str(table_number).replace('Table', '').replace('table', '').strip() if table_number else ''
@@ -347,21 +347,24 @@ IMPORTANT:
         if clean_table_num:
             parts.append(f'T{clean_table_num}')
 
-        if 'performance' in title.lower() or table_type == 'performance':
+        # Assurer que title est une chaîne
+        title_lower = title.lower() if title else ''
+
+        if 'performance' in title_lower or table_type == 'performance':
             sex = metadata.get('sex', 'mixed')
             unit_system = metadata.get('unit_system', 'metric')
             parts.extend([sex, unit_system])
-        elif 'nutrition' in title.lower() or 'nutrient' in title.lower():
-            if 'small' in title.lower():
+        elif 'nutrition' in title_lower or 'nutrient' in title_lower:
+            if 'small' in title_lower:
                 parts.extend(['nutrient', 'small'])
             else:
                 parts.extend(['nutrient', 'med_large'])
-        elif 'amino' in title.lower():
-            if 'small' in title.lower():
+        elif 'amino' in title_lower:
+            if 'small' in title_lower:
                 parts.extend(['amino', 'small'])
             else:
                 parts.extend(['amino', 'med_large'])
-        elif 'yield' in title.lower():
+        elif 'yield' in title_lower:
             sex = metadata.get('sex', 'mixed')
             parts.extend(['yield', sex, 'metric'])
         else:
@@ -404,7 +407,15 @@ IMPORTANT:
         column_info = []
 
         for i, header in enumerate(headers):
-            unit = units[i] if i < len(units) else ''
+            # S'assurer que unit est une chaîne
+            if i < len(units):
+                unit = units[i]
+                # Si unit est une liste, prendre le premier élément ou joindre
+                if isinstance(unit, list):
+                    unit = unit[0] if unit else ''
+                unit = str(unit) if unit else ''
+            else:
+                unit = ''
 
             # Nettoyer le nom
             col_name = str(header).replace(' ', '_').replace('(', '').replace(')', '').replace('.', '')
@@ -522,7 +533,42 @@ def main():
         print(f"[ERROR] Le fichier {pdf_file} n'existe pas")
         sys.exit(1)
 
-    print("="*60)
+    # Vérifier si le fichier de sortie existe déjà
+    output_path = Path(output_excel)
+    if output_path.exists():
+        print(f"\n[ATTENTION] Le fichier {output_excel} existe déjà!")
+        print("\nOptions:")
+        print("  1. Écraser le fichier existant")
+        print("  2. Annuler l'extraction")
+        print("  3. Créer un nouveau fichier avec suffixe (ex: _v2, _v3)")
+
+        choice = input("\nVotre choix (1/2/3): ").strip()
+
+        if choice == '2':
+            print("[INFO] Extraction annulée par l'utilisateur")
+            sys.exit(0)
+        elif choice == '3':
+            # Trouver le prochain suffixe disponible
+            base_name = output_path.stem
+            ext = output_path.suffix
+            parent = output_path.parent
+            version = 2
+
+            while True:
+                new_name = f"{base_name}_v{version}{ext}"
+                new_path = parent / new_name
+                if not new_path.exists():
+                    output_excel = str(new_path)
+                    print(f"[INFO] Nouveau fichier: {output_excel}")
+                    break
+                version += 1
+        elif choice != '1':
+            print(f"[ERROR] Choix invalide: {choice}")
+            sys.exit(1)
+        else:
+            print("[INFO] Le fichier existant sera écrasé")
+
+    print("\n" + "="*60)
     print("PDF Table Extractor - Claude Vision API")
     print("="*60)
 

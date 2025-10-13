@@ -46,8 +46,28 @@ export ANTHROPIC_API_KEY="sk-ant-api03-..."  # Votre clé API
 - ✅ **Précis**: 100% de précision sur les tests
 - ✅ **Intelligent**: Détecte automatiquement les en-têtes, unités, métadonnées
 - ✅ **Robuste**: Pas de mots-clés hardcodés
+- ✅ **Fusion multi-pages**: Combine automatiquement les tables sur plusieurs pages
+- ✅ **Protection contre écrasement**: Détecte les fichiers existants
 
 **Coût:** ~$0.01-0.03 USD par page
+
+**Protection des fichiers existants:**
+
+Si le fichier de sortie existe déjà, le script propose 3 options:
+```
+[ATTENTION] Le fichier output.xlsx existe déjà!
+
+Options:
+  1. Écraser le fichier existant
+  2. Annuler l'extraction
+  3. Créer un nouveau fichier avec suffixe (ex: _v2, _v3)
+
+Votre choix (1/2/3):
+```
+
+- **Option 1**: Remplace le fichier existant
+- **Option 2**: Annule l'extraction sans rien faire
+- **Option 3**: Crée automatiquement `output_v2.xlsx`, `output_v3.xlsx`, etc.
 
 ---
 
@@ -240,5 +260,5 @@ Les fichiers Excel générés sont directement utilisables par le système RAG:
 
 ---
 
-**Dernière mise à jour:** 2025-10-12
+**Dernière mise à jour:** 2025-10-13
 **Mainteneur:** Équipe Intelia Expert
