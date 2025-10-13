@@ -86,7 +86,6 @@ export const LanguageSelector = () => {
                 <span className="text-xl">{lang.flag}</span>
                 <div className="flex-1">
                   <div className="font-medium">{lang.nativeName}</div>
-                  <div className="text-xs text-gray-500">{lang.region}</div>
                 </div>
                 {lang.code === currentLanguage && (
                   <svg
