@@ -273,9 +273,12 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
           <button
             onClick={handlePrev}
             disabled={currentStep === 0}
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
-            ← {t("help.previous")}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>{t("help.previous")}</span>
           </button>
 
           <div className="flex space-x-2">
@@ -293,9 +296,12 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
 
           <button
             onClick={handleNext}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"
           >
-            {currentStep === steps.length - 1 ? t("help.finish") : t("help.next")} →
+            <span>{currentStep === steps.length - 1 ? t("help.finish") : t("help.next")}</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
         </div>
       </div>
