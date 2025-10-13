@@ -18,7 +18,6 @@ import {
   translations,
   validateEmail,
   validatePassword,
-  validatePhone,
   rememberMeUtils,
 } from "./page_hooks";
 
@@ -269,14 +268,9 @@ function PageContent() {
     confirmPassword: "",
     firstName: "",
     lastName: "",
-    linkedinProfile: "",
     country: "",
-    countryCode: "",
-    areaCode: "",
-    phoneNumber: "",
     companyName: "",
     companyWebsite: "",
-    companyLinkedin: "",
   });
 
   const safeRedirectToChat = useCallback(() => {
@@ -309,22 +303,7 @@ function PageContent() {
     field: keyof typeof signupData,
     value: string,
   ) => {
-    setSignupData((prev) => {
-      const newData = { ...prev, [field]: value };
-
-      // Auto-remplir l'indicatif pays quand le pays change
-      if (field === "country" && value && countryCodeMap[value]) {
-        console.log(
-          "🏳️ [Country] Auto-remplissage code pays:",
-          value,
-          "->",
-          countryCodeMap[value],
-        );
-        newData.countryCode = countryCodeMap[value];
-      }
-
-      return newData;
-    });
+    setSignupData((prev) => ({ ...prev, [field]: value }));
     setLocalError("");
   };
 
@@ -343,16 +322,6 @@ function PageContent() {
     if (!signupData.firstName.trim()) return t.firstNameRequired;
     if (!signupData.lastName.trim()) return t.lastNameRequired;
     if (!signupData.country) return t.countryRequired;
-
-    if (
-      !validatePhone(
-        signupData.countryCode,
-        signupData.areaCode,
-        signupData.phoneNumber,
-      )
-    ) {
-      return t.phoneInvalid;
-    }
 
     return null;
   };
@@ -418,14 +387,9 @@ function PageContent() {
         email: signupData.email,
         firstName: signupData.firstName,
         lastName: signupData.lastName,
-        linkedinProfile: signupData.linkedinProfile,
         country: signupData.country,
-        countryCode: signupData.countryCode,
-        areaCode: signupData.areaCode,
-        phoneNumber: signupData.phoneNumber,
         companyName: signupData.companyName,
         companyWebsite: signupData.companyWebsite,
-        companyLinkedin: signupData.companyLinkedin,
       };
 
       await register(signupData.email, signupData.password, userData);
@@ -807,21 +771,6 @@ function PageContent() {
                         />
                       </div>
                     </div>
-
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t.linkedinProfile} {t.optional}
-                      </label>
-                      <input
-                        type="url"
-                        value={signupData.linkedinProfile}
-                        onChange={(e) =>
-                          handleSignupChange("linkedinProfile", e.target.value)
-                        }
-                        placeholder="https://linkedin.com/in/votre-profil"
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      />
-                    </div>
                   </div>
 
                   {/* Section Contact */}
@@ -881,57 +830,6 @@ function PageContent() {
                         </select>
                       )}
                     </div>
-
-                    {/* Téléphone optionnel */}
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t.phoneNumber} {t.optional}
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">
-                            {t.countryCode}
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="+1"
-                            value={signupData.countryCode}
-                            onChange={(e) =>
-                              handleSignupChange("countryCode", e.target.value)
-                            }
-                            className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">
-                            {t.areaCode}
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="514"
-                            value={signupData.areaCode}
-                            onChange={(e) =>
-                              handleSignupChange("areaCode", e.target.value)
-                            }
-                            className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">
-                            {t.phoneNumber}
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="1234567"
-                            value={signupData.phoneNumber}
-                            onChange={(e) =>
-                              handleSignupChange("phoneNumber", e.target.value)
-                            }
-                            className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                          />
-                        </div>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Section Entreprise */}
@@ -965,21 +863,6 @@ function PageContent() {
                           handleSignupChange("companyWebsite", e.target.value)
                         }
                         placeholder="https://votre-entreprise.com"
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      />
-                    </div>
-
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t.companyLinkedin} {t.optional}
-                      </label>
-                      <input
-                        type="url"
-                        value={signupData.companyLinkedin}
-                        onChange={(e) =>
-                          handleSignupChange("companyLinkedin", e.target.value)
-                        }
-                        placeholder="https://linkedin.com/company/votre-entreprise"
                         className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                       />
                     </div>
