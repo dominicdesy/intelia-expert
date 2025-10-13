@@ -706,6 +706,27 @@ export interface TranslationKeys {
   "country.switzerland": string;
   "country.mexico": string;
   "country.brazil": string;
+
+  // ===========================================
+  // SHARE CONVERSATION
+  // ===========================================
+  "share.button": string;
+  "share.modalTitle": string;
+  "share.anonymize": string;
+  "share.anonymizeHelp": string;
+  "share.expiration": string;
+  "share.expirationHelp": string;
+  "share.expiration.7days": string;
+  "share.expiration.30days": string;
+  "share.expiration.90days": string;
+  "share.expiration.never": string;
+  "share.generating": string;
+  "share.generate": string;
+  "share.successTitle": string;
+  "share.successMessage": string;
+  "share.copy": string;
+  "share.copied": string;
+  "share.error": string;
 }
 
 // SYSTÈME DE NOTIFICATION POUR FORCER LES RE-RENDERS
