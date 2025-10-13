@@ -9,7 +9,6 @@ import React, {
 import { useTranslation } from "@/lib/languages/i18n";
 import { useAuthStore } from "@/lib/stores/auth";
 import { UserInfoModalProps } from "@/types";
-import { PhoneInput, usePhoneValidation } from "../PhoneInput";
 import { CountrySelect } from "../CountrySelect";
 import { apiClient } from "@/lib/api/client";
 
@@ -158,14 +157,9 @@ interface UserProfileUpdate {
   first_name?: string;
   last_name?: string;
   full_name?: string;
-  country_code?: string;
-  area_code?: string;
-  phone_number?: string;
   country?: string;
-  linkedin_profile?: string;
   company_name?: string;
   company_website?: string;
-  linkedin_corporate?: string;
   user_type?: string;
   language?: string;
 }
@@ -653,7 +647,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
   const { updateProfile } = useAuthStore();
   const isMountedRef = useRef(true);
   const { t, changeLanguage, getCurrentLanguage } = useTranslation();
-  const { validatePhoneFields } = usePhoneValidation();
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const {
@@ -669,14 +662,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
         firstName: "",
         lastName: "",
         email: "",
-        country_code: "",
-        area_code: "",
-        phone_number: "",
         country: "",
-        linkedinProfile: "",
         companyName: "",
         companyWebsite: "",
-        linkedinCorporate: "",
       };
     }
 
@@ -684,14 +672,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       email: user.email || "",
-      country_code: user.country_code || "",
-      area_code: user.area_code || "",
-      phone_number: user.phone_number || "",
       country: user.country || "",
-      linkedinProfile: user.linkedinProfile || "",
       companyName: user.companyName || "",
       companyWebsite: user.companyWebsite || "",
-      linkedinCorporate: user.linkedinCorporate || "",
     };
 
     debugLog("DATA", "User data memo updated", memo);
@@ -701,14 +684,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     user?.firstName,
     user?.lastName,
     user?.email,
-    user?.country_code,
-    user?.area_code,
-    user?.phone_number,
     user?.country,
-    user?.linkedinProfile,
     user?.companyName,
     user?.companyWebsite,
-    user?.linkedinCorporate,
   ]);
 
   // States - Initialize with stable data
@@ -724,14 +702,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
         firstName: "",
         lastName: "",
         email: "",
-        country_code: "",
-        area_code: "",
-        phone_number: "",
         country: "",
-        linkedinProfile: "",
         companyName: "",
         companyWebsite: "",
-        linkedinCorporate: "",
       };
     }
 
@@ -740,14 +713,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       email: user.email || "",
-      country_code: user.country_code || "",
-      area_code: user.area_code || "",
-      phone_number: user.phone_number || "",
       country: user.country || "",
-      linkedinProfile: user.linkedinProfile || "",
       companyName: user.companyName || "",
       companyWebsite: user.companyWebsite || "",
-      linkedinCorporate: user.linkedinCorporate || "",
     };
   });
 
@@ -875,35 +843,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     [t],
   );
 
-  const validateLinkedInUrl = useCallback(
-    (url: string, fieldName: string): string[] => {
-      const errors: string[] = [];
-
-      if (url.trim()) {
-        const urlErrors = validateUrl(url, fieldName);
-        if (urlErrors.length === 0) {
-          const isValidLinkedIn =
-            url.includes("linkedin.com/") &&
-            (url.includes("/in/") || url.includes("/company/"));
-
-          if (!isValidLinkedIn) {
-            errors.push(`${fieldName} ${t("error.linkedinInvalid")}`);
-          }
-        } else {
-          errors.push(...urlErrors);
-        }
-      }
-
-      debugLog("VALIDATION", "LinkedIn URL validation", {
-        url,
-        fieldName,
-        errors,
-      });
-      return errors;
-    },
-    [validateUrl, t],
-  );
-
   // Event handlers
   const handleClose = useCallback(() => {
     debugLog("INTERACTION", "Close button clicked", { isLoading });
@@ -935,23 +874,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     (field: keyof typeof showPasswords) => {
       debugLog("INTERACTION", "Password visibility toggled", { field });
       setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
-    },
-    [],
-  );
-
-  const handlePhoneChange = useCallback(
-    (phoneData: {
-      country_code: string;
-      area_code: string;
-      phone_number: string;
-    }) => {
-      debugLog("INTERACTION", "Phone data changed", phoneData);
-      setFormData((prev) => ({
-        ...prev,
-        country_code: phoneData.country_code,
-        area_code: phoneData.area_code,
-        phone_number: phoneData.phone_number,
-      }));
     },
     [],
   );
@@ -991,45 +913,12 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       const emailErrors = validateEmail(formData.email);
       errors.push(...emailErrors);
 
-      const hasPhoneData =
-        formData.country_code || formData.area_code || formData.phone_number;
-      if (hasPhoneData) {
-        const phoneValidation = validatePhoneFields(
-          formData.country_code,
-          formData.area_code,
-          formData.phone_number,
-        );
-        if (!phoneValidation.isValid) {
-          errors.push(
-            ...phoneValidation.errors.map(
-              (err) => `${t("error.phonePrefix")} ${err}`,
-            ),
-          );
-        }
-      }
-
-      if (formData.linkedinProfile) {
-        const linkedinErrors = validateLinkedInUrl(
-          formData.linkedinProfile,
-          t("profile.linkedinProfile"),
-        );
-        errors.push(...linkedinErrors);
-      }
-
       if (formData.companyWebsite) {
         const websiteErrors = validateUrl(
           formData.companyWebsite,
           t("profile.companyWebsite"),
         );
         errors.push(...websiteErrors);
-      }
-
-      if (formData.linkedinCorporate) {
-        const corporateErrors = validateLinkedInUrl(
-          formData.linkedinCorporate,
-          t("profile.linkedinCorporate"),
-        );
-        errors.push(...corporateErrors);
       }
 
       if (formData.companyName && formData.companyName.length > 100) {
@@ -1048,14 +937,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
         lastName: formData.lastName?.trim(),
         name: `${formData.firstName?.trim()} ${formData.lastName?.trim()}`.trim(),
         email: formData.email?.trim(),
-        country_code: formData.country_code,
-        area_code: formData.area_code,
-        phone_number: formData.phone_number,
         country: formData.country,
-        linkedinProfile: formData.linkedinProfile,
         companyName: formData.companyName,
         companyWebsite: formData.companyWebsite,
-        linkedinCorporate: formData.linkedinCorporate,
       };
 
       await updateProfile(updateData);
@@ -1102,8 +986,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     formData,
     validateEmail,
     validateUrl,
-    validateLinkedInUrl,
-    validatePhoneFields,
     updateProfile,
     handleClose,
     t,
@@ -1372,26 +1254,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
                     />
                   </div>
 
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      {t("profile.phone")}{" "}
-                      <span className="text-gray-500 text-sm">
-                        ({t("common.optional")})
-                      </span>
-                    </label>
-                    <div data-debug="phone-input">
-                      <PhoneInput
-                        countryCode={formData.country_code}
-                        areaCode={formData.area_code}
-                        phoneNumber={formData.phone_number}
-                        onChange={handlePhoneChange}
-                        countries={countries}
-                        countriesLoading={countriesLoading}
-                        usingFallback={usingFallback}
-                      />
-                    </div>
-                  </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       {t("profile.country")}{" "}
@@ -1425,25 +1287,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t("profile.linkedinProfile")}
-                      </label>
-                      <input
-                        type="url"
-                        value={formData.linkedinProfile}
-                        onChange={(e) =>
-                          handleFormDataChange(
-                            "linkedinProfile",
-                            e.target.value,
-                          )
-                        }
-                        placeholder={t("placeholder.linkedinPersonal")}
-                        className="input-primary"
-                        data-debug="linkedin-input"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t("profile.companyName")}
                       </label>
                       <input
@@ -1471,25 +1314,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
                         placeholder={t("placeholder.companyWebsite")}
                         className="input-primary"
                         data-debug="company-website-input"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t("profile.linkedinCorporate")}
-                      </label>
-                      <input
-                        type="url"
-                        value={formData.linkedinCorporate}
-                        onChange={(e) =>
-                          handleFormDataChange(
-                            "linkedinCorporate",
-                            e.target.value,
-                          )
-                        }
-                        placeholder={t("placeholder.linkedinCorporate")}
-                        className="input-primary"
-                        data-debug="linkedin-corporate-input"
                       />
                     </div>
                   </div>
