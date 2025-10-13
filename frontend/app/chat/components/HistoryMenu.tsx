@@ -46,12 +46,7 @@ export const HistoryMenu = React.memo(() => {
   );
 
   const handleToggle = useCallback(async () => {
-    secureLog.log(
-      t("history.toggleClicked"),
-      isOpen,
-      t("history.userPresent"),
-      !!user,
-    );
+    secureLog.log(`t("history.toggleClicked") ${isOpen} ${t("history.userPresent")} ${!!user}`);
 
     const newIsOpen = !isOpen;
     setIsOpen(newIsOpen);

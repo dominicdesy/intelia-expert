@@ -66,12 +66,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     setIsUpdating(true);
 
     try {
-      secureLog.log(
-        "[LanguageModal] Changement langue:",
-        currentLanguage,
-        "→",
-        languageCode,
-      );
+      secureLog.log(`[LanguageModal] Changement langue: ${currentLanguage} → ${languageCode} `);
 
       // 1. Changer dans l'interface via le hook
       await changeLanguage(languageCode);

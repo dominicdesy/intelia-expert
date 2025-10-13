@@ -420,10 +420,7 @@ function PageContent() {
   };
 
   const toggleMode = () => {
-    secureLog.log(
-      "🔄 [UI] Basculement mode:",
-      isSignupMode ? "signup → login" : "login → signup",
-    );
+    secureLog.log(`🔄 [UI] Basculement mode: ${isSignupMode ? "signup → login" : "login → signup"} `);
     setIsSignupMode(!isSignupMode);
     setLocalError("");
     setLocalSuccess("");

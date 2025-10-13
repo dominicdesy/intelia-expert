@@ -479,10 +479,7 @@ function InvitationAcceptPageContent() {
           }
 
           const validationResult = await validateResponse.json();
-          secureLog.log(
-            "[InvitationAccept] Token validé:",
-            validationResult.user_email,
-          );
+          secureLog.log(`[InvitationAccept] Token validé: ${validationResult.user_email} `);
 
           setProcessingResult({
             success: true,
@@ -648,10 +645,7 @@ function InvitationAcceptPageContent() {
     const validationErrors = validateForm();
 
     if (validationErrors.length > 0) {
-      secureLog.log(
-        "[InvitationAccept] Erreurs de validation:",
-        validationErrors,
-      );
+      secureLog.log(`[InvitationAccept] Erreurs de validation: ${validationErrors} `);
       setErrors(validationErrors);
       return;
     }
@@ -780,10 +774,7 @@ function InvitationAcceptPageContent() {
       }
 
       const completionResult = await completeResponse.json();
-      secureLog.log(
-        "[InvitationAccept] Profil finalisé avec succès:",
-        completionResult,
-      );
+      secureLog.log(`[InvitationAccept] Profil finalisé avec succès: ${completionResult} `);
 
       setStatus("success");
       setMessage(t("invitation.success.accountCreated"));

@@ -22,10 +22,7 @@ export const logoutService = {
         // Methode 1: Depuis le parametre user passe
         if (user?.language) {
           userLanguage = user.language;
-          secureLog.log(
-            "[LogoutService] Langue detectee depuis user:",
-            userLanguage,
-          );
+          secureLog.log(`[LogoutService] Langue detectee depuis user: ${userLanguage} `);
         }
         // Methode 2: Depuis le localStorage du store Zustand
         else {
@@ -33,10 +30,7 @@ export const logoutService = {
           if (zustandLang) {
             const parsed = JSON.parse(zustandLang);
             userLanguage = parsed?.state?.currentLanguage || "fr";
-            secureLog.log(
-              "[LogoutService] Langue detectee depuis localStorage:",
-              userLanguage,
-            );
+            secureLog.log(`[LogoutService] Langue detectee depuis localStorage: ${userLanguage} `);
           }
         }
       } catch (error) {
@@ -193,10 +187,7 @@ export const logoutService = {
       }
       secureLog.log("[LogoutService] Etape 7 terminee - Marqueurs logout");
 
-      secureLog.log(
-        "[LogoutService] Redirection vers page d'accueil, langue preservee:",
-        userLanguage,
-      );
+      secureLog.log(`[LogoutService] Redirection vers page d'accueil, langue preservee: ${userLanguage} `);
 
       // 8. Annuler le timeout global car tout s'est bien passe
       clearTimeout(forceRedirect);

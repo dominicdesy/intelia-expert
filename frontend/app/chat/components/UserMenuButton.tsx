@@ -245,12 +245,7 @@ export const UserMenuButton = React.memo(() => {
 
   const toggleOpen = useCallback(() => {
     if (!isMountedRef.current) return;
-    secureLog.log(
-      t("userMenu.debug.toggleOpen"),
-      isMountedRef.current,
-      t("userMenu.debug.currentIsOpen"),
-      isOpen,
-    );
+    secureLog.log(`t("userMenu.debug.toggleOpen") ${isMountedRef.current} ${t("userMenu.debug.currentIsOpen")} ${isOpen}`);
     setIsOpen((prev) => !prev);
   }, [isOpen, t]);
 

@@ -14,11 +14,7 @@ const useRobustAuth = () => {
   return useMemo(() => {
     // UNIQUEMENT le store unifié - plus de fallback
     if (user?.email && user?.user_type) {
-      secureLog.log(
-        "[useRobustAuth] Utilisateur trouvé dans le store unifié:",
-        user.email,
-        user.user_type,
-      );
+      secureLog.log(`[useRobustAuth] Utilisateur trouvé dans le store unifié: ${user.email} ${user.user_type} `);
       return user;
     }
 
@@ -302,17 +298,11 @@ export const StatisticsPage: React.FC = () => {
       setAuthStatus("unauthorized");
       setError("Vous devez être connecté pour accéder à cette page");
     } else if (currentUser.user_type !== "super_admin") {
-      secureLog.log(
-        "[StatisticsPage] Permissions insuffisantes:",
-        currentUser.user_type,
-      );
+      secureLog.log(`[StatisticsPage] Permissions insuffisantes: ${currentUser.user_type} `);
       setAuthStatus("forbidden");
       setError("Accès refusé - Permissions super_admin requises");
     } else {
-      secureLog.log(
-        "[StatisticsPage] Authentification réussie:",
-        currentUser.email,
-      );
+      secureLog.log(`[StatisticsPage] Authentification réussie: ${currentUser.email} `);
       setAuthStatus("ready");
       setError(null);
     }
@@ -340,10 +330,7 @@ export const StatisticsPage: React.FC = () => {
     ) {
       const pageKey = `${currentPage}-${questionsPerPage}`;
       if (!questionsLoadedRef.current.get(pageKey)) {
-        secureLog.log(
-          "[StatisticsPage] Lancement chargement des questions pour page:",
-          pageKey,
-        );
+        secureLog.log(`[StatisticsPage] Lancement chargement des questions pour page: ${pageKey} `);
         questionsLoadedRef.current.set(pageKey, true);
         loadQuestionLogs();
       }
@@ -369,12 +356,7 @@ export const StatisticsPage: React.FC = () => {
     newTab: "dashboard" | "questions" | "invitations" | "quality",
   ) => {
     if (newTab !== activeTab) {
-      secureLog.log(
-        "[StatisticsPage] Changement onglet:",
-        activeTab,
-        "->",
-        newTab,
-      );
+      secureLog.log(`[StatisticsPage] Changement onglet: ${activeTab} -> ${newTab} `);
 
       if (newTab === "questions") {
         questionsLoadedRef.current.clear();

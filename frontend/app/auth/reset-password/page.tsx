@@ -451,10 +451,7 @@ function ResetPasswordPageContent() {
     };
 
     const finalToken = extractTokenFromUrl();
-    secureLog.log(
-      "[ResetPassword] Token détecté:",
-      finalToken ? "Présent" : "Absent",
-    );
+    secureLog.log(`[ResetPassword] Token détecté: ${finalToken ? "Présent" : "Absent"} `);
 
     if (!finalToken) {
       setTokenValid(false);

@@ -179,10 +179,7 @@ async function processSSEStream(
             case "final":
               const finalEvent = event as FinalEvent;
               finalAnswer = finalEvent.answer || "";
-              secureLog.log(
-                "[aiStream] Réponse finale reçue, taille:",
-                finalAnswer.length,
-              );
+              secureLog.log(`[aiStream] Réponse finale reçue, taille: ${finalAnswer.length} `);
               break;
 
             case "error":
@@ -239,10 +236,7 @@ async function processSSEStream(
 
             case "proactive_followup":
               const followupEvent = event as ProactiveFollowupEvent;
-              secureLog.log(
-                "[aiStream] Suggestion proactive reçue:",
-                followupEvent.suggestion,
-              );
+              secureLog.log(`[aiStream] Suggestion proactive reçue: ${followupEvent.suggestion} `);
               // La suggestion pourrait être ajoutée au finalAnswer ou traitée séparément
               break;
 

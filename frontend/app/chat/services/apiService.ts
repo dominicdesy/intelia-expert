@@ -337,12 +337,7 @@ async function streamAIResponseInternal(
           switch (event.type) {
             case "agent_start":
               const agentStartEvent = event as AgentStartEvent;
-              secureLog.log(
-                "[apiService] Agent démarré:",
-                agentStartEvent.complexity,
-                "sous-requêtes:",
-                agentStartEvent.sub_queries_count,
-              );
+              secureLog.log(`[apiService] Agent démarré: ${agentStartEvent.complexity} sous-requêtes: ${agentStartEvent.sub_queries_count} `);
               agentMetadata.complexity = agentStartEvent.complexity || "simple";
               agentMetadata.sub_queries_count =
                 agentStartEvent.sub_queries_count || 0;
@@ -354,11 +349,7 @@ async function streamAIResponseInternal(
 
             case "agent_thinking":
               const agentThinkingEvent = event as AgentThinkingEvent;
-              secureLog.log(
-                "[apiService] Agent réflexion:",
-                agentThinkingEvent.decisions?.length || 0,
-                "décisions",
-              );
+              secureLog.log(`[apiService] Agent réflexion: ${agentThinkingEvent.decisions?.length || 0} décisions `);
               if (
                 agentThinkingEvent.decisions &&
                 Array.isArray(agentThinkingEvent.decisions)
@@ -385,11 +376,7 @@ async function streamAIResponseInternal(
 
             case "agent_progress":
               const agentProgressEvent = event as AgentProgressEvent;
-              secureLog.log(
-                "[apiService] Agent progression:",
-                agentProgressEvent.step,
-                agentProgressEvent.progress + "%",
-              );
+              secureLog.log(`[apiService] Agent progression: ${agentProgressEvent.step} ${agentProgressEvent.progress + "%"} `);
               callbacks?.onAgentProgress?.(
                 agentProgressEvent.step,
                 agentProgressEvent.progress,
@@ -398,12 +385,7 @@ async function streamAIResponseInternal(
 
             case "agent_end":
               const agentEndEvent = event as AgentEndEvent;
-              secureLog.log(
-                "[apiService] Agent terminé:",
-                agentEndEvent.synthesis_method,
-                "sources:",
-                agentEndEvent.sources_used,
-              );
+              secureLog.log(`[apiService] Agent terminé: ${agentEndEvent.synthesis_method} sources: ${agentEndEvent.sources_used} `);
               agentMetadata.synthesis_method =
                 agentEndEvent.synthesis_method || "direct";
               agentMetadata.sources_used = agentEndEvent.sources_used || 0;
@@ -456,10 +438,7 @@ async function streamAIResponseInternal(
             case "proactive_followup":
               const followupEvent = event as ProactiveFollowupEvent;
               if (followupEvent.suggestion) {
-                secureLog.log(
-                  "[apiService] Relance proactive reçue:",
-                  followupEvent.suggestion,
-                );
+                secureLog.log(`[apiService] Relance proactive reçue: ${followupEvent.suggestion} `);
                 callbacks?.onFollowup?.(followupEvent.suggestion);
               }
               break;
@@ -470,11 +449,7 @@ async function streamAIResponseInternal(
               throw new Error(errorEvent.message || "Erreur de streaming");
 
             default:
-              secureLog.log(
-                "[apiService] Événement SSE non géré:",
-                (event as any).type,
-                event,
-              );
+              secureLog.log(`[apiService] Événement SSE non géré: ${(event as any).type} ${event} `);
           }
         } catch (parseError) {
           // Ignore les lignes JSON malformées (chunks partiels)
@@ -567,10 +542,7 @@ export const generateAIResponse = async (
           profileData.organization_id ||
           `user_${user.id}`;
 
-        secureLog.log(
-          "[apiService] tenant_id extrait du backend:",
-          tenant_id,
-        );
+        secureLog.log(`[apiService] tenant_id extrait du backend: ${tenant_id} `);
       }
     } catch (error) {
       secureLog.error(
@@ -859,11 +831,7 @@ export const loadUserConversations = async (
     throw new Error("User ID requis");
   }
 
-  secureLog.log(
-    "[apiService] Chargement conversations (nouvelle architecture):",
-    userId,
-    "limit:", limit, // ← LIGNE MODIFIÉE: Ajout du log pour limit
-  );
+  secureLog.log(`[apiService] Chargement conversations (nouvelle architecture): ${userId} limit: ${limit} ${// ← LIGNE MODIFIÉE: Ajout du log pour limit}`);
 
   try {
     const headers = await getAuthHeaders();
@@ -897,14 +865,11 @@ export const loadUserConversations = async (
     }
 
     const data = await response.json();
-    secureLog.log(
-      "[apiService] Conversations chargées (nouvelle architecture):",
-      {
+    secureLog.log(`[apiService] Conversations chargées (nouvelle architecture): ${{
         total_count: data.total_count,
         conversations_count: data.conversations?.length || 0,
         source: data.source,
-      },
-    );
+      }} `);
 
     return data;
   } catch (error) {
@@ -986,10 +951,7 @@ export const deleteConversation = async (
     throw new Error("ID de conversation requis");
   }
 
-  secureLog.log(
-    "[apiService] Suppression conversation (nouvelle architecture):",
-    conversationId,
-  );
+  secureLog.log(`[apiService] Suppression conversation (nouvelle architecture): ${conversationId} `);
 
   try {
     const headers = await getAuthHeaders();
@@ -1019,10 +981,7 @@ export const deleteConversation = async (
     }
 
     const result = await response.json();
-    secureLog.log(
-      "[apiService] Conversation supprimée (nouvelle architecture):",
-      result.message || "Succès",
-    );
+    secureLog.log(`[apiService] Conversation supprimée (nouvelle architecture): ${result.message || "Succès"} `);
   } catch (error) {
     secureLog.error("[apiService] Erreur suppression conversation:", error);
     throw error;
@@ -1039,10 +998,7 @@ export const clearAllUserConversations = async (
     throw new Error("User ID requis");
   }
 
-  secureLog.log(
-    "[apiService] Suppression toutes conversations (nouvelle architecture):",
-    userId,
-  );
+  secureLog.log(`[apiService] Suppression toutes conversations (nouvelle architecture): ${userId} `);
 
   try {
     const headers = await getAuthHeaders();
@@ -1067,13 +1023,10 @@ export const clearAllUserConversations = async (
     }
 
     const result = await response.json();
-    secureLog.log(
-      "[apiService] Toutes conversations supprimées (nouvelle architecture):",
-      {
+    secureLog.log(`[apiService] Toutes conversations supprimées (nouvelle architecture): ${{
         message: result.message,
         deleted_count: result.deleted_count || 0,
-      },
-    );
+      }} `);
   } catch (error) {
     secureLog.error(
       "[apiService] Erreur suppression toutes conversations:",
@@ -1143,10 +1096,7 @@ export const checkAPIHealth = async (): Promise<boolean> => {
     });
 
     const isHealthy = response.ok;
-    secureLog.log(
-      "[apiService] API Health (nouvelle architecture):",
-      isHealthy ? "OK" : "KO",
-    );
+    secureLog.log(`[apiService] API Health (nouvelle architecture): ${isHealthy ? "OK" : "KO"} `);
 
     return isHealthy;
   } catch (error) {

@@ -301,10 +301,7 @@ export class ConversationService {
     conversationId: string,
   ): Promise<ConversationWithMessages | null> {
     try {
-      secureLog.log(
-        "[ConversationService] Chargement conversation complète:",
-        conversationId,
-      );
+      secureLog.log(`[ConversationService] Chargement conversation complète: ${conversationId} `);
 
       const response = await fetch(
         `${this.baseUrl}/conversations/${conversationId}`,
@@ -390,11 +387,7 @@ export class ConversationService {
       }
 
       const data = await response.json();
-      secureLog.log(
-        "[ConversationService] Historique chargé:",
-        data.total_count,
-        "conversations",
-      );
+      secureLog.log(`[ConversationService] Historique chargé: ${data.total_count} conversations `);
 
       return data;
     } catch (error) {
@@ -410,10 +403,7 @@ export class ConversationService {
     conversationId: string,
   ): Promise<ConversationDetailResponse> {
     try {
-      secureLog.log(
-        "[ConversationService] Chargement conversation:",
-        conversationId,
-      );
+      secureLog.log(`[ConversationService] Chargement conversation: ${conversationId} `);
 
       const response = await fetch(
         `${this.baseUrl}/v1/conversations/${conversationId}`,
@@ -428,11 +418,7 @@ export class ConversationService {
       }
 
       const data = await response.json();
-      secureLog.log(
-        "[ConversationService] Conversation chargée:",
-        data.conversation.message_count,
-        "messages",
-      );
+      secureLog.log(`[ConversationService] Conversation chargée: ${data.conversation.message_count} messages `);
 
       return data;
     } catch (error) {
@@ -505,10 +491,7 @@ export class ConversationService {
       return [];
     }
 
-    secureLog.log(
-      "[ConversationService] Récupération conversations pour:",
-      userId,
-    );
+    secureLog.log(`[ConversationService] Récupération conversations pour: ${userId} `);
     this.circuitBreaker.recordAttempt();
 
     try {
@@ -735,10 +718,7 @@ export class ConversationService {
         "recent_conversation_sessions",
         JSON.stringify(updated),
       );
-      secureLog.log(
-        "Session ID stocké pour historique:",
-        sessionId.substring(0, 8) + "...",
-      );
+      secureLog.log(`Session ID stocké pour historique: ${sessionId.substring(0, 8) + "..."} `);
     } catch (error) {
       secureLog.warn("Erreur stockage session ID:", error);
     }
@@ -774,10 +754,7 @@ export class ConversationService {
         if (response.ok) {
           const data = await response.json();
           secureLog.log(`ENDPOINT FONCTIONNEL: ${endpoint}`);
-          secureLog.log(
-            `Structure:`,
-            Array.isArray(data) ? `Array[${data.length}]` : Object.keys(data),
-          );
+          secureLog.log(`Structure: ${Array.isArray(data) ? `Array[${data.length}]` : Object.keys(data)} `);
           workingEndpoints.push(endpoint);
         }
       } catch (error) {
@@ -882,10 +859,7 @@ export class ConversationService {
    */
   async saveConversation(data: ConversationData): Promise<void> {
     if (!this.loggingEnabled) {
-      secureLog.log(
-        "Logging désactivé - conversation non sauvegardée:",
-        data.conversation_id,
-      );
+      secureLog.log(`Logging désactivé - conversation non sauvegardée: ${data.conversation_id} `);
       return;
     }
 
@@ -950,23 +924,13 @@ export class ConversationService {
     comment: string,
   ): Promise<void> {
     if (!this.loggingEnabled) {
-      secureLog.log(
-        "Logging désactivé - commentaire non envoyé:",
-        conversationId,
-      );
+      secureLog.log(`Logging désactivé - commentaire non envoyé: ${conversationId} `);
       return;
     }
 
     try {
-      secureLog.log(
-        "Envoi commentaire feedback:",
-        conversationId,
-        comment.substring(0, 50) + "...",
-      );
-      secureLog.log(
-        "URL commentaire:",
-        `${this.baseUrl}/conversations/${conversationId}/comment`,
-      );
+      secureLog.log(`Envoi commentaire feedback: ${conversationId} ${comment.substring(0, 50) + "..."} `);
+      secureLog.log(`URL commentaire: ${`${this.baseUrl}/conversations/${conversationId}/comment`} `);
 
       const response = await fetch(
         `${this.baseUrl}/conversations/${conversationId}/comment`,
@@ -1007,24 +971,13 @@ export class ConversationService {
     comment?: string,
   ): Promise<void> {
     if (!this.loggingEnabled) {
-      secureLog.log(
-        "Logging désactivé - feedback avec commentaire non envoyé:",
-        conversationId,
-      );
+      secureLog.log(`Logging désactivé - feedback avec commentaire non envoyé: ${conversationId} `);
       return;
     }
 
     try {
-      secureLog.log(
-        "Envoi feedback avec commentaire:",
-        conversationId,
-        feedback,
-        comment ? "avec commentaire" : "sans commentaire",
-      );
-      secureLog.log(
-        "URL feedback combiné:",
-        `${this.baseUrl}/conversations/${conversationId}/feedback-with-comment`,
-      );
+      secureLog.log(`Envoi feedback avec commentaire: ${conversationId} ${feedback} ${comment ? "avec commentaire" : "sans commentaire"} `);
+      secureLog.log(`URL feedback combiné: ${`${this.baseUrl}/conversations/${conversationId}/feedback-with-comment`} `);
 
       const response = await fetch(
         `${this.baseUrl}/conversations/${conversationId}/feedback-with-comment`,
@@ -1068,10 +1021,7 @@ export class ConversationService {
   // Invalidation du cache après suppression
   async deleteConversation(conversationId: string): Promise<void> {
     if (!this.loggingEnabled) {
-      secureLog.log(
-        "Logging désactivé - conversation non supprimée:",
-        conversationId,
-      );
+      secureLog.log(`Logging désactivé - conversation non supprimée: ${conversationId} `);
       return;
     }
 
@@ -1092,10 +1042,7 @@ export class ConversationService {
 
     try {
       secureLog.log("Suppression toutes conversations serveur pour:", userId);
-      secureLog.log(
-        "URL suppression globale:",
-        `${this.baseUrl}/conversations/user/${userId}`,
-      );
+      secureLog.log(`URL suppression globale: ${`${this.baseUrl}/conversations/user/${userId}`} `);
 
       const response = await fetch(
         `${this.baseUrl}/conversations/user/${userId}`,
@@ -1111,12 +1058,7 @@ export class ConversationService {
       }
 
       const result = await response.json();
-      secureLog.log(
-        "Toutes conversations supprimées du serveur:",
-        result.message,
-        "Count:",
-        result.deleted_count,
-      );
+      secureLog.log(`Toutes conversations supprimées du serveur: ${result.message} Count: ${result.deleted_count} `);
 
       // Invalidation du cache après suppression globale
       this.invalidateCache();

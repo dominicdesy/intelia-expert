@@ -235,10 +235,7 @@ const syncConversationGroups = (
   set: (fn: (state: ChatStoreState) => Partial<ChatStoreState>) => void,
 ) => {
   try {
-    secureLog.log(
-      "🔄 [ChatStore] Synchronisation sécurisée des groupes pour:",
-      conversation.id,
-    );
+    secureLog.log(`🔄 [ChatStore] Synchronisation sécurisée des groupes pour: ${conversation.id} `);
 
     const conversationForGroups: Conversation = {
       id: conversation.id,
@@ -358,10 +355,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       }
 
       const userConversations = conversationsData.conversations;
-      secureLog.log(
-        "✅ [ChatStore] Conversations récupérées:",
-        userConversations.length,
-      );
+      secureLog.log(`✅ [ChatStore] Conversations récupérées: ${userConversations.length} `);
 
       const formattedConversations: ConversationItem[] = userConversations.map(
         (conv) => {
@@ -665,12 +659,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
   // 🛡️ ADDMESSAGE SÉCURISÉ AVEC SYNCHRONISATION
   addMessage: (message: Message) => {
-    secureLog.log(
-      "💬 [ChatStore] Ajout message:",
-      message.id,
-      "User:",
-      message.isUser,
-    );
+    secureLog.log(`💬 [ChatStore] Ajout message: ${message.id} User: ${message.isUser} `);
 
     const state = get();
 
@@ -696,10 +685,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       };
 
       set({ currentConversation: tempConversation });
-      secureLog.log(
-        "🆕 [ChatStore] Conversation temporaire créée:",
-        tempConversation.id,
-      );
+      secureLog.log(`🆕 [ChatStore] Conversation temporaire créée: ${tempConversation.id} `);
       return;
     }
 
@@ -716,12 +702,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         state.currentConversation.id.startsWith("temp-"))
     ) {
       updatedId = message.conversation_id;
-      secureLog.log(
-        "🔄 [ChatStore] ID conversation mis à jour:",
-        state.currentConversation.id,
-        "→",
-        updatedId,
-      );
+      secureLog.log(`🔄 [ChatStore] ID conversation mis à jour: ${state.currentConversation.id} → ${updatedId} `);
     }
 
     const updatedConversation: ConversationWithMessages = {
@@ -750,12 +731,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       syncConversationGroups(updatedConversation, state, set);
     }
 
-    secureLog.log(
-      "✅ [ChatStore] Message ajouté - Total:",
-      updatedMessages.length,
-      "Conv ID:",
-      updatedConversation.id,
-    );
+    secureLog.log(`✅ [ChatStore] Message ajouté - Total: ${updatedMessages.length} Conv ID: ${updatedConversation.id} `);
   },
 
   updateMessage: (messageId: string, updates: Partial<Message>) => {
@@ -776,12 +752,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
        state.currentConversation.id.startsWith("temp-"))
     ) {
       effectiveId = updates.conversation_id;
-      secureLog.log(
-        "🔄 [ChatStore] ID conversation mis à jour via updateMessage:",
-        state.currentConversation.id,
-        "→",
-        effectiveId,
-      );
+      secureLog.log(`🔄 [ChatStore] ID conversation mis à jour via updateMessage: ${state.currentConversation.id} → ${effectiveId} `);
     }
 
     const updatedConversation: ConversationWithMessages = {
@@ -795,12 +766,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   setCurrentConversation: (conversation: ConversationWithMessages | null) => {
-    secureLog.log(
-      "🔄 [ChatStore] setCurrentConversation appelée:",
-      conversation?.id,
-      "Messages:",
-      conversation?.messages?.length || 0,
-    );
+    secureLog.log(`🔄 [ChatStore] setCurrentConversation appelée: ${conversation?.id} Messages: ${conversation?.messages?.length || 0} `);
     set({ currentConversation: conversation });
   },
 }));

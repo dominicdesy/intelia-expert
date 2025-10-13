@@ -22,10 +22,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           // ✅ CORRECTION : NE PAS forcer de langue, juste marquer comme prêt
           // Le hook useTranslation dans i18n.ts gère déjà la logique de langue
 
-          secureLog.log(
-            "[LanguageProvider] Synchronisation avec i18n, langue actuelle:",
-            currentLanguage,
-          );
+          secureLog.log(`[LanguageProvider] Synchronisation avec i18n, langue actuelle: ${currentLanguage} `);
 
           // Attendre que i18n.ts termine son initialisation
           setTimeout(() => {

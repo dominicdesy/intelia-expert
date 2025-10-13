@@ -65,10 +65,7 @@ const debugLog = (category: string, message: string, data?: any) => {
     countries: "🌍",
   };
 
-  secureLog.log(
-    `${emoji[category] || "📝"} [${category}] ${message}`,
-    data ? data : "",
-  );
+  secureLog.log(`${emoji[category] || "📝"} [${category}] ${message} ${data ? data : ""} `);
 };
 
 // Fonction de fetch avec support multilingue

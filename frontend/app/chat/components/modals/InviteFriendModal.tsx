@@ -80,10 +80,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
   const currentUser = useMemo(() => {
     // UNIQUEMENT le store unifié - plus de fallback
     if (user?.email) {
-      secureLog.log(
-        "[InviteFriendModal] Utilisateur trouvé dans le store unifié:",
-        user.email,
-      );
+      secureLog.log(`[InviteFriendModal] Utilisateur trouvé dans le store unifié: ${user.email} `);
       return {
         email: user.email,
         name: user.name || user.firstName || user.email.split("@")[0],
@@ -183,10 +180,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
         force_send: false,
       };
 
-      secureLog.log(
-        "🚀 [InviteFriendModal] Appel API avec store unifié:",
-        payload,
-      );
+      secureLog.log(`🚀 [InviteFriendModal] Appel API avec store unifié: ${payload} `);
 
       // ✅ UTILISE APILIENT.POSTSECURE() - plus d'appels directs
       const response = await apiClient.postSecure<InvitationResponse>(
@@ -204,10 +198,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
         throw new Error(t('invite.sendError'));
       }
 
-      secureLog.log(
-        "✅ [InviteFriendModal] Résultat reçu avec store unifié:",
-        response.data,
-      );
+      secureLog.log(`✅ [InviteFriendModal] Résultat reçu avec store unifié: ${response.data} `);
       setResults(response.data);
     } catch (error) {
       secureLog.error("❌ [InviteFriendModal] Erreur envoi:", error);
