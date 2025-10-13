@@ -101,6 +101,7 @@ Pour chaque tableau trouvé, retourne un objet JSON avec cette structure EXACTE:
 {
   "tables": [
     {
+      "table_number": "numéro du tableau si indiqué (ex: 'Table 1', 'Table 2', '1', '2', etc.), null sinon",
       "table_title": "titre exact du tableau (ex: 'C500 Broiler Performance Objectives (Metric) - Female')",
       "table_type": "type de tableau (ex: 'performance', 'nutrition', 'amino_acids', 'yield', 'other')",
       "description": "description du contenu du tableau",
@@ -125,6 +126,7 @@ IMPORTANT:
 - Extrait TOUTES les lignes de données, pas seulement un échantillon
 - Préserve l'ordre exact des colonnes
 - Inclus les en-têtes avec leurs unités
+- Si un numéro de table est visible (ex: "Table 1", "Table 2"), capture-le dans "table_number"
 - Si une page contient plusieurs tableaux, retourne-les tous dans le tableau "tables"
 - Si aucun tableau n'est trouvé, retourne: {"tables": []}
 - Retourne UNIQUEMENT le JSON, sans texte avant ou après"""
@@ -132,7 +134,7 @@ IMPORTANT:
         try:
             # Appel à Claude Vision API
             message = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",  # Model with vision
+                model="claude-3-5-sonnet-20250318",  # Latest model with vision
                 max_tokens=4096,
                 messages=[
                     {
@@ -212,9 +214,89 @@ IMPORTANT:
 
         print(f"\n{'='*60}")
         print(f"[OK] Total: {len(all_tables)} tableau(x) extrait(s)")
+
+        # Fusionner les tables multi-pages
+        all_tables = self._merge_multi_page_tables(all_tables)
+        print(f"[OK] Après fusion multi-pages: {len(all_tables)} tableau(x)")
         print(f"{'='*60}")
 
         return all_tables
+
+    def _merge_multi_page_tables(self, tables: List[Dict]) -> List[Dict]:
+        """
+        Fusionne automatiquement les tables qui s'étendent sur plusieurs pages.
+        Utilise table_number pour identifier les tables à fusionner.
+        """
+        if not tables:
+            return tables
+
+        # Grouper les tables par table_number
+        table_groups = {}
+        tables_without_number = []
+
+        for table in tables:
+            table_num = table.get('table_number')
+
+            if not table_num or table_num == '' or table_num is None:
+                # Pas de numéro, garder tel quel
+                tables_without_number.append(table)
+            else:
+                # Nettoyer le numéro (enlever "Table " si présent)
+                clean_num = str(table_num).replace('Table', '').replace('table', '').strip()
+
+                if clean_num not in table_groups:
+                    table_groups[clean_num] = []
+                table_groups[clean_num].append(table)
+
+        # Fusionner les tables du même groupe
+        merged_tables = []
+
+        for table_num, group in table_groups.items():
+            if len(group) == 1:
+                # Une seule page, pas de fusion nécessaire
+                merged_tables.append(group[0])
+            else:
+                # Multiple pages - fusionner
+                print(f"  [Fusion] Table {table_num}: {len(group)} pages détectées")
+                merged_table = self._merge_table_group(group)
+                merged_tables.append(merged_table)
+
+        # Ajouter les tables sans numéro
+        merged_tables.extend(tables_without_number)
+
+        # Trier par page source
+        merged_tables.sort(key=lambda t: t.get('page', 0))
+
+        return merged_tables
+
+    def _merge_table_group(self, tables: List[Dict]) -> Dict:
+        """
+        Fusionne un groupe de tables (même table sur plusieurs pages)
+        """
+        if not tables:
+            return {}
+
+        # Trier par page
+        tables = sorted(tables, key=lambda t: t.get('page', 0))
+
+        # Prendre les métadonnées de la première page
+        merged = tables[0].copy()
+
+        # Fusionner les données
+        all_data = []
+        for table in tables:
+            data = table.get('data', [])
+            all_data.extend(data)
+
+        merged['data'] = all_data
+
+        # Ajouter une note sur les pages sources
+        pages = [t.get('page') for t in tables if t.get('page')]
+        if len(pages) > 1:
+            merged['source_pages'] = f"{min(pages)}-{max(pages)}"
+            merged['page_count'] = len(pages)
+
+        return merged
 
     def save_to_excel(self, tables: List[Dict], output_path: str):
         """Sauvegarde tous les tableaux dans un fichier Excel avec métadonnées"""
@@ -252,30 +334,42 @@ IMPORTANT:
         # Extraire des infos du titre ou métadonnées
         title = table.get('table_title', '')
         table_type = table.get('table_type', 'table')
+        table_number = table.get('table_number', '')
         metadata = table.get('metadata', {})
+
+        # Nettoyer le numéro de table
+        clean_table_num = str(table_number).replace('Table', '').replace('table', '').strip() if table_number else ''
 
         # Construire un nom basé sur le type et les métadonnées
         parts = []
 
+        # Si on a un numéro de table, le préfixer
+        if clean_table_num:
+            parts.append(f'T{clean_table_num}')
+
         if 'performance' in title.lower() or table_type == 'performance':
             sex = metadata.get('sex', 'mixed')
             unit_system = metadata.get('unit_system', 'metric')
-            parts = [sex, unit_system]
+            parts.extend([sex, unit_system])
         elif 'nutrition' in title.lower() or 'nutrient' in title.lower():
             if 'small' in title.lower():
-                parts = ['nutrient', 'small']
+                parts.extend(['nutrient', 'small'])
             else:
-                parts = ['nutrient', 'med_large']
+                parts.extend(['nutrient', 'med_large'])
         elif 'amino' in title.lower():
             if 'small' in title.lower():
-                parts = ['amino', 'small']
+                parts.extend(['amino', 'small'])
             else:
-                parts = ['amino', 'med_large']
+                parts.extend(['amino', 'med_large'])
         elif 'yield' in title.lower():
             sex = metadata.get('sex', 'mixed')
-            parts = ['yield', sex, 'metric']
+            parts.extend(['yield', sex, 'metric'])
         else:
-            parts = [table_type, str(index + 1)]
+            # Si pas de numéro, utiliser l'index
+            if not clean_table_num:
+                parts = [table_type, str(index + 1)]
+            else:
+                parts.append(table_type)
 
         sheet_name = '_'.join(parts)
 
@@ -284,12 +378,20 @@ IMPORTANT:
 
     def _prepare_metadata(self, table: Dict) -> Dict:
         """Prépare les métadonnées pour le fichier Excel"""
-        metadata = {
-            'source_page': table.get('page', ''),
-            'table_title': table.get('table_title', ''),
-            'table_type': table.get('table_type', ''),
-            'description': table.get('description', ''),
-        }
+        metadata = {}
+
+        # Pages sources (peut être une seule page ou une plage)
+        if 'source_pages' in table:
+            metadata['source_pages'] = table['source_pages']
+            metadata['page_count'] = table.get('page_count', 1)
+        else:
+            metadata['source_page'] = table.get('page', '')
+
+        # Informations de table
+        metadata['table_number'] = table.get('table_number', '')
+        metadata['table_title'] = table.get('table_title', '')
+        metadata['table_type'] = table.get('table_type', '')
+        metadata['description'] = table.get('description', '')
 
         # Ajouter les métadonnées spécifiques du tableau
         table_metadata = table.get('metadata', {})
