@@ -35,6 +35,25 @@ Analyses techniques et audits de qualité.
 - [Faithfulness Root Cause](./analysis/FAITHFULNESS_ROOT_CAUSE.md) - Analyse de la fidélité des réponses
 - [Chunking Strategy](./analysis/CHUNKING_STRATEGY_ANALYSIS.md) - Analyse de la stratégie de chunking
 
+### 🔒 [Security](./security/)
+Rapports d'audit de sécurité et analyses de vulnérabilités.
+
+**Security Audits:**
+- [Security Analysis Report](./security/SECURITY_ANALYSIS_REPORT.md) - Analyse complète de sécurité
+- [Security Audit Report](./security/SECURITY_AUDIT_REPORT.md) - Audit de sécurité détaillé
+- [Security Final Summary](./security/SECURITY_FINAL_SUMMARY.md) - Résumé final de sécurité
+- [Security Tools Analysis](./security/SECURITY_TOOLS_ANALYSIS.md) - Analyse des outils de sécurité
+
+**SQL Security:**
+- [SQL Injection Audit Report](./security/SQL_INJECTION_AUDIT_REPORT.md) - Audit SQL injection
+- [Medium Issues Analysis](./security/MEDIUM_ISSUES_ANALYSIS.md) - Analyse des problèmes MEDIUM (Bandit)
+
+### 🔧 [Backend](./backend/)
+Documentation spécifique au backend.
+
+- [GDPR Compliance Report](./backend/GDPR_COMPLIANCE_REPORT.md) - Conformité RGPD
+- [QA Quality Tool README](./backend/QA_QUALITY_TOOL_README.md) - Outil d'analyse qualité QA
+
 ### ⚙️ [Configuration](./configuration/)
 Guides de configuration du système.
 
@@ -94,6 +113,30 @@ Guides utilisateur et documentation technique complète.
 - [Ensemble Integration Example](./guides/ENSEMBLE_INTEGRATION_EXAMPLE.md) - Exemple intégration ensemble
 - [ZEP Impact Analysis](./guides/ZEP_IMPACT_ANALYSIS.md) - Analyse impact ZEP
 
+### 🚀 [Deployment](./deployment/)
+Guides de déploiement et checklists de mise en production.
+
+- [Deployment Production Guide](./deployment/DEPLOYMENT_PRODUCTION_GUIDE.md) - Guide de déploiement en production
+- [Deploy Checklist](./deployment/DEPLOY_CHECKLIST.md) - Checklist de déploiement
+- [Cron Setup Instructions](./deployment/CRON_SETUP_INSTRUCTIONS.md) - Instructions configuration CRON
+
+### ⚡ [Operations](./operations/)
+Documentation opérationnelle, diagnostics et configuration.
+
+- [Diagnostic Statistiques Beta](./operations/DIAGNOSTIC_STATISTIQUES_BETA.md) - Diagnostic stats beta
+- [Solution Stats Beta Resume](./operations/SOLUTION_STATS_BETA_RESUME.md) - Résumé solution stats
+- [Multilingual Email Setup](./operations/MULTILINGUAL_EMAIL_SETUP.md) - Configuration emails multilingues
+
+### 📜 [Migration](./migration/)
+Archives de migration et historique de changements importants.
+
+- [Migration Guide](./migration/MIGRATION_GUIDE.md) - Guide de migration
+- [Migration Completed](./migration/MIGRATION_COMPLETED.md) - Migration complétée
+- [Migration Summary Final](./migration/MIGRATION_SUMMARY_FINAL.md) - Résumé final de migration
+- [Ready to Migrate](./migration/READY_TO_MIGRATE.md) - Prêt à migrer
+- [Execute Now](./migration/EXECUTE_NOW.md) - Exécution migration
+- [Q&A Page Fix](./migration/Q&A_PAGE_FIX.md) - Correction page Q&A
+
 ### 📦 [Archive](./archive/)
 Documentation historique et fichiers obsolètes.
 
@@ -110,6 +153,16 @@ Documentation historique et fichiers obsolètes.
 1. [RAG LLM Integration](./guides/RAG_LLM_INTEGRATION.md) - Intégrer le RAG
 2. [Hybrid Extraction Deployment](./guides/HYBRID_EXTRACTION_DEPLOYMENT.md) - Déployer l'extraction
 3. [CI/CD Setup](./guides/CI_CD_SETUP.md) - Configurer CI/CD
+
+### Pour déployer
+1. [Deployment Production Guide](./deployment/DEPLOYMENT_PRODUCTION_GUIDE.md) - Déployer en production
+2. [Deploy Checklist](./deployment/DEPLOY_CHECKLIST.md) - Checklist pré-déploiement
+3. [Cron Setup Instructions](./deployment/CRON_SETUP_INSTRUCTIONS.md) - Configurer les tâches CRON
+
+### Pour la sécurité
+1. [Security Final Summary](./security/SECURITY_FINAL_SUMMARY.md) - Vue d'ensemble sécurité
+2. [SQL Injection Audit Report](./security/SQL_INJECTION_AUDIT_REPORT.md) - Audit SQL
+3. [GDPR Compliance Report](./backend/GDPR_COMPLIANCE_REPORT.md) - Conformité RGPD
 
 ### Pour optimiser
 1. [Phase 1 Optimization](./reports/PHASE_1_OPTIMIZATION_REPORT.md) - Voir les optimisations
@@ -142,9 +195,14 @@ intelia-expert/
 ├── docs/                    # 📚 Toute la documentation (vous êtes ici)
 │   ├── reports/            # Rapports d'implémentation et optimisation
 │   ├── analysis/           # Analyses techniques et audits
+│   ├── security/           # 🔒 Rapports de sécurité et audits
+│   ├── backend/            # Documentation backend (GDPR, QA)
 │   ├── configuration/      # Guides de configuration
-│   ├── guides/            # Guides utilisateur et documentation
-│   └── archive/           # Documentation historique
+│   ├── guides/             # Guides utilisateur et documentation
+│   ├── deployment/         # 🚀 Guides de déploiement
+│   ├── operations/         # ⚡ Documentation opérationnelle
+│   ├── migration/          # 📜 Archives de migration
+│   └── archive/            # Documentation historique
 ├── llm/                    # 🧠 Module LLM principal
 │   ├── scripts/           # Scripts utilitaires
 │   │   ├── analysis/      # Scripts d'analyse de code
@@ -185,8 +243,13 @@ Pour ajouter de la documentation:
 1. **Choisir le bon dossier:**
    - `reports/` → Rapports d'implémentation/optimisation
    - `analysis/` → Analyses techniques/audits
+   - `security/` → Rapports d'audit de sécurité
+   - `backend/` → Documentation backend (GDPR, QA)
    - `configuration/` → Guides de configuration
    - `guides/` → Documentation utilisateur
+   - `deployment/` → Guides de déploiement
+   - `operations/` → Documentation opérationnelle
+   - `migration/` → Archives de migration
    - `archive/` → Documentation obsolète
 
 2. **Suivre les conventions** de nommage ci-dessus
