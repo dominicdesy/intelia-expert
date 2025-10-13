@@ -283,7 +283,7 @@ export function useTestConnection(tenant_id: string, lang: string = "fr") {
 
     try {
       const result = await stream.send("Test");
-      secureLog.log("[useChatStream] Test réussi:", result.length, "caractères");
+      secureLog.log(`[useChatStream] Test réussi: ${result.length} caractères`);
       return true;
     } catch (error) {
       secureLog.error("[useChatStream] Test échoué:", error);
@@ -324,11 +324,7 @@ export const chatStreamDebug = {
         { tenant_id, lang, message: "Test" },
         () => {}, // callback vide
       );
-      secureLog.log(
-        "[useChatStream] Test simple réussi:",
-        result.length,
-        "caractères",
-      );
+      secureLog.log(`[useChatStream] Test simple réussi: ${result.length} caractères`);
       return true;
     } catch (error) {
       secureLog.error("[useChatStream] Test simple échoué:", error);
