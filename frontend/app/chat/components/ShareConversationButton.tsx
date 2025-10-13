@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Share2, Copy, Check, X, Clock, Eye, Trash2 } from "lucide-react";
+import { useTranslation } from "@/lib/languages/i18n";
 
 interface ShareConversationButtonProps {
   conversationId: string;
@@ -21,6 +22,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
   conversationId,
   onShareCreated,
 }) => {
+  const { t } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [shareData, setShareData] = useState<ShareData | null>(null);
@@ -73,7 +75,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Erreur lors de la création du partage");
+        throw new Error(errorData.detail || t("share.error"));
       }
 
       const data = await response.json();
@@ -119,10 +121,10 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
       <button
         onClick={() => setIsModalOpen(true)}
         className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-        title="Partager cette conversation"
+        title={t("share.modalTitle")}
       >
         <Share2 size={16} />
-        <span>Partager</span>
+        <span>{t("share.button")}</span>
       </button>
 
       {/* Modal de partage */}
@@ -132,7 +134,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">
-                Partager la conversation
+                {t("share.modalTitle")}
               </h3>
               <button
                 onClick={handleClose}
@@ -164,10 +166,10 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
                       />
                       <div>
                         <div className="font-medium text-gray-900">
-                          Anonymiser mes données
+                          {t("share.anonymize")}
                         </div>
                         <div className="text-sm text-gray-600">
-                          Masque votre nom et informations personnelles
+                          {t("share.anonymizeHelp")}
                         </div>
                       </div>
                     </label>
@@ -175,7 +177,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
                     {/* Option expiration */}
                     <div>
                       <label className="block font-medium text-gray-900 mb-2">
-                        Expiration du lien
+                        {t("share.expiration")}
                       </label>
                       <select
                         value={expiresInDays === null ? "never" : expiresInDays}
@@ -186,10 +188,10 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
-                        <option value="7">7 jours</option>
-                        <option value="30">30 jours</option>
-                        <option value="90">90 jours</option>
-                        <option value="never">Jamais</option>
+                        <option value="7">{t("share.expiration.7days")}</option>
+                        <option value="30">{t("share.expiration.30days")}</option>
+                        <option value="90">{t("share.expiration.90days")}</option>
+                        <option value="never">{t("share.expiration.never")}</option>
                       </select>
                     </div>
                   </div>
@@ -199,7 +201,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
                     disabled={isLoading}
                     className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                   >
-                    {isLoading ? "Génération du lien..." : "Générer le lien de partage"}
+                    {isLoading ? t("share.generating") : t("share.generate")}
                   </button>
                 </div>
               ) : (
@@ -208,18 +210,15 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
                   <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center gap-2 text-green-700 font-medium mb-2">
                       <Check size={18} />
-                      <span>Lien de partage créé!</span>
+                      <span>{t("share.successTitle")}</span>
                     </div>
                     <div className="text-sm text-green-600">
-                      Partagez ce lien avec vos collègues
+                      {t("share.successMessage")}
                     </div>
                   </div>
 
                   {/* Lien */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Lien de partage
-                    </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -230,17 +229,17 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
                       <button
                         onClick={handleCopyLink}
                         className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-2"
-                        title="Copier le lien"
+                        title={t("share.copy")}
                       >
                         {copied ? (
                           <>
                             <Check size={16} className="text-green-600" />
-                            <span className="text-sm">Copié!</span>
+                            <span className="text-sm">{t("share.copied")}</span>
                           </>
                         ) : (
                           <>
                             <Copy size={16} />
-                            <span className="text-sm">Copier</span>
+                            <span className="text-sm">{t("share.copy")}</span>
                           </>
                         )}
                       </button>
@@ -270,7 +269,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
                     onClick={handleClose}
                     className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                   >
-                    Fermer
+                    {t("modal.close")}
                   </button>
                 </div>
               )}

@@ -599,5 +599,23 @@
   "country.switzerland": "Swiss",
   "country.mexico": "Meksiko",
   "country.brazil": "Brasil",
-  "country.indonesia": "Indonesia"
+  "country.indonesia": "Indonesia",
+
+  "share.button": "Bagikan",
+  "share.modalTitle": "Bagikan percakapan",
+  "share.anonymize": "Anonimkan data saya",
+  "share.anonymizeHelp": "Sembunyikan informasi pribadi dalam pesan yang dibagikan",
+  "share.expiration": "Kedaluwarsa tautan",
+  "share.expirationHelp": "Tautan akan dinonaktifkan secara otomatis setelah periode ini",
+  "share.expiration.7days": "7 hari",
+  "share.expiration.30days": "30 hari",
+  "share.expiration.90days": "90 hari",
+  "share.expiration.never": "Tidak pernah",
+  "share.generating": "Membuat...",
+  "share.generate": "Buat tautan berbagi",
+  "share.successTitle": "Tautan berbagi dibuat!",
+  "share.successMessage": "Tautan telah berhasil dibuat. Bagikan dengan kolega atau kolaborator Anda.",
+  "share.copy": "Salin",
+  "share.copied": "Disalin!",
+  "share.error": "Kesalahan membuat tautan berbagi"
 }

@@ -598,5 +598,23 @@
   "country.belgium": "België",
   "country.switzerland": "Zwitserland",
   "country.mexico": "Mexico",
-  "country.brazil": "Brazilië"
+  "country.brazil": "Brazilië",
+
+  "share.button": "Delen",
+  "share.modalTitle": "Gesprek delen",
+  "share.anonymize": "Mijn gegevens anonimiseren",
+  "share.anonymizeHelp": "Verberg persoonlijke informatie in gedeelde berichten",
+  "share.expiration": "Link vervaldatum",
+  "share.expirationHelp": "De link wordt automatisch gedeactiveerd na deze periode",
+  "share.expiration.7days": "7 dagen",
+  "share.expiration.30days": "30 dagen",
+  "share.expiration.90days": "90 dagen",
+  "share.expiration.never": "Nooit",
+  "share.generating": "Genereren...",
+  "share.generate": "Deel-link genereren",
+  "share.successTitle": "Deel-link aangemaakt!",
+  "share.successMessage": "De link is succesvol aangemaakt. Deel het met uw collega's of medewerkers.",
+  "share.copy": "Kopiëren",
+  "share.copied": "Gekopieerd!",
+  "share.error": "Fout bij aanmaken deel-link"
 }

@@ -598,5 +598,23 @@
   "country.belgium": "เบลเยียม",
   "country.switzerland": "สวิตเซอร์แลนด์",
   "country.mexico": "เม็กซิโก",
-  "country.brazil": "บราซิล"
+  "country.brazil": "บราซิล",
+
+  "share.button": "แชร์",
+  "share.modalTitle": "แชร์การสนทนา",
+  "share.anonymize": "ทำให้ข้อมูลของฉันเป็นนิรนาม",
+  "share.anonymizeHelp": "ซ่อนข้อมูลส่วนบุคคลในข้อความที่แชร์",
+  "share.expiration": "การหมดอายุของลิงก์",
+  "share.expirationHelp": "ลิงก์จะถูกปิดใช้งานโดยอัตโนมัติหลังจากช่วงเวลานี้",
+  "share.expiration.7days": "7 วัน",
+  "share.expiration.30days": "30 วัน",
+  "share.expiration.90days": "90 วัน",
+  "share.expiration.never": "ไม่มีวันหมดอายุ",
+  "share.generating": "กำลังสร้าง...",
+  "share.generate": "สร้างลิงก์แชร์",
+  "share.successTitle": "สร้างลิงก์แชร์แล้ว!",
+  "share.successMessage": "ลิงก์ถูกสร้างสำเร็จแล้ว แชร์กับเพื่อนร่วมงานหรือผู้ร่วมงานของคุณ",
+  "share.copy": "คัดลอก",
+  "share.copied": "คัดลอกแล้ว!",
+  "share.error": "เกิดข้อผิดพลาดในการสร้างลิงก์แชร์"
   }

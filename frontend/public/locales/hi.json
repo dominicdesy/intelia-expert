@@ -598,5 +598,23 @@
   "country.belgium": "बेल्जियम",
   "country.switzerland": "स्विट्जरलैंड",
   "country.mexico": "मेक्सिको",
-  "country.brazil": "ब्राजील"
+  "country.brazil": "ब्राजील",
+
+  "share.button": "साझा करें",
+  "share.modalTitle": "बातचीत साझा करें",
+  "share.anonymize": "मेरे डेटा को गुमनाम करें",
+  "share.anonymizeHelp": "साझा संदेशों में व्यक्तिगत जानकारी छिपाएं",
+  "share.expiration": "लिंक समाप्ति",
+  "share.expirationHelp": "लिंक इस अवधि के बाद स्वचालित रूप से निष्क्रिय हो जाएगा",
+  "share.expiration.7days": "7 दिन",
+  "share.expiration.30days": "30 दिन",
+  "share.expiration.90days": "90 दिन",
+  "share.expiration.never": "कभी नहीं",
+  "share.generating": "बनाया जा रहा है...",
+  "share.generate": "साझा लिंक बनाएं",
+  "share.successTitle": "साझा लिंक बनाया गया!",
+  "share.successMessage": "लिंक सफलतापूर्वक बनाया गया है। इसे अपने सहयोगियों या सहकर्मियों के साथ साझा करें।",
+  "share.copy": "कॉपी करें",
+  "share.copied": "कॉपी हो गया!",
+  "share.error": "साझा लिंक बनाने में त्रुटि"
 }

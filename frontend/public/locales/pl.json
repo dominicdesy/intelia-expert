@@ -598,5 +598,23 @@
   "country.belgium": "Belgia",
   "country.switzerland": "Szwajcaria",
   "country.mexico": "Meksyk",
-  "country.brazil": "Brazylia"
+  "country.brazil": "Brazylia",
+
+  "share.button": "Udostępnij",
+  "share.modalTitle": "Udostępnij rozmowę",
+  "share.anonymize": "Anonimizuj moje dane",
+  "share.anonymizeHelp": "Ukryj informacje osobiste w udostępnionych wiadomościach",
+  "share.expiration": "Wygaśnięcie linku",
+  "share.expirationHelp": "Link zostanie automatycznie wyłączony po tym okresie",
+  "share.expiration.7days": "7 dni",
+  "share.expiration.30days": "30 dni",
+  "share.expiration.90days": "90 dni",
+  "share.expiration.never": "Nigdy",
+  "share.generating": "Generowanie...",
+  "share.generate": "Wygeneruj link do udostępnienia",
+  "share.successTitle": "Link do udostępnienia utworzony!",
+  "share.successMessage": "Link został pomyślnie utworzony. Udostępnij go swoim kolegom lub współpracownikom.",
+  "share.copy": "Kopiuj",
+  "share.copied": "Skopiowano!",
+  "share.error": "Błąd tworzenia linku"
 }

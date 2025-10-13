@@ -598,5 +598,23 @@
   "country.belgium": "比利时",
   "country.switzerland": "瑞士",
   "country.mexico": "墨西哥",
-  "country.brazil": "巴西"
+  "country.brazil": "巴西",
+
+  "share.button": "分享",
+  "share.modalTitle": "分享对话",
+  "share.anonymize": "匿名化我的数据",
+  "share.anonymizeHelp": "隐藏共享消息中的个人信息",
+  "share.expiration": "链接过期",
+  "share.expirationHelp": "链接将在此期限后自动停用",
+  "share.expiration.7days": "7天",
+  "share.expiration.30days": "30天",
+  "share.expiration.90days": "90天",
+  "share.expiration.never": "永不过期",
+  "share.generating": "生成中...",
+  "share.generate": "生成分享链接",
+  "share.successTitle": "分享链接已创建！",
+  "share.successMessage": "链接已成功创建。与您的同事或合作者分享它。",
+  "share.copy": "复制",
+  "share.copied": "已复制！",
+  "share.error": "创建分享链接时出错"
   }

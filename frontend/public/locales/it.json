@@ -600,5 +600,23 @@
   "country.switzerland": "Svizzera",
   "country.mexico": "Messico",
   "country.brazil": "Brasile",
-  "country.italy": "Italia"
+  "country.italy": "Italia",
+
+  "share.button": "Condividi",
+  "share.modalTitle": "Condividi conversazione",
+  "share.anonymize": "Anonimizza i miei dati",
+  "share.anonymizeHelp": "Nascondi informazioni personali nei messaggi condivisi",
+  "share.expiration": "Scadenza del link",
+  "share.expirationHelp": "Il link verrà automaticamente disattivato dopo questo periodo",
+  "share.expiration.7days": "7 giorni",
+  "share.expiration.30days": "30 giorni",
+  "share.expiration.90days": "90 giorni",
+  "share.expiration.never": "Mai",
+  "share.generating": "Generazione in corso...",
+  "share.generate": "Genera link di condivisione",
+  "share.successTitle": "Link di condivisione creato!",
+  "share.successMessage": "Il link è stato creato con successo. Condividilo con i tuoi colleghi o collaboratori.",
+  "share.copy": "Copia",
+  "share.copied": "Copiato!",
+  "share.error": "Errore nella creazione del link"
 }
