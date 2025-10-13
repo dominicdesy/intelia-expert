@@ -831,7 +831,8 @@ export const loadUserConversations = async (
     throw new Error("User ID requis");
   }
 
-  secureLog.log(`[apiService] Chargement conversations (nouvelle architecture): ${userId} limit: ${limit} ${// ← LIGNE MODIFIÉE: Ajout du log pour limit}`);
+  // ← LIGNE MODIFIÉE: Ajout du log pour limit
+  secureLog.log(`[apiService] Chargement conversations (nouvelle architecture): ${userId}, limit: ${limit}`);
 
   try {
     const headers = await getAuthHeaders();
