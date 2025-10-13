@@ -88,7 +88,7 @@ const useCountries = () => {
         }
 
         const data = await response.json();
-        secureLog.log("[Countries] Données reçues:", data.length, "pays");
+        secureLog.log(`[Countries] Données reçues: ${data.length} pays`);
 
         const formattedCountries = data
           .map((country: any) => {
