@@ -194,19 +194,14 @@ async function processSSEStream(
             case "agent_start":
               const agentStartEvent = event as AgentStartEvent;
               secureLog.log(
-                "[aiStream] Agent démarré:",
-                agentStartEvent.complexity,
-                "sous-requêtes:",
-                agentStartEvent.sub_queries_count,
+                `[aiStream] Agent démarré: ${agentStartEvent.complexity}, sous-requêtes: ${agentStartEvent.sub_queries_count}`
               );
               break;
 
             case "agent_thinking":
               const agentThinkingEvent = event as AgentThinkingEvent;
               secureLog.log(
-                "[aiStream] Agent réfléchit:",
-                agentThinkingEvent.decisions?.length || 0,
-                "décisions",
+                `[aiStream] Agent réfléchit: ${agentThinkingEvent.decisions?.length || 0} décisions`
               );
               break;
 
@@ -217,10 +212,7 @@ async function processSSEStream(
                 onDelta(chunkEvent.content);
                 deltaCount++;
                 secureLog.log(
-                  "[aiStream] Chunk reçu:",
-                  chunkEvent.content.length,
-                  "chars, confidence:",
-                  chunkEvent.confidence,
+                  `[aiStream] Chunk reçu: ${chunkEvent.content.length} chars, confidence: ${chunkEvent.confidence}`
                 );
               }
               break;
@@ -228,19 +220,14 @@ async function processSSEStream(
             case "agent_progress":
               const agentProgressEvent = event as AgentProgressEvent;
               secureLog.log(
-                "[aiStream] Progression Agent:",
-                agentProgressEvent.step,
-                agentProgressEvent.progress + "%",
+                `[aiStream] Progression Agent: ${agentProgressEvent.step}, ${agentProgressEvent.progress}%`
               );
               break;
 
             case "agent_end":
               const agentEndEvent = event as AgentEndEvent;
               secureLog.log(
-                "[aiStream] Agent terminé:",
-                agentEndEvent.synthesis_method,
-                "sources utilisées:",
-                agentEndEvent.sources_used,
+                `[aiStream] Agent terminé: ${agentEndEvent.synthesis_method}, sources utilisées: ${agentEndEvent.sources_used}`
               );
               break;
 
