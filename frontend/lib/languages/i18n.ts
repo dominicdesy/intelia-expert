@@ -745,11 +745,6 @@ export interface TranslationKeys {
   "about.licensesUsed": string;
   "about.downloadFull": string;
   "about.downloadDescription": string;
-  "about.technologyStack": string;
-  "about.frontend": string;
-  "about.backend": string;
-  "about.aiml": string;
-  "about.infrastructure": string;
   "about.versionInfo": string;
   "about.version": string;
   "about.lastUpdated": string;

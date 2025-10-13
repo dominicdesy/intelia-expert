@@ -1,11 +1,9 @@
 {
   "page.title": "Connexion à Intelia Expert",
-
   "app.description": "Votre expert spécialisé en aviculture",
   "auth.continueWith": "Continuer avec",
   "auth.noAccountYet": "Pas encore de compte ?",
   "auth.oauthError": "Erreur de connexion OAuth. Vérifiez votre connexion",
-
   "resetPassword.title": "Nouveau mot de passe",
   "resetPassword.description": "Choisissez un nouveau mot de passe sécurisé pour votre compte Intelia Expert",
   "resetPassword.newPassword": "Nouveau mot de passe",
@@ -17,42 +15,33 @@
   "resetPassword.contactSupport": "Contactez le support",
   "resetPassword.validatingLink": "Validation du lien en cours...",
   "resetPassword.securityInfo": "Votre nouveau mot de passe suit les standards de sécurité modernes. Plus accessible et tout aussi sécurisé.",
-
   "resetPassword.validation.maxLength": "Maximum 128 caractères autorisés",
   "resetPassword.validation.letterRequired": "Au moins une lettre requise",
   "resetPassword.validation.tooCommon": "Mot de passe trop commun",
   "resetPassword.validation.tooRepetitive": "Trop de caractères identiques consécutifs",
   "resetPassword.validation.avoidSequences": "Évitez les séquences de caractères",
-
   "resetPassword.requirements.hasLetter": "Au moins une lettre",
   "resetPassword.requirements.noRepetition": "Pas de répétitions excessives",
   "resetPassword.requirements.reasonableLength": "Longueur raisonnable",
-
   "resetPassword.strength.weak": "Faible",
   "resetPassword.strength.medium": "Moyen",
   "resetPassword.strength.good": "Bon",
   "resetPassword.strength.excellent": "Excellent",
-
   "resetPassword.passwordStrength": "Force du mot de passe",
   "resetPassword.tips": "Conseils",
-
   "resetPassword.tip.longerPassword": "Utilisez 12+ caractères pour plus de sécurité",
   "resetPassword.tip.mixCase": "Mélangez majuscules et minuscules",
   "resetPassword.tip.specialChars": "Les caractères spéciaux renforcent la sécurité (optionnel)",
-
   "resetPassword.success.description": "Votre mot de passe a été mis à jour avec succès. Vous allez être redirigé vers expert.intelia.com dans quelques secondes.",
   "resetPassword.success.goToSite": "Aller à expert.intelia.com maintenant",
-
   "resetPassword.invalidToken.title": "Lien expiré ou invalide",
   "resetPassword.invalidToken.description": "Ce lien de réinitialisation n'est plus valide. Il a peut-être expiré ou déjà été utilisé.",
   "resetPassword.invalidToken.requestNew": "Demander un nouveau lien",
   "resetPassword.invalidToken.backToSite": "Retour à expert.intelia.com",
-
   "resetPassword.errors.tokenExpired": "Token expiré ou invalide. Demandez un nouveau lien de réinitialisation.",
   "resetPassword.errors.tooManyAttempts": "Trop de tentatives. Veuillez réessayer dans quelques minutes.",
   "resetPassword.errors.connectionProblem": "Problème de connexion. Vérifiez votre connexion internet.",
   "resetPassword.errors.generic": "Erreur lors de la réinitialisation du mot de passe",
-
   "auth.success": "Connexion réussie",
   "auth.error": "Erreur de connexion",
   "auth.incomplete": "Connexion incomplète",
@@ -61,7 +50,6 @@
   "auth.forgotPassword": "Mot de passe oublié ?",
   "auth.newToIntelia": "Nouveau sur Intelia Expert ?",
   "auth.createAccount": "Créer un compte",
-
   "error.serverError": "Erreur serveur",
   "error.unexpectedResponse": "Réponse inattendue du serveur",
   "error.checkConnection": "Vérifiez votre connexion",
@@ -70,17 +58,15 @@
   "auth.invalidCredentials": "Courriel ou mot de passe incorrect",
   "auth.emailNotConfirmed": "Courriel non confirmé. Vérifiez votre boîte de courriel",
   "auth.passwordRequirementsNotMet": "Le mot de passe ne respecte pas les critères requis",
-
   "placeholder.createSecurePassword": "Créez un mot de passe sécurisé",
   "placeholder.confirmNewPassword": "Confirmez votre nouveau mot de passe",
   "validation.password.minLength": "Au moins 8 caractères",
   "validation.password.uppercase": "Au moins une majuscule",
-  "validation.password.lowercase": "Au moins une minuscule", 
+  "validation.password.lowercase": "Au moins une minuscule",
   "validation.password.number": "Au moins un chiffre",
   "validation.password.special": "Au moins un caractère spécial",
   "nav.conversationSidebar": "Sidebar des conversations",
   "nav.closeSidebar": "Fermer la sidebar",
-
   "common.or": "ou",
   "common.optional": "optionnel",
   "common.appName": "Intelia Expert",
@@ -100,7 +86,6 @@
   "common.reset": "Réinitialiser",
   "common.apply": "Appliquer",
   "common.update": "Mettre à jour",
-
   "countries.fallbackWarning": "Liste de pays limitée (service externe temporairement indisponible)",
   "countries.searchPlaceholder": "Rechercher un pays...",
   "countries.listLabel": "Liste des pays",
@@ -108,19 +93,16 @@
   "countries.noResults": "Aucun pays trouvé",
   "countries.limitedList": "Liste de pays limitée (service externe temporairement indisponible)",
   "countries.loading": "Chargement des pays...",
-
   "success.authSynchronized": "Store auth synchronisé avec les nouvelles données",
   "success.profileUpdated": "Profil mis à jour avec succès !",
   "success.passwordChanged": "Mot de passe changé avec succès !",
   "success.languageUpdated": "Langue mise à jour",
-
   "language.current": "Langue actuelle",
   "language.debug.changing": "[LanguageModal] Changement langue:",
   "language.debug.interfaceUpdated": "[LanguageModal] Interface mise à jour",
   "language.debug.localStorageSaved": "[LanguageModal] localStorage sauvegardé:",
   "language.debug.modalClosed": "[LanguageModal] Modal fermée",
   "language.debug.changeError": "[LanguageModal] Erreur changement langue:",
-
   "invite.authRetrievalError": "Erreur récupération auth depuis storage:",
   "invite.loginRequired": "Vous devez être connecté pour envoyer des invitations",
   "invite.loginRequiredTitle": "Connexion requise",
@@ -136,7 +118,6 @@
   "invite.sessionExpiredDetail": "Votre session a expiré, reconnectez-vous pour continuer",
   "invite.retryOrContact": "Veuillez réessayer ou contacter le support si le problème persiste.",
   "invite.validationError": "Erreur de validation",
-
   "invite.title": "Invitez vos collègues à découvrir Intelia Expert",
   "invite.subtitle": "Partagez la puissance d'Intelia Expert avec votre équipe",
   "invite.sendStatus": "État de l'envoi",
@@ -153,7 +134,6 @@
   "invite.sending": "Envoi en cours...",
   "invite.send": "Envoyer",
   "invite.footerInfo": "Les invitations sont envoyées depuis support@intelia.com avec votre nom comme expéditeur.\nVos contacts recevront un lien pour créer leur compte Intelia Expert gratuitement.",
-
   "invite.invitationSent": "Invitation envoyée avec succès",
   "invite.userExists": "possède déjà un compte Intelia Expert",
   "invite.userExistsWithDate": "possède déjà un compte Intelia Expert",
@@ -166,7 +146,6 @@
   "invite.sendButton": "Envoyer l'invitation",
   "invite.sentSuccess": "Invitation envoyée avec succès !",
   "invite.error": "Erreur lors de l'envoi de l'invitation",
-
   "feedback.sendError": "Erreur envoi feedback:",
   "feedback.positiveTitle": "Merci pour votre feedback positif !",
   "feedback.negativeTitle": "Aidez-nous à améliorer",
@@ -179,7 +158,6 @@
   "feedback.learnMore": "En savoir plus",
   "feedback.sending": "Envoi...",
   "feedback.send": "Envoyer",
-
   "phone.limitedList": "Liste de codes téléphoniques limitée (service externe temporairement indisponible)",
   "phone.countryCode": "Code pays",
   "phone.loading": "Chargement...",
@@ -194,11 +172,9 @@
   "phone.phoneNumberHelp": "Votre numéro de téléphone principal",
   "phone.validation.countryRequired": "Code pays requis",
   "phone.validation.numberRequired": "Numéro requis",
-
   "subscription.free": "Gratuit",
   "subscription.premium.price": "29€ / mois",
   "subscription.featuresIncluded": "Fonctionnalités incluses",
-
   "userMenu.openMenu": "Ouvrir le menu utilisateur",
   "userMenu.superAdmin": "Super Admin",
   "userMenu.debug.unmounting": "[DEBUG-UserMenu] Composant en cours de démontage",
@@ -207,9 +183,7 @@
   "userMenu.debug.logoutServiceError": "[UserMenu] Erreur logout service:",
   "userMenu.debug.toggleOpen": "[DEBUG-UserMenu] toggleOpen - isMounted:",
   "userMenu.debug.currentIsOpen": "current isOpen:",
-
   "nav.statistics": "Statistiques",
-
   "chat.clarificationPlaceholder": "Répondez à la question ci-dessus...",
   "chat.clarificationInstruction": "Répondez simplement dans le chat avec les informations demandées.",
   "chat.clarificationMode": "Mode clarification : répondez à la question ci-dessus",
@@ -220,20 +194,17 @@
   "chat.scrollToBottom": "Revenir en bas de la conversation",
   "chat.newConversation": "Nouvelle conversation",
   "chat.startQuestion": "Commencez par poser une question",
-
   "history.toggleClicked": "[HistoryMenu] Toggle cliqué, isOpen:",
   "history.userPresent": "utilisateur:",
   "history.loadingConversationsFor": "[HistoryMenu] Chargement conversations pour:",
   "history.conversationsLoaded": "[HistoryMenu] Conversations chargées avec succès",
   "history.loadingError": "[HistoryMenu] Erreur chargement conversations:",
   "history.renderState": "[HistoryMenu] État du rendu:",
-
   "history.groups.today": "Aujourd'hui",
   "history.groups.yesterday": "Hier",
   "history.groups.thisWeek": "Cette semaine",
   "history.groups.thisMonth": "Ce mois-ci",
   "history.groups.older": "Plus ancien",
-
   "history.confirmClearAll": "Supprimer toutes les conversations ?",
   "history.loadingConversations": "Chargement des conversations...",
   "history.retrievingHistory": "Récupération de votre historique",
@@ -243,7 +214,6 @@
   "history.refresh": "Actualiser",
   "history.messageCount": "msg",
   "history.deleteConversation": "Supprimer cette conversation",
-
   "chat.redirectingLogin": "Redirection vers login:",
   "chat.sessionExpired": "Session expirée",
   "chat.authInitError": "Erreur initialisation auth:",
@@ -260,19 +230,16 @@
   "chat.feedbackSendError": "Erreur envoi feedback:",
   "chat.feedbackGeneralError": "Erreur générale feedback:",
   "chat.redirectingInProgress": "Redirection en cours...",
-
   "gdpr.notice": "En vous connectant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
   "legal.terms": "Conditions d'utilisation",
   "legal.privacy": "Politique de confidentialité",
   "login.email": "Adresse courriel",
   "login.password": "Mot de passe",
-
   "login.rememberMe": "Souvenir de moi",
   "login.emailLabel": "Adresse courriel",
   "login.passwordLabel": "Mot de passe",
   "login.emailPlaceholder": "votre@courriel.com",
   "login.passwordPlaceholder": "Votre mot de passe",
-
   "verification.title": "Vérification courriel",
   "verification.subtitle": "Intelia Expert - Assistant IA spécialisé",
   "verification.verifying": "Vérification en cours...",
@@ -287,13 +254,11 @@
   "verification.supportQuestion": "Problème avec la vérification ?",
   "verification.supportSubject": "Problème vérification courriel",
   "verification.contactSupport": "Contactez le support",
-
   "verification.success.title": "Courriel vérifié avec succès !",
   "verification.success.emailConfirmed": "Votre adresse courriel a été confirmée",
   "verification.success.confirmed": "Votre adresse courriel a été confirmée.",
   "verification.success.canLogin": "Vous pouvez maintenant vous connecter à votre compte Intelia Expert.",
   "verification.success.verified": "Courriel vérifié avec succès !",
-
   "verification.error.title": "Erreur de vérification",
   "verification.error.possibleCauses": "Causes possibles :",
   "verification.error.expired": "Le lien a expiré (plus de 24h)",
@@ -304,7 +269,6 @@
   "verification.error.alreadyVerified": "Cette adresse courriel est déjà vérifiée.",
   "verification.error.generic": "Erreur lors de la vérification du courriel.",
   "verification.error.network": "Problème de connexion. Vérifiez votre connexion internet.",
-
   "verification.pending.title": "Vérification courriel en attente",
   "verification.pending.emailSentTo": "Un courriel de confirmation a été envoyé",
   "verification.pending.emailSent": "Un courriel de confirmation vous a été envoyé",
@@ -313,7 +277,6 @@
   "verification.pending.step1": "Consultez votre courriel",
   "verification.pending.step2": "Cliquez sur le lien de confirmation",
   "verification.pending.step3": "Revenez vous connecter",
-
   "nav.history": "Historique des conversations",
   "nav.newConversation": "Nouvelle conversation",
   "nav.profile": "Profil",
@@ -327,7 +290,6 @@
   "nav.inviteFriend": "Inviter un ami",
   "nav.account": "Compte",
   "nav.settings": "Paramètres",
-
   "forgotPassword.title": "Mot de passe oublié",
   "forgotPassword.description": "Entrez votre adresse courriel et nous vous enverrons un lien pour réinitialiser votre mot de passe",
   "forgotPassword.emailLabel": "Adresse courriel",
@@ -349,7 +311,6 @@
   "forgotPassword.tooManyAttempts": "Trop de tentatives. Veuillez réessayer dans quelques minutes",
   "forgotPassword.connectionError": "Problème de connexion. Vérifiez votre connexion internet",
   "forgotPassword.genericError": "Erreur lors de l'envoi du courriel de réinitialisation",
-
   "invitation.validating": "Validation de votre invitation...",
   "invitation.processing": "Traitement en cours...",
   "invitation.completeProfile": "Complétez votre profil",
@@ -366,7 +327,6 @@
   "invitation.createAccount": "Créer mon compte",
   "invitation.needHelp": "Besoin d'aide ? Contactez-nous à ",
   "invitation.loadingInvitation": "Chargement de l'invitation...",
-
   "invitation.status.tokenValidated": "Token d'invitation validé",
   "invitation.status.tokenError": "Erreur de validation du token",
   "invitation.status.accountCreated": "Compte créé avec succès",
@@ -374,7 +334,6 @@
   "invitation.status.processing": "Traitement en cours",
   "invitation.redirecting.dashboard": "Redirection vers votre tableau de bord...",
   "invitation.redirecting.login": "Redirection vers la page de connexion...",
-
   "invitation.errors.missingToken": "Token d'accès manquant dans l'URL",
   "invitation.errors.tokenValidation": "Erreur de validation du token",
   "invitation.errors.noInvitation": "Aucune invitation trouvée dans cette URL",
@@ -383,11 +342,9 @@
   "invitation.errors.missingAccessToken": "Token d'accès manquant",
   "invitation.errors.profileCompletion": "Erreur lors de la finalisation du profil",
   "invitation.errors.accountCompletion": "Erreur lors de la finalisation du compte",
-
   "invitation.success.tokenValidated": "Token d'invitation validé",
   "invitation.success.accountCreated": "Compte créé avec succès !",
   "invitation.success.welcome": "Bienvenue ! Votre compte Intelia Expert a été créé avec succès.",
-
   "validation.required.firstName": "Le prénom est requis",
   "validation.required.lastName": "Le nom de famille est requis",
   "validation.required.fullName": "Le nom complet est requis",
@@ -398,27 +355,21 @@
   "validation.required.accessToken": "Token d'accès requis",
   "validation.correctErrors": "Veuillez corriger les erreurs suivantes :",
   "validation.invalidData": "Données invalides",
-  
   "validation.password.requirements": "Exigences du mot de passe",
   "validation.password.match": "Les mots de passe correspondent",
   "validation.password.mismatch": "Les mots de passe ne correspondent pas",
-  
   "validation.phone.incomplete": "Téléphone incomplet: veuillez remplir les champs manquants",
   "validation.phone.invalid": "Format de téléphone invalide",
-
   "placeholder.firstName": "Prénom",
   "placeholder.lastName": "Nom de famille",
   "placeholder.jobTitle": "Votre titre de poste",
   "placeholder.email": "votre@courriel.com",
-
   "profile.security": "Sécurité",
   "profile.countryCode": "Indicatif pays",
   "profile.areaCode": "Indicatif régional",
   "profile.phoneNumber": "Numéro de téléphone",
   "profile.jobTitle": "Titre du poste",
-
   "contact.supportEmail": "support@intelia.com",
-  
   "chat.welcome": "Bienvenue sur Intelia Expert",
   "chat.placeholder": "Bonjour ! Comment puis-je vous aider aujourd'hui ?",
   "chat.helpfulResponse": "Réponse utile",
@@ -430,14 +381,12 @@
   "chat.disclaimer": "Intelia Expert peut faire des erreurs. Faites vérifier les réponses par un professionnel au besoin.",
   "chat.send": "Envoyer",
   "chat.askQuestion": "Posez votre question à l'expert...",
-  
   "modal.close": "Fermer",
   "modal.cancel": "Annuler",
   "modal.save": "Sauvegarder",
   "modal.back": "Retour",
   "modal.loading": "Sauvegarde...",
   "modal.updating": "Mise à jour en cours...",
-  
   "profile.title": "Profil",
   "profile.personalInfo": "Informations personnelles",
   "profile.professionalInfo": "Informations Professionnelles",
@@ -467,7 +416,6 @@
   "profile.passwordChanged": "Mot de passe changé avec succès !",
   "profile.profileUpdated": "Profil mis à jour avec succès !",
   "profile.optional": "(optionnel)",
-  
   "language.title": "Langue",
   "language.description": "Sélectionnez votre langue préférée pour l'interface Intelia Expert",
   "language.updating": "Mise à jour en cours...",
@@ -476,7 +424,6 @@
   "language.reloadForWidget": "Pour que le widget de chat soit également dans la nouvelle langue, un rechargement de page est recommandé.",
   "language.reloadNow": "Recharger maintenant",
   "language.continueWithoutReload": "Continuer sans recharger",
-  
   "subscription.title": "Abonnement",
   "subscription.currentPlan": "Plan",
   "subscription.modify": "Modifier l'abonnement",
@@ -486,7 +433,6 @@
   "subscription.cancellation": "Annulation",
   "subscription.cancel": "Annuler",
   "subscription.confirmCancel": "Êtes-vous sûr de vouloir annuler votre abonnement ? Vous perdrez l'accès aux fonctionnalités premium.",
-  
   "contact.title": "Nous joindre",
   "contact.phone": "Nous appeler",
   "contact.phoneDescription": "Si vous ne trouvez pas de solution, appelez-nous pour parler directement avec notre équipe.",
@@ -498,14 +444,11 @@
   "contact.message": "Message",
   "contact.sendMessage": "Envoyer le message",
   "contact.messageSent": "Message envoyé avec succès !",
-  
   "date.today": "Aujourd'hui",
   "date.format": "fr-FR",
-  
   "plan.essential": "Essentiel",
   "plan.pro": "Pro",
   "plan.max": "Max",
-  
   "error.generic": "Une erreur est survenue",
   "error.connection": "Erreur de connexion",
   "error.updateProfile": "Erreur lors de la mise à jour du profil",
@@ -529,7 +472,6 @@
   "error.passwordServerError": "Erreur de connexion au serveur. Veuillez réessayer.",
   "error.userNotConnected": "Utilisateur non connecté",
   "error.validationErrors": "Erreurs de validation",
-  
   "form.required": "Champ requis",
   "form.phoneFormat": "Format",
   "form.passwordMinLength": "Au moins 8 caractères",
@@ -538,7 +480,6 @@
   "form.passwordNumber": "Au moins un chiffre",
   "form.passwordSpecial": "Au moins un caractère spécial",
   "form.passwordMismatch": "Les mots de passe ne correspondent pas",
-  
   "ui.menu": "Menu",
   "ui.close": "Fermer",
   "ui.open": "Ouvrir",
@@ -546,25 +487,21 @@
   "ui.collapse": "Réduire",
   "ui.previous": "Précédent",
   "ui.next": "Suivant",
-  
   "dialog.confirm": "Confirmer",
   "dialog.cancel": "Annuler",
   "dialog.ok": "OK",
   "dialog.yes": "Oui",
   "dialog.no": "Non",
-  
   "status.online": "En ligne",
   "status.offline": "Hors ligne",
   "status.connecting": "Connexion...",
   "status.connected": "Connecté",
   "status.disconnected": "Déconnecté",
-  
   "account.settings": "Paramètres du compte",
   "account.preferences": "Préférences",
   "account.security": "Sécurité",
   "account.privacy": "Confidentialité",
   "account.notifications": "Notifications",
-  
   "history.clear": "Effacer l'historique",
   "history.delete": "Supprimer",
   "history.export": "Exporter",
@@ -572,13 +509,11 @@
   "history.filter": "Filtrer l'historique",
   "history.noResults": "Aucun résultat trouvé",
   "history.confirmClear": "Êtes-vous sûr de vouloir effacer tout l'historique ?",
-  
   "user.menu": "Menu utilisateur",
   "user.profile": "Mon profil",
   "user.settings": "Paramètres",
   "user.logout": "Se déconnecter",
   "user.account": "Mon compte",
-  
   "placeholder.linkedinPersonal": "https://linkedin.com/in/votre-profil",
   "placeholder.companyName": "Nom de votre entreprise ou exploitation",
   "placeholder.companyWebsite": "https://www.votre-entreprise.com",
@@ -587,12 +522,10 @@
   "placeholder.currentPassword": "Tapez votre mot de passe actuel",
   "placeholder.newPassword": "Tapez votre nouveau mot de passe",
   "placeholder.confirmPassword": "Confirmez votre nouveau mot de passe",
-  
   "gdpr.deleteAccount": "Supprimer mon compte",
   "gdpr.exportData": "Exporter mes données",
   "gdpr.confirmDelete": "Êtes-vous sûr de vouloir supprimer définitivement votre compte ? Cette action est irréversible.",
   "gdpr.contactSupport": "Pour supprimer définitivement votre compte, veuillez contacter support@intelia.com",
-  
   "country.canada": "Canada",
   "country.usa": "États-Unis",
   "country.france": "France",
@@ -600,7 +533,6 @@
   "country.switzerland": "Suisse",
   "country.mexico": "Mexique",
   "country.brazil": "Brésil",
-
   "share.button": "Partager",
   "share.modalTitle": "Partager la conversation",
   "share.anonymize": "Anonymiser mes données",
@@ -618,7 +550,6 @@
   "share.copy": "Copier",
   "share.copied": "Copié!",
   "share.error": "Erreur création partage",
-
   "about.pageTitle": "À propos d'Intelia Expert",
   "about.introduction": "Intelia Expert est une plateforme alimentée par l'IA conçue pour fournir une assistance intelligente et des connaissances d'experts dans divers domaines. Construite avec une technologie de pointe, nous nous efforçons de fournir des réponses précises, fiables et utiles à vos questions.",
   "about.companyInformation": "Informations sur l'entreprise",
@@ -632,11 +563,6 @@
   "about.licensesUsed": "Les licences suivantes sont utilisées dans ce projet :",
   "about.downloadFull": "Télécharger les avis de tiers complets",
   "about.downloadDescription": "Le document complet des avis de tiers contient des informations détaillées sur tous les composants logiciels, leurs licences et les détenteurs de droits d'auteur.",
-  "about.technologyStack": "Stack technologique",
-  "about.frontend": "Frontend",
-  "about.backend": "Backend",
-  "about.aiml": "IA/ML",
-  "about.infrastructure": "Infrastructure",
   "about.versionInfo": "Informations sur la version",
   "about.version": "Version",
   "about.lastUpdated": "Dernière mise à jour",

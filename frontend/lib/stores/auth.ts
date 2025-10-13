@@ -8,6 +8,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { apiClient } from "@/lib/api/client";
 import type { User as AppUser } from "@/types";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Interface pour les données utilisateur du backend
 interface BackendUserData {
@@ -110,7 +111,7 @@ export const useAuthStore = create<AuthState>()(
 
       handleAuthError: (error: any, ctx?: string) => {
         const msg = (error?.message || "Authentication error").toString();
-        console.error("[AuthStore]", ctx || "", error);
+        secureLog.error(`[AuthStore] ${ctx || "Error"}`, error);
         set((s) => ({ authErrors: [...s.authErrors, msg] }));
       },
 
@@ -122,27 +123,27 @@ export const useAuthStore = create<AuthState>()(
       startSessionTracking: () => {
         // Éviter de créer plusieurs intervals
         if (get().heartbeatInterval) return;
-        
+
         const now = new Date();
-        console.log("[AuthStore] Session tracking démarré:", now.toISOString());
-        
+        secureLog.log("[AuthStore] Session tracking started");
+
         // Créer un interval unique qui gère heartbeat ET refresh
         const interval = setInterval(async () => {
           if (!get().isAuthenticated) {
             get().endSessionTracking();
             return;
           }
-          
+
           try {
             // 1. Heartbeat
             await apiClient.postSecure('/auth/heartbeat');
-            
+
             // 2. Rafraîchir le token (renouvelle automatiquement les 60 min)
             await get().refreshTokenIfNeeded();
-            
+
             set({ lastHeartbeat: Date.now() });
           } catch (error) {
-            console.error('[SessionTracking] Erreur heartbeat:', error);
+            secureLog.error('[SessionTracking] Heartbeat error', error);
           }
         }, 30000); // Toutes les 30 secondes
         
@@ -170,8 +171,8 @@ export const useAuthStore = create<AuthState>()(
             heartbeatInterval: null,
           });
 
-          console.log(
-            `[AuthStore] Session terminée - durée: ${Math.round(duration)}s`,
+          secureLog.log(
+            `[AuthStore] Session ended - duration: ${Math.round(duration)}s`,
           );
 
           try {
@@ -179,10 +180,10 @@ export const useAuthStore = create<AuthState>()(
               reason: "manual",
             });
             if (response.success) {
-              console.log("[AuthStore] Logout tracking envoyé au backend");
+              secureLog.log("[AuthStore] Logout tracking sent to backend");
             }
           } catch (error) {
-            console.warn("[AuthStore] Erreur logout tracking:", error);
+            secureLog.warn("[AuthStore] Logout tracking error", error);
           }
         }
       },
@@ -190,30 +191,30 @@ export const useAuthStore = create<AuthState>()(
       sendHeartbeat: async () => {
         // Cette fonction est maintenant gérée par startSessionTracking
         // On la garde pour compatibilité mais elle ne fait plus rien
-        console.log("[AuthStore] sendHeartbeat appelé (géré par interval automatique)");
+        secureLog.log("[AuthStore] sendHeartbeat called (managed by automatic interval)");
       },
 
       // NOUVELLE FONCTION: REFRESH AUTOMATIQUE DU TOKEN
       refreshTokenIfNeeded: async () => {
         const authData = localStorage.getItem('intelia-expert-auth');
         if (!authData) return;
-        
+
         try {
           const parsed = JSON.parse(authData);
           const expiresAt = new Date(parsed.expires_at || 0).getTime();
           const now = Date.now();
           const tenMinutes = 10 * 60 * 1000;
-          
+
           // Si le token expire dans moins de 10 minutes, le rafraîchir
           if (expiresAt - now < tenMinutes) {
-            console.log('[AuthStore] Token proche expiration, rafraîchissement...');
-            
-            const response = await apiClient.postSecure<{ 
-              access_token: string; 
+            secureLog.log('[AuthStore] Token near expiration, refreshing...');
+
+            const response = await apiClient.postSecure<{
+              access_token: string;
               expires_at: string;
               token_type: string;
             }>('/auth/refresh-token');
-            
+
             if (response.success && response.data) {
               const newAuthData = {
                 access_token: response.data.access_token,
@@ -221,19 +222,19 @@ export const useAuthStore = create<AuthState>()(
                 expires_at: response.data.expires_at,
                 synced_at: Date.now(),
               };
-              
+
               localStorage.setItem('intelia-expert-auth', JSON.stringify(newAuthData));
-              console.log('[AuthStore] Token rafraîchi avec succès');
+              secureLog.log('[AuthStore] Token refreshed successfully');
             }
           }
         } catch (error) {
-          console.error('[AuthStore] Erreur rafraîchissement token:', error);
+          secureLog.error('[AuthStore] Token refresh error', error);
         }
       },
 
       // INITIALIZE SESSION - Méthode modifiée
       initializeSession: async () => {
-        console.log("[AuthStore] Initialisation de session...");
+        secureLog.log("[AuthStore] Session initialization...");
 
         try {
           // NOUVEAU: Vérifier d'abord s'il y a un token OAuth dans l'URL
@@ -260,12 +261,12 @@ export const useAuthStore = create<AuthState>()(
               isAuthenticated: false,
               lastAuthCheck: Date.now(),
             });
-            console.log(
-              "[AuthStore] Aucun token trouvé - session non initialisée",
+            secureLog.log(
+              "[AuthStore] No token found - session not initialized",
             );
           }
         } catch (error) {
-          console.error("[AuthStore] Erreur initialisation session:", error);
+          secureLog.error("[AuthStore] Session initialization error", error);
           get().handleAuthError(error, "initializeSession");
 
           // En cas d'erreur, reset l'état
@@ -280,7 +281,7 @@ export const useAuthStore = create<AuthState>()(
       // CHECK AUTH : Utilise /auth/me
       checkAuth: async () => {
         try {
-          console.log("[AuthStore] Vérification auth via /auth/me");
+          secureLog.log("[AuthStore] Checking auth via /auth/me");
 
           // NOUVEAU: Rafraîchir le token si nécessaire avant de vérifier l'auth
           await get().refreshTokenIfNeeded();
@@ -330,17 +331,17 @@ export const useAuthStore = create<AuthState>()(
               authErrors: [],
             });
 
-            console.log("[AuthStore] Auth réussie:", appUser.email);
+            secureLog.log("[AuthStore] Auth successful");
           } else {
             set({
               user: null,
               isAuthenticated: false,
               lastAuthCheck: Date.now(),
             });
-            console.log("[AuthStore] Non authentifié");
+            secureLog.log("[AuthStore] Not authenticated");
           }
         } catch (e: any) {
-          console.error("[AuthStore] Erreur checkAuth:", e);
+          secureLog.error("[AuthStore] checkAuth error", e);
           set({
             user: null,
             isAuthenticated: false,
@@ -352,7 +353,7 @@ export const useAuthStore = create<AuthState>()(
       // LOGIN : Utilise /auth/login avec gestion d'erreurs améliorée + session tracking
       login: async (email: string, password: string) => {
         set({ isLoading: true, authErrors: [] });
-        console.log("[AuthStore] Login via /auth/login:", email);
+        secureLog.log("[AuthStore] Login attempt");
 
         try {
           const response = await apiClient.post<{
@@ -393,9 +394,9 @@ export const useAuthStore = create<AuthState>()(
             window.dispatchEvent(new Event("auth-state-changed"));
           }, 100);
 
-          console.log("[AuthStore] Login réussi");
+          secureLog.log("[AuthStore] Login successful");
         } catch (e: any) {
-          console.error("[AuthStore] Erreur login complète:", e);
+          secureLog.error("[AuthStore] Login error", e);
           get().handleAuthError(e, "login");
 
           // GESTION D'ERREURS AMÉLIORÉE
@@ -404,7 +405,7 @@ export const useAuthStore = create<AuthState>()(
           // Analyser le code de statut HTTP
           if (e?.status || e?.response?.status) {
             const statusCode = e.status || e.response?.status;
-            console.log("[AuthStore] Code de statut HTTP:", statusCode);
+            secureLog.log("[AuthStore] HTTP status code", { statusCode });
 
             switch (statusCode) {
               case 400:
@@ -440,7 +441,7 @@ export const useAuthStore = create<AuthState>()(
           // Analyser le message d'erreur
           else if (e?.message) {
             const errorMsg = e.message.toLowerCase();
-            console.log("[AuthStore] Message d'erreur:", errorMsg);
+            secureLog.log("[AuthStore] Error message type identified");
 
             if (
               errorMsg.includes("invalid login credentials") ||
@@ -493,7 +494,7 @@ export const useAuthStore = create<AuthState>()(
             userMessage = "Pas de connexion internet";
           }
 
-          console.log("[AuthStore] Message d'erreur final:", userMessage);
+          secureLog.log("[AuthStore] User-friendly error message prepared");
 
           set({ isLoading: false });
           throw new Error(userMessage);
@@ -503,8 +504,8 @@ export const useAuthStore = create<AuthState>()(
       // LOGIN WITH OAUTH : REDIRECTION DIRECTE VERS SUPABASE
       loginWithOAuth: async (provider: "linkedin" | "facebook") => {
         set({ isOAuthLoading: provider, authErrors: [] });
-        console.log(
-          `[AuthStore] OAuth login initié pour ${provider} - redirection directe vers Supabase`,
+        secureLog.log(
+          `[AuthStore] OAuth login initiated for ${provider}`,
         );
 
         try {
@@ -517,12 +518,12 @@ export const useAuthStore = create<AuthState>()(
           );
           const oauthUrl = `${supabaseUrl}/auth/v1/authorize?provider=${providerName}&redirect_to=${redirectTo}`;
 
-          console.log(`[AuthStore] Redirection vers Supabase OAuth:`, oauthUrl);
+          secureLog.log(`[AuthStore] Redirecting to Supabase OAuth`);
 
           // Redirection directe vers Supabase - pas d'appel backend intermédiaire
           window.location.href = oauthUrl;
         } catch (e: any) {
-          console.error(`[AuthStore] Erreur OAuth ${provider}:`, e);
+          secureLog.error(`[AuthStore] OAuth ${provider} error`, e);
           get().handleAuthError(e, `loginWithOAuth-${provider}`);
 
           let userMessage =
@@ -561,7 +562,7 @@ export const useAuthStore = create<AuthState>()(
             (oauthSuccess === "true" && oauthToken)
           ) {
             const finalToken = accessToken || oauthToken;
-            console.log("[AuthStore] Token OAuth détecté dans l'URL");
+            secureLog.log("[AuthStore] OAuth token detected in URL");
 
             // Calculer l'expiration
             const expiresAt = expiresIn
@@ -615,9 +616,8 @@ export const useAuthStore = create<AuthState>()(
               window.dispatchEvent(new Event("auth-state-changed"));
             }, 100);
 
-            console.log(
-              `[AuthStore] OAuth Supabase réussi:`,
-              oauthEmail || "utilisateur",
+            secureLog.log(
+              `[AuthStore] OAuth Supabase successful`,
             );
             return true;
           }
@@ -628,10 +628,9 @@ export const useAuthStore = create<AuthState>()(
           const errorDescription = urlParams.get("error_description");
 
           if (oauthError) {
-            console.error(
-              "[AuthStore] Erreur OAuth dans l'URL:",
-              oauthError,
-              errorDescription,
+            secureLog.error(
+              "[AuthStore] OAuth error in URL",
+              { type: oauthError },
             );
 
             // Nettoyer l'URL
@@ -661,8 +660,8 @@ export const useAuthStore = create<AuthState>()(
 
           return false;
         } catch (error) {
-          console.error(
-            "[AuthStore] Erreur traitement token OAuth URL:",
+          secureLog.error(
+            "[AuthStore] OAuth URL token processing error",
             error,
           );
           set({ isOAuthLoading: null });
@@ -677,7 +676,7 @@ export const useAuthStore = create<AuthState>()(
         userData: Partial<AppUser>,
       ) => {
         set({ isLoading: true, authErrors: [] });
-        console.log("[AuthStore] Register via /auth/register:", email);
+        secureLog.log("[AuthStore] Registration attempt");
 
         try {
           const fullName = userData?.name || "";
@@ -693,9 +692,7 @@ export const useAuthStore = create<AuthState>()(
             navigator.language.split('-')[0] ||
             'en';
 
-          console.log("[AuthStore] Langue détectée pour registration:", preferredLanguage);
-          console.log("[AuthStore] userData reçu:", JSON.stringify(userData, null, 2));
-          console.log("[AuthStore] userData.country:", userData.country);
+          secureLog.log("[AuthStore] Language detected for registration", { preferredLanguage });
 
           const payload = {
             email,
@@ -709,7 +706,7 @@ export const useAuthStore = create<AuthState>()(
             preferred_language: preferredLanguage,
           };
 
-          console.log("[AuthStore] Payload envoyé au backend:", JSON.stringify(payload, null, 2));
+          secureLog.log("[AuthStore] Registration payload prepared");
 
           const response = await apiClient.post<{ token?: string; user?: any }>(
             "/auth/register",
@@ -746,7 +743,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           set({ isLoading: false });
-          console.log("[AuthStore] Register réussi");
+          secureLog.log("[AuthStore] Registration successful");
         } catch (e: any) {
           get().handleAuthError(e, "register");
 
@@ -766,7 +763,7 @@ export const useAuthStore = create<AuthState>()(
 
       // LOGOUT : Nettoyage simple + fin de session tracking
       logout: async () => {
-        console.log("[AuthStore] Logout - nettoyage localStorage");
+        secureLog.log("[AuthStore] Logout - localStorage cleanup");
 
         try {
           // NOUVEAU: Terminer le tracking de session avant le logout
@@ -815,9 +812,9 @@ export const useAuthStore = create<AuthState>()(
           });
 
           sessionStorage.setItem("recent-logout", Date.now().toString());
-          console.log("[AuthStore] Logout réussi");
+          secureLog.log("[AuthStore] Logout successful");
         } catch (e: any) {
-          console.error("[AuthStore] Erreur logout:", e);
+          secureLog.error("[AuthStore] Logout error", e);
           throw new Error(e?.message || "Erreur lors de la déconnexion");
         }
       },
@@ -825,7 +822,7 @@ export const useAuthStore = create<AuthState>()(
       // UPDATE PROFILE : Via backend si endpoint disponible
       updateProfile: async (data: Partial<AppUser>) => {
         set({ isLoading: true });
-        console.log("[AuthStore] UpdateProfile");
+        secureLog.log("[AuthStore] UpdateProfile");
 
         try {
           const currentUser = get().user;
@@ -867,9 +864,8 @@ export const useAuthStore = create<AuthState>()(
           if (data.linkedinCorporate !== undefined)
             apiData.linkedin_corporate = data.linkedinCorporate;
 
-          console.log(
-            "[AuthStore] Envoi vers API backend via apiClient:",
-            "/users/profile",
+          secureLog.log(
+            "[AuthStore] Sending to backend API: /users/profile",
           );
 
           // Utiliser apiClient.putSecure() pour mettre à jour le profil
@@ -886,16 +882,15 @@ export const useAuthStore = create<AuthState>()(
             );
           }
 
-          console.log(
-            "[AuthStore] Profil mis à jour avec succès:",
-            response.data?.success,
+          secureLog.log(
+            "[AuthStore] Profile updated successfully",
           );
 
           // Recharger les données utilisateur
           await get().checkAuth();
 
           set({ isLoading: false });
-          console.log("[AuthStore] Profil mis à jour et rechargé");
+          secureLog.log("[AuthStore] Profile updated and reloaded");
         } catch (e: any) {
           get().handleAuthError(e, "updateProfile");
           set({ isLoading: false });
@@ -912,14 +907,14 @@ export const useAuthStore = create<AuthState>()(
           const parsed = JSON.parse(authData);
           return parsed.access_token || null;
         } catch (error) {
-          console.error("[AuthStore] Erreur récupération token:", error);
+          secureLog.error("[AuthStore] Token retrieval error", error);
           return null;
         }
       },
 
       // UPDATE CONSENT - Gestion du consentement RGPD
       updateConsent: async (consentGiven: boolean) => {
-        console.log("[AuthStore] Mise à jour du consentement:", consentGiven);
+        secureLog.log("[AuthStore] Updating consent");
 
         try {
           const currentUser = get().user;
@@ -942,7 +937,7 @@ export const useAuthStore = create<AuthState>()(
           // Recharger les données utilisateur pour refléter le changement
           await get().checkAuth();
 
-          console.log("[AuthStore] Consentement mis à jour avec succès");
+          secureLog.log("[AuthStore] Consent updated successfully");
         } catch (e: any) {
           get().handleAuthError(e, "updateConsent");
           throw new Error(
@@ -953,7 +948,7 @@ export const useAuthStore = create<AuthState>()(
 
       // EXPORT USER DATA - Conformité RGPD
       exportUserData: async () => {
-        console.log("[AuthStore] Export des données utilisateur (RGPD)");
+        secureLog.log("[AuthStore] Exporting user data (GDPR)");
 
         try {
           const currentUser = get().user;
@@ -969,7 +964,7 @@ export const useAuthStore = create<AuthState>()(
             );
           }
 
-          console.log("[AuthStore] Export des données réussi");
+          secureLog.log("[AuthStore] Data export successful");
           return response.data;
         } catch (e: any) {
           get().handleAuthError(e, "exportUserData");
@@ -979,7 +974,7 @@ export const useAuthStore = create<AuthState>()(
 
       // DELETE USER DATA - Suppression compte RGPD
       deleteUserData: async () => {
-        console.log("[AuthStore] Suppression des données utilisateur (RGPD)");
+        secureLog.log("[AuthStore] Deleting user data (GDPR)");
 
         try {
           const currentUser = get().user;
@@ -1001,7 +996,7 @@ export const useAuthStore = create<AuthState>()(
           // Déconnexion automatique après suppression
           await get().logout();
 
-          console.log("[AuthStore] Suppression du compte réussie");
+          secureLog.log("[AuthStore] Account deletion successful");
         } catch (e: any) {
           get().handleAuthError(e, "deleteUserData");
           throw new Error(
@@ -1020,15 +1015,15 @@ export const useAuthStore = create<AuthState>()(
         hasHydrated: state.hasHydrated,
       }),
       onRehydrateStorage: () => (state, error) => {
-        if (error) console.error("Erreur rehydrate auth store:", error);
+        if (error) secureLog.error("Auth store rehydrate error", error);
 
         // Protection contre la rehydration pendant une déconnexion récente
         const recentLogout = sessionStorage.getItem("recent-logout");
         if (recentLogout) {
           const logoutTime = parseInt(recentLogout);
           if (Date.now() - logoutTime < 1000) {
-            console.log(
-              "[AuthStore] Rehydration bloquée - déconnexion récente",
+            secureLog.log(
+              "[AuthStore] Rehydration blocked - recent logout",
             );
             if (state) {
               state.user = null;
@@ -1040,7 +1035,7 @@ export const useAuthStore = create<AuthState>()(
 
         if (state) {
           state.setHasHydrated(true);
-          console.log("[AuthStore] Store rehydraté");
+          secureLog.log("[AuthStore] Store rehydrated");
         }
       },
     },
@@ -1054,7 +1049,7 @@ export const useSessionHeartbeat = () => {
   useEffect(() => {
     // L'interval heartbeat + refresh est maintenant géré automatiquement
     // par startSessionTracking(), donc ce hook ne fait plus rien
-    console.log("[SessionHeartbeat] Tracking automatique actif");
+    secureLog.log("[SessionHeartbeat] Automatic tracking active");
   }, [isAuthenticated]);
 };
 
@@ -1067,7 +1062,7 @@ export const getAuthToken = async (): Promise<string | null> => {
     const parsed = JSON.parse(authData);
     return parsed.access_token || null;
   } catch (error) {
-    console.error("[AuthStore] Erreur récupération token utilitaire:", error);
+    secureLog.error("[AuthStore] Utility token retrieval error", error);
     return null;
   }
 };

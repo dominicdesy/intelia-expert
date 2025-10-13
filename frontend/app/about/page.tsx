@@ -39,9 +39,9 @@ export default function AboutPage() {
 
       {/* Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm border p-8">
+        <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6 lg:p-8">
           <div className="prose prose-gray max-w-none">
-            <h1 className="text-3xl font-bold text-gray-900 mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">
               {t("about.pageTitle")}
             </h1>
 
@@ -127,50 +127,6 @@ export default function AboutPage() {
               <p className="text-sm text-gray-500 mt-4">
                 {t("about.downloadDescription")}
               </p>
-            </section>
-
-            <section className="mb-12">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                {t("about.technologyStack")}
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-900 mb-2">{t("about.frontend")}</h3>
-                  <ul className="text-gray-700 text-sm space-y-1">
-                    <li>• Next.js (React)</li>
-                    <li>• TypeScript</li>
-                    <li>• Tailwind CSS</li>
-                  </ul>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-900 mb-2">{t("about.backend")}</h3>
-                  <ul className="text-gray-700 text-sm space-y-1">
-                    <li>• Python</li>
-                    <li>• FastAPI</li>
-                    <li>• PostgreSQL</li>
-                  </ul>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-900 mb-2">{t("about.aiml")}</h3>
-                  <ul className="text-gray-700 text-sm space-y-1">
-                    <li>• Anthropic Claude</li>
-                    <li>• Sentence Transformers</li>
-                    <li>• Weaviate Vector Database</li>
-                  </ul>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-900 mb-2">{t("about.infrastructure")}</h3>
-                  <ul className="text-gray-700 text-sm space-y-1">
-                    <li>• Docker</li>
-                    <li>• DigitalOcean</li>
-                    <li>• CI/CD</li>
-                  </ul>
-                </div>
-              </div>
             </section>
 
             <section>
