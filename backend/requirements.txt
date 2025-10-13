@@ -28,3 +28,7 @@ psutil==5.9.5
 typing-extensions>=4.8.0
 tenacity>=8.2.2
 toml==0.10.2
+
+# Security & Serialization
+msgpack>=1.0.7  # Secure serialization (replaces pickle)
+defusedxml>=0.7.1  # Secure XML parsing

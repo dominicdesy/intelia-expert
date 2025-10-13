@@ -132,6 +132,8 @@ regex==2023.12.25
 pydantic>=2.8.0,<3.0.0
 validators>=0.22.0
 bleach>=6.0.0
+msgpack>=1.0.7  # Secure serialization (replaces pickle)
+defusedxml>=0.7.1  # Secure XML parsing for external sources
 
 # === CACHE INTELLIGENT ESSENTIEL ===
 diskcache==5.6.3
