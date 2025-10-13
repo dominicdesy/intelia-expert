@@ -2,236 +2,330 @@
 
 ## 🚀 Quick Summary
 
-**NO CONFIGURATION REQUIRED** - The external sources system works automatically without any environment variables or API keys!
+**✅ CONFIGURATION WORKING** - Les variables d'environnement sont maintenant utilisées par le code !
 
-## ✅ What You Added on Digital Ocean (Optional)
+Suite à la mise à jour du 2025-01-XX, toutes les variables d'environnement sont désormais correctement intégrées dans le code.
 
-You added these environment variables:
+## ✅ Variables d'environnement actives sur Digital Ocean
+
+Vous avez configuré ces variables et **elles sont maintenant utilisées** :
+
 ```bash
-ENABLE_EXTERNAL_SOURCES=true
-EXTERNAL_SEARCH_THRESHOLD=0.7
+ENABLE_EXTERNAL_SOURCES=true          # ✅ Utilisée dans rag_engine.py
+EXTERNAL_SEARCH_THRESHOLD=0.7         # ✅ Utilisée dans query_processor.py
+EXTERNAL_SOURCES_LOG_DIR=/app/logs/external_sources
 ```
 
-**Important:** These variables are **NOT USED** by the code. The system is already configured to work automatically.
+## 🔧 Comment ça fonctionne maintenant
 
-## 🔧 How It Actually Works
+### 1. Activation via configuration (Nouvelle implémentation)
 
-### Auto-Activation (No Config Needed)
-The system enables automatically when Weaviate is available:
-
-**File:** `llm/core/rag_engine.py` (line 193)
+**Fichier:** `llm/core/rag_engine.py` (ligne 193)
 ```python
-# 🆕 Enable external sources if Weaviate is available
-enable_external = bool(self.weaviate_core)
+# 🆕 Enable external sources if config enabled AND Weaviate is available
+enable_external = ENABLE_EXTERNAL_SOURCES and bool(self.weaviate_core)
 ```
 
-When Weaviate is initialized, you'll see this log:
+Le système s'active quand **DEUX conditions** sont remplies :
+1. `ENABLE_EXTERNAL_SOURCES=true` (variable d'environnement)
+2. Weaviate est disponible
+
+**Log au démarrage :**
 ```
 ✅ External sources system ENABLED (Semantic Scholar, PubMed, Europe PMC)
 ```
 
-### Hardcoded Threshold (No Config Needed)
-The confidence threshold is hardcoded in the code:
+### 2. Seuil de confiance configurable
 
-**File:** `llm/core/query_processor.py` (line 462)
+**Fichier:** `llm/core/query_processor.py` (ligne 473)
 ```python
-# Step 6.5: Try external sources if low confidence and system enabled
-EXTERNAL_SEARCH_THRESHOLD = 0.7  # TODO: Move to config
+# Importé depuis config.py
+from config.config import EXTERNAL_SEARCH_THRESHOLD
+
+if result.confidence < EXTERNAL_SEARCH_THRESHOLD:
+    # Déclenche la recherche externe
 ```
 
-When Weaviate confidence < 0.7, external sources are searched automatically.
+La recherche externe se déclenche automatiquement quand :
+- Confiance Weaviate < `EXTERNAL_SEARCH_THRESHOLD` (par défaut 0.7)
+- Requête routée vers Weaviate (questions diagnostiques)
 
-## 📚 External Sources (All FREE)
+**Log lors du déclenchement :**
+```
+🔍 Low confidence (0.45), searching external sources...
+```
 
-### 1. Semantic Scholar
-- **Coverage:** 200M+ academic papers
-- **Rate Limit:** 10 requests/second
-- **API Key:** ❌ NOT required
-- **Cost:** $0
+### 3. Configuration complète des sources
 
-### 2. PubMed (NCBI)
-- **Coverage:** 35M+ biomedical papers
-- **Rate Limit:** 3 requests/second (default)
-- **API Key:** ⚠️ Optional (increases to 10 req/s)
-- **Cost:** $0
+**Fichier:** `llm/config/config.py` (lignes 112-131)
 
-### 3. Europe PMC
-- **Coverage:** 40M+ life sciences papers
-- **Rate Limit:** 5 requests/second
-- **API Key:** ❌ NOT required
-- **Cost:** $0
+Toutes ces variables sont maintenant configurables via environnement :
 
-## 💰 Cost Structure
+```python
+# Configuration principale
+ENABLE_EXTERNAL_SOURCES = os.getenv("ENABLE_EXTERNAL_SOURCES", "true").lower() == "true"
+EXTERNAL_SEARCH_THRESHOLD = float(os.getenv("EXTERNAL_SEARCH_THRESHOLD", "0.7"))
+EXTERNAL_SOURCES_LOG_DIR = os.getenv("EXTERNAL_SOURCES_LOG_DIR", "/app/logs/external_sources")
 
-### External APIs
+# Paramètres de recherche
+EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE = int(os.getenv("EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE", "5"))
+EXTERNAL_SOURCES_MIN_YEAR = int(os.getenv("EXTERNAL_SOURCES_MIN_YEAR", "2015"))
+
+# Toggles individuels par source
+ENABLE_SEMANTIC_SCHOLAR = os.getenv("ENABLE_SEMANTIC_SCHOLAR", "true").lower() == "true"
+ENABLE_PUBMED = os.getenv("ENABLE_PUBMED", "true").lower() == "true"
+ENABLE_EUROPE_PMC = os.getenv("ENABLE_EUROPE_PMC", "true").lower() == "true"
+ENABLE_FAO = os.getenv("ENABLE_FAO", "false").lower() == "true"  # Placeholder
+
+# API key optionnelle
+PUBMED_API_KEY = os.getenv("PUBMED_API_KEY")  # Optionnel: augmente limite
+```
+
+## 📚 Sources externes (Toutes GRATUITES)
+
+### 1. Semantic Scholar ✅
+- **Couverture:** 200M+ articles académiques
+- **Limite:** 10 requêtes/seconde
+- **Clé API:** ❌ NON requise
+- **Coût:** $0
+
+### 2. PubMed (NCBI) ✅
+- **Couverture:** 35M+ articles biomédicaux
+- **Limite:** 3 requêtes/seconde (par défaut)
+- **Clé API:** ⚠️ Optionnelle (augmente à 10 req/s)
+- **Coût:** $0
+
+### 3. Europe PMC ✅
+- **Couverture:** 40M+ articles sciences de la vie
+- **Limite:** 5 requêtes/seconde
+- **Clé API:** ❌ NON requise
+- **Coût:** $0
+
+## 💰 Structure de coûts
+
+### APIs externes
 - **Semantic Scholar:** $0
 - **PubMed:** $0
 - **Europe PMC:** $0
-- **Total API Cost:** $0
+- **Total APIs:** $0
 
-### OpenAI Embeddings (Only Cost)
-- **Usage:** ~90 tokens per document ingestion
-- **Cost:** ~$0.0018 per ingestion with text-embedding-3-small
-- **Estimate:** ~$0.002/month (based on typical usage)
+### Embeddings OpenAI (seul coût)
+- **Usage:** ~90 tokens par document ingéré
+- **Coût:** ~$0.0018 par ingestion (text-embedding-3-small)
+- **Estimation:** ~$0.002/mois (usage typique)
 
-**Total Monthly Cost:** ~$0.002 (nearly free!)
+**Coût mensuel total:** ~$0.002 (quasi gratuit !)
 
-## 🎯 Optional Configuration (If Needed)
+## ⚙️ Configuration optionnelle
 
-### Option 1: PubMed API Key (Optional)
-**When:** Only if you hit PubMed rate limits (very unlikely)
+### Variables déjà configurées sur Digital Ocean
 
-**How to get:**
-1. Create free NCBI account: https://www.ncbi.nlm.nih.gov/account/
-2. Generate API key in account settings
-3. Add to Digital Ocean:
-   ```bash
-   PUBMED_API_KEY=your_api_key_here
-   ```
-
-**Benefit:** Rate limit increases from 3 to 10 req/s
-
-### Option 2: Make Threshold Configurable (Future)
-Currently hardcoded at 0.7. To make configurable:
-
-1. Add to `llm/config/config.py`:
-   ```python
-   EXTERNAL_SEARCH_THRESHOLD = float(os.getenv("EXTERNAL_SEARCH_THRESHOLD", "0.7"))
-   ```
-
-2. Import in `llm/core/query_processor.py`:
-   ```python
-   from config.config import EXTERNAL_SEARCH_THRESHOLD
-   ```
-
-3. Add to Digital Ocean:
-   ```bash
-   EXTERNAL_SEARCH_THRESHOLD=0.6  # Lower = more external searches
-   ```
-
-## 📊 Performance Metrics
-
-### Search Performance
-- **Parallel Search:** All 3 sources queried simultaneously
-- **Total Latency:** ~2-3 seconds
-- **Results:** 5 documents per source = 15 total
-- **Best Document:** Automatically selected and ingested
-
-### Flow Diagram
+```bash
+# ✅ Déjà configurées et utilisées
+ENABLE_EXTERNAL_SOURCES=true
+EXTERNAL_SEARCH_THRESHOLD=0.7
+EXTERNAL_SOURCES_LOG_DIR=/app/logs/external_sources
 ```
-User Query
+
+### Variables optionnelles supplémentaires
+
+Si vous voulez personnaliser davantage, vous pouvez ajouter :
+
+```bash
+# Paramètres de recherche
+EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE=5    # Résultats par source
+EXTERNAL_SOURCES_MIN_YEAR=2015               # Année minimale
+
+# Désactiver une source spécifique
+ENABLE_SEMANTIC_SCHOLAR=true
+ENABLE_PUBMED=true
+ENABLE_EUROPE_PMC=true
+ENABLE_FAO=false                             # Placeholder (pas implémenté)
+
+# Clé API optionnelle pour PubMed (augmente limite)
+PUBMED_API_KEY=votre_cle_api_ncbi           # Seulement si rate limiting
+```
+
+### Option : Clé API PubMed (Optionnelle)
+
+**Quand :** Seulement si vous rencontrez des limites de taux (très rare)
+
+**Comment obtenir :**
+1. Créer un compte NCBI gratuit : https://www.ncbi.nlm.nih.gov/account/
+2. Générer une clé API dans les paramètres du compte
+3. Ajouter sur Digital Ocean :
+   ```bash
+   PUBMED_API_KEY=votre_cle_api_ici
+   ```
+
+**Bénéfice :** Limite de taux passe de 3 à 10 req/s
+
+## 📊 Métriques de performance
+
+### Performance de recherche
+- **Recherche parallèle :** Les 3 sources interrogées simultanément
+- **Latence totale :** ~2-3 secondes
+- **Résultats :** 5 documents par source = 15 total
+- **Meilleur document :** Automatiquement sélectionné et ingéré
+
+### Diagramme de flux
+```
+Requête utilisateur
     ↓
-Weaviate Search (primary)
+Recherche Weaviate (primaire)
     ↓
-Confidence < 0.7?
-    ↓ Yes
-Parallel External Search
+Confiance < 0.7 ?
+    ↓ Oui
+Recherche externe parallèle
 ├── Semantic Scholar (5 docs)
 ├── PubMed (5 docs)
 └── Europe PMC (5 docs)
     ↓
-Best Document Selected
+Sélection meilleur document
     ↓
-Check if exists in Weaviate
+Vérifier si existe dans Weaviate
     ↓
-Ingest if new (~$0.0018)
+Ingérer si nouveau (~$0.0018)
     ↓
-Return answer with citation
+Retourner réponse avec citation
 ```
 
-## 🔍 How to Verify It's Working
+## 🔍 Vérifier que ça fonctionne
 
-### Check Logs
-Look for these messages in production logs:
+### Vérifier les logs
 
-1. **System Enabled:**
+Cherchez ces messages dans les logs de production :
+
+1. **Système activé :**
    ```
    ✅ External sources system ENABLED (Semantic Scholar, PubMed, Europe PMC)
    ```
 
-2. **Low Confidence Trigger:**
+2. **Déclenchement (confiance basse) :**
    ```
    🔍 Low confidence (0.45), searching external sources...
    ```
 
-3. **Document Found:**
+3. **Document trouvé :**
    ```
    ✅ Found external document: 'Spaghetti breast in broilers...' (score=0.92, source=pubmed)
    ```
 
-4. **Document Ingested:**
+4. **Document ingéré :**
    ```
    📥 Ingesting document into Weaviate...
    ✅ Document ingested successfully
    ```
 
-### Test Query
-Try a query about recent research not in your database:
+### Requête de test
+
+Essayez une requête sur une recherche récente absente de votre base :
+
 ```
 "What is spaghetti breast in broilers?"
 ```
 
-Expected behavior:
-- Weaviate may have low confidence
-- External sources triggered automatically
-- PubMed/Semantic Scholar papers retrieved
-- Best document ingested for future use
+Comportement attendu :
+- Weaviate peut avoir une faible confiance
+- Sources externes déclenchées automatiquement
+- Articles PubMed/Semantic Scholar récupérés
+- Meilleur document ingéré pour usage futur
 
-## ❌ What You Don't Need
+## 🎛️ Contrôle du système
 
-### Environment Variables (Not Used)
+### Désactiver temporairement
+
+Pour désactiver les sources externes :
 ```bash
-ENABLE_EXTERNAL_SOURCES=true      # ❌ Not used by code
-EXTERNAL_SEARCH_THRESHOLD=0.7     # ❌ Not used by code
+ENABLE_EXTERNAL_SOURCES=false
 ```
 
-The system will work **regardless** of these variables being set or not.
+Le système continuera de fonctionner normalement, mais ne fera plus de recherches externes.
 
-### API Keys (Not Required)
+### Ajuster le seuil
+
+Pour déclencher plus/moins souvent :
 ```bash
-SEMANTIC_SCHOLAR_API_KEY=...      # ❌ Not needed
-PUBMED_API_KEY=...                # ⚠️ Optional (only for rate limit)
-EUROPE_PMC_API_KEY=...            # ❌ Not needed
-FAO_API_KEY=...                   # ❌ Placeholder (not implemented)
+EXTERNAL_SEARCH_THRESHOLD=0.8    # Moins de recherches externes (seulement si très faible confiance)
+EXTERNAL_SEARCH_THRESHOLD=0.6    # Plus de recherches externes (confiance modérée suffit)
 ```
 
-## ✨ Deployment Checklist
+### Désactiver une source spécifique
 
-- [x] **Weaviate enabled** → External sources auto-enable
-- [x] **OpenAI API key** → For embeddings (~$0.002/month)
-- [ ] **PubMed API key** → Only if rate limiting occurs (optional)
-- [ ] **Monitor logs** → Verify external searches working
-- [ ] **Test queries** → Try queries about recent research
+Pour désactiver PubMed par exemple :
+```bash
+ENABLE_PUBMED=false
+```
 
-## 🐛 Troubleshooting
+## ❌ Ce dont vous N'AVEZ PAS besoin
 
-### Issue: External sources not triggering
-**Cause:** Weaviate confidence always > 0.7
-**Solution:** This is normal! It means your knowledge base is comprehensive
+### Clés API (NON requises)
+```bash
+SEMANTIC_SCHOLAR_API_KEY=...      # ❌ Pas nécessaire
+PUBMED_API_KEY=...                # ⚠️ Optionnel (seulement pour limite)
+EUROPE_PMC_API_KEY=...            # ❌ Pas nécessaire
+FAO_API_KEY=...                   # ❌ Placeholder (pas implémenté)
+```
 
-### Issue: Rate limit errors from PubMed
-**Cause:** High volume of queries
-**Solution:** Add PUBMED_API_KEY to increase from 3 to 10 req/s
+## ✨ Checklist de déploiement
 
-### Issue: Embeddings cost too high
-**Cause:** Too many documents being ingested
-**Solution:**
-- Check if threshold is too low (< 0.7)
-- Review which queries trigger external search
-- Consider increasing threshold to 0.8
+- [x] **Variables configurées** → ENABLE_EXTERNAL_SOURCES, EXTERNAL_SEARCH_THRESHOLD
+- [x] **Weaviate activé** → Requis pour sources externes
+- [x] **Clé API OpenAI** → Pour embeddings (~$0.002/mois)
+- [ ] **Clé API PubMed** → Seulement si rate limiting (optionnel)
+- [ ] **Monitorer logs** → Vérifier recherches externes fonctionnent
+- [ ] **Tester requêtes** → Essayer des questions sur recherches récentes
 
-## 📝 Summary
+## 🐛 Dépannage
 
-**Current Setup (Auto-Configured):**
-✅ External sources: ENABLED when Weaviate available
-✅ Confidence threshold: 0.7 (hardcoded)
-✅ Data sources: Semantic Scholar, PubMed, Europe PMC
-✅ API keys: None required
-✅ Cost: ~$0.002/month
+### Problème : Sources externes ne se déclenchent pas
+**Cause :** Confiance Weaviate toujours > 0.7
+**Solution :** C'est normal ! Cela signifie que votre base de connaissances est complète
 
-**Your Digital Ocean Variables:**
-⚠️ `ENABLE_EXTERNAL_SOURCES=true` → Not used (auto-enabled)
-⚠️ `EXTERNAL_SEARCH_THRESHOLD=0.7` → Not used (hardcoded)
+### Problème : Erreurs de limite de taux PubMed
+**Cause :** Volume élevé de requêtes
+**Solution :** Ajouter PUBMED_API_KEY pour passer de 3 à 10 req/s
 
-**Recommendation:**
-🚀 Deploy as-is! Everything works automatically. Only add PUBMED_API_KEY if you encounter rate limits (unlikely).
+### Problème : Coût embeddings trop élevé
+**Cause :** Trop de documents ingérés
+**Solution :**
+- Vérifier si seuil trop bas (< 0.7)
+- Examiner quelles requêtes déclenchent recherche externe
+- Considérer augmenter seuil à 0.8
+
+### Problème : Sources externes désactivées
+**Vérifier :**
+```bash
+# Sur Digital Ocean, vérifier que la variable existe
+echo $ENABLE_EXTERNAL_SOURCES  # Doit retourner "true"
+```
+
+**Solution :**
+- Ajouter/corriger la variable sur Digital Ocean
+- Redémarrer l'application
+
+## 📝 Résumé
+
+**Configuration actuelle (Production) :**
+- ✅ Sources externes : ACTIVÉES via `ENABLE_EXTERNAL_SOURCES=true`
+- ✅ Seuil de confiance : 0.7 via `EXTERNAL_SEARCH_THRESHOLD=0.7`
+- ✅ Sources de données : Semantic Scholar, PubMed, Europe PMC
+- ✅ Clés API : Aucune requise (toutes gratuites)
+- ✅ Coût : ~$0.002/mois (embeddings OpenAI)
+
+**Vos variables Digital Ocean :**
+- ✅ `ENABLE_EXTERNAL_SOURCES=true` → **Utilisée** (contrôle l'activation)
+- ✅ `EXTERNAL_SEARCH_THRESHOLD=0.7` → **Utilisée** (contrôle le seuil)
+- ✅ `EXTERNAL_SOURCES_LOG_DIR=/app/logs/external_sources` → **Utilisée** (logs)
+
+**Recommandation :**
+🚀 Le système est prêt ! Aucune clé API nécessaire. Ajoutez PUBMED_API_KEY seulement si vous rencontrez des limites de taux (peu probable).
+
+## 🔄 Historique des modifications
+
+**2025-01-XX :** Intégration des variables d'environnement dans le code
+- Ajout de toutes les variables dans `config/config.py`
+- Utilisation de `ENABLE_EXTERNAL_SOURCES` dans `rag_engine.py`
+- Utilisation de `EXTERNAL_SEARCH_THRESHOLD` dans `query_processor.py`
+- Ajout toggles individuels par source
+- Support configuration complète via environnement
