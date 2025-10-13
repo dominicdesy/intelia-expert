@@ -4,6 +4,8 @@
 
 import { ad01Config } from "./ad-01-poultry-ai/config";
 import { ad01Translations, type SupportedLanguage } from "./ad-01-poultry-ai/translations";
+import { ad02Config } from "./ad-02-smart-sensors/config";
+import { ad02Translations } from "./ad-02-smart-sensors/translations";
 
 // Type pour une publicité complète
 export interface Ad {
@@ -25,10 +27,14 @@ export const ADS_CATALOG: Ad[] = [
     ...ad01Config,
     translations: ad01Translations,
   },
-  // FUTURE: Ajoutez ici ad-02, ad-03, etc.
+  {
+    ...ad02Config,
+    translations: ad02Translations,
+  },
+  // FUTURE: Ajoutez ici ad-03, ad-04, etc.
   // {
-  //   ...ad02Config,
-  //   translations: ad02Translations,
+  //   ...ad03Config,
+  //   translations: ad03Translations,
   // },
 ];
 
