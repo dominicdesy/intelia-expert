@@ -1,6 +1,7 @@
 // app/chat/services/apiService.ts - VERSION CORRIGÉE: Nouvelle architecture conversations
 
 import { getSupabaseClient } from "@/lib/supabase/singleton";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Import des nouveaux types Agent depuis index.ts
 import type {
@@ -46,10 +47,7 @@ function storeRecentSessionId(sessionId: string): void {
 
     // Éviter les doublons
     if (existing.includes(sessionId)) {
-      console.log(
-        "[apiService] Session ID déjà stocké:",
-        sessionId.substring(0, 8) + "...",
-      );
+      secureLog.log("[apiService] Session ID already stored");
       return;
     }
 
@@ -62,20 +60,15 @@ function storeRecentSessionId(sessionId: string): void {
     // Sauvegarder
     localStorage.setItem(STORAGE_KEY, JSON.stringify(limited));
 
-    console.log(
-      "[apiService] Session ID stocké:",
-      sessionId.substring(0, 8) + "...",
-      "Total:",
-      limited.length,
-    );
+    secureLog.log("[apiService] Session ID stored", { total: limited.length });
   } catch (error) {
-    console.error("[apiService] Erreur stockage session ID:", error);
+    secureLog.error("[apiService] Session ID storage error", error);
   }
 }
 
 // Fonction d'authentification pour le backend métier (conservée)
 const getAuthToken = async (): Promise<string | null> => {
-  console.log("[apiService] Récupération token auth...");
+  secureLog.log("[apiService] Retrieving auth token...");
 
   try {
     // Méthode 1: Récupérer depuis intelia-expert-auth (PRIORITÉ)
@@ -83,7 +76,7 @@ const getAuthToken = async (): Promise<string | null> => {
     if (authData) {
       const parsed = JSON.parse(authData);
       if (parsed.access_token) {
-        console.log("[apiService] Token récupéré depuis intelia-expert-auth");
+        secureLog.log("[apiService] Token retrieved from intelia-expert-auth");
 
         // Vérifier que le token n'est pas expiré
         try {
@@ -120,10 +113,10 @@ const getAuthToken = async (): Promise<string | null> => {
       }
     }
 
-    console.error("[apiService] Aucun token trouvé");
+    secureLog.error("[apiService] No token found");
     return null;
   } catch (error) {
-    console.error("[apiService] Erreur récupération token:", error);
+    secureLog.error("[apiService] Token retrieval error", error);
     return null;
   }
 };
@@ -172,7 +165,7 @@ export const formatToLocalTime = (utcTimestamp: string): string => {
     };
     return date.toLocaleString("fr-CA", options);
   } catch (error) {
-    console.warn("Erreur formatage date:", error);
+    secureLog.warn("Erreur formatage date:", error);
     return utcTimestamp;
   }
 };
@@ -188,7 +181,7 @@ export const simpleLocalTime = (utcTimestamp: string): string => {
       hour12: false,
     });
   } catch (error) {
-    console.warn("Erreur formatage date simple:", error);
+    secureLog.warn("Erreur formatage date simple:", error);
     return utcTimestamp;
   }
 };
@@ -250,7 +243,7 @@ async function streamAIResponseInternal(
     user_context,
   };
 
-  console.log("[apiService] Streaming Agent vers /llm/chat:", {
+  secureLog.log("[apiService] Streaming Agent vers /llm/chat:", {
     tenant_id,
     lang,
     message_preview: message.substring(0, 50) + "...",
@@ -281,7 +274,7 @@ async function streamAIResponseInternal(
       };
     }
 
-    console.error("[apiService] Erreur streaming Agent:", errorInfo);
+    secureLog.error("[apiService] Erreur streaming Agent:", errorInfo);
     throw new Error(errorInfo?.message || `Erreur ${response.status}`);
   }
 
@@ -313,7 +306,7 @@ async function streamAIResponseInternal(
         // Calculer le temps de traitement final
         agentMetadata.processing_time =
           Date.now() - agentMetadata.processing_time;
-        console.log("[apiService] Stream Agent terminé:", {
+        secureLog.log("[apiService] Stream Agent terminé:", {
           final_length: finalAnswer.length,
           agent_metadata: agentMetadata,
         });
@@ -344,7 +337,7 @@ async function streamAIResponseInternal(
           switch (event.type) {
             case "agent_start":
               const agentStartEvent = event as AgentStartEvent;
-              console.log(
+              secureLog.log(
                 "[apiService] Agent démarré:",
                 agentStartEvent.complexity,
                 "sous-requêtes:",
@@ -361,7 +354,7 @@ async function streamAIResponseInternal(
 
             case "agent_thinking":
               const agentThinkingEvent = event as AgentThinkingEvent;
-              console.log(
+              secureLog.log(
                 "[apiService] Agent réflexion:",
                 agentThinkingEvent.decisions?.length || 0,
                 "décisions",
@@ -392,7 +385,7 @@ async function streamAIResponseInternal(
 
             case "agent_progress":
               const agentProgressEvent = event as AgentProgressEvent;
-              console.log(
+              secureLog.log(
                 "[apiService] Agent progression:",
                 agentProgressEvent.step,
                 agentProgressEvent.progress + "%",
@@ -405,7 +398,7 @@ async function streamAIResponseInternal(
 
             case "agent_end":
               const agentEndEvent = event as AgentEndEvent;
-              console.log(
+              secureLog.log(
                 "[apiService] Agent terminé:",
                 agentEndEvent.synthesis_method,
                 "sources:",
@@ -422,7 +415,7 @@ async function streamAIResponseInternal(
 
             case "agent_error":
               const agentErrorEvent = event as AgentErrorEvent;
-              console.error(
+              secureLog.error(
                 "[apiService] Erreur Agent:",
                 agentErrorEvent.error,
               );
@@ -432,7 +425,7 @@ async function streamAIResponseInternal(
             // ✅ CORRECTION 2: Gestion de l'événement "end"
             case "end":
               const endEvent = event as EndEvent;
-              console.log("[apiService] Stream terminé (end event):", endEvent);
+              secureLog.log("[apiService] Stream terminé (end event):", endEvent);
               // Extraire les métadonnées de fin si disponibles
               if (endEvent.documents_used !== undefined) {
                 agentMetadata.sources_used = endEvent.documents_used;
@@ -463,7 +456,7 @@ async function streamAIResponseInternal(
             case "proactive_followup":
               const followupEvent = event as ProactiveFollowupEvent;
               if (followupEvent.suggestion) {
-                console.log(
+                secureLog.log(
                   "[apiService] Relance proactive reçue:",
                   followupEvent.suggestion,
                 );
@@ -473,11 +466,11 @@ async function streamAIResponseInternal(
 
             case "error":
               const errorEvent = event as ErrorEvent;
-              console.error("[apiService] Erreur dans le stream:", errorEvent);
+              secureLog.error("[apiService] Erreur dans le stream:", errorEvent);
               throw new Error(errorEvent.message || "Erreur de streaming");
 
             default:
-              console.log(
+              secureLog.log(
                 "[apiService] Événement SSE non géré:",
                 (event as any).type,
                 event,
@@ -485,7 +478,7 @@ async function streamAIResponseInternal(
           }
         } catch (parseError) {
           // Ignore les lignes JSON malformées (chunks partiels)
-          console.debug(
+          secureLog.debug(
             "[apiService] Ligne SSE malformée ignorée:",
             jsonStr.substring(0, 100),
           );
@@ -536,7 +529,7 @@ export const generateAIResponse = async (
 
   const finalConversationId = conversationId || generateUUID();
 
-  console.log("[apiService] AGENT: Génération AI avec streaming enrichi:", {
+  secureLog.log("[apiService] AGENT: Génération AI avec streaming enrichi:", {
     question: question.substring(0, 50) + "...",
     session_id: finalConversationId.substring(0, 8) + "...",
     user_id: user.id,
@@ -559,14 +552,14 @@ export const generateAIResponse = async (
       });
 
       if (!profileResponse.ok) {
-        console.warn(
+        secureLog.warn(
           "[apiService] Erreur récupération profil backend:",
           profileResponse.status,
         );
         tenant_id = `user_${user.id}`;
       } else {
         const profileData = await profileResponse.json();
-        console.log("[apiService] Profil reçu du backend:", profileData);
+        secureLog.log("[apiService] Profil reçu du backend:", profileData);
 
         // Prioriser tenant_id, puis organization_id, sinon user.id
         tenant_id =
@@ -574,13 +567,13 @@ export const generateAIResponse = async (
           profileData.organization_id ||
           `user_${user.id}`;
 
-        console.log(
+        secureLog.log(
           "[apiService] tenant_id extrait du backend:",
           tenant_id,
         );
       }
     } catch (error) {
-      console.error(
+      secureLog.error(
         "[apiService] Exception récupération tenant_id via backend:",
         error,
       );
@@ -592,7 +585,7 @@ export const generateAIResponse = async (
     let finalQuestion = question.trim();
 
     if (isClarificationResponse && originalQuestion) {
-      console.log("[apiService] Mode clarification - enrichissement question");
+      secureLog.log("[apiService] Mode clarification - enrichissement question");
 
       const breedMatch = finalQuestion.match(
         /(ross\s*308|cobb\s*500|hubbard)/i,
@@ -606,7 +599,7 @@ export const generateAIResponse = async (
 
       if (breed && sex) {
         finalQuestion = `${originalQuestion} pour ${breed} ${sex}`;
-        console.log("[apiService] Question enrichie:", finalQuestion);
+        secureLog.log("[apiService] Question enrichie:", finalQuestion);
       }
     }
 
@@ -629,7 +622,7 @@ export const generateAIResponse = async (
     const finalResponse = streamResult.response;
     const agentMetadata = streamResult.agentMetadata;
 
-    console.log("[apiService] Streaming Agent terminé:", {
+    secureLog.log("[apiService] Streaming Agent terminé:", {
       final_length: finalResponse.length,
       conversation_id: finalConversationId,
       agent_complexity: agentMetadata.complexity,
@@ -646,7 +639,7 @@ export const generateAIResponse = async (
         agentMetadata,
       );
     } catch (saveError) {
-      console.warn("[apiService] Erreur sauvegarde conversation:", saveError);
+      secureLog.warn("[apiService] Erreur sauvegarde conversation:", saveError);
       // Ne pas faire échouer la réponse pour une erreur de sauvegarde
     }
 
@@ -690,7 +683,7 @@ export const generateAIResponse = async (
       },
     };
 
-    console.log("[apiService] Réponse Agent traitée:", {
+    secureLog.log("[apiService] Réponse Agent traitée:", {
       response_length: processedResponse.response.length,
       conversation_id: processedResponse.conversation_id,
       agent_metadata: processedResponse.agent_metadata,
@@ -698,7 +691,7 @@ export const generateAIResponse = async (
 
     return processedResponse;
   } catch (error) {
-    console.error("[apiService] Erreur génération AI Agent:", error);
+    secureLog.error("[apiService] Erreur génération AI Agent:", error);
 
     // Gestion des erreurs avec messages appropriés
     if (error instanceof Error) {
@@ -738,7 +731,7 @@ async function saveConversationToBackend(
       },
     };
 
-    console.log("[apiService] Sauvegarde vers nouvelle architecture:", {
+    secureLog.log("[apiService] Sauvegarde vers nouvelle architecture:", {
       conversation_id: conversationId.substring(0, 8) + "...",
       user_id: userId,
       question_length: question.length,
@@ -753,17 +746,17 @@ async function saveConversationToBackend(
 
     if (!response_save.ok) {
       const errorText = await response_save.text();
-      console.error("[apiService] Erreur sauvegarde conversation:", errorText);
+      secureLog.error("[apiService] Erreur sauvegarde conversation:", errorText);
       throw new Error(`Erreur sauvegarde: ${response_save.status}`);
     }
 
     const result = await response_save.json();
-    console.log("[apiService] Conversation sauvegardée avec succès:", {
+    secureLog.log("[apiService] Conversation sauvegardée avec succès:", {
       status: result.status,
       action: result.action,
     });
   } catch (error) {
-    console.error("[apiService] Erreur lors de la sauvegarde:", error);
+    secureLog.error("[apiService] Erreur lors de la sauvegarde:", error);
     throw error;
   }
 }
@@ -788,7 +781,7 @@ export const generateAIResponsePublic = async (
 
   const finalConversationId = conversationId || generateUUID();
 
-  console.log("[apiService] Génération AI publique Agent:", {
+  secureLog.log("[apiService] Génération AI publique Agent:", {
     question: question.substring(0, 50) + "...",
     session_id: finalConversationId.substring(0, 8) + "...",
     has_agent_callbacks: !!(
@@ -847,7 +840,7 @@ export const generateAIResponsePublic = async (
       },
     };
   } catch (error) {
-    console.error("[apiService] Erreur génération AI publique Agent:", error);
+    secureLog.error("[apiService] Erreur génération AI publique Agent:", error);
     throw error;
   }
 };
@@ -866,7 +859,7 @@ export const loadUserConversations = async (
     throw new Error("User ID requis");
   }
 
-  console.log(
+  secureLog.log(
     "[apiService] Chargement conversations (nouvelle architecture):",
     userId,
     "limit:", limit, // ← LIGNE MODIFIÉE: Ajout du log pour limit
@@ -884,7 +877,7 @@ export const loadUserConversations = async (
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[apiService] Erreur conversations:", errorText);
+      secureLog.error("[apiService] Erreur conversations:", errorText);
 
       if (response.status === 401) {
         throw new Error("Session expirée. Veuillez vous reconnecter.");
@@ -904,7 +897,7 @@ export const loadUserConversations = async (
     }
 
     const data = await response.json();
-    console.log(
+    secureLog.log(
       "[apiService] Conversations chargées (nouvelle architecture):",
       {
         total_count: data.total_count,
@@ -915,7 +908,7 @@ export const loadUserConversations = async (
 
     return data;
   } catch (error) {
-    console.error("[apiService] Erreur chargement conversations:", error);
+    secureLog.error("[apiService] Erreur chargement conversations:", error);
 
     if (error instanceof Error && error.message.includes("Failed to fetch")) {
       return {
@@ -943,7 +936,7 @@ export const sendFeedback = async (
     throw new Error("ID de conversation requis");
   }
 
-  console.log("[apiService] Envoi feedback (nouvelle architecture):", feedback);
+  secureLog.log("[apiService] Envoi feedback (nouvelle architecture):", feedback);
 
   try {
     const headers = await getAuthHeaders();
@@ -965,7 +958,7 @@ export const sendFeedback = async (
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[apiService] Erreur feedback:", errorText);
+      secureLog.error("[apiService] Erreur feedback:", errorText);
 
       if (response.status === 401) {
         throw new Error("Session expirée. Veuillez vous reconnecter.");
@@ -974,11 +967,11 @@ export const sendFeedback = async (
       throw new Error(`Erreur envoi feedback: ${response.status}`);
     }
 
-    console.log(
+    secureLog.log(
       "[apiService] Feedback envoyé avec succès (nouvelle architecture)",
     );
   } catch (error) {
-    console.error("[apiService] Erreur feedback:", error);
+    secureLog.error("[apiService] Erreur feedback:", error);
     throw error;
   }
 };
@@ -993,7 +986,7 @@ export const deleteConversation = async (
     throw new Error("ID de conversation requis");
   }
 
-  console.log(
+  secureLog.log(
     "[apiService] Suppression conversation (nouvelle architecture):",
     conversationId,
   );
@@ -1011,12 +1004,12 @@ export const deleteConversation = async (
 
     if (!response.ok) {
       if (response.status === 404) {
-        console.warn("[apiService] Conversation déjà supprimée ou inexistante");
+        secureLog.warn("[apiService] Conversation déjà supprimée ou inexistante");
         return;
       }
 
       const errorText = await response.text();
-      console.error("[apiService] Erreur delete conversation:", errorText);
+      secureLog.error("[apiService] Erreur delete conversation:", errorText);
 
       if (response.status === 401) {
         throw new Error("Session expirée. Veuillez vous reconnecter.");
@@ -1026,12 +1019,12 @@ export const deleteConversation = async (
     }
 
     const result = await response.json();
-    console.log(
+    secureLog.log(
       "[apiService] Conversation supprimée (nouvelle architecture):",
       result.message || "Succès",
     );
   } catch (error) {
-    console.error("[apiService] Erreur suppression conversation:", error);
+    secureLog.error("[apiService] Erreur suppression conversation:", error);
     throw error;
   }
 };
@@ -1046,7 +1039,7 @@ export const clearAllUserConversations = async (
     throw new Error("User ID requis");
   }
 
-  console.log(
+  secureLog.log(
     "[apiService] Suppression toutes conversations (nouvelle architecture):",
     userId,
   );
@@ -1064,7 +1057,7 @@ export const clearAllUserConversations = async (
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[apiService] Erreur clear all conversations:", errorText);
+      secureLog.error("[apiService] Erreur clear all conversations:", errorText);
 
       if (response.status === 401) {
         throw new Error("Session expirée. Veuillez vous reconnecter.");
@@ -1074,7 +1067,7 @@ export const clearAllUserConversations = async (
     }
 
     const result = await response.json();
-    console.log(
+    secureLog.log(
       "[apiService] Toutes conversations supprimées (nouvelle architecture):",
       {
         message: result.message,
@@ -1082,7 +1075,7 @@ export const clearAllUserConversations = async (
       },
     );
   } catch (error) {
-    console.error(
+    secureLog.error(
       "[apiService] Erreur suppression toutes conversations:",
       error,
     );
@@ -1095,7 +1088,7 @@ export const clearAllUserConversations = async (
 export const getTopicSuggestions = async (
   language: string = "fr",
 ): Promise<string[]> => {
-  console.log("[apiService] Récupération suggestions sujets:", language);
+  secureLog.log("[apiService] Récupération suggestions sujets:", language);
 
   try {
     const headers = await getAuthHeaders();
@@ -1109,7 +1102,7 @@ export const getTopicSuggestions = async (
     );
 
     if (!response.ok) {
-      console.warn("[apiService] Erreur récupération sujets:", response.status);
+      secureLog.warn("[apiService] Erreur récupération sujets:", response.status);
 
       return [
         "Problèmes de croissance poulets",
@@ -1122,11 +1115,11 @@ export const getTopicSuggestions = async (
     }
 
     const data = await response.json();
-    console.log("[apiService] Sujets récupérés:", data.topics?.length || 0);
+    secureLog.log("[apiService] Sujets récupérés:", data.topics?.length || 0);
 
     return Array.isArray(data.topics) ? data.topics : [];
   } catch (error) {
-    console.error("[apiService] Erreur sujets:", error);
+    secureLog.error("[apiService] Erreur sujets:", error);
 
     return [
       "Problèmes de croissance poulets",
@@ -1150,14 +1143,14 @@ export const checkAPIHealth = async (): Promise<boolean> => {
     });
 
     const isHealthy = response.ok;
-    console.log(
+    secureLog.log(
       "[apiService] API Health (nouvelle architecture):",
       isHealthy ? "OK" : "KO",
     );
 
     return isHealthy;
   } catch (error) {
-    console.error("[apiService] Erreur health check:", error);
+    secureLog.error("[apiService] Erreur health check:", error);
     return false;
   }
 };
@@ -1176,11 +1169,11 @@ export const checkLLMHealth = async (): Promise<any> => {
     }
 
     const data = await response.json();
-    console.log("[apiService] LLM Health:", data.status);
+    secureLog.log("[apiService] LLM Health:", data.status);
 
     return data;
   } catch (error) {
-    console.error("[apiService] Erreur LLM health check:", error);
+    secureLog.error("[apiService] Erreur LLM health check:", error);
     return { status: "unhealthy", error: error.message };
   }
 };
@@ -1199,11 +1192,11 @@ export const runLLMDiagnostic = async (): Promise<any> => {
     }
 
     const data = await response.json();
-    console.log("[apiService] LLM Diagnostic terminé");
+    secureLog.log("[apiService] LLM Diagnostic terminé");
 
     return data;
   } catch (error) {
-    console.error("[apiService] Erreur LLM diagnostic:", error);
+    secureLog.error("[apiService] Erreur LLM diagnostic:", error);
     return { success: false, error: error.message };
   }
 };
@@ -1270,7 +1263,7 @@ export const buildClarificationEntities = (
     }
   });
 
-  console.log("[apiService] Entités construites:", entities);
+  secureLog.log("[apiService] Entités construites:", entities);
   return entities;
 };
 
