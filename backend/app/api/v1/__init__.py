@@ -284,6 +284,24 @@ except Exception as e:
     conversations_router = None
     logger.error("ERREUR import conversations router: %s", e)
 
+# Shared router (pour l'accès public aux conversations partagées)
+SHARED_AVAILABLE = False
+try:
+    from .shared import router as shared_router
+
+    SHARED_AVAILABLE = True
+    logger.info(
+        "Shared router importé avec %d routes", len(shared_router.routes)
+    )
+except ImportError:
+    SHARED_AVAILABLE = False
+    shared_router = None
+    logger.warning("Shared router non disponible (normal si pas encore créé)")
+except Exception as e:
+    SHARED_AVAILABLE = False
+    shared_router = None
+    logger.error("ERREUR import shared router: %s", e)
+
 # Webhooks router (pour emails multilingues Supabase)
 WEBHOOKS_AVAILABLE = False
 try:
@@ -455,6 +473,16 @@ if CONVERSATIONS_AVAILABLE and conversations_router:
         conversations_router, prefix="/conversations", tags=["Conversations"]
     )
     logger.info("Conversations router monté")
+
+# Shared (pour l'accès public aux conversations partagées)
+if SHARED_AVAILABLE and shared_router:
+    router.include_router(
+        shared_router, prefix="/shared", tags=["Shared"]
+    )
+    logger.info("Shared router monté")
+    logger.info("Shared router maintenant disponible sur /v1/shared/*")
+else:
+    logger.warning("Shared router non monté (module non disponible)")
 
 # Webhooks (pour emails multilingues Supabase)
 if WEBHOOKS_AVAILABLE and webhooks_router:

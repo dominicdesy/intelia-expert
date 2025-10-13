@@ -35,6 +35,13 @@ class ConversationSaveRequest(BaseModel):
     metadata: Optional[Dict[str, Any]] = {}
 
 
+class ShareConversationRequest(BaseModel):
+    """Requête pour partager une conversation"""
+    share_type: str = "public"  # 'public' or 'private'
+    anonymize: bool = True
+    expires_in_days: Optional[int] = None  # None = permanent
+
+
 class MessageAddRequest(BaseModel):
     """Requête pour ajouter un message à une conversation existante"""
     conversation_id: str
@@ -535,6 +542,259 @@ async def delete_conversation_endpoint(
             detail=f"Erreur lors de la suppression: {str(e)}",
         )
 
+
+# ===== ENDPOINTS DE PARTAGE =====
+
+@router.post("/{conversation_id}/share")
+async def share_conversation(
+    conversation_id: str,
+    share_request: ShareConversationRequest,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Crée un lien de partage pour une conversation.
+    Seul le propriétaire de la conversation peut la partager.
+    """
+    try:
+        logger.info(
+            f"share_conversation: conversation_id={conversation_id}, "
+            f"user={current_user.get('email', 'unknown')}"
+        )
+
+        from app.core.database import get_pg_connection
+        from psycopg2.extras import RealDictCursor
+        import secrets
+
+        requester_id = current_user.get("user_id", "")
+
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Vérifier que la conversation existe et appartient à l'utilisateur
+                cur.execute(
+                    """
+                    SELECT user_id, status
+                    FROM conversations
+                    WHERE id = %s
+                    """,
+                    (conversation_id,)
+                )
+
+                conversation = cur.fetchone()
+
+                if not conversation:
+                    raise HTTPException(status_code=404, detail="Conversation non trouvée")
+
+                if conversation["user_id"] != requester_id and not current_user.get("is_admin", False):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Vous ne pouvez partager que vos propres conversations"
+                    )
+
+                if conversation["status"] == "deleted":
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Impossible de partager une conversation supprimée"
+                    )
+
+                # Générer un token de partage cryptographique
+                share_token = secrets.token_urlsafe(48)  # 64 caractères
+
+                # Calculer la date d'expiration
+                expires_at = None
+                if share_request.expires_in_days:
+                    from datetime import timedelta
+                    expires_at = datetime.utcnow() + timedelta(days=share_request.expires_in_days)
+
+                # Créer le partage
+                cur.execute(
+                    """
+                    INSERT INTO conversation_shares
+                    (conversation_id, share_token, created_by, share_type, anonymize, expires_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id, share_token, expires_at, created_at
+                    """,
+                    (
+                        conversation_id,
+                        share_token,
+                        requester_id,
+                        share_request.share_type,
+                        share_request.anonymize,
+                        expires_at
+                    )
+                )
+
+                share = cur.fetchone()
+
+        logger.info(f"Partage créé: share_id={share['id']}, token={share_token[:8]}...")
+
+        # Construire l'URL de partage
+        share_url = f"https://expert.intelia.com/shared/{share_token}"
+
+        return {
+            "status": "success",
+            "share_id": str(share["id"]),
+            "share_url": share_url,
+            "share_token": share_token,
+            "anonymize": share_request.anonymize,
+            "expires_at": share["expires_at"].isoformat() if share["expires_at"] else None,
+            "created_at": share["created_at"].isoformat(),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Erreur création partage pour {conversation_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la création du partage: {str(e)}",
+        )
+
+
+@router.get("/{conversation_id}/shares")
+async def get_conversation_shares(
+    conversation_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Liste tous les partages actifs d'une conversation.
+    """
+    try:
+        logger.info(f"get_conversation_shares: conversation_id={conversation_id}")
+
+        from app.core.database import get_pg_connection
+        from psycopg2.extras import RealDictCursor
+
+        requester_id = current_user.get("user_id", "")
+
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Vérifier la propriété
+                cur.execute(
+                    "SELECT user_id FROM conversations WHERE id = %s",
+                    (conversation_id,)
+                )
+                conversation = cur.fetchone()
+
+                if not conversation:
+                    raise HTTPException(status_code=404, detail="Conversation non trouvée")
+
+                if conversation["user_id"] != requester_id and not current_user.get("is_admin", False):
+                    raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+                # Récupérer les partages actifs
+                cur.execute(
+                    """
+                    SELECT
+                        id, share_token, share_type, anonymize,
+                        expires_at, view_count, last_viewed_at, created_at
+                    FROM conversation_shares
+                    WHERE conversation_id = %s
+                    AND (expires_at IS NULL OR expires_at > NOW())
+                    ORDER BY created_at DESC
+                    """,
+                    (conversation_id,)
+                )
+
+                shares = cur.fetchall()
+
+        shares_list = [
+            {
+                "id": str(share["id"]),
+                "share_url": f"https://expert.intelia.com/shared/{share['share_token']}",
+                "share_type": share["share_type"],
+                "anonymize": share["anonymize"],
+                "expires_at": share["expires_at"].isoformat() if share["expires_at"] else None,
+                "view_count": share["view_count"],
+                "last_viewed_at": share["last_viewed_at"].isoformat() if share["last_viewed_at"] else None,
+                "created_at": share["created_at"].isoformat(),
+            }
+            for share in shares
+        ]
+
+        logger.info(f"Partages trouvés: {len(shares_list)}")
+
+        return {
+            "status": "success",
+            "conversation_id": conversation_id,
+            "shares": shares_list,
+            "count": len(shares_list),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Erreur récupération partages pour {conversation_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la récupération: {str(e)}",
+        )
+
+
+@router.delete("/shares/{share_id}")
+async def revoke_share(
+    share_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Révoque un partage (le supprime).
+    """
+    try:
+        logger.info(f"revoke_share: share_id={share_id}")
+
+        from app.core.database import get_pg_connection
+        from psycopg2.extras import RealDictCursor
+
+        requester_id = current_user.get("user_id", "")
+
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Vérifier que le partage existe et appartient à l'utilisateur
+                cur.execute(
+                    """
+                    SELECT cs.id, cs.created_by, c.user_id as conversation_owner
+                    FROM conversation_shares cs
+                    JOIN conversations c ON cs.conversation_id = c.id
+                    WHERE cs.id = %s
+                    """,
+                    (share_id,)
+                )
+
+                share = cur.fetchone()
+
+                if not share:
+                    raise HTTPException(status_code=404, detail="Partage non trouvé")
+
+                # Vérifier que l'utilisateur est soit le créateur du partage, soit le propriétaire de la conversation
+                if (share["created_by"] != requester_id and
+                    share["conversation_owner"] != requester_id and
+                    not current_user.get("is_admin", False)):
+                    raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+                # Supprimer le partage
+                cur.execute("DELETE FROM conversation_shares WHERE id = %s", (share_id,))
+
+        logger.info(f"Partage révoqué: {share_id}")
+
+        return {
+            "status": "success",
+            "share_id": share_id,
+            "message": "Partage révoqué avec succès",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Erreur révocation partage {share_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la révocation: {str(e)}",
+        )
+
+
+# ===== ENDPOINT SUPPRESSION =====
 
 @router.delete("/user/{user_id}")
 async def delete_all_user_conversations(
