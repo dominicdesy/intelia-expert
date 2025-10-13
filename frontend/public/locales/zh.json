@@ -1,11 +1,9 @@
 {
   "page.title": "登录 Intelia Expert",
-
   "app.description": "您的专业家禽专家",
   "auth.continueWith": "继续使用",
   "auth.noAccountYet": "还没有账户？",
   "auth.oauthError": "OAuth连接错误。请检查您的连接",
-  
   "resetPassword.title": "新密码",
   "resetPassword.description": "为您的 Intelia Expert 账户选择一个安全的新密码",
   "resetPassword.newPassword": "新密码",
@@ -17,42 +15,33 @@
   "resetPassword.contactSupport": "联系支持",
   "resetPassword.validatingLink": "验证链接中...",
   "resetPassword.securityInfo": "您的新密码遵循现代安全标准。更易访问且同样安全。",
-
   "resetPassword.validation.maxLength": "最多允许128个字符",
   "resetPassword.validation.letterRequired": "至少需要一个字母",
   "resetPassword.validation.tooCommon": "密码太常见",
   "resetPassword.validation.tooRepetitive": "连续相同字符过多",
   "resetPassword.validation.avoidSequences": "避免字符序列",
-
   "resetPassword.requirements.hasLetter": "至少一个字母",
   "resetPassword.requirements.noRepetition": "无过度重复",
   "resetPassword.requirements.reasonableLength": "合理长度",
-
   "resetPassword.strength.weak": "弱",
   "resetPassword.strength.medium": "中等",
   "resetPassword.strength.good": "良好",
   "resetPassword.strength.excellent": "优秀",
-
   "resetPassword.passwordStrength": "密码强度",
   "resetPassword.tips": "提示",
-
   "resetPassword.tip.longerPassword": "使用12+字符以获得更好的安全性",
   "resetPassword.tip.mixCase": "混合大小写字母",
   "resetPassword.tip.specialChars": "特殊字符增强安全性（可选）",
-
   "resetPassword.success.description": "您的密码已成功更新。几秒钟内您将被重定向到 expert.intelia.com。",
   "resetPassword.success.goToSite": "立即前往 expert.intelia.com",
-
   "resetPassword.invalidToken.title": "链接过期或无效",
   "resetPassword.invalidToken.description": "此重置链接不再有效。可能已过期或已被使用。",
   "resetPassword.invalidToken.requestNew": "请求新链接",
   "resetPassword.invalidToken.backToSite": "返回 expert.intelia.com",
-
   "resetPassword.errors.tokenExpired": "令牌过期或无效。请求新的重置链接。",
   "resetPassword.errors.tooManyAttempts": "尝试次数过多。请几分钟后重试。",
   "resetPassword.errors.connectionProblem": "连接问题。检查您的网络连接。",
   "resetPassword.errors.generic": "重置密码时出错",
-
   "error.serverError": "服务器错误",
   "error.unexpectedResponse": "服务器意外响应",
   "error.checkConnection": "检查您的连接",
@@ -61,7 +50,6 @@
   "auth.invalidCredentials": "邮箱或密码错误",
   "auth.emailNotConfirmed": "邮箱未确认。请检查您的邮件",
   "auth.passwordRequirementsNotMet": "密码不符合所需标准",
-
   "auth.success": "登录成功",
   "auth.error": "登录错误",
   "auth.incomplete": "登录不完整",
@@ -70,17 +58,15 @@
   "auth.forgotPassword": "忘记密码?",
   "auth.newToIntelia": "Intelia Expert新用户?",
   "auth.createAccount": "创建账户",
-
   "placeholder.createSecurePassword": "创建安全密码",
   "placeholder.confirmNewPassword": "确认您的新密码",
   "validation.password.minLength": "至少8个字符",
   "validation.password.uppercase": "至少一个大写字母",
-  "validation.password.lowercase": "至少一个小写字母", 
+  "validation.password.lowercase": "至少一个小写字母",
   "validation.password.number": "至少一个数字",
   "validation.password.special": "至少一个特殊字符",
   "nav.conversationSidebar": "对话侧边栏",
   "nav.closeSidebar": "关闭侧边栏",
-
   "common.or": "或",
   "common.optional": "可选",
   "common.appName": "Intelia Expert",
@@ -100,7 +86,6 @@
   "common.reset": "重置",
   "common.apply": "应用",
   "common.update": "更新",
-
   "countries.fallbackWarning": "国家列表有限（外部服务暂时不可用）",
   "countries.searchPlaceholder": "搜索国家...",
   "countries.listLabel": "国家列表",
@@ -108,19 +93,16 @@
   "countries.noResults": "未找到国家",
   "countries.limitedList": "国家列表有限（外部服务暂时不可用）",
   "countries.loading": "正在加载国家...",
-
   "success.authSynchronized": "Auth store已与新数据同步",
   "success.profileUpdated": "资料更新成功！",
   "success.passwordChanged": "密码修改成功！",
   "success.languageUpdated": "语言已更新",
-
   "language.current": "当前语言",
   "language.debug.changing": "[LanguageModal] 更改语言:",
   "language.debug.interfaceUpdated": "[LanguageModal] 界面已更新",
   "language.debug.localStorageSaved": "[LanguageModal] localStorage已保存:",
   "language.debug.modalClosed": "[LanguageModal] 模态框已关闭",
   "language.debug.changeError": "[LanguageModal] 语言更改错误:",
-
   "invite.authRetrievalError": "从存储获取认证时出错:",
   "invite.loginRequired": "您必须登录才能发送邀请",
   "invite.loginRequiredTitle": "需要登录",
@@ -136,7 +118,6 @@
   "invite.sessionExpiredDetail": "您的会话已过期，请重新登录以继续",
   "invite.retryOrContact": "请重试或联系支持如果问题持续存在。",
   "invite.validationError": "验证错误",
-
   "invite.title": "邀请您的同事探索 Intelia Expert",
   "invite.subtitle": "与您的团队分享 Intelia Expert 的力量",
   "invite.sendStatus": "发送状态",
@@ -153,7 +134,6 @@
   "invite.sending": "发送中...",
   "invite.send": "发送",
   "invite.footerInfo": "邀请从 support@intelia.com 发送，您的姓名作为发送方。\n您的联系人将收到创建免费 Intelia Expert 账户的链接。",
-
   "invite.invitationSent": "邀请发送成功",
   "invite.userExists": "已有 Intelia Expert 账户",
   "invite.userExistsWithDate": "已有 Intelia Expert 账户",
@@ -166,7 +146,6 @@
   "invite.sendButton": "发送邀请",
   "invite.sentSuccess": "邀请发送成功！",
   "invite.error": "发送邀请时出错",
-
   "feedback.sendError": "反馈发送错误:",
   "feedback.positiveTitle": "感谢您的积极反馈！",
   "feedback.negativeTitle": "帮助我们改进",
@@ -179,7 +158,6 @@
   "feedback.learnMore": "了解更多",
   "feedback.sending": "发送中...",
   "feedback.send": "发送",
-
   "phone.limitedList": "有限的电话代码列表（外部服务暂时不可用）",
   "phone.countryCode": "国家代码",
   "phone.loading": "加载中...",
@@ -194,11 +172,9 @@
   "phone.phoneNumberHelp": "您的主要电话号码",
   "phone.validation.countryRequired": "需要国家代码",
   "phone.validation.numberRequired": "需要号码",
-
   "subscription.free": "免费",
   "subscription.premium.price": "¥200 / 月",
   "subscription.featuresIncluded": "包含功能",
-
   "userMenu.openMenu": "打开用户菜单",
   "userMenu.superAdmin": "超级管理员",
   "userMenu.debug.unmounting": "[DEBUG-UserMenu] 组件正在卸载",
@@ -207,9 +183,7 @@
   "userMenu.debug.logoutServiceError": "[UserMenu] 退出服务错误:",
   "userMenu.debug.toggleOpen": "[DEBUG-UserMenu] toggleOpen - isMounted:",
   "userMenu.debug.currentIsOpen": "current isOpen:",
-
   "nav.statistics": "统计",
-
   "chat.clarificationPlaceholder": "回答上面的问题...",
   "chat.clarificationInstruction": "只需在聊天中回复所请求的信息。",
   "chat.clarificationMode": "澄清模式：回答上面的问题",
@@ -219,20 +193,17 @@
   "chat.feedbackCommentPrefix": "评论: ",
   "chat.scrollToBottom": "回到对话底部",
   "chat.startQuestion": "从问问题开始",
-
   "history.toggleClicked": "[HistoryMenu] Toggle点击, isOpen:",
   "history.userPresent": "用户:",
   "history.loadingConversationsFor": "[HistoryMenu] 正在为以下用户加载对话:",
   "history.conversationsLoaded": "[HistoryMenu] 对话加载成功",
   "history.loadingError": "[HistoryMenu] 加载对话错误:",
   "history.renderState": "[HistoryMenu] 渲染状态:",
-
   "history.groups.today": "今天",
   "history.groups.yesterday": "昨天",
   "history.groups.thisWeek": "本周",
   "history.groups.thisMonth": "本月",
   "history.groups.older": "更早",
-
   "history.confirmClearAll": "删除所有对话？",
   "history.loadingConversations": "加载对话中...",
   "history.retrievingHistory": "正在检索您的历史记录",
@@ -242,7 +213,6 @@
   "history.refresh": "刷新",
   "history.messageCount": "条消息",
   "history.deleteConversation": "删除此对话",
-
   "chat.redirectingLogin": "重定向到登录:",
   "chat.sessionExpired": "会话已过期",
   "chat.authInitError": "Auth初始化错误:",
@@ -259,19 +229,16 @@
   "chat.feedbackSendError": "反馈发送错误:",
   "chat.feedbackGeneralError": "一般反馈错误:",
   "chat.redirectingInProgress": "重定向进行中...",
-
   "gdpr.notice": "通过登录，您同意我们的服务条款和隐私政策。",
   "legal.terms": "服务条款",
   "legal.privacy": "隐私政策",
   "login.email": "邮箱地址",
   "login.password": "密码",
-
   "login.rememberMe": "记住我",
   "login.emailLabel": "邮箱地址",
   "login.passwordLabel": "密码",
   "login.emailPlaceholder": "您的@email.com",
   "login.passwordPlaceholder": "您的密码",
-
   "verification.title": "邮箱验证",
   "verification.subtitle": "Intelia Expert - 专业AI助手",
   "verification.verifying": "验证中...",
@@ -286,13 +253,11 @@
   "verification.supportQuestion": "验证有问题？",
   "verification.supportSubject": "邮箱验证问题",
   "verification.contactSupport": "联系支持",
-
   "verification.success.title": "邮箱验证成功！",
   "verification.success.emailConfirmed": "您的邮箱地址已确认",
   "verification.success.confirmed": "您的邮箱地址已确认。",
   "verification.success.canLogin": "您现在可以登录您的Intelia Expert账户。",
   "verification.success.verified": "邮箱验证成功！",
-
   "verification.error.title": "验证错误",
   "verification.error.possibleCauses": "可能的原因:",
   "verification.error.expired": "链接已过期（超过24小时）",
@@ -303,7 +268,6 @@
   "verification.error.alreadyVerified": "此邮箱地址已验证。",
   "verification.error.generic": "验证邮箱时出错。",
   "verification.error.network": "连接问题。请检查您的网络连接。",
-
   "verification.pending.title": "邮箱验证待处理",
   "verification.pending.emailSentTo": "确认邮件已发送",
   "verification.pending.emailSent": "确认邮件已发送给您",
@@ -312,7 +276,6 @@
   "verification.pending.step1": "检查您的邮件收件箱",
   "verification.pending.step2": "点击确认链接",
   "verification.pending.step3": "返回登录",
-
   "nav.history": "对话历史",
   "nav.newConversation": "新对话",
   "nav.profile": "个人资料",
@@ -325,7 +288,6 @@
   "nav.inviteFriend": "邀请朋友",
   "nav.account": "账户",
   "nav.settings": "设置",
-
   "forgotPassword.title": "忘记密码",
   "forgotPassword.description": "输入您的邮箱地址，我们将为您发送重置密码的链接",
   "forgotPassword.emailLabel": "邮箱地址",
@@ -347,7 +309,6 @@
   "forgotPassword.tooManyAttempts": "尝试次数过多。请几分钟后重试",
   "forgotPassword.connectionError": "连接问题。请检查您的网络连接",
   "forgotPassword.genericError": "发送重置邮件时出错",
-
   "invitation.validating": "正在验证您的邀请...",
   "invitation.processing": "处理中...",
   "invitation.completeProfile": "完善您的个人资料",
@@ -364,7 +325,6 @@
   "invitation.createAccount": "创建我的账户",
   "invitation.needHelp": "需要帮助？联系我们 ",
   "invitation.loadingInvitation": "加载邀请中...",
-
   "invitation.status.tokenValidated": "邀请令牌已验证",
   "invitation.status.tokenError": "令牌验证错误",
   "invitation.status.accountCreated": "账户创建成功",
@@ -372,7 +332,6 @@
   "invitation.status.processing": "处理中",
   "invitation.redirecting.dashboard": "重定向到您的仪表板...",
   "invitation.redirecting.login": "重定向到登录页面...",
-
   "invitation.errors.missingToken": "URL中缺少访问令牌",
   "invitation.errors.tokenValidation": "令牌验证错误",
   "invitation.errors.noInvitation": "在此URL中未找到邀请",
@@ -381,11 +340,9 @@
   "invitation.errors.missingAccessToken": "缺少访问令牌",
   "invitation.errors.profileCompletion": "完成个人资料时出错",
   "invitation.errors.accountCompletion": "完成账户时出错",
-
   "invitation.success.tokenValidated": "邀请令牌已验证",
   "invitation.success.accountCreated": "账户创建成功！",
   "invitation.success.welcome": "欢迎！您的Intelia Expert账户已成功创建。",
-
   "validation.required.firstName": "需要名字",
   "validation.required.lastName": "需要姓氏",
   "validation.required.fullName": "需要全名",
@@ -396,27 +353,21 @@
   "validation.required.accessToken": "需要访问令牌",
   "validation.correctErrors": "请纠正以下错误:",
   "validation.invalidData": "无效数据",
-  
   "validation.password.requirements": "密码要求",
   "validation.password.match": "密码匹配",
   "validation.password.mismatch": "密码不匹配",
-  
   "validation.phone.incomplete": "电话不完整：请填写缺失字段",
   "validation.phone.invalid": "电话格式无效",
-
   "placeholder.firstName": "名字",
   "placeholder.lastName": "姓氏",
   "placeholder.jobTitle": "您的职位",
   "placeholder.email": "您的@email.com",
-
   "profile.security": "安全",
   "profile.countryCode": "国家代码",
   "profile.areaCode": "区号",
   "profile.phoneNumber": "电话号码",
   "profile.jobTitle": "职位",
-
   "contact.supportEmail": "support@intelia.com",
-  
   "chat.welcome": "欢迎使用 Intelia Expert",
   "chat.placeholder": "您好！今天我可以为您做些什么？",
   "chat.helpfulResponse": "有用的回答",
@@ -429,14 +380,12 @@
   "chat.disclaimer": "Intelia Expert 可能会出错。如有必要，请向专业人士核实答案。",
   "chat.send": "发送",
   "chat.askQuestion": "向专家提问...",
-  
   "modal.close": "关闭",
   "modal.cancel": "取消",
   "modal.save": "保存",
   "modal.back": "返回",
   "modal.loading": "保存中...",
   "modal.updating": "更新中...",
-  
   "profile.title": "个人资料",
   "profile.personalInfo": "个人信息",
   "profile.professionalInfo": "职业信息",
@@ -466,7 +415,6 @@
   "profile.passwordChanged": "密码修改成功！",
   "profile.profileUpdated": "资料更新成功！",
   "profile.optional": "（可选）",
-  
   "language.title": "语言",
   "language.description": "为 Intelia Expert 界面选择您的首选语言",
   "language.updating": "更新中...",
@@ -475,7 +423,6 @@
   "language.reloadForWidget": "为了让聊天小部件也使用新语言，建议刷新页面。",
   "language.reloadNow": "🔄 立即刷新",
   "language.continueWithoutReload": "⭐ 不刷新继续",
-  
   "subscription.title": "订阅",
   "subscription.currentPlan": "方案",
   "subscription.modify": "修改订阅",
@@ -485,7 +432,6 @@
   "subscription.cancellation": "取消",
   "subscription.cancel": "取消",
   "subscription.confirmCancel": "您确定要取消订阅吗？您将失去高级功能的访问权限。",
-  
   "contact.title": "联系我们",
   "contact.phone": "致电我们",
   "contact.phoneDescription": "如果您找不到解决方案，请致电我们直接与我们的团队交谈。",
@@ -497,14 +443,11 @@
   "contact.message": "消息",
   "contact.sendMessage": "发送消息",
   "contact.messageSent": "消息发送成功！",
-  
   "date.today": "今天",
   "date.format": "zh-CN",
-  
   "plan.essential": "基础版",
   "plan.pro": "专业版",
   "plan.max": "旗舰版",
-  
   "error.generic": "发生错误",
   "error.connection": "连接错误",
   "error.updateProfile": "更新个人资料时出错",
@@ -528,7 +471,6 @@
   "error.passwordServerError": "服务器连接错误。请重试。",
   "error.userNotConnected": "用户未连接",
   "error.validationErrors": "验证错误",
-  
   "form.required": "必填字段",
   "form.phoneFormat": "格式",
   "form.passwordMinLength": "至少8个字符",
@@ -537,7 +479,6 @@
   "form.passwordNumber": "至少一个数字",
   "form.passwordSpecial": "至少一个特殊字符",
   "form.passwordMismatch": "密码不匹配",
-  
   "ui.menu": "菜单",
   "ui.close": "关闭",
   "ui.open": "打开",
@@ -545,25 +486,21 @@
   "ui.collapse": "收起",
   "ui.previous": "上一个",
   "ui.next": "下一个",
-  
   "dialog.confirm": "确认",
   "dialog.cancel": "取消",
   "dialog.ok": "确定",
   "dialog.yes": "是",
   "dialog.no": "否",
-  
   "status.online": "在线",
   "status.offline": "离线",
   "status.connecting": "连接中...",
   "status.connected": "已连接",
   "status.disconnected": "已断开连接",
-  
   "account.settings": "账户设置",
   "account.preferences": "偏好设置",
   "account.security": "安全",
   "account.privacy": "隐私",
   "account.notifications": "通知",
-  
   "history.clear": "清除历史",
   "history.delete": "删除",
   "history.export": "导出",
@@ -571,13 +508,11 @@
   "history.filter": "筛选历史",
   "history.noResults": "未找到结果",
   "history.confirmClear": "您确定要清除所有历史记录吗？",
-  
   "user.menu": "用户菜单",
   "user.profile": "我的个人资料",
   "user.settings": "设置",
   "user.logout": "登出",
   "user.account": "我的账户",
-  
   "placeholder.linkedinPersonal": "https://linkedin.com/in/您的资料",
   "placeholder.companyName": "您的公司或企业名称",
   "placeholder.companyWebsite": "https://www.您的公司.com",
@@ -586,12 +521,10 @@
   "placeholder.currentPassword": "输入您的当前密码",
   "placeholder.newPassword": "输入您的新密码",
   "placeholder.confirmPassword": "确认您的新密码",
-  
   "gdpr.deleteAccount": "删除我的账户",
   "gdpr.exportData": "导出我的数据",
   "gdpr.confirmDelete": "您确定要永久删除您的账户吗？此操作无法撤销。",
   "gdpr.contactSupport": "要永久删除您的账户，请联系 support@intelia.com",
-  
   "country.canada": "加拿大",
   "country.usa": "美国",
   "country.france": "法国",
@@ -599,7 +532,6 @@
   "country.switzerland": "瑞士",
   "country.mexico": "墨西哥",
   "country.brazil": "巴西",
-
   "share.button": "分享",
   "share.modalTitle": "分享对话",
   "share.anonymize": "匿名化我的数据",
@@ -616,5 +548,29 @@
   "share.successMessage": "链接已成功创建。与您的同事或合作者分享它。",
   "share.copy": "复制",
   "share.copied": "已复制！",
-  "share.error": "创建分享链接时出错"
-  }
+  "share.error": "创建分享链接时出错",
+  "about.pageTitle": "关于 Intelia Expert",
+  "about.introduction": "Intelia Expert 是一个人工智能驱动的平台，旨在提供智能协助和各领域的专业知识。采用尖端技术构建，我们致力于为您的问题提供准确、可靠和有用的答案。",
+  "about.companyInformation": "公司信息",
+  "about.companyName": "Intelia Technologies Inc.",
+  "about.location": "Joliette (Quebec) Canada",
+  "about.email": "电子邮件",
+  "about.website": "网站",
+  "about.thirdPartyNotices": "第三方声明",
+  "about.thirdPartyIntro": "本产品包含根据各种开源许可证许可的第三方软件组件。我们感谢开源社区的贡献。",
+  "about.openSourceLicenses": "开源许可证",
+  "about.licensesUsed": "本项目中使用了以下许可证：",
+  "about.downloadFull": "下载完整的第三方声明",
+  "about.downloadDescription": "完整的第三方声明文档包含有关所有软件组件、其许可证和版权持有者的详细信息。",
+  "about.technologyStack": "技术栈",
+  "about.frontend": "前端",
+  "about.backend": "后端",
+  "about.aiml": "AI/ML",
+  "about.infrastructure": "基础设施",
+  "about.versionInfo": "版本信息",
+  "about.version": "版本",
+  "about.lastUpdated": "最后更新",
+  "about.license": "许可证",
+  "about.backToHome": "返回首页",
+  "nav.about": "关于"
+}

@@ -1,11 +1,9 @@
 {
   "page.title": "Inloggen bij Intelia Expert",
-
   "app.description": "Uw gespecialiseerde pluimvee-expert",
   "auth.continueWith": "Doorgaan met",
   "auth.noAccountYet": "Nog geen account?",
   "auth.oauthError": "OAuth-verbindingsfout. Controleer uw verbinding",
-  
   "resetPassword.title": "Nieuw wachtwoord",
   "resetPassword.description": "Kies een veilig nieuw wachtwoord voor uw Intelia Expert-account",
   "resetPassword.newPassword": "Nieuw wachtwoord",
@@ -17,42 +15,33 @@
   "resetPassword.contactSupport": "Contact opnemen met ondersteuning",
   "resetPassword.validatingLink": "Link valideren...",
   "resetPassword.securityInfo": "Uw nieuwe wachtwoord volgt moderne beveiligingsstandaarden. Toegankelijker en even veilig.",
-
   "resetPassword.validation.maxLength": "Maximaal 128 tekens toegestaan",
   "resetPassword.validation.letterRequired": "Minimaal één letter vereist",
   "resetPassword.validation.tooCommon": "Wachtwoord te gebruikelijk",
   "resetPassword.validation.tooRepetitive": "Te veel opeenvolgende identieke tekens",
   "resetPassword.validation.avoidSequences": "Vermijd tekenreeksen",
-
   "resetPassword.requirements.hasLetter": "Minimaal één letter",
   "resetPassword.requirements.noRepetition": "Geen buitensporige herhaling",
   "resetPassword.requirements.reasonableLength": "Redelijke lengte",
-
   "resetPassword.strength.weak": "Zwak",
   "resetPassword.strength.medium": "Gemiddeld",
   "resetPassword.strength.good": "Goed",
   "resetPassword.strength.excellent": "Uitstekend",
-
   "resetPassword.passwordStrength": "Wachtwoordsterkte",
   "resetPassword.tips": "Tips",
-
   "resetPassword.tip.longerPassword": "Gebruik 12+ tekens voor betere beveiliging",
   "resetPassword.tip.mixCase": "Mix hoofdletters en kleine letters",
   "resetPassword.tip.specialChars": "Speciale tekens verbeteren de beveiliging (optioneel)",
-
   "resetPassword.success.description": "Uw wachtwoord is succesvol bijgewerkt. U wordt over enkele seconden doorgestuurd naar expert.intelia.com.",
   "resetPassword.success.goToSite": "Ga nu naar expert.intelia.com",
-
   "resetPassword.invalidToken.title": "Verlopen of ongeldige link",
   "resetPassword.invalidToken.description": "Deze resetlink is niet meer geldig. Deze kan verlopen zijn of al gebruikt zijn.",
   "resetPassword.invalidToken.requestNew": "Nieuwe link aanvragen",
   "resetPassword.invalidToken.backToSite": "Terug naar expert.intelia.com",
-
   "resetPassword.errors.tokenExpired": "Token verlopen of ongeldig. Vraag een nieuwe resetlink aan.",
   "resetPassword.errors.tooManyAttempts": "Te veel pogingen. Probeer het over een paar minuten opnieuw.",
   "resetPassword.errors.connectionProblem": "Verbindingsprobleem. Controleer uw internetverbinding.",
   "resetPassword.errors.generic": "Fout bij het resetten van het wachtwoord",
-
   "error.serverError": "Serverfout",
   "error.unexpectedResponse": "Onverwacht serverantwoord",
   "error.checkConnection": "Controleer uw verbinding",
@@ -61,7 +50,6 @@
   "auth.invalidCredentials": "Onjuiste e-mail of wachtwoord",
   "auth.emailNotConfirmed": "E-mail niet bevestigd. Controleer uw e-mails",
   "auth.passwordRequirementsNotMet": "Wachtwoord voldoet niet aan de vereiste criteria",
-
   "auth.success": "Inloggen succesvol",
   "auth.error": "Inlogfout",
   "auth.incomplete": "Onvolledige inlog",
@@ -70,17 +58,15 @@
   "auth.forgotPassword": "Wachtwoord vergeten?",
   "auth.newToIntelia": "Nieuw bij Intelia Expert?",
   "auth.createAccount": "Account aanmaken",
-
   "placeholder.createSecurePassword": "Maak een veilig wachtwoord",
   "placeholder.confirmNewPassword": "Bevestig je nieuwe wachtwoord",
   "validation.password.minLength": "Minimaal 8 tekens",
   "validation.password.uppercase": "Minimaal één hoofdletter",
-  "validation.password.lowercase": "Minimaal één kleine letter", 
+  "validation.password.lowercase": "Minimaal één kleine letter",
   "validation.password.number": "Minimaal één cijfer",
   "validation.password.special": "Minimaal één speciaal teken",
   "nav.conversationSidebar": "Gesprekken zijbalk",
   "nav.closeSidebar": "Zijbalk sluiten",
-
   "common.or": "of",
   "common.optional": "optioneel",
   "common.appName": "Intelia Expert",
@@ -100,7 +86,6 @@
   "common.reset": "Resetten",
   "common.apply": "Toepassen",
   "common.update": "Bijwerken",
-
   "countries.fallbackWarning": "Beperkte landenlijst (externe service tijdelijk niet beschikbaar)",
   "countries.searchPlaceholder": "Zoek naar een land...",
   "countries.listLabel": "Landenlijst",
@@ -108,19 +93,16 @@
   "countries.noResults": "Geen landen gevonden",
   "countries.limitedList": "Beperkte landenlijst (externe service tijdelijk niet beschikbaar)",
   "countries.loading": "Landen laden...",
-
   "success.authSynchronized": "Auth store gesynchroniseerd met nieuwe gegevens",
   "success.profileUpdated": "Profiel succesvol bijgewerkt!",
   "success.passwordChanged": "Wachtwoord succesvol gewijzigd!",
   "success.languageUpdated": "Taal bijgewerkt",
-
   "language.current": "Huidige taal",
   "language.debug.changing": "[LanguageModal] Taal wijzigen:",
   "language.debug.interfaceUpdated": "[LanguageModal] Interface bijgewerkt",
   "language.debug.localStorageSaved": "[LanguageModal] localStorage opgeslagen:",
   "language.debug.modalClosed": "[LanguageModal] Modal gesloten",
   "language.debug.changeError": "[LanguageModal] Taal wijzigen fout:",
-
   "invite.authRetrievalError": "Fout bij ophalen auth uit opslag:",
   "invite.loginRequired": "U moet ingelogd zijn om uitnodigingen te verzenden",
   "invite.loginRequiredTitle": "Inloggen vereist",
@@ -136,7 +118,6 @@
   "invite.sessionExpiredDetail": "Uw sessie is verlopen, log opnieuw in om door te gaan",
   "invite.retryOrContact": "Probeer opnieuw of neem contact op met support als het probleem aanhoudt.",
   "invite.validationError": "Validatiefout",
-
   "invite.title": "Nodig uw collega's uit om Intelia Expert te ontdekken",
   "invite.subtitle": "Deel de kracht van Intelia Expert met uw team",
   "invite.sendStatus": "Verzendstatus",
@@ -153,7 +134,6 @@
   "invite.sending": "Verzenden...",
   "invite.send": "Verzenden",
   "invite.footerInfo": "Uitnodigingen worden verstuurd vanaf support@intelia.com met uw naam als afzender.\nUw contacten ontvangen een link om gratis hun Intelia Expert-account aan te maken.",
-
   "invite.invitationSent": "Uitnodiging succesvol verzonden",
   "invite.userExists": "heeft al een Intelia Expert-account",
   "invite.userExistsWithDate": "heeft al een Intelia Expert-account",
@@ -166,7 +146,6 @@
   "invite.sendButton": "Uitnodiging verzenden",
   "invite.sentSuccess": "Uitnodiging succesvol verzonden!",
   "invite.error": "Fout bij het verzenden van uitnodiging",
-
   "feedback.sendError": "Feedback verzenden fout:",
   "feedback.positiveTitle": "Bedankt voor uw positieve feedback!",
   "feedback.negativeTitle": "Help ons verbeteren",
@@ -179,7 +158,6 @@
   "feedback.learnMore": "Meer leren",
   "feedback.sending": "Verzenden...",
   "feedback.send": "Verzenden",
-
   "phone.limitedList": "Beperkte telefooncodelijst (externe service tijdelijk niet beschikbaar)",
   "phone.countryCode": "Landcode",
   "phone.loading": "Laden...",
@@ -194,11 +172,9 @@
   "phone.phoneNumberHelp": "Uw hoofd telefoonnummer",
   "phone.validation.countryRequired": "Landcode vereist",
   "phone.validation.numberRequired": "Nummer vereist",
-
   "subscription.free": "Gratis",
   "subscription.premium.price": "€29 / maand",
   "subscription.featuresIncluded": "Inbegrepen functies",
-
   "userMenu.openMenu": "Gebruikersmenu openen",
   "userMenu.superAdmin": "Super Admin",
   "userMenu.debug.unmounting": "[DEBUG-UserMenu] Component ontkoppelen",
@@ -207,9 +183,7 @@
   "userMenu.debug.logoutServiceError": "[UserMenu] Uitlog service fout:",
   "userMenu.debug.toggleOpen": "[DEBUG-UserMenu] toggleOpen - isMounted:",
   "userMenu.debug.currentIsOpen": "current isOpen:",
-
   "nav.statistics": "Statistieken",
-
   "chat.clarificationPlaceholder": "Antwoord op de vraag hierboven...",
   "chat.clarificationInstruction": "Antwoord gewoon in de chat met de gevraagde informatie.",
   "chat.clarificationMode": "Verduidelijkingsmodus: beantwoord de vraag hierboven",
@@ -219,20 +193,17 @@
   "chat.feedbackCommentPrefix": "Reactie: ",
   "chat.scrollToBottom": "Naar beneden scrollen",
   "chat.startQuestion": "Begin met het stellen van een vraag",
-
   "history.toggleClicked": "[HistoryMenu] Toggle geklikt, isOpen:",
   "history.userPresent": "gebruiker:",
   "history.loadingConversationsFor": "[HistoryMenu] Gesprekken laden voor:",
   "history.conversationsLoaded": "[HistoryMenu] Gesprekken succesvol geladen",
   "history.loadingError": "[HistoryMenu] Fout bij laden gesprekken:",
   "history.renderState": "[HistoryMenu] Renderstaat:",
-
   "history.groups.today": "Vandaag",
   "history.groups.yesterday": "Gisteren",
   "history.groups.thisWeek": "Deze week",
   "history.groups.thisMonth": "Deze maand",
   "history.groups.older": "Ouder",
-
   "history.confirmClearAll": "Alle gesprekken verwijderen?",
   "history.loadingConversations": "Gesprekken laden...",
   "history.retrievingHistory": "Uw geschiedenis ophalen",
@@ -242,7 +213,6 @@
   "history.refresh": "Vernieuwen",
   "history.messageCount": "msg",
   "history.deleteConversation": "Dit gesprek verwijderen",
-
   "chat.redirectingLogin": "Omleiding naar login:",
   "chat.sessionExpired": "Sessie verlopen",
   "chat.authInitError": "Fout auth initialisatie:",
@@ -259,19 +229,16 @@
   "chat.feedbackSendError": "Fout verzenden feedback:",
   "chat.feedbackGeneralError": "Algemene feedback fout:",
   "chat.redirectingInProgress": "Omleiding bezig...",
-
   "gdpr.notice": "Door in te loggen, accepteert u onze gebruiksvoorwaarden en privacybeleid.",
   "legal.terms": "Gebruiksvoorwaarden",
   "legal.privacy": "Privacybeleid",
   "login.email": "E-mailadres",
   "login.password": "Wachtwoord",
-
   "login.rememberMe": "Ingelogd blijven",
   "login.emailLabel": "E-mailadres",
   "login.passwordLabel": "Wachtwoord",
   "login.emailPlaceholder": "uw@email.com",
   "login.passwordPlaceholder": "Uw wachtwoord",
-
   "verification.title": "E-mail Verificatie",
   "verification.subtitle": "Intelia Expert - Gespecialiseerde AI Assistent",
   "verification.verifying": "Verificatie bezig...",
@@ -286,13 +253,11 @@
   "verification.supportQuestion": "Probleem met de verificatie?",
   "verification.supportSubject": "E-mail verificatie probleem",
   "verification.contactSupport": "Contact support",
-
   "verification.success.title": "E-mail succesvol geverifieerd!",
   "verification.success.emailConfirmed": "Uw e-mailadres is bevestigd",
   "verification.success.confirmed": "Uw e-mailadres is bevestigd.",
   "verification.success.canLogin": "U kunt nu inloggen op uw Intelia Expert account.",
   "verification.success.verified": "E-mail succesvol geverifieerd!",
-
   "verification.error.title": "Verificatiefout",
   "verification.error.possibleCauses": "Mogelijke oorzaken:",
   "verification.error.expired": "De link is verlopen (meer dan 24u)",
@@ -303,7 +268,6 @@
   "verification.error.alreadyVerified": "Dit e-mailadres is al geverifieerd.",
   "verification.error.generic": "Fout bij het verifiëren van de e-mail.",
   "verification.error.network": "Verbindingsprobleem. Controleer uw internetverbinding.",
-
   "verification.pending.title": "E-mail verificatie wachtend",
   "verification.pending.emailSentTo": "Een bevestigingsmail is verzonden",
   "verification.pending.emailSent": "Een bevestigingsmail is naar u verzonden",
@@ -312,7 +276,6 @@
   "verification.pending.step1": "Controleer uw e-mail inbox",
   "verification.pending.step2": "Klik op de bevestigingslink",
   "verification.pending.step3": "Kom terug om in te loggen",
-
   "nav.history": "Gespreksgeschiedenis",
   "nav.newConversation": "Nieuw gesprek",
   "nav.profile": "Profiel",
@@ -325,7 +288,6 @@
   "nav.inviteFriend": "Vriend uitnodigen",
   "nav.account": "Account",
   "nav.settings": "Instellingen",
-
   "forgotPassword.title": "Wachtwoord vergeten",
   "forgotPassword.description": "Voer uw e-mailadres in en we sturen u een link om uw wachtwoord opnieuw in te stellen",
   "forgotPassword.emailLabel": "E-mailadres",
@@ -347,7 +309,6 @@
   "forgotPassword.tooManyAttempts": "Te veel pogingen. Probeer over enkele minuten opnieuw",
   "forgotPassword.connectionError": "Verbindingsprobleem. Controleer uw internetverbinding",
   "forgotPassword.genericError": "Fout bij verzenden reset e-mail",
-
   "invitation.validating": "Uw uitnodiging valideren...",
   "invitation.processing": "Verwerking bezig...",
   "invitation.completeProfile": "Voltooi uw profiel",
@@ -364,7 +325,6 @@
   "invitation.createAccount": "Mijn account aanmaken",
   "invitation.needHelp": "Hulp nodig? Neem contact op via ",
   "invitation.loadingInvitation": "Uitnodiging laden...",
-
   "invitation.status.tokenValidated": "Uitnodigingstoken gevalideerd",
   "invitation.status.tokenError": "Fout bij token validatie",
   "invitation.status.accountCreated": "Account succesvol aangemaakt",
@@ -372,7 +332,6 @@
   "invitation.status.processing": "Verwerking bezig",
   "invitation.redirecting.dashboard": "Omleiding naar uw dashboard...",
   "invitation.redirecting.login": "Omleiding naar inlogpagina...",
-
   "invitation.errors.missingToken": "Toegangstoken ontbreekt in URL",
   "invitation.errors.tokenValidation": "Fout bij token validatie",
   "invitation.errors.noInvitation": "Geen uitnodiging gevonden in deze URL",
@@ -381,11 +340,9 @@
   "invitation.errors.missingAccessToken": "Toegangstoken ontbreekt",
   "invitation.errors.profileCompletion": "Fout bij afronden profiel",
   "invitation.errors.accountCompletion": "Fout bij afronden account",
-
   "invitation.success.tokenValidated": "Uitnodigingstoken gevalideerd",
   "invitation.success.accountCreated": "Account succesvol aangemaakt!",
   "invitation.success.welcome": "Welkom! Uw Intelia Expert account is succesvol aangemaakt.",
-
   "validation.required.firstName": "Voornaam is vereist",
   "validation.required.lastName": "Achternaam is vereist",
   "validation.required.fullName": "Volledige naam is vereist",
@@ -396,27 +353,21 @@
   "validation.required.accessToken": "Toegangstoken vereist",
   "validation.correctErrors": "Corrigeer de volgende fouten:",
   "validation.invalidData": "Ongeldige gegevens",
-  
   "validation.password.requirements": "Wachtwoord vereisten",
   "validation.password.match": "Wachtwoorden komen overeen",
   "validation.password.mismatch": "Wachtwoorden komen niet overeen",
-  
   "validation.phone.incomplete": "Telefoon incompleet: vul de ontbrekende velden in",
   "validation.phone.invalid": "Ongeldig telefoonformaat",
-
   "placeholder.firstName": "Voornaam",
   "placeholder.lastName": "Achternaam",
   "placeholder.jobTitle": "Uw functietitel",
   "placeholder.email": "uw@email.com",
-
   "profile.security": "Beveiliging",
   "profile.countryCode": "Landcode",
   "profile.areaCode": "Netnummer",
   "profile.phoneNumber": "Telefoonnummer",
   "profile.jobTitle": "Functietitel",
-
   "contact.supportEmail": "support@intelia.com",
-  
   "chat.welcome": "Welkom bij Intelia Expert",
   "chat.placeholder": "Hallo! Hoe kan ik u vandaag helpen?",
   "chat.helpfulResponse": "Nuttig antwoord",
@@ -429,14 +380,12 @@
   "chat.disclaimer": "Intelia Expert kan fouten maken. Laat antwoorden indien nodig door een professional controleren.",
   "chat.send": "Verzenden",
   "chat.askQuestion": "Stel uw vraag aan de expert...",
-  
   "modal.close": "Sluiten",
   "modal.cancel": "Annuleren",
   "modal.save": "Opslaan",
   "modal.back": "Terug",
   "modal.loading": "Opslaan...",
   "modal.updating": "Bijwerken...",
-  
   "profile.title": "Profiel",
   "profile.personalInfo": "Persoonlijke informatie",
   "profile.professionalInfo": "Professionele informatie",
@@ -466,7 +415,6 @@
   "profile.passwordChanged": "Wachtwoord succesvol gewijzigd!",
   "profile.profileUpdated": "Profiel succesvol bijgewerkt!",
   "profile.optional": "(optioneel)",
-  
   "language.title": "Taal",
   "language.description": "Selecteer uw voorkeurstaal voor de Intelia Expert interface",
   "language.updating": "Bijwerken...",
@@ -475,7 +423,6 @@
   "language.reloadForWidget": "Voor de chatwidget in de nieuwe taal wordt een pagina-herlaad aanbevolen.",
   "language.reloadNow": "Nu herladen",
   "language.continueWithoutReload": "Doorgaan zonder herladen",
-  
   "subscription.title": "Abonnement",
   "subscription.currentPlan": "Plan",
   "subscription.modify": "Abonnement wijzigen",
@@ -485,7 +432,6 @@
   "subscription.cancellation": "Annulering",
   "subscription.cancel": "Annuleren",
   "subscription.confirmCancel": "Weet u zeker dat u uw abonnement wilt annuleren? U verliest toegang tot premium functies.",
-  
   "contact.title": "Contact opnemen",
   "contact.phone": "Bel ons",
   "contact.phoneDescription": "Als u geen oplossing vindt, bel ons om direct met ons team te spreken.",
@@ -497,14 +443,11 @@
   "contact.message": "Bericht",
   "contact.sendMessage": "Bericht verzenden",
   "contact.messageSent": "Bericht succesvol verzonden!",
-  
   "date.today": "Vandaag",
   "date.format": "nl-NL",
-  
   "plan.essential": "Essentieel",
   "plan.pro": "Pro",
   "plan.max": "Max",
-  
   "error.generic": "Er is een fout opgetreden",
   "error.connection": "Verbindingsfout",
   "error.updateProfile": "Fout bij bijwerken profiel",
@@ -528,7 +471,6 @@
   "error.passwordServerError": "Serververbindingsfout. Probeer opnieuw.",
   "error.userNotConnected": "Gebruiker niet verbonden",
   "error.validationErrors": "Validatiefouten",
-  
   "form.required": "Vereist veld",
   "form.phoneFormat": "Formaat",
   "form.passwordMinLength": "Ten minste 8 karakters",
@@ -537,7 +479,6 @@
   "form.passwordNumber": "Ten minste één cijfer",
   "form.passwordSpecial": "Ten minste één speciaal karakter",
   "form.passwordMismatch": "Wachtwoorden komen niet overeen",
-  
   "ui.menu": "Menu",
   "ui.close": "Sluiten",
   "ui.open": "Openen",
@@ -545,25 +486,21 @@
   "ui.collapse": "Inklappen",
   "ui.previous": "Vorige",
   "ui.next": "Volgende",
-  
   "dialog.confirm": "Bevestigen",
   "dialog.cancel": "Annuleren",
   "dialog.ok": "OK",
   "dialog.yes": "Ja",
   "dialog.no": "Nee",
-  
   "status.online": "Online",
   "status.offline": "Offline",
   "status.connecting": "Verbinden...",
   "status.connected": "Verbonden",
   "status.disconnected": "Niet verbonden",
-  
   "account.settings": "Account instellingen",
   "account.preferences": "Voorkeuren",
   "account.security": "Beveiliging",
   "account.privacy": "Privacy",
   "account.notifications": "Meldingen",
-  
   "history.clear": "Geschiedenis wissen",
   "history.delete": "Verwijderen",
   "history.export": "Exporteren",
@@ -571,13 +508,11 @@
   "history.filter": "Geschiedenis filteren",
   "history.noResults": "Geen resultaten gevonden",
   "history.confirmClear": "Weet u zeker dat u alle geschiedenis wilt wissen?",
-  
   "user.menu": "Gebruikersmenu",
   "user.profile": "Mijn profiel",
   "user.settings": "Instellingen",
   "user.logout": "Uitloggen",
   "user.account": "Mijn account",
-  
   "placeholder.linkedinPersonal": "https://linkedin.com/in/uw-profiel",
   "placeholder.companyName": "Naam van uw bedrijf of exploitatie",
   "placeholder.companyWebsite": "https://www.uw-bedrijf.com",
@@ -586,12 +521,10 @@
   "placeholder.currentPassword": "Typ uw huidige wachtwoord",
   "placeholder.newPassword": "Typ uw nieuwe wachtwoord",
   "placeholder.confirmPassword": "Bevestig uw nieuwe wachtwoord",
-  
   "gdpr.deleteAccount": "Mijn account verwijderen",
   "gdpr.exportData": "Mijn gegevens exporteren",
   "gdpr.confirmDelete": "Weet u zeker dat u uw account definitief wilt verwijderen? Deze actie is onomkeerbaar.",
   "gdpr.contactSupport": "Om uw account definitief te verwijderen, neem contact op met support@intelia.com",
-  
   "country.canada": "Canada",
   "country.usa": "Verenigde Staten",
   "country.france": "Frankrijk",
@@ -599,7 +532,6 @@
   "country.switzerland": "Zwitserland",
   "country.mexico": "Mexico",
   "country.brazil": "Brazilië",
-
   "share.button": "Delen",
   "share.modalTitle": "Gesprek delen",
   "share.anonymize": "Mijn gegevens anonimiseren",
@@ -616,5 +548,29 @@
   "share.successMessage": "De link is succesvol aangemaakt. Deel het met uw collega's of medewerkers.",
   "share.copy": "Kopiëren",
   "share.copied": "Gekopieerd!",
-  "share.error": "Fout bij aanmaken deel-link"
+  "share.error": "Fout bij aanmaken deel-link",
+  "about.pageTitle": "Over Intelia Expert",
+  "about.introduction": "Intelia Expert is een AI-aangedreven platform ontworpen om intelligente assistentie en expertkennis te bieden in verschillende domeinen. Gebouwd met geavanceerde technologie, streven we ernaar nauwkeurige, betrouwbare en nuttige antwoorden op uw vragen te geven.",
+  "about.companyInformation": "Bedrijfsinformatie",
+  "about.companyName": "Intelia Technologies Inc.",
+  "about.location": "Joliette (Quebec) Canada",
+  "about.email": "E-mail",
+  "about.website": "Website",
+  "about.thirdPartyNotices": "Kennisgevingen van derden",
+  "about.thirdPartyIntro": "Dit product bevat softwarecomponenten van derden die onder verschillende open source-licenties zijn gelicentieerd. We zijn de open source-gemeenschap dankbaar voor hun bijdragen.",
+  "about.openSourceLicenses": "Open Source-licenties",
+  "about.licensesUsed": "De volgende licenties worden gebruikt in dit project:",
+  "about.downloadFull": "Download volledige kennisgevingen van derden",
+  "about.downloadDescription": "Het volledige document met kennisgevingen van derden bevat gedetailleerde informatie over alle softwarecomponenten, hun licenties en copyrighthouders.",
+  "about.technologyStack": "Technologiestack",
+  "about.frontend": "Frontend",
+  "about.backend": "Backend",
+  "about.aiml": "AI/ML",
+  "about.infrastructure": "Infrastructuur",
+  "about.versionInfo": "Versie-informatie",
+  "about.version": "Versie",
+  "about.lastUpdated": "Laatst bijgewerkt",
+  "about.license": "Licentie",
+  "about.backToHome": "Terug naar home",
+  "nav.about": "Over"
 }

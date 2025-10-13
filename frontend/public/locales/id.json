@@ -1,11 +1,9 @@
 {
   "page.title": "Masuk ke Intelia Expert",
-
   "app.description": "Ahli unggas khusus Anda",
   "auth.continueWith": "Lanjutkan dengan",
   "auth.noAccountYet": "Belum punya akun?",
   "auth.oauthError": "Kesalahan koneksi OAuth. Periksa koneksi Anda",
-  
   "resetPassword.title": "Kata Sandi Baru",
   "resetPassword.description": "Pilih kata sandi baru yang aman untuk akun Intelia Expert Anda",
   "resetPassword.newPassword": "Kata sandi baru",
@@ -17,42 +15,33 @@
   "resetPassword.contactSupport": "Hubungi dukungan",
   "resetPassword.validatingLink": "Memvalidasi tautan...",
   "resetPassword.securityInfo": "Kata sandi baru Anda mengikuti standar keamanan modern. Lebih mudah diakses dan sama amannya.",
-
   "resetPassword.validation.maxLength": "Maksimal 128 karakter diizinkan",
   "resetPassword.validation.letterRequired": "Setidaknya satu huruf diperlukan",
   "resetPassword.validation.tooCommon": "Kata sandi terlalu umum",
   "resetPassword.validation.tooRepetitive": "Terlalu banyak karakter identik berturut-turut",
   "resetPassword.validation.avoidSequences": "Hindari urutan karakter",
-
   "resetPassword.requirements.hasLetter": "Setidaknya satu huruf",
   "resetPassword.requirements.noRepetition": "Tidak ada pengulangan berlebihan",
   "resetPassword.requirements.reasonableLength": "Panjang yang wajar",
-
   "resetPassword.strength.weak": "Lemah",
   "resetPassword.strength.medium": "Sedang",
   "resetPassword.strength.good": "Baik",
   "resetPassword.strength.excellent": "Sangat Baik",
-
   "resetPassword.passwordStrength": "Kekuatan kata sandi",
   "resetPassword.tips": "Tips",
-
   "resetPassword.tip.longerPassword": "Gunakan 12+ karakter untuk keamanan yang lebih baik",
   "resetPassword.tip.mixCase": "Campurkan huruf besar dan kecil",
   "resetPassword.tip.specialChars": "Karakter khusus meningkatkan keamanan (opsional)",
-
   "resetPassword.success.description": "Kata sandi Anda telah berhasil diperbarui. Anda akan dialihkan ke expert.intelia.com dalam beberapa detik.",
   "resetPassword.success.goToSite": "Pergi ke expert.intelia.com sekarang",
-
   "resetPassword.invalidToken.title": "Tautan kedaluwarsa atau tidak valid",
   "resetPassword.invalidToken.description": "Tautan reset ini tidak lagi valid. Mungkin sudah kedaluwarsa atau sudah digunakan.",
   "resetPassword.invalidToken.requestNew": "Minta tautan baru",
   "resetPassword.invalidToken.backToSite": "Kembali ke expert.intelia.com",
-
   "resetPassword.errors.tokenExpired": "Token kedaluwarsa atau tidak valid. Minta tautan reset baru.",
   "resetPassword.errors.tooManyAttempts": "Terlalu banyak percobaan. Silakan coba lagi dalam beberapa menit.",
   "resetPassword.errors.connectionProblem": "Masalah koneksi. Periksa koneksi internet Anda.",
   "resetPassword.errors.generic": "Kesalahan saat mereset kata sandi",
-
   "error.serverError": "Kesalahan server",
   "error.unexpectedResponse": "Respons server yang tidak diharapkan",
   "error.checkConnection": "Periksa koneksi Anda",
@@ -61,7 +50,6 @@
   "auth.invalidCredentials": "Email atau kata sandi salah",
   "auth.emailNotConfirmed": "Email belum dikonfirmasi. Periksa email Anda",
   "auth.passwordRequirementsNotMet": "Kata sandi tidak memenuhi kriteria yang diperlukan",
-
   "auth.success": "Masuk berhasil",
   "auth.error": "Gagal masuk",
   "auth.incomplete": "Masuk tidak lengkap",
@@ -70,17 +58,15 @@
   "auth.forgotPassword": "Lupa kata sandi?",
   "auth.newToIntelia": "Baru di Intelia Expert?",
   "auth.createAccount": "Buat akun",
-
   "placeholder.createSecurePassword": "Buat kata sandi yang aman",
   "placeholder.confirmNewPassword": "Konfirmasi kata sandi baru Anda",
   "validation.password.minLength": "Minimal 8 karakter",
   "validation.password.uppercase": "Minimal satu huruf kapital",
-  "validation.password.lowercase": "Minimal satu huruf kecil", 
+  "validation.password.lowercase": "Minimal satu huruf kecil",
   "validation.password.number": "Minimal satu angka",
   "validation.password.special": "Minimal satu karakter khusus",
   "nav.conversationSidebar": "Sidebar percakapan",
   "nav.closeSidebar": "Tutup sidebar",
-
   "common.or": "atau",
   "common.optional": "opsional",
   "common.appName": "Intelia Expert",
@@ -100,7 +86,6 @@
   "common.reset": "Reset",
   "common.apply": "Terapkan",
   "common.update": "Perbarui",
-
   "countries.fallbackWarning": "Daftar negara terbatas (layanan eksternal sementara tidak tersedia)",
   "countries.searchPlaceholder": "Cari negara...",
   "countries.listLabel": "Daftar negara",
@@ -108,19 +93,16 @@
   "countries.noResults": "Tidak ada negara ditemukan",
   "countries.limitedList": "Daftar negara terbatas (layanan eksternal sementara tidak tersedia)",
   "countries.loading": "Memuat negara...",
-
   "success.authSynchronized": "Store auth disinkronkan dengan data baru",
   "success.profileUpdated": "Profil berhasil diperbarui!",
   "success.passwordChanged": "Kata sandi berhasil diubah!",
   "success.languageUpdated": "Bahasa diperbarui",
-
   "language.current": "Bahasa saat ini",
   "language.debug.changing": "[LanguageModal] Mengubah bahasa:",
   "language.debug.interfaceUpdated": "[LanguageModal] Antarmuka diperbarui",
   "language.debug.localStorageSaved": "[LanguageModal] localStorage disimpan:",
   "language.debug.modalClosed": "[LanguageModal] Modal ditutup",
   "language.debug.changeError": "[LanguageModal] Kesalahan mengubah bahasa:",
-
   "invite.authRetrievalError": "Kesalahan mengambil auth dari storage:",
   "invite.loginRequired": "Anda harus masuk untuk mengirim undangan",
   "invite.loginRequiredTitle": "Masuk diperlukan",
@@ -136,7 +118,6 @@
   "invite.sessionExpiredDetail": "Sesi Anda telah berakhir, masuk kembali untuk melanjutkan",
   "invite.retryOrContact": "Silakan coba lagi atau hubungi dukungan jika masalah berlanjut.",
   "invite.validationError": "Kesalahan validasi",
-
   "invite.title": "Undang kolega Anda untuk menemukan Intelia Expert",
   "invite.subtitle": "Bagikan kekuatan Intelia Expert dengan tim Anda",
   "invite.sendStatus": "Status pengiriman",
@@ -153,7 +134,6 @@
   "invite.sending": "Mengirim...",
   "invite.send": "Kirim",
   "invite.footerInfo": "Undangan dikirim dari support@intelia.com dengan nama Anda sebagai pengirim.\nKontak Anda akan menerima tautan untuk membuat akun Intelia Expert gratis.",
-
   "invite.invitationSent": "Undangan berhasil dikirim",
   "invite.userExists": "sudah memiliki akun Intelia Expert",
   "invite.userExistsWithDate": "sudah memiliki akun Intelia Expert",
@@ -166,7 +146,6 @@
   "invite.sendButton": "Kirim undangan",
   "invite.sentSuccess": "Undangan berhasil dikirim!",
   "invite.error": "Kesalahan saat mengirim undangan",
-
   "feedback.sendError": "Kesalahan mengirim feedback:",
   "feedback.positiveTitle": "Terima kasih atas feedback positif Anda!",
   "feedback.negativeTitle": "Bantu kami untuk memperbaiki",
@@ -179,7 +158,6 @@
   "feedback.learnMore": "Pelajari lebih lanjut",
   "feedback.sending": "Mengirim...",
   "feedback.send": "Kirim",
-
   "phone.limitedList": "Daftar kode telepon terbatas (layanan eksternal sementara tidak tersedia)",
   "phone.countryCode": "Kode negara",
   "phone.loading": "Memuat...",
@@ -194,11 +172,9 @@
   "phone.phoneNumberHelp": "Nomor telepon utama Anda",
   "phone.validation.countryRequired": "Kode negara diperlukan",
   "phone.validation.numberRequired": "Nomor diperlukan",
-
   "subscription.free": "Gratis",
   "subscription.premium.price": "29€ / bulan",
   "subscription.featuresIncluded": "Fitur yang disertakan",
-
   "userMenu.openMenu": "Buka menu pengguna",
   "userMenu.superAdmin": "Super Admin",
   "userMenu.debug.unmounting": "[DEBUG-UserMenu] Komponen sedang dibongkar",
@@ -207,9 +183,7 @@
   "userMenu.debug.logoutServiceError": "[UserMenu] Kesalahan layanan logout:",
   "userMenu.debug.toggleOpen": "[DEBUG-UserMenu] toggleOpen - isMounted:",
   "userMenu.debug.currentIsOpen": "current isOpen:",
-
   "nav.statistics": "Statistik",
-
   "chat.clarificationPlaceholder": "Jawab pertanyaan di atas...",
   "chat.clarificationInstruction": "Cukup jawab dalam chat dengan informasi yang diminta.",
   "chat.clarificationMode": "Mode klarifikasi: jawab pertanyaan di atas",
@@ -220,20 +194,17 @@
   "chat.scrollToBottom": "Kembali ke bawah percakapan",
   "chat.newConversation": "Percakapan baru",
   "chat.startQuestion": "Mulai dengan mengajukan pertanyaan",
-
   "history.toggleClicked": "[HistoryMenu] Toggle diklik, isOpen:",
   "history.userPresent": "pengguna:",
   "history.loadingConversationsFor": "[HistoryMenu] Memuat percakapan untuk:",
   "history.conversationsLoaded": "[HistoryMenu] Percakapan berhasil dimuat",
   "history.loadingError": "[HistoryMenu] Kesalahan memuat percakapan:",
   "history.renderState": "[HistoryMenu] Status render:",
-
   "history.groups.today": "Hari ini",
   "history.groups.yesterday": "Kemarin",
   "history.groups.thisWeek": "Minggu ini",
   "history.groups.thisMonth": "Bulan ini",
   "history.groups.older": "Lebih lama",
-
   "history.confirmClearAll": "Hapus semua percakapan?",
   "history.loadingConversations": "Memuat percakapan...",
   "history.retrievingHistory": "Mengambil riwayat Anda",
@@ -243,7 +214,6 @@
   "history.refresh": "Segarkan",
   "history.messageCount": "pesan",
   "history.deleteConversation": "Hapus percakapan ini",
-
   "chat.redirectingLogin": "Mengarahkan ke login:",
   "chat.sessionExpired": "Sesi berakhir",
   "chat.authInitError": "Kesalahan inisialisasi auth:",
@@ -260,19 +230,16 @@
   "chat.feedbackSendError": "Kesalahan mengirim feedback:",
   "chat.feedbackGeneralError": "Kesalahan umum feedback:",
   "chat.redirectingInProgress": "Pengalihan sedang berlangsung...",
-
   "gdpr.notice": "Dengan masuk, Anda menyetujui syarat penggunaan dan kebijakan privasi kami.",
   "legal.terms": "Syarat penggunaan",
   "legal.privacy": "Kebijakan privasi",
   "login.email": "Alamat email",
   "login.password": "Kata sandi",
-
   "login.rememberMe": "Ingat saya",
   "login.emailLabel": "Alamat email",
   "login.passwordLabel": "Kata sandi",
   "login.emailPlaceholder": "anda@email.com",
   "login.passwordPlaceholder": "Kata sandi Anda",
-
   "verification.title": "Verifikasi Email",
   "verification.subtitle": "Intelia Expert - Asisten AI Spesialis",
   "verification.verifying": "Memverifikasi...",
@@ -287,13 +254,11 @@
   "verification.supportQuestion": "Masalah dengan verifikasi?",
   "verification.supportSubject": "Masalah verifikasi email",
   "verification.contactSupport": "Hubungi dukungan",
-
   "verification.success.title": "Email berhasil diverifikasi!",
   "verification.success.emailConfirmed": "Alamat email Anda telah dikonfirmasi",
   "verification.success.confirmed": "Alamat email Anda telah dikonfirmasi.",
   "verification.success.canLogin": "Anda sekarang dapat masuk ke akun Intelia Expert Anda.",
   "verification.success.verified": "Email berhasil diverifikasi!",
-
   "verification.error.title": "Kesalahan verifikasi",
   "verification.error.possibleCauses": "Kemungkinan penyebab:",
   "verification.error.expired": "Tautan telah kedaluwarsa (lebih dari 24 jam)",
@@ -304,7 +269,6 @@
   "verification.error.alreadyVerified": "Alamat email ini sudah diverifikasi.",
   "verification.error.generic": "Kesalahan saat memverifikasi email.",
   "verification.error.network": "Masalah koneksi. Periksa koneksi internet Anda.",
-
   "verification.pending.title": "Verifikasi email menunggu",
   "verification.pending.emailSentTo": "Email konfirmasi telah dikirim",
   "verification.pending.emailSent": "Email konfirmasi telah dikirim kepada Anda",
@@ -313,7 +277,6 @@
   "verification.pending.step1": "Periksa kotak masuk email Anda",
   "verification.pending.step2": "Klik tautan konfirmasi",
   "verification.pending.step3": "Kembali untuk masuk",
-
   "nav.history": "Riwayat percakapan",
   "nav.newConversation": "Percakapan baru",
   "nav.profile": "Profil",
@@ -326,7 +289,6 @@
   "nav.inviteFriend": "Undang teman",
   "nav.account": "Akun",
   "nav.settings": "Pengaturan",
-
   "forgotPassword.title": "Lupa kata sandi",
   "forgotPassword.description": "Masukkan alamat email Anda dan kami akan mengirimkan tautan untuk mereset kata sandi",
   "forgotPassword.emailLabel": "Alamat email",
@@ -348,7 +310,6 @@
   "forgotPassword.tooManyAttempts": "Terlalu banyak percobaan. Silakan coba lagi dalam beberapa menit",
   "forgotPassword.connectionError": "Masalah koneksi. Periksa koneksi internet Anda",
   "forgotPassword.genericError": "Kesalahan saat mengirim email reset",
-
   "invitation.validating": "Memvalidasi undangan Anda...",
   "invitation.processing": "Memproses...",
   "invitation.completeProfile": "Lengkapi profil Anda",
@@ -365,7 +326,6 @@
   "invitation.createAccount": "Buat akun saya",
   "invitation.needHelp": "Butuh bantuan? Hubungi kami di ",
   "invitation.loadingInvitation": "Memuat undangan...",
-
   "invitation.status.tokenValidated": "Token undangan divalidasi",
   "invitation.status.tokenError": "Kesalahan validasi token",
   "invitation.status.accountCreated": "Akun berhasil dibuat",
@@ -373,7 +333,6 @@
   "invitation.status.processing": "Memproses",
   "invitation.redirecting.dashboard": "Mengalihkan ke dashboard Anda...",
   "invitation.redirecting.login": "Mengalihkan ke halaman login...",
-
   "invitation.errors.missingToken": "Token akses tidak ada di URL",
   "invitation.errors.tokenValidation": "Kesalahan validasi token",
   "invitation.errors.noInvitation": "Tidak ada undangan ditemukan di URL ini",
@@ -382,11 +341,9 @@
   "invitation.errors.missingAccessToken": "Token akses tidak ada",
   "invitation.errors.profileCompletion": "Kesalahan saat menyelesaikan profil",
   "invitation.errors.accountCompletion": "Kesalahan saat menyelesaikan akun",
-
   "invitation.success.tokenValidated": "Token undangan divalidasi",
   "invitation.success.accountCreated": "Akun berhasil dibuat!",
   "invitation.success.welcome": "Selamat datang! Akun Intelia Expert Anda telah berhasil dibuat.",
-
   "validation.required.firstName": "Nama depan diperlukan",
   "validation.required.lastName": "Nama belakang diperlukan",
   "validation.required.fullName": "Nama lengkap diperlukan",
@@ -397,27 +354,21 @@
   "validation.required.accessToken": "Token akses diperlukan",
   "validation.correctErrors": "Harap perbaiki kesalahan berikut:",
   "validation.invalidData": "Data tidak valid",
-  
   "validation.password.requirements": "Persyaratan kata sandi",
   "validation.password.match": "Kata sandi cocok",
   "validation.password.mismatch": "Kata sandi tidak cocok",
-  
   "validation.phone.incomplete": "Telepon tidak lengkap: harap isi kolom yang kosong",
   "validation.phone.invalid": "Format telepon tidak valid",
-
   "placeholder.firstName": "Nama depan",
   "placeholder.lastName": "Nama belakang",
   "placeholder.jobTitle": "Jabatan Anda",
   "placeholder.email": "anda@email.com",
-
   "profile.security": "Keamanan",
   "profile.countryCode": "Kode negara",
   "profile.areaCode": "Kode wilayah",
   "profile.phoneNumber": "Nomor telepon",
   "profile.jobTitle": "Jabatan",
-
   "contact.supportEmail": "support@intelia.com",
-  
   "chat.welcome": "Selamat datang di Intelia Expert",
   "chat.placeholder": "Halo! Bagaimana saya bisa membantu Anda hari ini?",
   "chat.helpfulResponse": "Respons bermanfaat",
@@ -429,14 +380,12 @@
   "chat.disclaimer": "Intelia Expert dapat membuat kesalahan. Minta profesional untuk memverifikasi jawaban jika diperlukan.",
   "chat.send": "Kirim",
   "chat.askQuestion": "Ajukan pertanyaan Anda kepada ahli...",
-  
   "modal.close": "Tutup",
   "modal.cancel": "Batal",
   "modal.save": "Simpan",
   "modal.back": "Kembali",
   "modal.loading": "Menyimpan...",
   "modal.updating": "Memperbarui...",
-  
   "profile.title": "Profil",
   "profile.personalInfo": "Informasi pribadi",
   "profile.professionalInfo": "Informasi Profesional",
@@ -466,7 +415,6 @@
   "profile.passwordChanged": "Kata sandi berhasil diubah!",
   "profile.profileUpdated": "Profil berhasil diperbarui!",
   "profile.optional": "(opsional)",
-  
   "language.title": "Bahasa",
   "language.description": "Pilih bahasa pilihan Anda untuk antarmuka Intelia Expert",
   "language.updating": "Memperbarui...",
@@ -475,7 +423,6 @@
   "language.reloadForWidget": "Agar widget chat juga dalam bahasa baru, disarankan untuk memuat ulang halaman.",
   "language.reloadNow": "Muat ulang sekarang",
   "language.continueWithoutReload": "Lanjutkan tanpa memuat ulang",
-  
   "subscription.title": "Berlangganan",
   "subscription.currentPlan": "Paket",
   "subscription.modify": "Ubah berlangganan",
@@ -485,7 +432,6 @@
   "subscription.cancellation": "Pembatalan",
   "subscription.cancel": "Batal",
   "subscription.confirmCancel": "Apakah Anda yakin ingin membatalkan berlangganan? Anda akan kehilangan akses ke fitur premium.",
-  
   "contact.title": "Hubungi kami",
   "contact.phone": "Telepon kami",
   "contact.phoneDescription": "Jika Anda tidak menemukan solusi, hubungi kami untuk berbicara langsung dengan tim kami.",
@@ -497,14 +443,11 @@
   "contact.message": "Pesan",
   "contact.sendMessage": "Kirim pesan",
   "contact.messageSent": "Pesan berhasil dikirim!",
-  
   "date.today": "Hari ini",
   "date.format": "id-ID",
-  
   "plan.essential": "Esensial",
   "plan.pro": "Pro",
   "plan.max": "Maksimal",
-  
   "error.generic": "Terjadi kesalahan",
   "error.connection": "Kesalahan koneksi",
   "error.updateProfile": "Kesalahan saat memperbarui profil",
@@ -528,7 +471,6 @@
   "error.passwordServerError": "Kesalahan koneksi server. Silakan coba lagi.",
   "error.userNotConnected": "Pengguna tidak terhubung",
   "error.validationErrors": "Kesalahan validasi",
-  
   "form.required": "Kolom wajib",
   "form.phoneFormat": "Format",
   "form.passwordMinLength": "Minimal 8 karakter",
@@ -537,7 +479,6 @@
   "form.passwordNumber": "Minimal satu angka",
   "form.passwordSpecial": "Minimal satu karakter khusus",
   "form.passwordMismatch": "Kata sandi tidak cocok",
-  
   "ui.menu": "Menu",
   "ui.close": "Tutup",
   "ui.open": "Buka",
@@ -545,25 +486,21 @@
   "ui.collapse": "Lipat",
   "ui.previous": "Sebelumnya",
   "ui.next": "Selanjutnya",
-  
   "dialog.confirm": "Konfirmasi",
   "dialog.cancel": "Batal",
   "dialog.ok": "OK",
   "dialog.yes": "Ya",
   "dialog.no": "Tidak",
-  
   "status.online": "Online",
   "status.offline": "Offline",
   "status.connecting": "Menghubungkan...",
   "status.connected": "Terhubung",
   "status.disconnected": "Terputus",
-  
   "account.settings": "Pengaturan akun",
   "account.preferences": "Preferensi",
   "account.security": "Keamanan",
   "account.privacy": "Privasi",
   "account.notifications": "Notifikasi",
-  
   "history.clear": "Hapus riwayat",
   "history.delete": "Hapus",
   "history.export": "Ekspor",
@@ -571,13 +508,11 @@
   "history.filter": "Filter riwayat",
   "history.noResults": "Tidak ada hasil ditemukan",
   "history.confirmClear": "Apakah Anda yakin ingin menghapus semua riwayat?",
-  
   "user.menu": "Menu pengguna",
   "user.profile": "Profil saya",
   "user.settings": "Pengaturan",
   "user.logout": "Keluar",
   "user.account": "Akun saya",
-  
   "placeholder.linkedinPersonal": "https://linkedin.com/in/profil-anda",
   "placeholder.companyName": "Nama perusahaan atau usaha Anda",
   "placeholder.companyWebsite": "https://www.perusahaan-anda.com",
@@ -586,12 +521,10 @@
   "placeholder.currentPassword": "Ketik kata sandi saat ini",
   "placeholder.newPassword": "Ketik kata sandi baru Anda",
   "placeholder.confirmPassword": "Konfirmasi kata sandi baru Anda",
-  
   "gdpr.deleteAccount": "Hapus akun saya",
   "gdpr.exportData": "Ekspor data saya",
   "gdpr.confirmDelete": "Apakah Anda yakin ingin menghapus akun Anda secara permanen? Tindakan ini tidak dapat dibatalkan.",
   "gdpr.contactSupport": "Untuk menghapus akun Anda secara permanen, silakan hubungi support@intelia.com",
-  
   "country.canada": "Kanada",
   "country.usa": "Amerika Serikat",
   "country.france": "Prancis",
@@ -600,7 +533,6 @@
   "country.mexico": "Meksiko",
   "country.brazil": "Brasil",
   "country.indonesia": "Indonesia",
-
   "share.button": "Bagikan",
   "share.modalTitle": "Bagikan percakapan",
   "share.anonymize": "Anonimkan data saya",
@@ -617,5 +549,29 @@
   "share.successMessage": "Tautan telah berhasil dibuat. Bagikan dengan kolega atau kolaborator Anda.",
   "share.copy": "Salin",
   "share.copied": "Disalin!",
-  "share.error": "Kesalahan membuat tautan berbagi"
+  "share.error": "Kesalahan membuat tautan berbagi",
+  "about.pageTitle": "Tentang Intelia Expert",
+  "about.introduction": "Intelia Expert adalah platform bertenaga AI yang dirancang untuk memberikan bantuan cerdas dan pengetahuan ahli di berbagai domain. Dibangun dengan teknologi terdepan, kami berusaha memberikan jawaban yang akurat, andal, dan membantu untuk pertanyaan Anda.",
+  "about.companyInformation": "Informasi Perusahaan",
+  "about.companyName": "Intelia Technologies Inc.",
+  "about.location": "Joliette (Quebec) Kanada",
+  "about.email": "Email",
+  "about.website": "Situs web",
+  "about.thirdPartyNotices": "Pemberitahuan Pihak Ketiga",
+  "about.thirdPartyIntro": "Produk ini berisi komponen perangkat lunak pihak ketiga yang dilisensikan di bawah berbagai lisensi sumber terbuka. Kami berterima kasih kepada komunitas sumber terbuka atas kontribusi mereka.",
+  "about.openSourceLicenses": "Lisensi Sumber Terbuka",
+  "about.licensesUsed": "Lisensi berikut digunakan dalam proyek ini:",
+  "about.downloadFull": "Unduh Pemberitahuan Pihak Ketiga Lengkap",
+  "about.downloadDescription": "Dokumen pemberitahuan pihak ketiga lengkap berisi informasi rinci tentang semua komponen perangkat lunak, lisensi mereka, dan pemegang hak cipta.",
+  "about.technologyStack": "Tumpukan Teknologi",
+  "about.frontend": "Frontend",
+  "about.backend": "Backend",
+  "about.aiml": "AI/ML",
+  "about.infrastructure": "Infrastruktur",
+  "about.versionInfo": "Informasi Versi",
+  "about.version": "Versi",
+  "about.lastUpdated": "Terakhir Diperbarui",
+  "about.license": "Lisensi",
+  "about.backToHome": "Kembali ke Beranda",
+  "nav.about": "Tentang"
 }

@@ -238,6 +238,7 @@ export interface TranslationKeys {
   "nav.language": string;
   "nav.subscription": string;
   "nav.contact": string;
+  "nav.about": string;
   "nav.legal": string;
   "nav.logout": string;
   "nav.clearAll": string;
@@ -727,6 +728,33 @@ export interface TranslationKeys {
   "share.copy": string;
   "share.copied": string;
   "share.error": string;
+
+  // ===========================================
+  // ABOUT PAGE
+  // ===========================================
+  "about.pageTitle": string;
+  "about.introduction": string;
+  "about.companyInformation": string;
+  "about.companyName": string;
+  "about.location": string;
+  "about.email": string;
+  "about.website": string;
+  "about.thirdPartyNotices": string;
+  "about.thirdPartyIntro": string;
+  "about.openSourceLicenses": string;
+  "about.licensesUsed": string;
+  "about.downloadFull": string;
+  "about.downloadDescription": string;
+  "about.technologyStack": string;
+  "about.frontend": string;
+  "about.backend": string;
+  "about.aiml": string;
+  "about.infrastructure": string;
+  "about.versionInfo": string;
+  "about.version": string;
+  "about.lastUpdated": string;
+  "about.license": string;
+  "about.backToHome": string;
 }
 
 // SYSTÈME DE NOTIFICATION POUR FORCER LES RE-RENDERS
