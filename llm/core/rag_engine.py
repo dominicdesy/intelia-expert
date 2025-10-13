@@ -13,7 +13,7 @@ import time
 from typing import TYPE_CHECKING
 from utils.types import Dict, List, Optional, Any
 
-from config.config import RAG_ENABLED
+from config.config import RAG_ENABLED, ENABLE_EXTERNAL_SOURCES
 
 try:
     from .data_models import RAGResult, RAGSource
@@ -189,8 +189,8 @@ class InteliaRAGEngine(InitializableMixin):
             await self._configure_handlers()
 
             # Initialize processors after handlers are configured
-            # 🆕 Enable external sources if Weaviate is available
-            enable_external = bool(self.weaviate_core)
+            # 🆕 Enable external sources if config enabled AND Weaviate is available
+            enable_external = ENABLE_EXTERNAL_SOURCES and bool(self.weaviate_core)
 
             self.query_processor = RAGQueryProcessor(
                 query_router=self.query_router,

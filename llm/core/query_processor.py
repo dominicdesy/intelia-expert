@@ -13,6 +13,15 @@ from .data_models import RAGResult, RAGSource
 from .query_enricher import ConversationalQueryEnricher
 from utils.clarification_helper import get_clarification_helper
 from utils.llm_translator import LLMTranslator
+from config.config import (
+    EXTERNAL_SEARCH_THRESHOLD,
+    ENABLE_SEMANTIC_SCHOLAR,
+    ENABLE_PUBMED,
+    ENABLE_EUROPE_PMC,
+    ENABLE_FAO,
+    EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE,
+    EXTERNAL_SOURCES_MIN_YEAR,
+)
 
 logger = logging.getLogger(__name__)
 structured_logger = structlog.get_logger()
@@ -65,10 +74,10 @@ class RAGQueryProcessor:
                 from external_sources.ingestion_service import DocumentIngestionService
 
                 self.external_manager = ExternalSourceManager(
-                    enable_semantic_scholar=True,
-                    enable_pubmed=True,
-                    enable_europe_pmc=True,
-                    enable_fao=False  # FAO is placeholder
+                    enable_semantic_scholar=ENABLE_SEMANTIC_SCHOLAR,
+                    enable_pubmed=ENABLE_PUBMED,
+                    enable_europe_pmc=ENABLE_EUROPE_PMC,
+                    enable_fao=ENABLE_FAO
                 )
 
                 self.ingestion_service = DocumentIngestionService(
@@ -459,8 +468,6 @@ class RAGQueryProcessor:
         step6_duration = time.time() - step6_start
 
         # Step 6.5: 🆕 Try external sources if low confidence and system enabled
-        EXTERNAL_SEARCH_THRESHOLD = 0.7  # TODO: Move to config
-
         if (self.external_manager and
             hasattr(result, 'confidence') and
             result.confidence < EXTERNAL_SEARCH_THRESHOLD and
@@ -482,8 +489,8 @@ class RAGQueryProcessor:
                 external_result = await self.external_manager.search(
                     query=query_for_routing,
                     language=language,
-                    max_results_per_source=5,
-                    min_year=2015
+                    max_results_per_source=EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE,
+                    min_year=EXTERNAL_SOURCES_MIN_YEAR
                 )
                 external_duration = time.time() - external_start
 

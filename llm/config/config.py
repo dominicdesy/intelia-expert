@@ -109,6 +109,27 @@ MAX_CONVERSATION_CONTEXT = int(os.getenv("MAX_CONVERSATION_CONTEXT", "8"))
 HYBRID_SEARCH_ENABLED = os.getenv("HYBRID_SEARCH_ENABLED", "true").lower() == "true"
 DEFAULT_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
 
+# ===== EXTERNAL SOURCES CONFIGURATION =====
+# Query-driven document ingestion from external scientific sources
+ENABLE_EXTERNAL_SOURCES = os.getenv("ENABLE_EXTERNAL_SOURCES", "true").lower() == "true"
+EXTERNAL_SEARCH_THRESHOLD = float(os.getenv("EXTERNAL_SEARCH_THRESHOLD", "0.7"))
+EXTERNAL_SOURCES_LOG_DIR = os.getenv("EXTERNAL_SOURCES_LOG_DIR", "/app/logs/external_sources")
+
+# External sources settings
+EXTERNAL_SOURCES_ENABLED_BY_DEFAULT = True  # Auto-enable if Weaviate available
+EXTERNAL_SOURCES_PARALLEL_SEARCH = True  # Search all sources simultaneously
+EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE = int(os.getenv("EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE", "5"))
+EXTERNAL_SOURCES_MIN_YEAR = int(os.getenv("EXTERNAL_SOURCES_MIN_YEAR", "2015"))
+
+# Individual source toggles
+ENABLE_SEMANTIC_SCHOLAR = os.getenv("ENABLE_SEMANTIC_SCHOLAR", "true").lower() == "true"
+ENABLE_PUBMED = os.getenv("ENABLE_PUBMED", "true").lower() == "true"
+ENABLE_EUROPE_PMC = os.getenv("ENABLE_EUROPE_PMC", "true").lower() == "true"
+ENABLE_FAO = os.getenv("ENABLE_FAO", "false").lower() == "true"  # Placeholder only
+
+# Optional API keys
+PUBMED_API_KEY = os.getenv("PUBMED_API_KEY")  # Optional: increases rate limit
+
 # ===== CACHE CONFIGURATION =====
 CACHE_TOTAL_MEMORY_LIMIT_MB = int(os.getenv("CACHE_TOTAL_MEMORY_LIMIT_MB", "150"))
 CACHE_VALUE_MAX_SIZE_KB = int(os.getenv("CACHE_VALUE_MAX_SIZE_KB", "200"))
@@ -465,6 +486,19 @@ __all__ = [
     "HYBRID_SEARCH_ENABLED",
     "DEFAULT_ALPHA",
     "MAX_CONVERSATION_CONTEXT",
+    # External Sources
+    "ENABLE_EXTERNAL_SOURCES",
+    "EXTERNAL_SEARCH_THRESHOLD",
+    "EXTERNAL_SOURCES_LOG_DIR",
+    "EXTERNAL_SOURCES_ENABLED_BY_DEFAULT",
+    "EXTERNAL_SOURCES_PARALLEL_SEARCH",
+    "EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE",
+    "EXTERNAL_SOURCES_MIN_YEAR",
+    "ENABLE_SEMANTIC_SCHOLAR",
+    "ENABLE_PUBMED",
+    "ENABLE_EUROPE_PMC",
+    "ENABLE_FAO",
+    "PUBMED_API_KEY",
     # Cache
     "CACHE_TOTAL_MEMORY_LIMIT_MB",
     "CACHE_VALUE_MAX_SIZE_KB",
