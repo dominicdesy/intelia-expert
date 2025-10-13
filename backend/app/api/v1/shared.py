@@ -6,7 +6,7 @@ Pas d'authentification requise pour consulter une conversation partagée.
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any, List
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 
 logger = logging.getLogger("app.api.v1.shared")
@@ -106,7 +106,7 @@ async def get_shared_conversation(share_token: str) -> Dict[str, Any]:
                     )
 
                 # Vérifier l'expiration
-                if share["expires_at"] and share["expires_at"] < datetime.utcnow():
+                if share["expires_at"] and share["expires_at"] < datetime.now(timezone.utc):
                     raise HTTPException(
                         status_code=410,
                         detail="Ce partage a expiré"
@@ -199,7 +199,7 @@ async def get_shared_conversation(share_token: str) -> Dict[str, Any]:
                 "view_count": share["view_count"] + 1,  # Inclure la vue actuelle
                 "expires_at": share["expires_at"].isoformat() if share["expires_at"] else None,
             },
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     except HTTPException:
@@ -252,7 +252,7 @@ async def check_share_health(share_token: str) -> Dict[str, Any]:
                         "message": "Conversation supprimée"
                     }
 
-                if share["expires_at"] and share["expires_at"] < datetime.utcnow():
+                if share["expires_at"] and share["expires_at"] < datetime.now(timezone.utc):
                     return {
                         "status": "expired",
                         "valid": False,
