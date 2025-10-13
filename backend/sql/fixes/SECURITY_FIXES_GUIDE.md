@@ -32,36 +32,25 @@ SET search_path = 'attacker_schema, public';
 
 ### Solution
 
-#### Étape 1: Vérifier les fonctions actuelles
+#### ✅ Le script est prêt à l'emploi !
 
-Avant d'appliquer les correctifs, vérifiez d'abord les définitions actuelles dans Supabase:
+Le fichier `fix_search_path_security.sql` contient les **définitions exactes** de vos fonctions actuelles avec uniquement l'ajout de `SET search_path = ''`.
 
-```sql
--- Obtenir les définitions complètes des fonctions
-SELECT
-  proname AS function_name,
-  pg_get_functiondef(oid) AS function_definition
-FROM pg_proc
-WHERE pronamespace = 'public'::regnamespace
-  AND proname IN ('handle_new_user', 'notify_user_created', 'update_updated_at_column');
-```
-
-#### Étape 2: Comparer avec le script de correction
-
-Ouvrez le fichier `fix_search_path_security.sql` et **comparez la logique avec vos fonctions actuelles**.
-
-Les implémentations dans le script sont des **exemples typiques**. Vous devrez peut-être les adapter.
-
-#### Étape 3: Exécuter le script
+#### Étape 1: Exécuter le script
 
 Dans le SQL Editor de Supabase:
 
 1. Allez dans **SQL Editor**
-2. Ouvrez `fix_search_path_security.sql`
-3. **ADAPTEZ** les fonctions si nécessaire
-4. Exécutez le script
+2. Copiez tout le contenu de `fix_search_path_security.sql`
+3. Collez dans le SQL Editor
+4. Cliquez sur **Run** (ou F5)
 
-#### Étape 4: Vérifier que c'est corrigé
+Le script va:
+- ✅ Re-créer les 3 fonctions avec `SET search_path = ''`
+- ✅ Conserver toute la logique existante (0 changement fonctionnel)
+- ✅ Afficher une requête de vérification à la fin
+
+#### Étape 2: Vérifier que c'est corrigé
 
 ```sql
 -- Cette requête doit montrer "SET search_path = ''" pour chaque fonction
@@ -153,22 +142,27 @@ Si après avoir exécuté les correctifs vous rencontrez des erreurs:
 
 ### Rollback d'urgence
 
-Si vous devez annuler les changements:
+Si vous devez annuler les changements (bien que ce soit très improbable):
 
 ```sql
--- Exemple pour handle_new_user (adaptez selon votre logique originale)
+-- Pour retirer le SET search_path, re-créez simplement la fonction SANS cette ligne
+-- Exemple pour handle_new_user:
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
--- PAS de SET search_path (version originale)
+-- Retirez simplement la ligne: SET search_path = ''
 AS $$
 BEGIN
-  -- Votre logique originale ici
+  INSERT INTO public.users (id, email, email_verified)
+  VALUES (NEW.id, NEW.email, NEW.email_confirmed_at IS NOT NULL)
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$;
 ```
+
+**Note**: Le rollback réintroduirait la vulnérabilité de sécurité - ne le faites que si absolument nécessaire.
 
 ---
 
