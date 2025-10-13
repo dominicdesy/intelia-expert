@@ -1,4 +1,5 @@
 import React from "react";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Types pour les données
 interface QuestionLog {
@@ -225,7 +226,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         ...conversations.map((c) => c.total_questions),
       );
 
-      console.log(
+      secureLog.log(
         `📊 Export CSV ${exportScope} de ${conversations.length} conversations, max ${maxQuestions} questions`,
       );
 
@@ -325,7 +326,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      console.log(
+      secureLog.log(
         `✅ Export CSV conversations ${exportScope} réussi: ${fileName}`,
       );
 
@@ -349,7 +350,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
 
       alert(summary);
     } catch (error) {
-      console.error("❌ Erreur export CSV conversations:", error);
+      secureLog.error("❌ Erreur export CSV conversations:", error);
       alert(`❌ Erreur export CSV: ${error}`);
     }
   };

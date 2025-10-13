@@ -1,5 +1,6 @@
 // hooks/useResponseConcision.ts - VERSION SIMPLIFIÉE POUR SÉLECTION DE VERSIONS BACKEND
 import { useState, useCallback, useEffect } from "react";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 export enum ConcisionLevel {
   ULTRA_CONCISE = "ultra_concise",
@@ -53,7 +54,7 @@ export const useResponseConcision = () => {
 
       // Retourner la version demandée si elle existe
       if (responseVersions[targetLevel]) {
-        console.log(
+        secureLog.log(
           `📋 [selectVersionFromResponse] Version ${targetLevel} sélectionnée`,
         );
         return responseVersions[targetLevel];
@@ -69,7 +70,7 @@ export const useResponseConcision = () => {
 
       for (const fallbackLevel of fallbackOrder) {
         if (responseVersions[fallbackLevel]) {
-          console.warn(
+          secureLog.warn(
             `⚠️ [selectVersionFromResponse] Fallback vers ${fallbackLevel} (${targetLevel} manquant)`,
           );
           return responseVersions[fallbackLevel];
@@ -78,7 +79,7 @@ export const useResponseConcision = () => {
 
       // Ultime fallback - première version disponible
       const firstAvailable = Object.values(responseVersions)[0];
-      console.warn(
+      secureLog.warn(
         "⚠️ [selectVersionFromResponse] Aucune version standard - utilisation première disponible",
       );
       return firstAvailable || "Réponse non disponible";
@@ -285,9 +286,9 @@ export function debugResponseVersions(
 ) {
   console.group("🔍 [responseVersions] Versions disponibles");
   Object.entries(responseVersions).forEach(([level, content]) => {
-    console.log(`${level}: ${content?.length || 0} caractères`);
+    secureLog.log(`${level}: ${content?.length || 0} caractères`);
     if (content) {
-      console.log(`  Aperçu: "${content.substring(0, 50)}..."`);
+      secureLog.log(`  Aperçu: "${content.substring(0, 50)}..."`);
     }
   });
   console.groupEnd();

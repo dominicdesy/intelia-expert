@@ -31,6 +31,7 @@ import {
   LoadingSpinner,
   AuthFooter,
 } from "./signup_components";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // ==================== HOOK USECOUNTRIES INTÉGRÉ ====================
 const fallbackCountries = [
@@ -65,24 +66,24 @@ interface Country {
 
 // Hook pour charger les pays depuis l'API REST Countries
 const useCountries = () => {
-  console.log("🎯 [Countries] Hook useCountries appelé!");
+  secureLog.log("🎯 [Countries] Hook useCountries appelé!");
 
   const [countries, setCountries] = useState<Country[]>(fallbackCountries);
   const [loading, setLoading] = useState(true);
   const [usingFallback, setUsingFallback] = useState(true);
 
   useEffect(() => {
-    console.log("🚀 [Countries] DÉMARRAGE du processus de chargement des pays");
+    secureLog.log("🚀 [Countries] DÉMARRAGE du processus de chargement des pays");
 
     const fetchCountries = async () => {
       try {
-        console.log(
+        secureLog.log(
           "🌍 [Countries] Début du chargement depuis l'API REST Countries...",
         );
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => {
-          console.log("⏱️ [Countries] Timeout atteint (10s)");
+          secureLog.log("⏱️ [Countries] Timeout atteint (10s)");
           controller.abort();
         }, 10000);
 
@@ -99,7 +100,7 @@ const useCountries = () => {
         );
 
         clearTimeout(timeoutId);
-        console.log(
+        secureLog.log(
           `📡 [Countries] Statut HTTP: ${response.status} ${response.statusText}`,
         );
 
@@ -108,10 +109,10 @@ const useCountries = () => {
         }
 
         const data = await response.json();
-        console.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`);
+        secureLog.log(`📊 [Countries] Données reçues: ${data.length} pays bruts`);
 
         if (!Array.isArray(data)) {
-          console.error("❌ [Countries] Format invalide - pas un array");
+          secureLog.error("❌ [Countries] Format invalide - pas un array");
           throw new Error("Format de données invalide");
         }
 
@@ -158,18 +159,18 @@ const useCountries = () => {
             a.label.localeCompare(b.label, "fr", { numeric: true }),
           );
 
-        console.log(
+        secureLog.log(
           `✅ [Countries] Pays valides après filtrage: ${formattedCountries.length}`,
         );
 
         if (formattedCountries.length >= 50) {
-          console.log(
+          secureLog.log(
             "🎉 [Countries] API validée! Utilisation des données complètes",
           );
           setCountries(formattedCountries);
           setUsingFallback(false);
         } else {
-          console.warn(
+          secureLog.warn(
             `⚠️ [Countries] Pas assez de pays valides: ${formattedCountries.length}/50`,
           );
           throw new Error(
@@ -177,18 +178,18 @@ const useCountries = () => {
           );
         }
       } catch (err: any) {
-        console.error("💥 [Countries] ERREUR:", err);
-        console.warn("🔄 [Countries] Passage en mode fallback");
+        secureLog.error("💥 [Countries] ERREUR:", err);
+        secureLog.warn("🔄 [Countries] Passage en mode fallback");
         setCountries(fallbackCountries);
         setUsingFallback(true);
       } finally {
-        console.log("🏁 [Countries] Chargement terminé");
+        secureLog.log("🏁 [Countries] Chargement terminé");
         setLoading(false);
       }
     };
 
     const timer = setTimeout(() => {
-      console.log("⏰ [Countries] Démarrage après délai de 100ms");
+      secureLog.log("⏰ [Countries] Démarrage après délai de 100ms");
       fetchCountries();
     }, 100);
 
@@ -209,7 +210,7 @@ const useCountryCodeMap = (countries: Country[]) => {
       {} as Record<string, string>,
     );
 
-    console.log(
+    secureLog.log(
       `🗺️ [CountryCodeMap] Mapping créé avec ${Object.keys(mapping).length} entrées`,
     );
     return mapping;
@@ -218,7 +219,7 @@ const useCountryCodeMap = (countries: Country[]) => {
 
 // Contenu principal de la page
 function PageContent() {
-  console.log("🚀 [PageContent] Composant PageContent rendu");
+  secureLog.log("🚀 [PageContent] Composant PageContent rendu");
 
   const router = useRouter();
   const pathname = usePathname();
@@ -228,13 +229,13 @@ function PageContent() {
   const { login, register, initializeSession } = useAuthStore();
 
   // ⭐ HOOK APPELÉ IMMÉDIATEMENT - PAS DE CONDITION
-  console.log("🎯 [PageContent] Appel du hook useCountries...");
+  secureLog.log("🎯 [PageContent] Appel du hook useCountries...");
   const {
     countries,
     loading: countriesLoading,
     usingFallback,
   } = useCountries();
-  console.log("📊 [PageContent] Hook useCountries retourné:", {
+  secureLog.log("📊 [PageContent] Hook useCountries retourné:", {
     countriesLength: countries.length,
     loading: countriesLoading,
     usingFallback,
@@ -275,17 +276,17 @@ function PageContent() {
 
   const safeRedirectToChat = useCallback(() => {
     if (redirectLock.current) {
-      console.log("🔒 [Redirect] Redirection déjà en cours, skip");
+      secureLog.log("🔒 [Redirect] Redirection déjà en cours, skip");
       return;
     }
 
     redirectLock.current = true;
-    console.log("🚀 [Redirect] Redirection vers /chat...");
+    secureLog.log("🚀 [Redirect] Redirection vers /chat...");
 
     try {
       router.push("/chat");
     } catch (error) {
-      console.error("❌ [Redirect] Erreur redirection:", error);
+      secureLog.error("❌ [Redirect] Erreur redirection:", error);
       redirectLock.current = false;
     }
   }, [router]);
@@ -348,7 +349,7 @@ function PageContent() {
     }
 
     try {
-      console.log("🔐 [Login] Tentative connexion...");
+      secureLog.log("🔐 [Login] Tentative connexion...");
 
       await login(loginData.email, loginData.password);
 
@@ -356,14 +357,14 @@ function PageContent() {
       rememberMeUtils.save(loginData.email, loginData.rememberMe);
 
       setLocalSuccess(t.authSuccess);
-      console.log("✅ [Login] Connexion réussie");
+      secureLog.log("✅ [Login] Connexion réussie");
 
       // Redirection automatique après succès
       setTimeout(() => {
         safeRedirectToChat();
       }, 1000);
     } catch (error: any) {
-      console.error("❌ [Login] Erreur connexion:", error);
+      secureLog.error("❌ [Login] Erreur connexion:", error);
       setLocalError(error?.message || t.authError);
     }
   };
@@ -381,7 +382,7 @@ function PageContent() {
     }
 
     try {
-      console.log("🔐 [Signup] Tentative création compte...");
+      secureLog.log("🔐 [Signup] Tentative création compte...");
 
       const userData = {
         email: signupData.email,
@@ -395,7 +396,7 @@ function PageContent() {
       await register(signupData.email, signupData.password, userData);
 
       setLocalSuccess(t.accountCreated);
-      console.log("✅ [Signup] Création compte réussie");
+      secureLog.log("✅ [Signup] Création compte réussie");
 
       // Retour au mode login après création
       setTimeout(() => {
@@ -403,7 +404,7 @@ function PageContent() {
         setLoginData((prev) => ({ ...prev, email: signupData.email }));
       }, 2000);
     } catch (error: any) {
-      console.error("❌ [Signup] Erreur création compte:", error);
+      secureLog.error("❌ [Signup] Erreur création compte:", error);
       setLocalError(error?.message || t.signupError);
     }
   };
@@ -419,7 +420,7 @@ function PageContent() {
   };
 
   const toggleMode = () => {
-    console.log(
+    secureLog.log(
       "🔄 [UI] Basculement mode:",
       isSignupMode ? "signup → login" : "login → signup",
     );
@@ -432,7 +433,7 @@ function PageContent() {
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
-      console.log("🎯 [Init] Initialisation unique");
+      secureLog.log("🎯 [Init] Initialisation unique");
 
       // Charger remember me
       const { rememberMe, lastEmail } = rememberMeUtils.load();
@@ -451,7 +452,7 @@ function PageContent() {
 
     if (!sessionInitialized.current) {
       sessionInitialized.current = true;
-      console.log("🔐 [Session] Initialisation unique de la session");
+      secureLog.log("🔐 [Session] Initialisation unique de la session");
       initializeSession();
     }
   }, [hasHydrated, initializeSession]);
@@ -461,13 +462,13 @@ function PageContent() {
 
     if (!hasCheckedAuth.current && !isLoading) {
       hasCheckedAuth.current = true;
-      console.log("🔐 [Auth] Vérification unique de l'authentification");
+      secureLog.log("🔐 [Auth] Vérification unique de l'authentification");
 
       if (isAuthenticated && user) {
-        console.log("✅ [Auth] Utilisateur connecté, redirection...");
+        secureLog.log("✅ [Auth] Utilisateur connecté, redirection...");
         safeRedirectToChat();
       } else {
-        console.log("❌ [Auth] Utilisateur non connecté");
+        secureLog.log("❌ [Auth] Utilisateur non connecté");
       }
     }
   }, [hasHydrated, isLoading, isAuthenticated, user, safeRedirectToChat]);
@@ -493,11 +494,11 @@ function PageContent() {
 
   // Affichage loading pendant l'hydratation
   if (!hasHydrated || isLoading) {
-    console.log("⏳ [Render] Affichage du spinner de chargement");
+    secureLog.log("⏳ [Render] Affichage du spinner de chargement");
     return <LoadingSpinner />;
   }
 
-  console.log("🎨 [Render] Rendu de la page principale");
+  secureLog.log("🎨 [Render] Rendu de la page principale");
 
   return (
     <>
@@ -943,7 +944,7 @@ function PageContent() {
 
 // Export principal avec Suspense
 export default function Page() {
-  console.log("🎁 [Page] Composant Page principal appelé");
+  secureLog.log("🎁 [Page] Composant Page principal appelé");
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <PageContent />

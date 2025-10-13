@@ -14,6 +14,7 @@ import type {
   FinalEvent,
   ErrorEvent,
 } from "@/types";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Type pour le payload de chat (conservé)
 export type ChatStreamBody = {
@@ -34,7 +35,7 @@ export async function streamAIResponse(
   onDelta: (text: string) => void,
   signal?: AbortSignal,
 ): Promise<string> {
-  console.log("[aiStream] Démarrage du stream:", {
+  secureLog.log("[aiStream] Démarrage du stream:", {
     tenant: body.tenant_id,
     lang: body.lang,
     message_preview: body.message.substring(0, 50) + "...",
@@ -51,7 +52,7 @@ export async function streamAIResponse(
       signal,
     });
 
-    console.log("[aiStream] Response status:", res.status);
+    secureLog.log("[aiStream] Response status:", res.status);
 
     // Si l'API retourne une erreur non-SSE (ex. 402 quota, 401 auth), on la propage
     if (!res.ok) {
@@ -66,7 +67,7 @@ export async function streamAIResponse(
         };
       }
 
-      console.error("[aiStream] Erreur HTTP:", errorInfo);
+      secureLog.error("[aiStream] Erreur HTTP:", errorInfo);
 
       const err: ErrorEvent = {
         type: "error",
@@ -82,7 +83,7 @@ export async function streamAIResponse(
 
     return await processSSEStream(res.body, onDelta, signal);
   } catch (error) {
-    console.error("[aiStream] Erreur stream:", error);
+    secureLog.error("[aiStream] Erreur stream:", error);
 
     // Si c'est une ErrorEvent, on la relance telle quelle
     if (
@@ -96,7 +97,7 @@ export async function streamAIResponse(
 
     // Si c'est une AbortError (stop volontaire), on retourne silencieusement
     if (error instanceof Error && error.name === "AbortError") {
-      console.log("[aiStream] Stream arrêté par l'utilisateur");
+      secureLog.log("[aiStream] Stream arrêté par l'utilisateur");
       return "";
     }
 
@@ -131,14 +132,14 @@ async function processSSEStream(
     while (true) {
       // Vérification du signal d'arrêt
       if (signal?.aborted) {
-        console.log("[aiStream] Stream interrompu par signal");
+        secureLog.log("[aiStream] Stream interrompu par signal");
         break;
       }
 
       const { value, done } = await reader.read();
 
       if (done) {
-        console.log("[aiStream] Stream terminé, deltas reçus:", deltaCount);
+        secureLog.log("[aiStream] Stream terminé, deltas reçus:", deltaCount);
         break;
       }
 
@@ -178,7 +179,7 @@ async function processSSEStream(
             case "final":
               const finalEvent = event as FinalEvent;
               finalAnswer = finalEvent.answer || "";
-              console.log(
+              secureLog.log(
                 "[aiStream] Réponse finale reçue, taille:",
                 finalAnswer.length,
               );
@@ -186,13 +187,13 @@ async function processSSEStream(
 
             case "error":
               const errorEvent = event as ErrorEvent;
-              console.error("[aiStream] Erreur dans le stream:", errorEvent);
+              secureLog.error("[aiStream] Erreur dans le stream:", errorEvent);
               throw errorEvent;
 
             // NOUVEAUX: Événements Agent
             case "agent_start":
               const agentStartEvent = event as AgentStartEvent;
-              console.log(
+              secureLog.log(
                 "[aiStream] Agent démarré:",
                 agentStartEvent.complexity,
                 "sous-requêtes:",
@@ -202,7 +203,7 @@ async function processSSEStream(
 
             case "agent_thinking":
               const agentThinkingEvent = event as AgentThinkingEvent;
-              console.log(
+              secureLog.log(
                 "[aiStream] Agent réfléchit:",
                 agentThinkingEvent.decisions?.length || 0,
                 "décisions",
@@ -215,7 +216,7 @@ async function processSSEStream(
                 // Traiter le chunk comme un delta pour compatibilité
                 onDelta(chunkEvent.content);
                 deltaCount++;
-                console.log(
+                secureLog.log(
                   "[aiStream] Chunk reçu:",
                   chunkEvent.content.length,
                   "chars, confidence:",
@@ -226,7 +227,7 @@ async function processSSEStream(
 
             case "agent_progress":
               const agentProgressEvent = event as AgentProgressEvent;
-              console.log(
+              secureLog.log(
                 "[aiStream] Progression Agent:",
                 agentProgressEvent.step,
                 agentProgressEvent.progress + "%",
@@ -235,7 +236,7 @@ async function processSSEStream(
 
             case "agent_end":
               const agentEndEvent = event as AgentEndEvent;
-              console.log(
+              secureLog.log(
                 "[aiStream] Agent terminé:",
                 agentEndEvent.synthesis_method,
                 "sources utilisées:",
@@ -245,13 +246,13 @@ async function processSSEStream(
 
             case "agent_error":
               const agentErrorEvent = event as AgentErrorEvent;
-              console.error("[aiStream] Erreur Agent:", agentErrorEvent.error);
+              secureLog.error("[aiStream] Erreur Agent:", agentErrorEvent.error);
               // Ne pas interrompre le stream pour une erreur Agent
               break;
 
             case "proactive_followup":
               const followupEvent = event as ProactiveFollowupEvent;
-              console.log(
+              secureLog.log(
                 "[aiStream] Suggestion proactive reçue:",
                 followupEvent.suggestion,
               );
@@ -259,7 +260,7 @@ async function processSSEStream(
               break;
 
             default:
-              console.warn(
+              secureLog.warn(
                 "[aiStream] Type d'événement inconnu:",
                 (event as any).type,
               );
@@ -267,7 +268,7 @@ async function processSSEStream(
         } catch (parseError) {
           // Ignore les lignes JSON malformées (chunks partiels)
           // En mode debug, on pourrait logger
-          // console.debug('[aiStream] Ligne JSON ignorée:', jsonStr.substring(0, 100));
+          // secureLog.debug('[aiStream] Ligne JSON ignorée:', jsonStr.substring(0, 100));
         }
       }
     }
@@ -307,7 +308,7 @@ export async function testStreamConnection(
 
     return received;
   } catch (error) {
-    console.error("[aiStream] Test de connexion échoué:", error);
+    secureLog.error("[aiStream] Test de connexion échoué:", error);
     return false;
   }
 }
@@ -358,11 +359,11 @@ export function getErrorMessage(error: any): string {
 export const aiStreamDebug = {
   logConfig: () => {
     console.group("[aiStream] Configuration");
-    console.log("Endpoint:", "/llm/chat");
-    console.log("Mode:", "SSE (Server-Sent Events)");
-    console.log("Encoding:", "UTF-8");
-    console.log("Parser:", "Tolérant aux coupures + Support Agent");
-    console.log("Événements supportés:", [
+    secureLog.log("Endpoint:", "/llm/chat");
+    secureLog.log("Mode:", "SSE (Server-Sent Events)");
+    secureLog.log("Encoding:", "UTF-8");
+    secureLog.log("Parser:", "Tolérant aux coupures + Support Agent");
+    secureLog.log("Événements supportés:", [
       "delta",
       "final",
       "error",

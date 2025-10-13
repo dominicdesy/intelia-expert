@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/auth";
 import ClientOnly from "./ClientOnly";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -51,7 +52,7 @@ export default function ProtectedRoute({
 
         setIsChecking(false);
       } catch (error) {
-        console.error("❌ Erreur vérification auth:", error);
+        secureLog.error("❌ Erreur vérification auth:", error);
         setIsChecking(false);
       }
     };
@@ -66,7 +67,7 @@ export default function ProtectedRoute({
 
     // Pas connecté = redirection login avec message
     if (!isAuthenticated || !user) {
-      console.log("🚫 Utilisateur non authentifié - Redirection");
+      secureLog.log("🚫 Utilisateur non authentifié - Redirection");
 
       const currentPath = window.location.pathname;
       const redirectUrl = new URL(redirectTo, window.location.origin);
@@ -79,7 +80,7 @@ export default function ProtectedRoute({
 
     // Vérifier le type d'utilisateur si requis
     if (requiredUserType && user.user_type !== requiredUserType) {
-      console.warn("🚫 Accès refusé: type utilisateur insuffisant");
+      secureLog.warn("🚫 Accès refusé: type utilisateur insuffisant");
       router.replace("/unauthorized?reason=user_type");
       return;
     }
@@ -90,7 +91,7 @@ export default function ProtectedRoute({
       const isAdmin = user.user_type === "professional"; // Exemple
 
       if (!isAdmin) {
-        console.warn("🚫 Accès refusé: permissions admin requises");
+        secureLog.warn("🚫 Accès refusé: permissions admin requises");
         router.replace("/unauthorized?reason=admin_required");
         return;
       }

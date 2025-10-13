@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
 import { useAuthStore } from "@/lib/stores/auth"; // ✅ Store unifié uniquement
 import { apiClient } from "@/lib/api/client";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 interface InviteFriendModalProps {
   onClose: () => void;
@@ -79,7 +80,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
   const currentUser = useMemo(() => {
     // UNIQUEMENT le store unifié - plus de fallback
     if (user?.email) {
-      console.log(
+      secureLog.log(
         "[InviteFriendModal] Utilisateur trouvé dans le store unifié:",
         user.email,
       );
@@ -91,7 +92,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
       };
     }
 
-    console.log("[InviteFriendModal] Aucun utilisateur dans le store unifié");
+    secureLog.log("[InviteFriendModal] Aucun utilisateur dans le store unifié");
     return null;
   }, [user]);
 
@@ -130,7 +131,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
 
   // ✅ FONCTION D'ENVOI SIMPLIFIÉE - Plus de vérifications complexes
   const handleSendInvitations = async () => {
-    console.log(
+    secureLog.log(
       '🖱️ [InviteFriendModal] Bouton "Envoyer" cliqué (version store unifié)',
     );
 
@@ -182,7 +183,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
         force_send: false,
       };
 
-      console.log(
+      secureLog.log(
         "🚀 [InviteFriendModal] Appel API avec store unifié:",
         payload,
       );
@@ -203,13 +204,13 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
         throw new Error(t('invite.sendError'));
       }
 
-      console.log(
+      secureLog.log(
         "✅ [InviteFriendModal] Résultat reçu avec store unifié:",
         response.data,
       );
       setResults(response.data);
     } catch (error) {
-      console.error("❌ [InviteFriendModal] Erreur envoi:", error);
+      secureLog.error("❌ [InviteFriendModal] Erreur envoi:", error);
 
       let errorMessage = t('invite.sendError');
 

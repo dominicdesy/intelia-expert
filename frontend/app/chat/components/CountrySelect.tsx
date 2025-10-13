@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 interface Country {
   value: string;
@@ -54,7 +55,7 @@ const useCountriesAutonomous = () => {
       const signal = abortControllerRef.current.signal;
 
       try {
-        console.log(
+        secureLog.log(
           `[CountrySelect] Chargement des pays en ${currentLanguage} (${languageCode})...`,
         );
         setLoading(true);
@@ -79,7 +80,7 @@ const useCountriesAutonomous = () => {
         }
 
         const data = await response.json();
-        console.log(`[CountrySelect] Données reçues: ${data.length} pays`);
+        secureLog.log(`[CountrySelect] Données reçues: ${data.length} pays`);
 
         if (signal.aborted) return;
 
@@ -153,7 +154,7 @@ const useCountriesAutonomous = () => {
             return a.label.localeCompare(b.label, locale, { numeric: true });
           });
 
-        console.log(
+        secureLog.log(
           `[CountrySelect] Pays traités: ${formattedCountries.length}`,
         );
 
@@ -165,14 +166,14 @@ const useCountriesAutonomous = () => {
           const usa = formattedCountries.find((c) => c.value === "US");
           const germany = formattedCountries.find((c) => c.value === "DE");
 
-          console.log(`[CountrySelect] Exemples en ${currentLanguage}:`);
-          console.log("  France:", france?.label);
-          console.log("  USA:", usa?.label);
-          console.log("  Germany:", germany?.label);
+          secureLog.log(`[CountrySelect] Exemples en ${currentLanguage}:`);
+          secureLog.log("  France:", france?.label);
+          secureLog.log("  USA:", usa?.label);
+          secureLog.log("  Germany:", germany?.label);
         }
       } catch (err: any) {
         if (err.name !== "AbortError" && !signal.aborted) {
-          console.error("[CountrySelect] Erreur:", err);
+          secureLog.error("[CountrySelect] Erreur:", err);
           setError(err.message || "Erreur de chargement des pays");
         }
       } finally {

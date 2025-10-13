@@ -8,6 +8,7 @@ import {
 } from "@/lib/languages/i18n";
 import { useAuthStore } from "@/lib/stores/auth";
 import { CheckIcon } from "../../utils/icons";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
   const { t, changeLanguage, currentLanguage } = useTranslation();
@@ -65,7 +66,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
     setIsUpdating(true);
 
     try {
-      console.log(
+      secureLog.log(
         "[LanguageModal] Changement langue:",
         currentLanguage,
         "→",
@@ -74,7 +75,7 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
 
       // 1. Changer dans l'interface via le hook
       await changeLanguage(languageCode);
-      console.log("[LanguageModal] Langue changée via hook");
+      secureLog.log("[LanguageModal] Langue changée via hook");
 
       // 2. Attendre que la synchronisation se fasse
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -86,12 +87,12 @@ export const LanguageModal = ({ onClose }: { onClose: () => void }) => {
         }),
       );
 
-      console.log("[LanguageModal] Synchronisation terminée");
+      secureLog.log("[LanguageModal] Synchronisation terminée");
 
       // 4. Fermer la modal
       onClose();
     } catch (error) {
-      console.error("[LanguageModal] Erreur changement:", error);
+      secureLog.error("[LanguageModal] Erreur changement:", error);
     } finally {
       setIsUpdating(false);
     }

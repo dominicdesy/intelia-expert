@@ -11,6 +11,7 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { UserInfoModalProps } from "@/types";
 import { CountrySelect } from "../CountrySelect";
 import { apiClient } from "@/lib/api/client";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Debug utility - TEMPORAIREMENT DÉSACTIVÉ
 const debugLog = (category: string, message: string, data?: any) => {
@@ -296,12 +297,12 @@ const useCountries = () => {
           const usa = formattedCountries.find((c) => c.value === "US");
           const germany = formattedCountries.find((c) => c.value === "DE");
 
-          console.log(
+          secureLog.log(
             `[UserInfoModal-Countries] Exemples en ${currentLanguage}:`,
           );
-          console.log("  France:", france?.label);
-          console.log("  USA:", usa?.label);
-          console.log("  Germany:", germany?.label);
+          secureLog.log("  France:", france?.label);
+          secureLog.log("  USA:", usa?.label);
+          secureLog.log("  Germany:", germany?.label);
         }
       } catch (error) {
         if (
@@ -930,7 +931,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
         return;
       }
 
-      console.log("[UserInfoModal] Mise à jour via store unifié");
+      secureLog.log("[UserInfoModal] Mise à jour via store unifié");
 
       const updateData = {
         firstName: formData.firstName?.trim(),
@@ -944,7 +945,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
 
       await updateProfile(updateData);
 
-      console.log(
+      secureLog.log(
         "[UserInfoModal] Profil mis à jour avec succès via store unifié",
       );
 
@@ -957,7 +958,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       });
     } catch (error: any) {
       if (isMountedRef.current) {
-        console.error("Erreur mise à jour profil:", error);
+        secureLog.error("Erreur mise à jour profil:", error);
         let errorMessage = t("common.unexpectedError");
 
         if (error.message) {
@@ -1046,7 +1047,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
         confirmPassword: "",
       });
       setPasswordErrors([]);
-      console.log(t("success.passwordChanged"));
+      secureLog.log(t("success.passwordChanged"));
 
       startTransition(() => {
         if (isMountedRef.current) {
@@ -1055,7 +1056,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       });
     } catch (error: any) {
       debugLog("API", "Password change error", { error: error?.message });
-      console.error("Erreur technique:", error);
+      secureLog.error("Erreur technique:", error);
 
       let errorMessage = t("error.passwordServerError");
       if (error.message?.includes("Incorrect current password")) {

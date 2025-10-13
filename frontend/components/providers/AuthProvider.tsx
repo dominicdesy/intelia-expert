@@ -4,6 +4,7 @@
 import React, { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/auth";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 interface AuthProviderProps {
   children: React.ReactNode;
@@ -64,12 +65,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       sendHeartbeat();
     }, 120000); // 2 minutes
 
-    console.log("[AuthProvider] Heartbeat automatique activé");
+    secureLog.log("[AuthProvider] Heartbeat automatique activé");
 
     return () => {
       clearTimeout(initialHeartbeat);
       clearInterval(heartbeatInterval);
-      console.log("[AuthProvider] Heartbeat automatique désactivé");
+      secureLog.log("[AuthProvider] Heartbeat automatique désactivé");
     };
   }, [isAuthenticated, sendHeartbeat]);
 
@@ -106,12 +107,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
               // Ignorer les erreurs silencieusement lors de la fermeture
             });
 
-            console.log(
+            secureLog.log(
               "[AuthProvider] Signal de fermeture envoyé via logout endpoint",
             );
           }
         } catch (error) {
-          console.warn("[AuthProvider] Erreur envoi logout:", error);
+          secureLog.warn("[AuthProvider] Erreur envoi logout:", error);
         }
       }
     };
@@ -140,13 +141,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (sessionStart) {
         const sessionDuration = (Date.now() - sessionStart.getTime()) / 1000;
-        console.log(
+        secureLog.log(
           `[AuthProvider] Session active depuis ${Math.round(sessionDuration)}s`,
         );
 
         if (lastHeartbeat) {
           const timeSinceHeartbeat = (Date.now() - lastHeartbeat) / 1000;
-          console.log(
+          secureLog.log(
             `[AuthProvider] Dernier heartbeat il y a ${Math.round(timeSinceHeartbeat)}s`,
           );
         }

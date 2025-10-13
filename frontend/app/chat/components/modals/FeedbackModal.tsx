@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
 import { ThumbUpIcon, ThumbDownIcon } from "../../utils/icons";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -33,7 +34,7 @@ export const FeedbackModal = ({
       setComment("");
       onClose(); // ✅ Fermer la modal après succès
     } catch (error) {
-      console.error(t("feedback.sendError"), error);
+      secureLog.error(t("feedback.sendError"), error);
       // ✅ CORRECTION: Fermer la modal même en cas d'erreur
       setComment("");
       onClose();

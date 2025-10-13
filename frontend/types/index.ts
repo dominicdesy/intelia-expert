@@ -1,3 +1,5 @@
+import { secureLog } from "@/lib/utils/secureLogger";
+
 // types/index.ts - VERSION COMPLÈTE AVEC SUPPORT RAG JSON + TOUT LE CONTENU ORIGINAL
 
 // ==================== NOUVEAUX TYPES RAG JSON AVICOLE ====================
@@ -871,16 +873,16 @@ export const JSONSystemUtils = {
   // Debug et logging
   debugValidationResult: (result: JSONValidationResult): void => {
     console.group("🔍 [JSON Validation] Résultat");
-    console.log(`Statut: ${result.is_valid ? "✅ Valide" : "❌ Invalide"}`);
-    console.log(`Erreurs: ${result.errors.length}`);
-    console.log(`Avertissements: ${result.warnings.length}`);
-    console.log(`Lignées détectées: ${result.metadata.genetic_lines_detected.join(", ")}`);
-    console.log(`Métriques: ${result.metadata.performance_metrics_count}`);
+    secureLog.log(`Statut: ${result.is_valid ? "✅ Valide" : "❌ Invalide"}`);
+    secureLog.log(`Erreurs: ${result.errors.length}`);
+    secureLog.log(`Avertissements: ${result.warnings.length}`);
+    secureLog.log(`Lignées détectées: ${result.metadata.genetic_lines_detected.join(", ")}`);
+    secureLog.log(`Métriques: ${result.metadata.performance_metrics_count}`);
     
     if (result.errors.length > 0) {
       console.group("Erreurs:");
       result.errors.forEach(error => {
-        console.error(`${error.field}: ${error.message}`);
+        secureLog.error(`${error.field}: ${error.message}`);
       });
       console.groupEnd();
     }
@@ -1645,7 +1647,7 @@ const getApiConfig = () => {
   const version = process.env.NEXT_PUBLIC_API_VERSION || "v1";
 
   if (!baseUrl) {
-    console.error("NEXT_PUBLIC_API_BASE_URL environment variable missing");
+    secureLog.error("NEXT_PUBLIC_API_BASE_URL environment variable missing");
     return {
       BASE_URL: "https://expert.intelia.com",
       TIMEOUT: 30000,
@@ -2075,7 +2077,7 @@ export const ConcisionUtils = {
 
     for (const fallbackLevel of fallbackOrder) {
       if (responseVersions[fallbackLevel]) {
-        console.warn(
+        secureLog.warn(
           `⚠️ [ConcisionUtils] Fallback vers ${fallbackLevel} (${level} manquant)`,
         );
         return responseVersions[fallbackLevel];
@@ -2083,7 +2085,7 @@ export const ConcisionUtils = {
     }
 
     const firstAvailable = Object.values(responseVersions)[0];
-    console.warn(
+    secureLog.warn(
       "⚠️ [ConcisionUtils] Aucune version standard - utilisation première disponible",
     );
     return firstAvailable || "Réponse non disponible";
@@ -2216,9 +2218,9 @@ export const ConcisionUtils = {
   debugResponseVersions: (responseVersions: Record<string, string>): void => {
     console.group("🔍 [ConcisionUtils] Versions disponibles");
     Object.entries(responseVersions).forEach(([level, content]) => {
-      console.log(`${level}: ${content?.length || 0} caractères`);
+      secureLog.log(`${level}: ${content?.length || 0} caractères`);
       if (content) {
-        console.log(`  Aperçu: "${content.substring(0, 50)}..."`);
+        secureLog.log(`  Aperçu: "${content.substring(0, 50)}..."`);
       }
     });
     console.groupEnd();
@@ -2315,7 +2317,7 @@ export const AdSystemUtils = {
         : undefined,
     };
 
-    console.log("📊 [AdSystem] Event:", eventData);
+    secureLog.log("📊 [AdSystem] Event:", eventData);
 
     try {
       const existingLogs = localStorage.getItem("adEventLogs");
@@ -2328,7 +2330,7 @@ export const AdSystemUtils = {
 
       localStorage.setItem("adEventLogs", JSON.stringify(logs));
     } catch (error) {
-      console.warn("Erreur lors du stockage des logs publicitaires:", error);
+      secureLog.warn("Erreur lors du stockage des logs publicitaires:", error);
     }
   },
 

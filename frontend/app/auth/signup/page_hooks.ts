@@ -3,6 +3,7 @@
 
 import { useMemo } from "react";
 import type { Language } from "@/types";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Traductions
 export const translations = {
@@ -220,14 +221,14 @@ export const rememberMeUtils = {
       if (remember && email) {
         localStorage.setItem("intelia_remember_email", email);
         localStorage.setItem("intelia_remember_flag", "true");
-        console.log("📄 [Init] Remember me sauvegardé:", { email, remember });
+        secureLog.log("📄 [Init] Remember me sauvegardé:", { email, remember });
       } else {
         localStorage.removeItem("intelia_remember_email");
         localStorage.removeItem("intelia_remember_flag");
-        console.log("📄 [Init] Remember me effacé");
+        secureLog.log("📄 [Init] Remember me effacé");
       }
     } catch (error) {
-      console.warn("⚠️ [Init] Erreur sauvegarde remember me:", error);
+      secureLog.warn("⚠️ [Init] Erreur sauvegarde remember me:", error);
     }
   },
 
@@ -244,10 +245,10 @@ export const rememberMeUtils = {
         hasRememberedEmail,
       };
 
-      console.log("📄 [Init] Chargement remember me:", result);
+      secureLog.log("📄 [Init] Chargement remember me:", result);
       return result;
     } catch (error) {
-      console.warn("⚠️ [Init] Erreur chargement remember me:", error);
+      secureLog.warn("⚠️ [Init] Erreur chargement remember me:", error);
       return { rememberMe: false, lastEmail: "", hasRememberedEmail: false };
     }
   },

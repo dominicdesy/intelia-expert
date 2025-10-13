@@ -776,7 +776,7 @@ class I18nNotificationManager {
       try {
         callback();
       } catch (error) {
-        console.error("Erreur notification i18n:", error);
+        secureLog.error("Erreur notification i18n:", error);
       }
     });
   }
@@ -819,7 +819,7 @@ const getStoredLanguage = (): string => {
       return parsed?.state?.currentLanguage || detectBrowserLanguage();
     }
   } catch (error) {
-    console.warn("Erreur lecture langue stockée:", error);
+    secureLog.warn("Erreur lecture langue stockée:", error);
   }
   return detectBrowserLanguage();
 };
@@ -828,7 +828,7 @@ const getStoredLanguage = (): string => {
 async function loadTranslations(language: string): Promise<TranslationKeys> {
   // Vérifier le cache des erreurs
   if (errorCache.has(language)) {
-    console.warn(
+    secureLog.warn(
       `[i18n] Langue ${language} en cache d'erreur, utilisation de ${DEFAULT_LANGUAGE}`,
     );
     if (language === DEFAULT_LANGUAGE) {
@@ -875,24 +875,24 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     // NOTIFIER TOUS LES COMPOSANTS
     notificationManager.notify();
 
-    console.log(
+    secureLog.log(
       `[i18n] Traductions chargées pour ${language}: ${Object.keys(translations).length} clés`,
     );
     return translations;
   } catch (error) {
-    console.error(`[i18n] Could not load translations for ${language}:`, error);
+    secureLog.error(`[i18n] Could not load translations for ${language}:`, error);
 
     // Ajouter à la cache des erreurs pour éviter les boucles
     errorCache.add(language);
 
     // Fallback vers la langue par défaut
     if (language !== DEFAULT_LANGUAGE) {
-      console.warn(`[i18n] Falling back to ${DEFAULT_LANGUAGE}`);
+      secureLog.warn(`[i18n] Falling back to ${DEFAULT_LANGUAGE}`);
       return loadTranslations(DEFAULT_LANGUAGE);
     }
 
     // Si même la langue par défaut échoue, retourner des clés vides
-    console.error(
+    secureLog.error(
       `[i18n] Even ${DEFAULT_LANGUAGE} failed to load, returning empty translations`,
     );
     return {} as TranslationKeys;
@@ -937,7 +937,7 @@ export const useTranslation = () => {
           const browserLang = detectBrowserLanguage();
           if (storedLang !== browserLang) {
             // L'utilisateur a fait un choix explicite différent du navigateur
-            console.log(
+            secureLog.log(
               `[i18n] Choix utilisateur (localStorage): ${storedLang}`,
             );
             setCurrentLanguage(storedLang);
@@ -947,7 +947,7 @@ export const useTranslation = () => {
 
         // PRIORITÉ 2: Navigateur (nouveau défaut)
         const browserLang = detectBrowserLanguage();
-        console.log(`[i18n] Langue du navigateur détectée: ${browserLang}`);
+        secureLog.log(`[i18n] Langue du navigateur détectée: ${browserLang}`);
         setCurrentLanguage(browserLang);
 
         // PRIORITÉ 3: Supabase (optionnel)
@@ -958,16 +958,16 @@ export const useTranslation = () => {
           const userLang = session?.user?.user_metadata?.language;
 
           if (userLang && isValidLanguageCode(userLang) && !storedLang) {
-            console.log(`[i18n] Langue Supabase utilisée: ${userLang}`);
+            secureLog.log(`[i18n] Langue Supabase utilisée: ${userLang}`);
             setCurrentLanguage(userLang);
             return;
           }
         } catch (error) {
           // Ignorer les erreurs Supabase, continuer avec le navigateur
-          console.log("Pas de session Supabase, utilisation langue navigateur");
+          secureLog.log("Pas de session Supabase, utilisation langue navigateur");
         }
       } catch (error) {
-        console.log(
+        secureLog.log(
           "Erreur initialisation langue, utilisation navigateur par défaut",
         );
         const browserLang = detectBrowserLanguage();
@@ -989,7 +989,7 @@ export const useTranslation = () => {
         storedLang !== currentLanguage &&
         isValidLanguageCode(storedLang)
       ) {
-        console.log(
+        secureLog.log(
           `[i18n] Resynchronisation détectée: ${currentLanguage} → ${storedLang}`,
         );
         setCurrentLanguage(storedLang);
@@ -1022,13 +1022,13 @@ export const useTranslation = () => {
             newLang !== currentLanguage &&
             isValidLanguageCode(newLang)
           ) {
-            console.log(
+            secureLog.log(
               `[i18n] Changement localStorage détecté: ${currentLanguage} → ${newLang}`,
             );
             setCurrentLanguage(newLang);
           }
         } catch (error) {
-          console.warn("Erreur parsing localStorage change:", error);
+          secureLog.warn("Erreur parsing localStorage change:", error);
         }
       }
     };
@@ -1052,7 +1052,7 @@ export const useTranslation = () => {
         setTranslations(loadedTranslations);
         setLoading(false);
       } catch (error) {
-        console.error("Erreur chargement traductions:", error);
+        secureLog.error("Erreur chargement traductions:", error);
         setLoading(false);
       }
     };
@@ -1131,9 +1131,9 @@ export const useTranslation = () => {
         },
       };
       localStorage.setItem("intelia-language", JSON.stringify(langData));
-      console.log("[i18n] Langue sauvegardée:", newLanguage);
+      secureLog.log("[i18n] Langue sauvegardée:", newLanguage);
     } catch (error) {
-      console.warn("[i18n] Erreur sauvegarde langue:", error);
+      secureLog.warn("[i18n] Erreur sauvegarde langue:", error);
     }
 
     // Forcer le rechargement complet des traductions
@@ -1183,3 +1183,4 @@ export {
   DEFAULT_LANGUAGE,
   getLanguageByCode,
 } from "./config";
+import { secureLog } from "@/lib/utils/secureLogger";

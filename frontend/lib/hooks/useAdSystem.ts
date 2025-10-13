@@ -9,6 +9,7 @@ import type {
   User,
 } from "@/types";
 import { AD_CONFIG } from "@/types";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 export const useAdSystem = () => {
   const { user, isAuthenticated } = useAuthStore();
@@ -82,7 +83,7 @@ export const useAdSystem = () => {
           }
         }
 
-        console.log("🔍 Debug Ad System:", {
+        secureLog.log("🔍 Debug Ad System:", {
           totalSessions,
           averageSessionDuration,
           data: data.summary,
@@ -114,7 +115,7 @@ export const useAdSystem = () => {
         stats.qualifiesForAd =
           meetsSessionCriteria && meetsDurationCriteria && cooldownExpired;
 
-        console.log("🎯 Critères publicitaires:", {
+        secureLog.log("🎯 Critères publicitaires:", {
           sessions: `${stats.totalSessions} >= ${AD_CRITERIA.MIN_SESSIONS} = ${meetsSessionCriteria}`,
           duration: `${Math.round(stats.averageSessionDuration)}s >= ${AD_CRITERIA.MIN_DURATION_PER_SESSION}s = ${meetsDurationCriteria}`,
           cooldown: `Expiré = ${cooldownExpired}`,
@@ -125,18 +126,18 @@ export const useAdSystem = () => {
 
         // TEST FORCÉ EN DÉVELOPPEMENT
         if (process.env.NODE_ENV === "development") {
-          console.log("🚀 Mode développement: forçage publicité");
+          secureLog.log("🚀 Mode développement: forçage publicité");
           stats.qualifiesForAd = true;
         }
 
         // Déclencher la publicité si éligible
         if (stats.qualifiesForAd) {
-          console.log("✅ Déclenchement publicité...");
+          secureLog.log("✅ Déclenchement publicité...");
           await triggerAd();
         }
       }
     } catch (error) {
-      console.error(
+      secureLog.error(
         "❌ Erreur lors de la vérification de l'éligibilité publicitaire:",
         error,
       );
@@ -188,19 +189,19 @@ export const useAdSystem = () => {
   // Déclencher l'affichage de la publicité
   const triggerAd = useCallback(async () => {
     try {
-      console.log("🎬 Chargement publicité...");
+      secureLog.log("🎬 Chargement publicité...");
       const adData = await getPersonalizedAd();
       setCurrentAd(adData);
       setShowAd(true);
-      console.log("📺 Publicité affichée:", adData.title);
+      secureLog.log("📺 Publicité affichée:", adData.title);
     } catch (error) {
-      console.error("❌ Erreur lors du chargement de la publicité:", error);
+      secureLog.error("❌ Erreur lors du chargement de la publicité:", error);
     }
   }, [getPersonalizedAd]);
 
   // Gérer la fermeture de la publicité
   const handleAdClose = useCallback(() => {
-    console.log("❌ Fermeture publicité");
+    secureLog.log("❌ Fermeture publicité");
     setShowAd(false);
     setCurrentAd(null);
 
@@ -210,7 +211,7 @@ export const useAdSystem = () => {
 
   // Gérer le clic sur la publicité
   const handleAdClick = useCallback((adId: string) => {
-    console.log("👆 Clic publicité:", adId);
+    secureLog.log("👆 Clic publicité:", adId);
 
     // Enregistrer le timestamp pour le cooldown
     localStorage.setItem("lastAdShown", new Date().toISOString());
@@ -225,18 +226,18 @@ export const useAdSystem = () => {
   // Vérifier l'éligibilité au démarrage et périodiquement
   useEffect(() => {
     if (isAuthenticated) {
-      console.log("🏁 Initialisation Ad System...");
+      secureLog.log("🏁 Initialisation Ad System...");
 
       // Délai initial pour laisser le temps aux sessions de se charger
       const initialDelay = setTimeout(() => {
-        console.log("🔍 Vérification éligibilité publicité...");
+        secureLog.log("🔍 Vérification éligibilité publicité...");
         checkAdEligibility();
       }, AD_CRITERIA.INITIAL_CHECK_DELAY || 3000);
 
       // Puis vérifier selon l'intervalle configuré
       const interval = setInterval(
         () => {
-          console.log("🔄 Vérification périodique publicité...");
+          secureLog.log("🔄 Vérification périodique publicité...");
           checkAdEligibility();
         },
         AD_CRITERIA.CHECK_INTERVAL || 5 * 60 * 1000,
@@ -252,7 +253,7 @@ export const useAdSystem = () => {
   // Test manual trigger
   useEffect(() => {
     const handleManualTrigger = () => {
-      console.log("🧪 Déclenchement manuel publicité");
+      secureLog.log("🧪 Déclenchement manuel publicité");
       triggerAd();
     };
 

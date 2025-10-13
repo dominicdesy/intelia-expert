@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
 import type { Country } from "./page_types";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Mapping des codes de langue vers les codes utilisés par REST Countries
 const getLanguageCode = (currentLanguage: string): string => {
@@ -64,7 +65,7 @@ const debugLog = (category: string, message: string, data?: any) => {
     countries: "🌍",
   };
 
-  console.log(
+  secureLog.log(
     `${emoji[category] || "📝"} [${category}] ${message}`,
     data ? data : "",
   );

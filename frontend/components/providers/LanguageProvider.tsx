@@ -4,6 +4,7 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
 import { isValidLanguageCode } from "@/lib/languages/config";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const { changeLanguage, currentLanguage } = useTranslation();
@@ -21,7 +22,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           // ✅ CORRECTION : NE PAS forcer de langue, juste marquer comme prêt
           // Le hook useTranslation dans i18n.ts gère déjà la logique de langue
 
-          console.log(
+          secureLog.log(
             "[LanguageProvider] Synchronisation avec i18n, langue actuelle:",
             currentLanguage,
           );
@@ -29,10 +30,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           // Attendre que i18n.ts termine son initialisation
           setTimeout(() => {
             document.documentElement.classList.add("language-ready");
-            console.log("[LanguageProvider] 🎯 Interface prête - Flash évité");
+            secureLog.log("[LanguageProvider] 🎯 Interface prête - Flash évité");
           }, 200); // Délai plus long pour laisser i18n.ts finir
         } catch (error) {
-          console.error("[LanguageProvider] Erreur initialisation:", error);
+          secureLog.error("[LanguageProvider] Erreur initialisation:", error);
           // En cas d'erreur, forcer l'affichage pour éviter un écran noir
           document.documentElement.classList.add("language-ready");
         } finally {
@@ -68,10 +69,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
               }, 100);
             });
 
-            console.log("[LanguageProvider] 🔄 Changement détecté:", newLang);
+            secureLog.log("[LanguageProvider] 🔄 Changement détecté:", newLang);
           }
         } catch (error) {
-          console.warn("[LanguageProvider] Erreur storage change:", error);
+          secureLog.warn("[LanguageProvider] Erreur storage change:", error);
         }
       }
     };
@@ -84,7 +85,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const safetyTimer = setTimeout(() => {
       if (!document.documentElement.classList.contains("language-ready")) {
-        console.warn(
+        secureLog.warn(
           "[LanguageProvider] ⚠️ Timeout sécurité atteint - Affichage forcé",
         );
         document.documentElement.classList.add("language-ready");

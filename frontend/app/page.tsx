@@ -8,6 +8,7 @@ import { useAuthStore } from "@/lib/stores/auth"; // Store unifié
 import { availableLanguages } from "../lib/languages/config";
 import { rememberMeUtils } from "./page_hooks";
 import { SignupModal } from "./page_signup_modal";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Logo Intelia dans un carré avec bordure bleue
 const InteliaLogo = ({ className = "w-20 h-20" }: { className?: string }) => (
@@ -135,7 +136,7 @@ function AuthCallbackHandler() {
       url.searchParams.delete("auth");
       window.history.replaceState({}, "", url.pathname);
     } catch (error) {
-      console.error("Erreur nettoyage URL:", error);
+      secureLog.error("Erreur nettoyage URL:", error);
     }
 
     const timeoutId = setTimeout(() => {
@@ -235,7 +236,7 @@ function LoginPageContent() {
 
   // FONCTION OAUTH LOGIN - Utilise le nouveau store
   const handleOAuthLogin = async (provider: "linkedin" | "facebook") => {
-    console.log(`[OAuth] Début de connexion ${provider}`);
+    secureLog.log(`[OAuth] Début de connexion ${provider}`);
 
     setError("");
 
@@ -243,12 +244,12 @@ function LoginPageContent() {
       // Utilise la nouvelle méthode du store
       await loginWithOAuth(provider);
 
-      console.log(
+      secureLog.log(
         `[OAuth] Connexion ${provider} initiée - redirection en cours...`,
       );
       // La redirection se fera automatiquement vers le provider OAuth
     } catch (error: any) {
-      console.error(`[OAuth] Erreur connexion ${provider}:`, error);
+      secureLog.error(`[OAuth] Erreur connexion ${provider}:`, error);
 
       if (error.message?.includes("OAuth")) {
         setError(t("auth.oauthError") || "Erreur de connexion OAuth");
@@ -261,7 +262,7 @@ function LoginPageContent() {
   // FONCTION SIGNUP UNIFIÉE - utilise le store au lieu de fetch direct
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("[Signup] Utilisation du store unifié:", {
+    secureLog.log("[Signup] Utilisation du store unifié:", {
       email: signupData.email,
       firstName: signupData.firstName,
       lastName: signupData.lastName,
@@ -316,7 +317,7 @@ function LoginPageContent() {
         preferredLanguage: currentLanguage, // Passer la langue actuelle du frontend
       };
 
-      console.log("[Signup] Langue envoyée au backend:", currentLanguage);
+      secureLog.log("[Signup] Langue envoyée au backend:", currentLanguage);
 
       await register(signupData.email, signupData.password, userData);
 
@@ -336,7 +337,7 @@ function LoginPageContent() {
           t("verification.pending.emailSent") || "Compte créé avec succès!",
       };
     } catch (error: any) {
-      console.error("[Signup] Erreur store unifié:", error);
+      secureLog.error("[Signup] Erreur store unifié:", error);
 
       let errorMessage =
         error.message || t("error.generic") || "Erreur générique";
@@ -416,7 +417,7 @@ function LoginPageContent() {
         router.push("/chat");
       }, 1000);
     } catch (error: any) {
-      console.error("[Login] Erreur de connexion:", error);
+      secureLog.error("[Login] Erreur de connexion:", error);
 
       // Gestion d'erreurs harmonisée avec les autres composants
       let errorMessage =

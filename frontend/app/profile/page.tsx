@@ -266,14 +266,14 @@ function ProfilePageContent() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow">
           {/* Header du profil avec avatar sécurisé */}
-          <div className="px-6 py-8 border-b border-gray-200">
-            <div className="flex items-center space-x-6">
-              <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-2xl">
+          <div className="px-4 sm:px-6 py-6 sm:py-8 border-b border-gray-200">
+            <div className="flex items-center space-x-3 sm:space-x-6">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl sm:text-2xl">
                 {userInitials}
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">{userName}</h2>
-                <p className="text-gray-600">{userEmail}</p>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{userName}</h2>
+                <p className="text-sm sm:text-base text-gray-600 truncate">{userEmail}</p>
                 <div
                   className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-2 ${getBadgeColor(userType)}`}
                 >
@@ -285,7 +285,7 @@ function ProfilePageContent() {
 
           {/* Navigation des onglets */}
           <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6">
+            <nav className="flex space-x-4 sm:space-x-8 px-4 sm:px-6 overflow-x-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}

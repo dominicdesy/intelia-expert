@@ -5,6 +5,7 @@ import {
   getErrorMessage,
   type ChatStreamBody,
 } from "../services/aiStream";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 export interface ChatStreamState {
   isStreaming: boolean;
@@ -52,7 +53,7 @@ export function useChatStream(
     ): Promise<string> => {
       // Éviter les appels multiples simultanés
       if (processingRef.current || isStreaming) {
-        console.warn("[useChatStream] Tentative d'envoi multiple ignorée");
+        secureLog.warn("[useChatStream] Tentative d'envoi multiple ignorée");
         return "";
       }
 
@@ -84,7 +85,7 @@ export function useChatStream(
         ...options, // Merge avec les options additionnelles
       };
 
-      console.log("[useChatStream] Démarrage stream:", {
+      secureLog.log("[useChatStream] Démarrage stream:", {
         tenant_id,
         lang,
         message_length: message.length,
@@ -102,21 +103,21 @@ export function useChatStream(
           abortRef.current.signal,
         );
 
-        console.log("[useChatStream] Stream terminé:", {
+        secureLog.log("[useChatStream] Stream terminé:", {
           final_length: finalResponse.length,
           partial_length: partial.length,
         });
 
         return finalResponse;
       } catch (streamError: any) {
-        console.error("[useChatStream] Erreur stream:", streamError);
+        secureLog.error("[useChatStream] Erreur stream:", streamError);
 
         // Gestion spéciale pour l'arrêt volontaire
         if (
           streamError?.name === "AbortError" ||
           abortRef.current?.signal.aborted
         ) {
-          console.log("[useChatStream] Stream arrêté par l'utilisateur");
+          secureLog.log("[useChatStream] Stream arrêté par l'utilisateur");
           return partial; // Retourne ce qui a été reçu jusqu'ici
         }
 
@@ -145,7 +146,7 @@ export function useChatStream(
    */
   const stop = useCallback(() => {
     if (abortRef.current && !abortRef.current.signal.aborted) {
-      console.log("[useChatStream] Arrêt du stream demandé");
+      secureLog.log("[useChatStream] Arrêt du stream demandé");
       abortRef.current.abort();
     }
   }, []);
@@ -278,14 +279,14 @@ export function useTestConnection(tenant_id: string, lang: string = "fr") {
   const stream = useChatStream(tenant_id, lang);
 
   const testConnection = useCallback(async (): Promise<boolean> => {
-    console.log("[useChatStream] Test de connexion...");
+    secureLog.log("[useChatStream] Test de connexion...");
 
     try {
       const result = await stream.send("Test");
-      console.log("[useChatStream] Test réussi:", result.length, "caractères");
+      secureLog.log("[useChatStream] Test réussi:", result.length, "caractères");
       return true;
     } catch (error) {
-      console.error("[useChatStream] Test échoué:", error);
+      secureLog.error("[useChatStream] Test échoué:", error);
       return false;
     }
   }, [stream]);
@@ -303,10 +304,10 @@ export function useTestConnection(tenant_id: string, lang: string = "fr") {
 export const chatStreamDebug = {
   logState: (stream: UseChatStreamReturn) => {
     console.group("[useChatStream] État actuel");
-    console.log("isStreaming:", stream.isStreaming);
-    console.log("partial length:", stream.partial.length);
-    console.log("has error:", !!stream.error);
-    console.log("is connected:", stream.isConnected);
+    secureLog.log("isStreaming:", stream.isStreaming);
+    secureLog.log("partial length:", stream.partial.length);
+    secureLog.log("has error:", !!stream.error);
+    secureLog.log("is connected:", stream.isConnected);
     console.groupEnd();
   },
 
@@ -315,7 +316,7 @@ export const chatStreamDebug = {
     tenant_id: string,
     lang: string = "fr",
   ): Promise<boolean> => {
-    console.log("[useChatStream] Test de connexion simple...");
+    secureLog.log("[useChatStream] Test de connexion simple...");
 
     try {
       // Utiliser directement streamAIResponse sans hooks
@@ -323,14 +324,14 @@ export const chatStreamDebug = {
         { tenant_id, lang, message: "Test" },
         () => {}, // callback vide
       );
-      console.log(
+      secureLog.log(
         "[useChatStream] Test simple réussi:",
         result.length,
         "caractères",
       );
       return true;
     } catch (error) {
-      console.error("[useChatStream] Test simple échoué:", error);
+      secureLog.error("[useChatStream] Test simple échoué:", error);
       return false;
     }
   },

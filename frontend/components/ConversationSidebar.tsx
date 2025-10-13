@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useChatStore } from "@/app/chat/hooks/useChatStore";
 import { useTranslation } from "@/lib/languages/i18n";
 import type { Conversation, Message } from "@/types";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // IcÃ´nes SVG
 const ChatBubbleLeftRightIcon = ({ className }: { className?: string }) => (
@@ -112,7 +113,7 @@ export default function ConversationSidebar({
       await loadConversation(conversationId);
       onClose();
     } catch (error) {
-      console.error("Erreur lors du chargement de la conversation:", error);
+      secureLog.error("Erreur lors du chargement de la conversation:", error);
     } finally {
       setIsLoading(false);
     }
@@ -127,7 +128,7 @@ export default function ConversationSidebar({
       await deleteConversation(conversationId);
       setShowDeleteConfirm(null);
     } catch (error) {
-      console.error("Erreur lors de la suppression:", error);
+      secureLog.error("Erreur lors de la suppression:", error);
     } finally {
       setIsLoading(false);
     }
@@ -142,7 +143,7 @@ export default function ConversationSidebar({
       await clearAllConversations();
       setShowClearAllConfirm(false);
     } catch (error) {
-      console.error("Erreur lors de la suppression complÃ¨te:", error);
+      secureLog.error("Erreur lors de la suppression complÃ¨te:", error);
     } finally {
       setIsLoading(false);
     }
@@ -181,7 +182,7 @@ export default function ConversationSidebar({
         });
       }
     } catch (error) {
-      console.error("Erreur de formatage de date:", error);
+      secureLog.error("Erreur de formatage de date:", error);
       return "Date inconnue";
     }
   };
@@ -193,7 +194,7 @@ export default function ConversationSidebar({
         conversation.title || conversation.preview || "Conversation sans titre"
       );
     } catch (error) {
-      console.error("Erreur lors de la gÃ©nÃ©ration de l'aperÃ§u:", error);
+      secureLog.error("Erreur lors de la gÃ©nÃ©ration de l'aperÃ§u:", error);
       return "Conversation";
     }
   };
@@ -203,7 +204,7 @@ export default function ConversationSidebar({
     try {
       return conversation.message_count || 0;
     } catch (error) {
-      console.error("Erreur lors du comptage des messages:", error);
+      secureLog.error("Erreur lors du comptage des messages:", error);
       return 0;
     }
   };

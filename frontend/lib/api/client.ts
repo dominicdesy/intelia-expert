@@ -1,3 +1,5 @@
+import { secureLog } from "@/lib/utils/secureLogger";
+
 // lib/api/client.ts - CLIENT API CORRIGÉ avec gestion d'erreurs harmonisée
 
 interface APIResponse<T = any> {
@@ -24,7 +26,7 @@ export class APIClient {
       Origin: "https://expert.intelia.com",
     };
 
-    console.log("[APIClient] Initialisé avec baseURL:", this.baseURL);
+    secureLog.log("[APIClient] Initialisé avec baseURL:", this.baseURL);
   }
 
   // CORRECTION CRITIQUE: Construction URL propre
@@ -41,7 +43,7 @@ export class APIClient {
     const version = process.env.NEXT_PUBLIC_API_VERSION || "v1";
     const fullUrl = `${cleanBaseUrl}/api/${version}/${cleanEndpoint}`;
 
-    console.log("[APIClient] URL construite:", fullUrl);
+    secureLog.log("[APIClient] URL construite:", fullUrl);
     return fullUrl;
   }
 
@@ -58,7 +60,7 @@ export class APIClient {
       
       // Si le token expire dans moins de 10 minutes, le rafraîchir
       if (expiresAt - now < tenMinutes) {
-        console.log('[APIClient] Token proche expiration, rafraîchissement...');
+        secureLog.log('[APIClient] Token proche expiration, rafraîchissement...');
         
         const url = this.buildURL('auth/refresh-token');
         const token = await this.getAuthToken();
@@ -83,11 +85,11 @@ export class APIClient {
           };
           
           localStorage.setItem('intelia-expert-auth', JSON.stringify(newAuthData));
-          console.log('[APIClient] Token rafraîchi avec succès');
+          secureLog.log('[APIClient] Token rafraîchi avec succès');
         }
       }
     } catch (error) {
-      console.error('[APIClient] Erreur rafraîchissement token:', error);
+      secureLog.error('[APIClient] Erreur rafraîchissement token:', error);
     }
   }
 
@@ -102,7 +104,7 @@ export class APIClient {
       await this.refreshTokenIfNeeded();
       
       const url = this.buildURL(endpoint);
-      console.log(`[APIClient] URL construite: ${url}`);
+      secureLog.log(`[APIClient] URL construite: ${url}`);
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -113,9 +115,9 @@ export class APIClient {
         const token = await this.getAuthToken();
         if (token) {
           headers["Authorization"] = `Bearer ${token}`;
-          console.log("[APIClient] Token ajouté à la requête");
+          secureLog.log("[APIClient] Token ajouté à la requête");
         } else {
-          console.warn(
+          secureLog.warn(
             "[APIClient] Aucun token disponible pour requête authentifiée",
           );
         }
@@ -127,12 +129,12 @@ export class APIClient {
         credentials: "include",
       };
 
-      console.log(`[APIClient] Requête: ${options.method || "GET"} ${url}`);
+      secureLog.log(`[APIClient] Requête: ${options.method || "GET"} ${url}`);
 
       const response = await fetch(url, config);
 
       // Logging détaillé du statut
-      console.log(
+      secureLog.log(
         `[APIClient] Réponse: ${response.status} ${response.statusText}`,
       );
 
@@ -147,7 +149,7 @@ export class APIClient {
 
           if (contentType?.includes("application/json")) {
             errorDetails = await response.json();
-            console.log("[APIClient] Détails erreur JSON:", errorDetails);
+            secureLog.log("[APIClient] Détails erreur JSON:", errorDetails);
 
             // Extraire le message d'erreur du backend
             if (errorDetails.detail) {
@@ -160,13 +162,13 @@ export class APIClient {
           } else {
             // Si ce n'est pas du JSON, lire comme texte
             const textError = await response.text();
-            console.log("[APIClient] Détails erreur texte:", textError);
+            secureLog.log("[APIClient] Détails erreur texte:", textError);
             if (textError && textError.trim()) {
               errorMessage = textError;
             }
           }
         } catch (parseError) {
-          console.warn(
+          secureLog.warn(
             "[APIClient] Impossible de parser la réponse d'erreur:",
             parseError,
           );
@@ -243,7 +245,7 @@ export class APIClient {
             }
         }
 
-        console.error(`[APIClient] HTTP ${response.status}:`, friendlyMessage);
+        secureLog.error(`[APIClient] HTTP ${response.status}:`, friendlyMessage);
 
         // Créer un objet d'erreur enrichi
         const apiError = new Error(friendlyMessage);
@@ -270,15 +272,15 @@ export class APIClient {
 
         if (contentType?.includes("application/json")) {
           data = await response.json();
-          console.log("[APIClient] Réponse JSON parsée avec succès");
+          secureLog.log("[APIClient] Réponse JSON parsée avec succès");
         } else {
           // Si ce n'est pas du JSON, retourner comme texte
           const textData = await response.text();
           data = textData as unknown as T;
-          console.log("[APIClient] Réponse texte reçue");
+          secureLog.log("[APIClient] Réponse texte reçue");
         }
       } catch (parseError) {
-        console.error("[APIClient] Erreur parsing réponse:", parseError);
+        secureLog.error("[APIClient] Erreur parsing réponse:", parseError);
         throw new Error("Erreur de traitement de la réponse du serveur");
       }
 
@@ -288,7 +290,7 @@ export class APIClient {
         error: null,
       };
     } catch (error: any) {
-      console.error("[APIClient] Erreur requête:", error);
+      secureLog.error("[APIClient] Erreur requête:", error);
 
       // Gestion des erreurs réseau
       let errorMessage = "Erreur de connexion";
@@ -396,7 +398,7 @@ export class APIClient {
     try {
       const authData = localStorage.getItem("intelia-expert-auth");
       if (!authData) {
-        console.warn("[APIClient] Aucun token d'authentification trouvé");
+        secureLog.warn("[APIClient] Aucun token d'authentification trouvé");
         return null;
       }
 
@@ -404,13 +406,13 @@ export class APIClient {
       const token = parsed.access_token;
 
       if (!token) {
-        console.warn("[APIClient] Token invalide dans localStorage");
+        secureLog.warn("[APIClient] Token invalide dans localStorage");
         return null;
       }
 
       return token;
     } catch (error) {
-      console.error("[APIClient] Erreur récupération token:", error);
+      secureLog.error("[APIClient] Erreur récupération token:", error);
       return null;
     }
   }

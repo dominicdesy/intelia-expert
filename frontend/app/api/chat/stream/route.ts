@@ -1,6 +1,7 @@
 // app/api/chat/stream/route.ts
 
 import type { NextRequest } from "next/server";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 /**
  * Forcer un vrai streaming côté Next.js
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
   const payload = await req.json().catch(() => ({}));
 
   // CORRECTION: URL construite dynamiquement avec la variable d'environnement
-  console.log(`[route.ts] Appel vers: ${LLM_STREAM_URL}`);
+  secureLog.log(`[route.ts] Appel vers: ${LLM_STREAM_URL}`);
 
   // Appel du backend LLM (FastAPI) qui renvoie un flux text/event-stream
   const controller = new AbortController();
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify(payload),
   }).catch((err) => {
     // Si le backend est injoignable, on renvoie un flux SSE avec une erreur
-    console.error(`[route.ts] Erreur connexion vers ${LLM_STREAM_URL}:`, err);
+    secureLog.error(`[route.ts] Erreur connexion vers ${LLM_STREAM_URL}:`, err);
     const errEvent = `data: ${JSON.stringify({
       type: "error",
       message:
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest) {
               const chunkText = decoder.decode(value, { stream: true });
               if (chunkText.includes('"type":"proactive_followup"')) {
                 // eslint-disable-next-line no-console
-                console.log("[chat/stream] 🚀 RELANCE PROACTIVE détectée");
+                secureLog.log("[chat/stream] 🚀 RELANCE PROACTIVE détectée");
               }
             } catch {
               /* ignore decode errors */

@@ -13,6 +13,7 @@ import {
   reviewQA,
   getQualityStats,
 } from "../../../lib/services/qaQualityService";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 interface QualityIssuesTabProps {
   token: string;
@@ -84,7 +85,7 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
         avg_quality_score: statsData.avg_quality_score,
       });
     } catch (err: any) {
-      console.error("Error loading QA quality data:", err);
+      secureLog.error("Error loading QA quality data:", err);
       setError(err.message || "Erreur de chargement");
     } finally {
       setIsLoading(false);

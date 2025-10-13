@@ -16,6 +16,7 @@ import {
   sendFeedback,
   deleteConversation,
 } from "./apiService";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Interface cache côté frontend pour les conversations
 interface ConversationCache {
@@ -39,7 +40,7 @@ class ConversationLoadingCircuitBreaker {
     }
 
     if (this.attempts >= this.MAX_ATTEMPTS) {
-      console.warn(
+      secureLog.warn(
         "[ConversationService] Circuit breaker: BLOQUÉ pour 10 minutes",
       );
       return false;
@@ -51,18 +52,18 @@ class ConversationLoadingCircuitBreaker {
   recordAttempt(): void {
     this.attempts++;
     this.lastAttempt = Date.now();
-    console.log(
+    secureLog.log(
       `[ConversationService] Circuit breaker: tentative ${this.attempts}/${this.MAX_ATTEMPTS}`,
     );
   }
 
   recordSuccess(): void {
     this.attempts = 0;
-    console.log("[ConversationService] Circuit breaker: reset après succès");
+    secureLog.log("[ConversationService] Circuit breaker: reset après succès");
   }
 
   recordFailure(): void {
-    console.log(
+    secureLog.log(
       `[ConversationService] Circuit breaker: échec ${this.attempts}/${this.MAX_ATTEMPTS}`,
     );
   }
@@ -113,7 +114,7 @@ export class ConversationService {
     const apiVersion = process.env.NEXT_PUBLIC_API_VERSION || "v1";
 
     if (!apiBaseUrl) {
-      console.error("NEXT_PUBLIC_API_BASE_URL environment variable missing");
+      secureLog.error("NEXT_PUBLIC_API_BASE_URL environment variable missing");
       this.loggingEnabled = false;
       this.baseUrl = "";
       return;
@@ -121,7 +122,7 @@ export class ConversationService {
 
     // URL construite proprement
     this.baseUrl = `${apiBaseUrl}/api/${apiVersion}`;
-    console.log("ConversationService configuré:", apiBaseUrl);
+    secureLog.log("ConversationService configuré:", apiBaseUrl);
   }
 
   private getAuthToken(): string {
@@ -155,7 +156,7 @@ export class ConversationService {
             return parsed[0];
           }
         } catch (e) {
-          console.warn(
+          secureLog.warn(
             "[ConversationService] Failed to parse localStorage token",
           );
         }
@@ -163,7 +164,7 @@ export class ConversationService {
 
       return "";
     } catch (error) {
-      console.error("[ConversationService] Error getting auth token:", error);
+      secureLog.error("[ConversationService] Error getting auth token:", error);
       return "";
     }
   }
@@ -202,14 +203,14 @@ export class ConversationService {
     const isDifferentUser = this.conversationsCache.userId !== userId;
 
     if (isExpired || isDifferentUser) {
-      console.log(
+      secureLog.log(
         "[ConversationService] Cache expiré ou utilisateur différent",
       );
       this.conversationsCache = null;
       return null;
     }
 
-    console.log("[ConversationService] Utilisation cache local");
+    secureLog.log("[ConversationService] Utilisation cache local");
     return this.conversationsCache.conversations;
   }
 
@@ -223,7 +224,7 @@ export class ConversationService {
       timestamp: Date.now(),
       userId: userId,
     };
-    console.log(
+    secureLog.log(
       `[ConversationService] Cache mis à jour: ${conversations.length} conversations`,
     );
   }
@@ -239,7 +240,7 @@ export class ConversationService {
     }
 
     // Pas de cache valide, appeler l'API
-    console.log("[ConversationService] Chargement depuis API...");
+    secureLog.log("[ConversationService] Chargement depuis API...");
     const result = await loadUserConversations(userId);
 
     if (result && result.conversations) {
@@ -300,7 +301,7 @@ export class ConversationService {
     conversationId: string,
   ): Promise<ConversationWithMessages | null> {
     try {
-      console.log(
+      secureLog.log(
         "[ConversationService] Chargement conversation complète:",
         conversationId,
       );
@@ -316,7 +317,7 @@ export class ConversationService {
       if (response.ok) {
         const data = await response.json();
 
-        console.log("[ConversationService] Données récupérées:", {
+        secureLog.log("[ConversationService] Données récupérées:", {
           id: data.conversation?.conversation_id,
           questionLength: data.conversation?.question?.length || 0,
           responseLength:
@@ -333,7 +334,7 @@ export class ConversationService {
             this.transformToConversationWithMessages(data.conversation);
 
           if (conversationWithMessages.messages.length > 0) {
-            console.log(
+            secureLog.log(
               "[ConversationService] Conversation transformée avec messages complets",
             );
             return conversationWithMessages;
@@ -341,12 +342,12 @@ export class ConversationService {
         }
       }
 
-      console.warn(
+      secureLog.warn(
         "[ConversationService] Impossible de récupérer la conversation complète",
       );
       return null;
     } catch (error) {
-      console.error(
+      secureLog.error(
         "[ConversationService] Erreur getConversationWithMessages:",
         error,
       );
@@ -364,7 +365,7 @@ export class ConversationService {
     },
   ): Promise<ConversationHistoryResponse> {
     try {
-      console.log("[ConversationService] Chargement historique pour:", userId);
+      secureLog.log("[ConversationService] Chargement historique pour:", userId);
 
       const params = new URLSearchParams({
         groupBy: options.groupBy,
@@ -389,7 +390,7 @@ export class ConversationService {
       }
 
       const data = await response.json();
-      console.log(
+      secureLog.log(
         "[ConversationService] Historique chargé:",
         data.total_count,
         "conversations",
@@ -397,7 +398,7 @@ export class ConversationService {
 
       return data;
     } catch (error) {
-      console.error(
+      secureLog.error(
         "[ConversationService] Erreur chargement historique:",
         error,
       );
@@ -409,7 +410,7 @@ export class ConversationService {
     conversationId: string,
   ): Promise<ConversationDetailResponse> {
     try {
-      console.log(
+      secureLog.log(
         "[ConversationService] Chargement conversation:",
         conversationId,
       );
@@ -427,7 +428,7 @@ export class ConversationService {
       }
 
       const data = await response.json();
-      console.log(
+      secureLog.log(
         "[ConversationService] Conversation chargée:",
         data.conversation.message_count,
         "messages",
@@ -435,7 +436,7 @@ export class ConversationService {
 
       return data;
     } catch (error) {
-      console.error(
+      secureLog.error(
         "[ConversationService] Erreur chargement conversation:",
         error,
       );
@@ -483,14 +484,14 @@ export class ConversationService {
     limit = 50,
   ): Promise<Conversation[]> {
     if (!this.circuitBreaker.canAttempt()) {
-      console.warn(
+      secureLog.warn(
         "[ConversationService] Circuit breaker actif - tentatives bloquées temporairement",
       );
 
       // Même en circuit breaker, essayer le cache
       const cached = this.getCachedConversations(userId);
       if (cached && cached.length > 0) {
-        console.log(
+        secureLog.log(
           "[ConversationService] Utilisation cache malgré circuit breaker",
         );
         return cached.slice(0, limit);
@@ -500,11 +501,11 @@ export class ConversationService {
     }
 
     if (!this.loggingEnabled) {
-      console.log("Logging désactivé - conversations non récupérées");
+      secureLog.log("Logging désactivé - conversations non récupérées");
       return [];
     }
 
-    console.log(
+    secureLog.log(
       "[ConversationService] Récupération conversations pour:",
       userId,
     );
@@ -516,7 +517,7 @@ export class ConversationService {
         await this.loadConversationsWithCache(userId);
 
       if (!conversations || conversations.length === 0) {
-        console.log(
+        secureLog.log(
           "[ConversationService] Aucune conversation via cache/API, essai fallback localStorage...",
         );
         const fallbackResult =
@@ -531,14 +532,14 @@ export class ConversationService {
         return fallbackResult;
       }
 
-      console.log(
+      secureLog.log(
         `[ConversationService] ${conversations.length} conversations récupérées ${fromCache ? "(cache)" : "(API)"}`,
       );
 
       this.circuitBreaker.recordSuccess();
       return conversations.slice(0, limit);
     } catch (error) {
-      console.error(
+      secureLog.error(
         "[ConversationService] Erreur cache/API, fallback localStorage...",
         error,
       );
@@ -546,7 +547,7 @@ export class ConversationService {
       // En cas d'erreur, essayer le cache en dernier recours
       const cached = this.getCachedConversations(userId);
       if (cached && cached.length > 0) {
-        console.log(
+        secureLog.log(
           "[ConversationService] Utilisation cache en fallback d'erreur",
         );
         this.circuitBreaker.recordSuccess();
@@ -564,7 +565,7 @@ export class ConversationService {
         }
         return fallbackResult;
       } catch (fallbackError) {
-        console.error("Erreur fallback localStorage:", fallbackError);
+        secureLog.error("Erreur fallback localStorage:", fallbackError);
         this.circuitBreaker.recordFailure();
         return [];
       }
@@ -578,17 +579,17 @@ export class ConversationService {
       const recentSessionIds = this.getRecentSessionIds();
 
       if (recentSessionIds.length === 0) {
-        console.log("Aucune session localStorage trouvée");
+        secureLog.log("Aucune session localStorage trouvée");
         return [];
       }
 
-      console.log(`${recentSessionIds.length} sessions localStorage trouvées`);
+      secureLog.log(`${recentSessionIds.length} sessions localStorage trouvées`);
 
       const conversations: Conversation[] = [];
 
       for (const sessionId of recentSessionIds.slice(0, limit)) {
         try {
-          console.log(`Récupération session: ${sessionId}`);
+          secureLog.log(`Récupération session: ${sessionId}`);
 
           const response = await fetch(
             `${this.baseUrl}/conversations/${sessionId}`,
@@ -616,19 +617,19 @@ export class ConversationService {
               });
 
               conversations.push(conversation);
-              console.log(`Session ${sessionId} transformée`);
+              secureLog.log(`Session ${sessionId} transformée`);
             } else {
-              console.log(`Session ${sessionId} - pas de session_id`);
+              secureLog.log(`Session ${sessionId} - pas de session_id`);
             }
           } else {
-            console.log(`Session ${sessionId} - status ${response.status}`);
+            secureLog.log(`Session ${sessionId} - status ${response.status}`);
           }
         } catch (error) {
-          console.log(`Erreur récupération session ${sessionId}:`, error);
+          secureLog.log(`Erreur récupération session ${sessionId}:`, error);
         }
       }
 
-      console.log(
+      secureLog.log(
         `${conversations.length} conversations récupérées via localStorage fallback`,
       );
 
@@ -639,7 +640,7 @@ export class ConversationService {
 
       return conversations;
     } catch (error) {
-      console.error("Erreur fallback localStorage:", error);
+      secureLog.error("Erreur fallback localStorage:", error);
       return [];
     }
   }
@@ -717,7 +718,7 @@ export class ConversationService {
         }
       }
     } catch (error) {
-      console.warn("Erreur lecture sessions récentes:", error);
+      secureLog.warn("Erreur lecture sessions récentes:", error);
     }
 
     return [];
@@ -734,17 +735,17 @@ export class ConversationService {
         "recent_conversation_sessions",
         JSON.stringify(updated),
       );
-      console.log(
+      secureLog.log(
         "Session ID stocké pour historique:",
         sessionId.substring(0, 8) + "...",
       );
     } catch (error) {
-      console.warn("Erreur stockage session ID:", error);
+      secureLog.warn("Erreur stockage session ID:", error);
     }
   }
 
   async discoverWorkingEndpoints(): Promise<string[]> {
-    console.log("=== DÉCOUVERTE DES ENDPOINTS FONCTIONNELS ===");
+    secureLog.log("=== DÉCOUVERTE DES ENDPOINTS FONCTIONNELS ===");
 
     const endpointsToTest = [
       "/conversations",
@@ -768,23 +769,23 @@ export class ConversationService {
           headers: this.getHeaders("GET"),
         });
 
-        console.log(`${endpoint}: ${response.status} ${response.statusText}`);
+        secureLog.log(`${endpoint}: ${response.status} ${response.statusText}`);
 
         if (response.ok) {
           const data = await response.json();
-          console.log(`ENDPOINT FONCTIONNEL: ${endpoint}`);
-          console.log(
+          secureLog.log(`ENDPOINT FONCTIONNEL: ${endpoint}`);
+          secureLog.log(
             `Structure:`,
             Array.isArray(data) ? `Array[${data.length}]` : Object.keys(data),
           );
           workingEndpoints.push(endpoint);
         }
       } catch (error) {
-        console.log(`${endpoint}: ${error.message}`);
+        secureLog.log(`${endpoint}: ${error.message}`);
       }
     }
 
-    console.log("Endpoints fonctionnels découverts:", workingEndpoints);
+    secureLog.log("Endpoints fonctionnels découverts:", workingEndpoints);
     return workingEndpoints;
   }
 
@@ -881,7 +882,7 @@ export class ConversationService {
    */
   async saveConversation(data: ConversationData): Promise<void> {
     if (!this.loggingEnabled) {
-      console.log(
+      secureLog.log(
         "Logging désactivé - conversation non sauvegardée:",
         data.conversation_id,
       );
@@ -889,8 +890,8 @@ export class ConversationService {
     }
 
     try {
-      console.log("Sauvegarde conversation:", data.conversation_id);
-      console.log("URL de sauvegarde:", `${this.baseUrl}/conversation`);
+      secureLog.log("Sauvegarde conversation:", data.conversation_id);
+      secureLog.log("URL de sauvegarde:", `${this.baseUrl}/conversation`);
 
       const response = await fetch(`${this.baseUrl}/conversation`, {
         method: "POST",
@@ -921,23 +922,23 @@ export class ConversationService {
       }
 
       const result = await response.json();
-      console.log("Conversation sauvegardée:", result.message);
+      secureLog.log("Conversation sauvegardée:", result.message);
 
       // Invalidation du cache après sauvegarde
       this.invalidateCache();
     } catch (error) {
-      console.error("Erreur sauvegarde conversation:", error);
+      secureLog.error("Erreur sauvegarde conversation:", error);
     }
   }
 
   // Délégation vers apiService.ts
   async sendFeedback(conversationId: string, feedback: 1 | -1): Promise<void> {
     if (!this.loggingEnabled) {
-      console.log("Logging désactivé - feedback non envoyé:", conversationId);
+      secureLog.log("Logging désactivé - feedback non envoyé:", conversationId);
       return;
     }
 
-    console.log("[ConversationService] Délégation feedback vers apiService...");
+    secureLog.log("[ConversationService] Délégation feedback vers apiService...");
     await sendFeedback(conversationId, feedback);
 
     // Invalidation du cache après feedback
@@ -949,7 +950,7 @@ export class ConversationService {
     comment: string,
   ): Promise<void> {
     if (!this.loggingEnabled) {
-      console.log(
+      secureLog.log(
         "Logging désactivé - commentaire non envoyé:",
         conversationId,
       );
@@ -957,12 +958,12 @@ export class ConversationService {
     }
 
     try {
-      console.log(
+      secureLog.log(
         "Envoi commentaire feedback:",
         conversationId,
         comment.substring(0, 50) + "...",
       );
-      console.log(
+      secureLog.log(
         "URL commentaire:",
         `${this.baseUrl}/conversations/${conversationId}/comment`,
       );
@@ -981,7 +982,7 @@ export class ConversationService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn(
+          secureLog.warn(
             "Endpoint commentaire feedback pas encore implémenté sur le serveur",
           );
           return;
@@ -991,12 +992,12 @@ export class ConversationService {
       }
 
       const result = await response.json();
-      console.log("Commentaire feedback enregistré:", result.message);
+      secureLog.log("Commentaire feedback enregistré:", result.message);
 
       // Invalidation du cache après commentaire
       this.invalidateCache();
     } catch (error) {
-      console.error("Erreur envoi commentaire feedback:", error);
+      secureLog.error("Erreur envoi commentaire feedback:", error);
     }
   }
 
@@ -1006,7 +1007,7 @@ export class ConversationService {
     comment?: string,
   ): Promise<void> {
     if (!this.loggingEnabled) {
-      console.log(
+      secureLog.log(
         "Logging désactivé - feedback avec commentaire non envoyé:",
         conversationId,
       );
@@ -1014,13 +1015,13 @@ export class ConversationService {
     }
 
     try {
-      console.log(
+      secureLog.log(
         "Envoi feedback avec commentaire:",
         conversationId,
         feedback,
         comment ? "avec commentaire" : "sans commentaire",
       );
-      console.log(
+      secureLog.log(
         "URL feedback combiné:",
         `${this.baseUrl}/conversations/${conversationId}/feedback-with-comment`,
       );
@@ -1040,7 +1041,7 @@ export class ConversationService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn(
+          secureLog.warn(
             "Endpoint combiné non disponible, utilisation méthodes séparées",
           );
           await this.sendFeedback(conversationId, feedback);
@@ -1054,12 +1055,12 @@ export class ConversationService {
       }
 
       const result = await response.json();
-      console.log("Feedback avec commentaire enregistré:", result.message);
+      secureLog.log("Feedback avec commentaire enregistré:", result.message);
 
       // Invalidation du cache après feedback combiné
       this.invalidateCache();
     } catch (error) {
-      console.error("Erreur envoi feedback avec commentaire:", error);
+      secureLog.error("Erreur envoi feedback avec commentaire:", error);
       throw error;
     }
   }
@@ -1067,14 +1068,14 @@ export class ConversationService {
   // Invalidation du cache après suppression
   async deleteConversation(conversationId: string): Promise<void> {
     if (!this.loggingEnabled) {
-      console.log(
+      secureLog.log(
         "Logging désactivé - conversation non supprimée:",
         conversationId,
       );
       return;
     }
 
-    console.log(
+    secureLog.log(
       "[ConversationService] Délégation suppression vers apiService...",
     );
     await deleteConversation(conversationId);
@@ -1085,13 +1086,13 @@ export class ConversationService {
 
   async clearAllUserConversations(userId: string): Promise<void> {
     if (!this.loggingEnabled) {
-      console.log("Logging désactivé - conversations non supprimées:", userId);
+      secureLog.log("Logging désactivé - conversations non supprimées:", userId);
       return;
     }
 
     try {
-      console.log("Suppression toutes conversations serveur pour:", userId);
-      console.log(
+      secureLog.log("Suppression toutes conversations serveur pour:", userId);
+      secureLog.log(
         "URL suppression globale:",
         `${this.baseUrl}/conversations/user/${userId}`,
       );
@@ -1110,7 +1111,7 @@ export class ConversationService {
       }
 
       const result = await response.json();
-      console.log(
+      secureLog.log(
         "Toutes conversations supprimées du serveur:",
         result.message,
         "Count:",
@@ -1120,14 +1121,14 @@ export class ConversationService {
       // Invalidation du cache après suppression globale
       this.invalidateCache();
     } catch (error) {
-      console.error("Erreur suppression toutes conversations serveur:", error);
+      secureLog.error("Erreur suppression toutes conversations serveur:", error);
       throw error;
     }
   }
 
   async getFeedbackStats(userId?: string, days: number = 7): Promise<any> {
     if (!this.loggingEnabled) {
-      console.log("Logging désactivé - stats feedback non récupérées");
+      secureLog.log("Logging désactivé - stats feedback non récupérées");
       return null;
     }
 
@@ -1137,7 +1138,7 @@ export class ConversationService {
       params.append("days", days.toString());
 
       const url = `${this.baseUrl}/analytics/feedback?${params.toString()}`;
-      console.log("Récupération stats feedback:", url);
+      secureLog.log("Récupération stats feedback:", url);
 
       const response = await fetch(url, {
         headers: this.getHeaders("GET"),
@@ -1145,24 +1146,24 @@ export class ConversationService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn("Endpoint stats feedback pas encore implémenté");
+          secureLog.warn("Endpoint stats feedback pas encore implémenté");
           return null;
         }
         throw new Error(`HTTP ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("Stats feedback récupérées:", data);
+      secureLog.log("Stats feedback récupérées:", data);
       return data;
     } catch (error) {
-      console.error("Erreur récupération stats feedback:", error);
+      secureLog.error("Erreur récupération stats feedback:", error);
       return null;
     }
   }
 
   async testConnection(): Promise<boolean> {
     try {
-      console.log("Test connectivité service logging...");
+      secureLog.log("Test connectivité service logging...");
 
       const response = await fetch(`${this.baseUrl}/test-comments`, {
         headers: this.getHeaders("GET"),
@@ -1170,21 +1171,21 @@ export class ConversationService {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Service logging opérationnel:", data.message);
+        secureLog.log("Service logging opérationnel:", data.message);
         return true;
       } else {
-        console.warn("Service logging indisponible:", response.status);
+        secureLog.warn("Service logging indisponible:", response.status);
         return false;
       }
     } catch (error) {
-      console.error("Erreur test connectivité:", error);
+      secureLog.error("Erreur test connectivité:", error);
       return false;
     }
   }
 
   resetCircuitBreaker(): void {
     this.circuitBreaker = new ConversationLoadingCircuitBreaker();
-    console.log("[ConversationService] Circuit breaker resetté manuellement");
+    secureLog.log("[ConversationService] Circuit breaker resetté manuellement");
   }
 
   getCircuitBreakerStatus(): { attempts: number; canAttempt: boolean } {
@@ -1201,14 +1202,14 @@ export class ConversationService {
    */
   invalidateCache(): void {
     this.conversationsCache = null;
-    console.log("[ConversationService] Cache invalidé manuellement");
+    secureLog.log("[ConversationService] Cache invalidé manuellement");
   }
 
   /**
    * Forcer le rechargement en ignorant le cache
    */
   async forceReload(userId: string, limit = 50): Promise<Conversation[]> {
-    console.log("[ConversationService] Rechargement forcé demandé");
+    secureLog.log("[ConversationService] Rechargement forcé demandé");
     this.invalidateCache();
     return await this.getUserConversations(userId, limit);
   }

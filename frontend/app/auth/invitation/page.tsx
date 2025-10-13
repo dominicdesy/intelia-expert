@@ -4,6 +4,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/languages/i18n";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // ==================== CONFIGURATION DES PAYS AVEC FALLBACK ====================
 // Pays de fallback (les plus communs) en cas d'échec de l'API
@@ -67,7 +68,7 @@ const useCountries = () => {
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        console.log(
+        secureLog.log(
           `[Countries] Tentative de chargement via API REST Countries en ${currentLanguage} (${languageCode})...`,
         );
 
@@ -87,7 +88,7 @@ const useCountries = () => {
         }
 
         const data = await response.json();
-        console.log("[Countries] Données reçues:", data.length, "pays");
+        secureLog.log("[Countries] Données reçues:", data.length, "pays");
 
         const formattedCountries = data
           .map((country: any) => {
@@ -149,14 +150,14 @@ const useCountries = () => {
         if (formattedCountries.length >= 50) {
           setCountries(formattedCountries);
           setUsingFallback(false);
-          console.log(
+          secureLog.log(
             `[Countries] API REST Countries utilisée avec succès en ${currentLanguage}`,
           );
         } else {
           throw new Error("Données insuffisantes");
         }
       } catch (err) {
-        console.warn(
+        secureLog.warn(
           "[Countries] API REST Countries bloquée, utilisation du fallback:",
           err,
         );
@@ -409,11 +410,11 @@ function InvitationAcceptPageContent() {
     const handleAuthCallback = async () => {
       try {
         if (hasProcessedToken) {
-          console.log("[InvitationAccept] Token déjà traité, ignorer");
+          secureLog.log("[InvitationAccept] Token déjà traité, ignorer");
           return;
         }
 
-        console.log("[InvitationAccept] Début traitement invitation");
+        secureLog.log("[InvitationAccept] Début traitement invitation");
 
         const hash = window.location.hash;
         const token = searchParams.get("token");
@@ -425,7 +426,7 @@ function InvitationAcceptPageContent() {
         const hasInvitationInQuery = token && type === "invite";
 
         if (hasInvitationInHash || hasInvitationInQuery) {
-          console.log("[InvitationAccept] Invitation détectée dans URL");
+          secureLog.log("[InvitationAccept] Invitation détectée dans URL");
           setMessage(t("invitation.validating"));
 
           setHasProcessedToken(true);
@@ -443,7 +444,7 @@ function InvitationAcceptPageContent() {
             throw new Error(t("invitation.errors.missingToken"));
           }
 
-          console.log(
+          secureLog.log(
             "[InvitationAccept] Token extrait, validation via backend...",
           );
 
@@ -478,7 +479,7 @@ function InvitationAcceptPageContent() {
           }
 
           const validationResult = await validateResponse.json();
-          console.log(
+          secureLog.log(
             "[InvitationAccept] Token validé:",
             validationResult.user_email,
           );
@@ -504,7 +505,7 @@ function InvitationAcceptPageContent() {
             email: validationResult.user_email,
           }));
 
-          console.log("[InvitationAccept] Passage au mode set-password");
+          secureLog.log("[InvitationAccept] Passage au mode set-password");
           setStatus("set-password");
           setMessage(t("invitation.completeProfile"));
 
@@ -517,7 +518,7 @@ function InvitationAcceptPageContent() {
           }, 100);
         } else {
           if (!hasProcessedToken) {
-            console.log("[InvitationAccept] Pas d'invitation trouvée");
+            secureLog.log("[InvitationAccept] Pas d'invitation trouvée");
             setStatus("error");
             setMessage(t("invitation.errors.noInvitation"));
             setProcessingResult({
@@ -529,7 +530,7 @@ function InvitationAcceptPageContent() {
           }
         }
       } catch (error) {
-        console.error("[InvitationAccept] Erreur traitement:", error);
+        secureLog.error("[InvitationAccept] Erreur traitement:", error);
         setStatus("error");
 
         if (error instanceof Error) {
@@ -642,12 +643,12 @@ function InvitationAcceptPageContent() {
   };
 
   const handleFormSubmit = async () => {
-    console.log("[InvitationAccept] Début handleFormSubmit");
+    secureLog.log("[InvitationAccept] Début handleFormSubmit");
 
     const validationErrors = validateForm();
 
     if (validationErrors.length > 0) {
-      console.log(
+      secureLog.log(
         "[InvitationAccept] Erreurs de validation:",
         validationErrors,
       );
@@ -655,12 +656,12 @@ function InvitationAcceptPageContent() {
       return;
     }
 
-    console.log("[InvitationAccept] Validation formulaire passée");
+    secureLog.log("[InvitationAccept] Validation formulaire passée");
     setIsProcessing(true);
     setErrors([]);
 
     try {
-      console.log("[InvitationAccept] Finalisation du compte via backend...");
+      secureLog.log("[InvitationAccept] Finalisation du compte via backend...");
 
       if (!userInfo?.accessToken) {
         throw new Error(t("invitation.errors.missingAccessToken"));
@@ -703,7 +704,7 @@ function InvitationAcceptPageContent() {
         clientValidationErrors.push(t("validation.required.accessToken"));
 
       if (clientValidationErrors.length > 0) {
-        console.error(
+        secureLog.error(
           "[InvitationAccept] Erreurs validation client:",
           clientValidationErrors,
         );
@@ -739,7 +740,7 @@ function InvitationAcceptPageContent() {
             errorData = { detail: textResponse, rawResponse: textResponse };
           }
         } catch (parseError) {
-          console.error(
+          secureLog.error(
             "[InvitationAccept] Erreur parsing réponse:",
             parseError,
           );
@@ -779,7 +780,7 @@ function InvitationAcceptPageContent() {
       }
 
       const completionResult = await completeResponse.json();
-      console.log(
+      secureLog.log(
         "[InvitationAccept] Profil finalisé avec succès:",
         completionResult,
       );
@@ -793,11 +794,11 @@ function InvitationAcceptPageContent() {
       });
 
       setTimeout(() => {
-        console.log("[InvitationAccept] Redirection vers chat");
+        secureLog.log("[InvitationAccept] Redirection vers chat");
         router.push(completionResult.redirect_url || "/chat");
       }, 2000);
     } catch (error: any) {
-      console.error("[InvitationAccept] Erreur finalisation compte:", error);
+      secureLog.error("[InvitationAccept] Erreur finalisation compte:", error);
 
       let errorMessage = t("invitation.errors.accountCompletion");
 

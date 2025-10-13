@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useTranslation, availableLanguages } from "@/lib/languages/i18n";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // ==================== VALIDATION MOT DE PASSE INTERNATIONALISÉE ====================
 const validatePassword = (
@@ -428,7 +429,7 @@ function ResetPasswordPageContent() {
   useEffect(() => {
     const langParam = searchParams.get("lang");
     if (langParam && availableLanguages.some((l) => l.code === langParam)) {
-      console.log("[ResetPassword] Changement de langue détecté:", langParam);
+      secureLog.log("[ResetPassword] Changement de langue détecté:", langParam);
       changeLanguage(langParam);
     }
   }, [searchParams, changeLanguage]);
@@ -450,7 +451,7 @@ function ResetPasswordPageContent() {
     };
 
     const finalToken = extractTokenFromUrl();
-    console.log(
+    secureLog.log(
       "[ResetPassword] Token détecté:",
       finalToken ? "Présent" : "Absent",
     );
@@ -524,7 +525,7 @@ function ResetPasswordPageContent() {
 
       setSuccess(true);
     } catch (error: any) {
-      console.error("[ResetPassword] Erreur:", error);
+      secureLog.error("[ResetPassword] Erreur:", error);
 
       if (error.message.includes("400")) {
         setErrors([t("resetPassword.errors.tokenExpired")]);

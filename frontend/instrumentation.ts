@@ -5,18 +5,19 @@
  */
 
 import packageJson from './package.json';
+import { secureLog } from "@/lib/utils/secureLogger";
 
 export async function register() {
   const version = packageJson.version;
   const environment = process.env.NODE_ENV || 'development';
   const timestamp = new Date().toISOString();
 
-  console.log('\n' + '='.repeat(60));
-  console.log('🚀 Intelia Expert Frontend - Starting up');
-  console.log('='.repeat(60));
-  console.log(`📦 Version: ${version}`);
-  console.log(`🌍 Environment: ${environment}`);
-  console.log(`⏰ Timestamp: ${timestamp}`);
-  console.log(`🔧 Node version: ${process.version}`);
-  console.log('='.repeat(60) + '\n');
+  secureLog.log('\n' + '='.repeat(60));
+  secureLog.log('🚀 Intelia Expert Frontend - Starting up');
+  secureLog.log('='.repeat(60));
+  secureLog.log(`📦 Version: ${version}`);
+  secureLog.log(`🌍 Environment: ${environment}`);
+  secureLog.log(`⏰ Timestamp: ${timestamp}`);
+  secureLog.log(`🔧 Node version: ${process.version}`);
+  secureLog.log('='.repeat(60) + '\n');
 }

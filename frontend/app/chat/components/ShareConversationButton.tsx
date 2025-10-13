@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Share2, Copy, Check, X, Clock, Eye, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/languages/i18n";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 interface ShareConversationButtonProps {
   conversationId: string;
@@ -42,7 +43,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
       }
       return null;
     } catch (error) {
-      console.error("Erreur récupération token:", error);
+      secureLog.error("Erreur récupération token:", error);
       return null;
     }
   };
@@ -86,7 +87,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
       }
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue");
-      console.error("Erreur création partage:", err);
+      secureLog.error("Erreur création partage:", err);
     } finally {
       setIsLoading(false);
     }
@@ -100,7 +101,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error("Erreur copie:", err);
+      secureLog.error("Erreur copie:", err);
       setError("Impossible de copier le lien");
     }
   };

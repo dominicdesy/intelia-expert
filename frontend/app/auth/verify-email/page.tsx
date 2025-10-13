@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useTranslation } from "@/lib/languages/i18n";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // ==================== LOGO INTELIA ====================
 const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
@@ -225,7 +226,7 @@ function VerifyEmailPageContent() {
   // Redirection si déjà connecté
   useEffect(() => {
     if (isAuthenticated && user) {
-      console.log("[VerifyEmail] Utilisateur déjà connecté, redirection...");
+      secureLog.log("[VerifyEmail] Utilisateur déjà connecté, redirection...");
       router.push("/chat");
     }
   }, [isAuthenticated, user, router]);
@@ -238,7 +239,7 @@ function VerifyEmailPageContent() {
       const emailParam = searchParams.get("email");
       const type = searchParams.get("type"); // Peut être 'signup' ou autre
 
-      console.log("[VerifyEmail] Paramètres URL:", {
+      secureLog.log("[VerifyEmail] Paramètres URL:", {
         token,
         confirmationUrl,
         emailParam,
@@ -249,7 +250,7 @@ function VerifyEmailPageContent() {
 
       // Si pas de token, afficher page en attente
       if (!token && !confirmationUrl) {
-        console.log("[VerifyEmail] Pas de token - page en attente");
+        secureLog.log("[VerifyEmail] Pas de token - page en attente");
         setStatus("pending");
         // CORRECTION: Utiliser les clés simples sans interpolation
         setMessage(
@@ -264,7 +265,7 @@ function VerifyEmailPageContent() {
       const finalToken = token || confirmationUrl;
 
       try {
-        console.log("[VerifyEmail] Vérification en cours...");
+        secureLog.log("[VerifyEmail] Vérification en cours...");
         setMessage(t("verification.verifying"));
 
         // APPEL API pour vérifier l'email
@@ -284,14 +285,14 @@ function VerifyEmailPageContent() {
 
         if (response.ok) {
           const data = await response.json();
-          console.log("[VerifyEmail] Vérification réussie");
+          secureLog.log("[VerifyEmail] Vérification réussie");
 
           setStatus("success");
           setMessage(t("verification.success.verified"));
           setEmail(data.email || emailParam);
         } else {
           const errorData = await response.json().catch(() => ({}));
-          console.log("[VerifyEmail] Vérification échouée:", errorData);
+          secureLog.log("[VerifyEmail] Vérification échouée:", errorData);
 
           setStatus("error");
 
@@ -305,7 +306,7 @@ function VerifyEmailPageContent() {
           }
         }
       } catch (error) {
-        console.error("[VerifyEmail] Erreur réseau:", error);
+        secureLog.error("[VerifyEmail] Erreur réseau:", error);
         setStatus("error");
         setMessage(t("verification.error.network"));
       }

@@ -5,6 +5,7 @@ import { StatisticsDashboard } from "./StatisticsDashboard";
 import { QuestionsTab } from "./QuestionsTab";
 import { InvitationStatsComponent } from "./InvitationStats";
 import { QualityIssuesTab } from "./QualityIssuesTab";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // ✅ HOOK SIMPLIFIÉ - Plus de fallback localStorage/Supabase
 const useRobustAuth = () => {
@@ -13,7 +14,7 @@ const useRobustAuth = () => {
   return useMemo(() => {
     // UNIQUEMENT le store unifié - plus de fallback
     if (user?.email && user?.user_type) {
-      console.log(
+      secureLog.log(
         "[useRobustAuth] Utilisateur trouvé dans le store unifié:",
         user.email,
         user.user_type,
@@ -21,7 +22,7 @@ const useRobustAuth = () => {
       return user;
     }
 
-    console.log("[useRobustAuth] Aucun utilisateur dans le store unifié");
+    secureLog.log("[useRobustAuth] Aucun utilisateur dans le store unifié");
     return null;
   }, [user]);
 };
@@ -264,7 +265,7 @@ export const StatisticsPage: React.FC = () => {
 
   // Reset forcé des références à chaque mount
   useEffect(() => {
-    console.log("[StatisticsPage] Reset forcé des références au mount");
+    secureLog.log("[StatisticsPage] Reset forcé des références au mount");
     dashboardLoadedRef.current = false;
     authCheckRef.current = false;
     stabilityCounterRef.current = 0;
@@ -285,7 +286,7 @@ export const StatisticsPage: React.FC = () => {
 
   // ✅ LOGIQUE D'AUTHENTIFICATION SIMPLIFIÉE - Store unifié uniquement
   useEffect(() => {
-    console.log("[StatisticsPage] Auth check unifié:", {
+    secureLog.log("[StatisticsPage] Auth check unifié:", {
       hasHydrated,
       isAuthenticated,
       hasUser: !!currentUser,
@@ -294,21 +295,21 @@ export const StatisticsPage: React.FC = () => {
     });
 
     if (!hasHydrated) {
-      console.log("[StatisticsPage] Store pas encore hydraté...");
+      secureLog.log("[StatisticsPage] Store pas encore hydraté...");
       setAuthStatus("initializing");
     } else if (!isAuthenticated || !currentUser) {
-      console.log("[StatisticsPage] Utilisateur non connecté");
+      secureLog.log("[StatisticsPage] Utilisateur non connecté");
       setAuthStatus("unauthorized");
       setError("Vous devez être connecté pour accéder à cette page");
     } else if (currentUser.user_type !== "super_admin") {
-      console.log(
+      secureLog.log(
         "[StatisticsPage] Permissions insuffisantes:",
         currentUser.user_type,
       );
       setAuthStatus("forbidden");
       setError("Accès refusé - Permissions super_admin requises");
     } else {
-      console.log(
+      secureLog.log(
         "[StatisticsPage] Authentification réussie:",
         currentUser.email,
       );
@@ -320,7 +321,7 @@ export const StatisticsPage: React.FC = () => {
   // ✅ CHARGEMENT STATS - Avec délai pour stabilité
   useEffect(() => {
     if (authStatus === "ready" && !statsLoading && !systemStats) {
-      console.log("[StatisticsPage] Lancement chargement des statistiques");
+      secureLog.log("[StatisticsPage] Lancement chargement des statistiques");
 
       const timeoutId = setTimeout(() => {
         loadAllStatistics();
@@ -339,7 +340,7 @@ export const StatisticsPage: React.FC = () => {
     ) {
       const pageKey = `${currentPage}-${questionsPerPage}`;
       if (!questionsLoadedRef.current.get(pageKey)) {
-        console.log(
+        secureLog.log(
           "[StatisticsPage] Lancement chargement des questions pour page:",
           pageKey,
         );
@@ -357,7 +358,7 @@ export const StatisticsPage: React.FC = () => {
       !invitationLoading &&
       !invitationsLoadedRef.current
     ) {
-      console.log("[StatisticsPage] Lancement chargement des invitations");
+      secureLog.log("[StatisticsPage] Lancement chargement des invitations");
       invitationsLoadedRef.current = true;
       loadInvitationStats();
     }
@@ -368,7 +369,7 @@ export const StatisticsPage: React.FC = () => {
     newTab: "dashboard" | "questions" | "invitations" | "quality",
   ) => {
     if (newTab !== activeTab) {
-      console.log(
+      secureLog.log(
         "[StatisticsPage] Changement onglet:",
         activeTab,
         "->",
@@ -386,11 +387,11 @@ export const StatisticsPage: React.FC = () => {
   // ✅ MÉTHODE UNIFIÉE : Utiliser apiClient.getSecure() uniquement
   const loadAllStatistics = async () => {
     if (statsLoading) {
-      console.log("[StatisticsPage] Chargement déjà en cours, annulation...");
+      secureLog.log("[StatisticsPage] Chargement déjà en cours, annulation...");
       return;
     }
 
-    console.log(
+    secureLog.log(
       "[StatisticsPage] DÉBUT chargement statistiques avec store unifié",
     );
     setStatsLoading(true);
@@ -400,7 +401,7 @@ export const StatisticsPage: React.FC = () => {
 
     try {
       // ✅ UTILISE APILIENT.GETSECURE() - plus d'appels directs
-      console.log(
+      secureLog.log(
         "[StatisticsPage] Appel apiClient.getSecure() pour stats-fast/dashboard",
       );
 
@@ -420,10 +421,10 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const fastData = response.data;
-      console.log("✅ Statistiques chargées avec store unifié!", fastData);
+      secureLog.log("✅ Statistiques chargées avec store unifié!", fastData);
 
       const loadTime = performance.now() - startTime;
-      console.log(`Performance: ${loadTime.toFixed(0)}ms`);
+      secureLog.log(`Performance: ${loadTime.toFixed(0)}ms`);
 
       const performanceGainValue =
         fastData.performanceStats?.performance_gain ||
@@ -524,9 +525,9 @@ export const StatisticsPage: React.FC = () => {
       setBillingStats(safeBillingStats);
       setPerformanceStats(safePerformanceStats);
 
-      console.log("Toutes les statistiques chargées via store unifié!");
+      secureLog.log("Toutes les statistiques chargées via store unifié!");
     } catch (err) {
-      console.error("[StatisticsPage] Erreur chargement statistiques:", err);
+      secureLog.error("[StatisticsPage] Erreur chargement statistiques:", err);
       setError(`Erreur lors du chargement des statistiques: ${err}`);
     } finally {
       setStatsLoading(false);
@@ -536,11 +537,11 @@ export const StatisticsPage: React.FC = () => {
   // ✅ MÉTHODE UNIFIÉE : Charger les questions avec apiClient.getSecure
   const loadQuestionLogs = async () => {
     if (questionsLoading) {
-      console.log("[Questions] Chargement déjà en cours, annulation...");
+      secureLog.log("[Questions] Chargement déjà en cours, annulation...");
       return;
     }
 
-    console.log("[Questions] Chargement avec store unifié");
+    secureLog.log("[Questions] Chargement avec store unifié");
     setQuestionsLoading(true);
     const startTime = performance.now();
 
@@ -566,10 +567,10 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const fastData = response.data;
-      console.log("Questions chargées avec store unifié!", fastData);
+      secureLog.log("Questions chargées avec store unifié!", fastData);
 
       const loadTime = performance.now() - startTime;
-      console.log(`Questions Performance: ${loadTime.toFixed(0)}ms`);
+      secureLog.log(`Questions Performance: ${loadTime.toFixed(0)}ms`);
 
       const realCacheInfo = fastData.cache_info || {
         is_available: false,
@@ -612,7 +613,7 @@ export const StatisticsPage: React.FC = () => {
       setQuestionLogs(adaptedQuestions);
       setTotalQuestions(fastData.pagination.total);
     } catch (err) {
-      console.error("Erreur chargement questions:", err);
+      secureLog.error("Erreur chargement questions:", err);
       setError(`Erreur chargement questions: ${err}`);
       setQuestionLogs([]);
       const pageKey = `${currentPage}-${questionsPerPage}`;
@@ -625,17 +626,17 @@ export const StatisticsPage: React.FC = () => {
   // ✅ MÉTHODE UNIFIÉE : Charger les invitations avec l'endpoint fonctionnel
   const loadInvitationStats = async () => {
     if (invitationLoading) {
-      console.log("[Invitations] Chargement déjà en cours, annulation...");
+      secureLog.log("[Invitations] Chargement déjà en cours, annulation...");
       return;
     }
 
-    console.log("[Invitations] Chargement avec store unifié");
+    secureLog.log("[Invitations] Chargement avec store unifié");
     setInvitationLoading(true);
     setError(null);
     const startTime = performance.now();
 
     try {
-      console.log(
+      secureLog.log(
         "Utilisation endpoint fonctionnel: invitations/stats/global-enhanced",
       );
 
@@ -656,10 +657,10 @@ export const StatisticsPage: React.FC = () => {
       }
 
       const globalData = response.data;
-      console.log("Invitations chargées avec store unifié!", globalData);
+      secureLog.log("Invitations chargées avec store unifié!", globalData);
 
       const loadTime = performance.now() - startTime;
-      console.log(`Invitations Performance: ${loadTime.toFixed(0)}ms`);
+      secureLog.log(`Invitations Performance: ${loadTime.toFixed(0)}ms`);
 
       const adaptedCacheStatus: CacheStatus = {
         is_available: false,
@@ -681,9 +682,9 @@ export const StatisticsPage: React.FC = () => {
       setInvitationCacheStatus(adaptedCacheStatus);
       setInvitationStats(adaptedInvitationStats);
 
-      console.log("Données d'invitations adaptées:", adaptedInvitationStats);
+      secureLog.log("Données d'invitations adaptées:", adaptedInvitationStats);
     } catch (err) {
-      console.error(
+      secureLog.error(
         "[StatisticsPage] Erreur chargement stats invitations:",
         err,
       );

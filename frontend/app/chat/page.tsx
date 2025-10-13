@@ -33,6 +33,7 @@ import { ZohoSalesIQ } from "./components/ZohoSalesIQ";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
 import { LoadingMessage } from "./components/LoadingMessage";
 import ShareConversationButton from "./components/ShareConversationButton";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Composant ChatInput optimisé avec React.memo
 const ChatInput = React.memo(
@@ -395,7 +396,7 @@ function ChatInterface() {
   // Gestion d'erreur unifiée
   const handleAuthError = useCallback(
     (error: any) => {
-      console.error("[Chat] Auth error détectée:", error);
+      secureLog.error("[Chat] Auth error détectée:", error);
 
       const isSessionExpired =
         error?.status === 401 ||
@@ -409,7 +410,7 @@ function ChatInterface() {
         error?.detail === "Token expired";
 
       if (isSessionExpired) {
-        console.log(
+        secureLog.log(
           "[Chat] Session expirée détectée - déconnexion automatique",
         );
 
@@ -425,7 +426,7 @@ function ChatInterface() {
             logoutService.performLogout(user);
           })
           .catch((err) => {
-            console.warn("[Chat] Fallback - redirection directe:", err);
+            secureLog.warn("[Chat] Fallback - redirection directe:", err);
             setTimeout(() => {
               window.location.href = "/";
             }, 100);
@@ -434,7 +435,7 @@ function ChatInterface() {
         return;
       }
 
-      console.warn("[Chat] Erreur non-auth (pas de redirection):", error);
+      secureLog.warn("[Chat] Erreur non-auth (pas de redirection):", error);
     },
     [user, setCurrentConversation],
   );
@@ -548,10 +549,10 @@ function ChatInterface() {
       try {
         const handled = await handleOAuthTokenFromURL();
         if (handled) {
-          console.log("[Chat] Token OAuth traité par le store unifié");
+          secureLog.log("[Chat] Token OAuth traité par le store unifié");
         }
       } catch (error) {
-        console.error("[Chat] Erreur traitement OAuth:", error);
+        secureLog.error("[Chat] Erreur traitement OAuth:", error);
       }
     };
 
@@ -777,7 +778,7 @@ function ChatInterface() {
       !hasLoadedConversationsRef.current &&
       isMountedRef.current
     ) {
-      console.log("[Chat] Chargement initial UNIQUE pour:", user.id);
+      secureLog.log("[Chat] Chargement initial UNIQUE pour:", user.id);
       hasLoadedConversationsRef.current = true;
 
       const userId = user.id;
@@ -786,12 +787,12 @@ function ChatInterface() {
         try {
           const { loadConversations: loadFn } = useChatStore.getState();
           await loadFn(userId);
-          console.log("[Chat] Chargement initial terminé avec succès");
+          secureLog.log("[Chat] Chargement initial terminé avec succès");
         } catch (error) {
-          console.error("[Chat] Erreur chargement initial:", error);
+          secureLog.error("[Chat] Erreur chargement initial:", error);
 
           if (error?.status === 401 || error?.status === 403) {
-            console.log("[Chat] Session expirée détectée - redirection");
+            secureLog.log("[Chat] Session expirée détectée - redirection");
             hasLoadedConversationsRef.current = false;
             setTimeout(() => {
               window.location.href = "/";
@@ -978,16 +979,16 @@ function ChatInterface() {
 		  );
 		  
 		  if (isNewConversation) {
-		    console.log("🔄 [Chat] Nouvelle conversation créée, refresh dans 2s");
+		    secureLog.log("🔄 [Chat] Nouvelle conversation créée, refresh dans 2s");
 		    setTimeout(async () => {
 			  if (!isMountedRef.current) return;
 			  try {
 			    // ✅ Utiliser refreshConversations qui force le bypass de la protection
 			    const { refreshConversations } = useChatStore.getState();
 			    await refreshConversations(user.id);
-			    console.log("✅ [Chat] Historique rafraîchi automatiquement avec bypass");
+			    secureLog.log("✅ [Chat] Historique rafraîchi automatiquement avec bypass");
 			  } catch (error) {
-			    console.warn("⚠️ [Chat] Erreur refresh auto:", error);
+			    secureLog.warn("⚠️ [Chat] Erreur refresh auto:", error);
 			  }
 		    }, 2000);
 		  }		  
@@ -995,7 +996,7 @@ function ChatInterface() {
 		// ✅ FIN DE L'AJOUT
 
 	  } catch (error) {
-		console.error(t("chat.sendError"), error);
+		secureLog.error(t("chat.sendError"), error);
 		handleAuthError(error);
 
 		if (isMountedRef.current) {
@@ -1081,11 +1082,11 @@ function ChatInterface() {
                 comment.trim(),
               );
             } catch (commentError) {
-              console.warn(t("chat.commentNotSent"), commentError);
+              secureLog.warn(t("chat.commentNotSent"), commentError);
             }
           }
         } catch (feedbackError) {
-          console.error(t("chat.feedbackSendError"), feedbackError);
+          secureLog.error(t("chat.feedbackSendError"), feedbackError);
           handleAuthError(feedbackError);
 
           if (isMountedRef.current) {
@@ -1097,7 +1098,7 @@ function ChatInterface() {
           throw feedbackError;
         }
       } catch (error) {
-        console.error(t("chat.feedbackGeneralError"), error);
+        secureLog.error(t("chat.feedbackGeneralError"), error);
         throw error;
       } finally {
         if (isMountedRef.current) {

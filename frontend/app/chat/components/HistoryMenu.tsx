@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from "@/lib/stores/auth";
 import { TrashIcon, PlusIcon, MessageCircleIcon } from "../utils/icons";
 import type { Conversation, ConversationGroup } from "../../../types";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 export const HistoryMenu = React.memo(() => {
   const { t } = useTranslation();
@@ -45,7 +46,7 @@ export const HistoryMenu = React.memo(() => {
   );
 
   const handleToggle = useCallback(async () => {
-    console.log(
+    secureLog.log(
       t("history.toggleClicked"),
       isOpen,
       t("history.userPresent"),
@@ -56,14 +57,14 @@ export const HistoryMenu = React.memo(() => {
     setIsOpen(newIsOpen);
 
     if (newIsOpen && user && !isLoadingHistory) {
-      console.log(
+      secureLog.log(
         "🔄 [HistoryMenu] Chargement à l'ouverture du menu",
       );
       try {
         await loadConversations(user.id || user.email);
-        console.log("✅ [HistoryMenu] Conversations chargées");
+        secureLog.log("✅ [HistoryMenu] Conversations chargées");
       } catch (error) {
-        console.error("❌ [HistoryMenu] Erreur chargement:", error);
+        secureLog.error("❌ [HistoryMenu] Erreur chargement:", error);
       }
     }
   }, [
@@ -79,7 +80,7 @@ export const HistoryMenu = React.memo(() => {
       e.preventDefault();
       e.stopPropagation();
       if (!user) return;
-      console.log("🔄 [HistoryMenu] Refresh demandé");
+      secureLog.log("🔄 [HistoryMenu] Refresh demandé");
       await refreshConversations(user.id || user.email);
     },
     [user, refreshConversations],
@@ -158,7 +159,7 @@ export const HistoryMenu = React.memo(() => {
     };
 
     if (isOpen || totalConversations > 0) {
-      console.log("[HistoryMenu] État actuel:", state);
+      secureLog.log("[HistoryMenu] État actuel:", state);
     }
 
     return state;

@@ -19,6 +19,7 @@ import { AccountModal } from "./modals/AccountModal";
 import { ContactModal } from "./modals/ContactModal";
 import { LanguageModal } from "./modals/LanguageModal";
 import { InviteFriendModal } from "./modals/InviteFriendModal";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // UserMenuButton - Version corrigée avec coordination auth store pour React #300
 export const UserMenuButton = React.memo(() => {
@@ -41,7 +42,7 @@ export const UserMenuButton = React.memo(() => {
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
-      console.log(t("userMenu.debug.unmounting"));
+      secureLog.log(t("userMenu.debug.unmounting"));
       isMountedRef.current = false;
     };
   }, [t]);
@@ -96,7 +97,7 @@ export const UserMenuButton = React.memo(() => {
   useEffect(() => {
     // Debug seulement en cas de changement réel des données utilisateur
     if (user?.name || user?.email) {
-      console.log("UserMenu user data:", {
+      secureLog.log("UserMenu user data:", {
         user_name: user?.name,
         user_email: user?.email,
         calculated_initials: getUserInitials(user),
@@ -170,7 +171,7 @@ export const UserMenuButton = React.memo(() => {
     if (logoutInProgressRef.current || !isMountedRef.current) return;
 
     try {
-      console.log(t("userMenu.debug.logoutViaService"));
+      secureLog.log(t("userMenu.debug.logoutViaService"));
       logoutInProgressRef.current = true;
 
       // Fermer le menu immédiatement
@@ -179,7 +180,7 @@ export const UserMenuButton = React.memo(() => {
       // ✅ CORRECTION: Passer l'objet user pour préserver la langue
       await logoutService.performLogout(user);
     } catch (error) {
-      console.error(t("userMenu.debug.logoutServiceError"), error);
+      secureLog.error(t("userMenu.debug.logoutServiceError"), error);
       // En cas d'erreur, forcer quand même la redirection
       window.location.href = "/";
     }
@@ -244,7 +245,7 @@ export const UserMenuButton = React.memo(() => {
 
   const toggleOpen = useCallback(() => {
     if (!isMountedRef.current) return;
-    console.log(
+    secureLog.log(
       t("userMenu.debug.toggleOpen"),
       isMountedRef.current,
       t("userMenu.debug.currentIsOpen"),

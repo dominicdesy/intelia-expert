@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MessageCircle, Clock, Eye, AlertCircle, Loader2 } from "lucide-react";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 interface Message {
   id: string;
@@ -68,7 +69,7 @@ export default function SharedConversationPage() {
         setData(result);
       } catch (err: any) {
         setError(err.message || "Une erreur est survenue");
-        console.error("Erreur chargement conversation partagée:", err);
+        secureLog.error("Erreur chargement conversation partagée:", err);
       } finally {
         setIsLoading(false);
       }

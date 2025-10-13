@@ -1,13 +1,15 @@
+import { secureLog } from "@/lib/utils/secureLogger";
+
 // lib/services/logoutService.ts
 // Service de logout independant pour eviter les problemes React #300
 
 export const logoutService = {
   async performLogout(user?: any): Promise<void> {
-    console.log("[LogoutService] Debut deconnexion via service independant");
+    secureLog.log("[LogoutService] Debut deconnexion via service independant");
 
     // Timeout global pour forcer la redirection en cas de blocage
     const forceRedirect = setTimeout(() => {
-      console.log(
+      secureLog.log(
         "[LogoutService] TIMEOUT GLOBAL - Redirection forcée après 8 secondes",
       );
       window.location.href = "/";
@@ -20,7 +22,7 @@ export const logoutService = {
         // Methode 1: Depuis le parametre user passe
         if (user?.language) {
           userLanguage = user.language;
-          console.log(
+          secureLog.log(
             "[LogoutService] Langue detectee depuis user:",
             userLanguage,
           );
@@ -31,19 +33,19 @@ export const logoutService = {
           if (zustandLang) {
             const parsed = JSON.parse(zustandLang);
             userLanguage = parsed?.state?.currentLanguage || "fr";
-            console.log(
+            secureLog.log(
               "[LogoutService] Langue detectee depuis localStorage:",
               userLanguage,
             );
           }
         }
       } catch (error) {
-        console.warn(
+        secureLog.warn(
           "[LogoutService] Erreur detection langue, utilisation du francais:",
           error,
         );
       }
-      console.log("[LogoutService] Etape 1 terminee - Detection langue");
+      secureLog.log("[LogoutService] Etape 1 terminee - Detection langue");
 
       // 2. Preserver RememberMe si necessaire
       let preservedRememberMe = null;
@@ -53,15 +55,15 @@ export const logoutService = {
         );
         if (rememberMeData) {
           preservedRememberMe = JSON.parse(rememberMeData);
-          console.log("[LogoutService] RememberMe preserve");
+          secureLog.log("[LogoutService] RememberMe preserve");
         }
       } catch (error) {
-        console.warn("[LogoutService] Erreur preservation RememberMe:", error);
+        secureLog.warn("[LogoutService] Erreur preservation RememberMe:", error);
       }
-      console.log("[LogoutService] Etape 2 terminee - Preservation RememberMe");
+      secureLog.log("[LogoutService] Etape 2 terminee - Preservation RememberMe");
 
       // 3. Deconnexion Supabase avec timeout robuste
-      console.log("[LogoutService] Tentative deconnexion Supabase...");
+      secureLog.log("[LogoutService] Tentative deconnexion Supabase...");
       try {
         // Import avec timeout de 2 secondes
         const importPromise = import("@/lib/supabase/singleton");
@@ -82,19 +84,19 @@ export const logoutService = {
         );
 
         await Promise.race([signOutPromise, signOutTimeout]);
-        console.log(
+        secureLog.log(
           "[LogoutService] Deconnexion Supabase terminee avec succes",
         );
       } catch (supabaseError) {
-        console.warn(
+        secureLog.warn(
           "[LogoutService] Erreur/Timeout Supabase (continue quand meme):",
           supabaseError?.message || supabaseError,
         );
       }
-      console.log("[LogoutService] Etape 3 terminee - Deconnexion Supabase");
+      secureLog.log("[LogoutService] Etape 3 terminee - Deconnexion Supabase");
 
       // 4. Nettoyage localStorage selectif
-      console.log("[LogoutService] Nettoyage localStorage...");
+      secureLog.log("[LogoutService] Nettoyage localStorage...");
       const keysToRemove = [];
       try {
         for (let i = 0; i < localStorage.length; i++) {
@@ -119,18 +121,18 @@ export const logoutService = {
         keysToRemove.forEach((key) => {
           try {
             localStorage.removeItem(key);
-            console.log(`[LogoutService] Supprime: ${key}`);
+            secureLog.log(`[LogoutService] Supprime: ${key}`);
           } catch (e) {
-            console.warn(`[LogoutService] Impossible de supprimer ${key}:`, e);
+            secureLog.warn(`[LogoutService] Impossible de supprimer ${key}:`, e);
           }
         });
       } catch (storageError) {
-        console.warn(
+        secureLog.warn(
           "[LogoutService] Erreur lors du nettoyage localStorage:",
           storageError,
         );
       }
-      console.log("[LogoutService] Etape 4 terminee - Nettoyage localStorage");
+      secureLog.log("[LogoutService] Etape 4 terminee - Nettoyage localStorage");
 
       // 5. Reinitialiser le store auth au lieu de le supprimer
       try {
@@ -146,18 +148,18 @@ export const logoutService = {
             version: 0,
           }),
         );
-        console.log("[LogoutService] Store auth reinitialise");
+        secureLog.log("[LogoutService] Store auth reinitialise");
       } catch (error) {
-        console.warn(
+        secureLog.warn(
           "[LogoutService] Erreur reinitialisation store auth:",
           error,
         );
       }
-      console.log(
+      secureLog.log(
         "[LogoutService] Etape 5 terminee - Reinitialisation store auth",
       );
 
-      console.log(
+      secureLog.log(
         `[LogoutService] ${keysToRemove.length} cles supprimees, RememberMe et Language preserves, Store auth reinitialise`,
       );
 
@@ -168,30 +170,30 @@ export const logoutService = {
             "intelia-remember-me-persist",
             JSON.stringify(preservedRememberMe),
           );
-          console.log("[LogoutService] RememberMe restaure");
+          secureLog.log("[LogoutService] RememberMe restaure");
         } catch (error) {
-          console.warn(
+          secureLog.warn(
             "[LogoutService] Erreur restauration RememberMe:",
             error,
           );
         }
       }
-      console.log("[LogoutService] Etape 6 terminee - Restauration RememberMe");
+      secureLog.log("[LogoutService] Etape 6 terminee - Restauration RememberMe");
 
       // 7. Marquer le logout comme complete
       try {
         sessionStorage.setItem("recent-logout", Date.now().toString());
         sessionStorage.setItem("logout-complete", "true");
-        console.log("[LogoutService] Marqueurs de logout definis");
+        secureLog.log("[LogoutService] Marqueurs de logout definis");
       } catch (error) {
-        console.warn(
+        secureLog.warn(
           "[LogoutService] Erreur definition marqueurs logout:",
           error,
         );
       }
-      console.log("[LogoutService] Etape 7 terminee - Marqueurs logout");
+      secureLog.log("[LogoutService] Etape 7 terminee - Marqueurs logout");
 
-      console.log(
+      secureLog.log(
         "[LogoutService] Redirection vers page d'accueil, langue preservee:",
         userLanguage,
       );
@@ -200,21 +202,21 @@ export const logoutService = {
       clearTimeout(forceRedirect);
 
       // 9. Redirection finale avec un petit delai pour laisser les logs s'afficher
-      console.log("[LogoutService] Demarrage redirection dans 200ms...");
+      secureLog.log("[LogoutService] Demarrage redirection dans 200ms...");
       setTimeout(() => {
-        console.log("[LogoutService] REDIRECTION MAINTENANT vers /");
+        secureLog.log("[LogoutService] REDIRECTION MAINTENANT vers /");
         window.location.href = "/";
       }, 200);
     } catch (error) {
-      console.error("[LogoutService] Erreur durant logout:", error);
+      secureLog.error("[LogoutService] Erreur durant logout:", error);
 
       // Annuler le timeout global
       clearTimeout(forceRedirect);
 
       // En cas d'erreur, forcer quand meme la redirection vers la page d'accueil
-      console.log("[LogoutService] Redirection d'urgence apres erreur...");
+      secureLog.log("[LogoutService] Redirection d'urgence apres erreur...");
       setTimeout(() => {
-        console.log("[LogoutService] REDIRECTION D'URGENCE vers /");
+        secureLog.log("[LogoutService] REDIRECTION D'URGENCE vers /");
         window.location.href = "/";
       }, 500);
     }

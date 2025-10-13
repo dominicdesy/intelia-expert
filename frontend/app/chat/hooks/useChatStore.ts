@@ -8,6 +8,7 @@ import {
 } from "../../../types";
 import { conversationService } from "../services/conversationService";
 import { loadUserConversations } from "../services/apiService";
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // PROTECTION GLOBALE ULTRA-RENFORCÉE CONTRE LE POLLING
 const globalLoadingProtection = {
@@ -25,7 +26,7 @@ const globalLoadingProtection = {
     this.isLoading = false;
     this.retryCount = 0;
     this.lastLoadTime = 0;
-    console.log("🔄 [GlobalProtection] Reset forcé manuel");
+    secureLog.log("🔄 [GlobalProtection] Reset forcé manuel");
   },
 
   // Vérification ultra-stricte
@@ -34,7 +35,7 @@ const globalLoadingProtection = {
 
     // BLOQUAGE 1: Si chargement en cours pour le même user
     if (this.isLoading && this.currentUserId === userId) {
-      console.log("🛡️ [GlobalProtection] Chargement déjà en cours, BLOQUÉ");
+      secureLog.log("🛡️ [GlobalProtection] Chargement déjà en cours, BLOQUÉ");
       return false;
     }
 
@@ -46,7 +47,7 @@ const globalLoadingProtection = {
       const remainingTime = Math.ceil(
         (this.SUCCESS_CACHE_DURATION - (now - this.lastSuccessfulLoad)) / 60000,
       );
-      console.log(
+      secureLog.log(
         `🛡️ [GlobalProtection] Cache encore valide pour ${remainingTime} minutes, BLOQUÉ`,
       );
       return false;
@@ -57,7 +58,7 @@ const globalLoadingProtection = {
       const remainingCooldown = Math.ceil(
         (this.COOLDOWN_PERIOD - (now - this.lastLoadTime)) / 60000,
       );
-      console.log(
+      secureLog.log(
         `🛡️ [GlobalProtection] Cooldown actif encore ${remainingCooldown} minutes, BLOQUÉ`,
       );
       return false;
@@ -65,7 +66,7 @@ const globalLoadingProtection = {
 
     // BLOQUAGE 4: Max retries atteint
     if (this.retryCount >= this.MAX_RETRIES) {
-      console.log(
+      secureLog.log(
         "🛡️ [GlobalProtection] Max retries atteint, BLOQUÉ définitivement",
       );
       return false;
@@ -79,7 +80,7 @@ const globalLoadingProtection = {
     this.lastSuccessfulLoad = Date.now();
     this.retryCount = 0;
     this.isLoading = false;
-    console.log(
+    secureLog.log(
       "✅ [GlobalProtection] Succès enregistré - Cache valide 30 minutes",
     );
   },
@@ -96,13 +97,13 @@ const syncProtection = {
 
     // Vérifier le cooldown global
     if (now - this.lastSyncTime < this.syncCooldown) {
-      console.log("🔒 [SyncProtection] Cooldown actif - sync bloquée");
+      secureLog.log("🔒 [SyncProtection] Cooldown actif - sync bloquée");
       return false;
     }
 
     // Vérifier si cette conversation a été sync récemment
     if (this.recentSyncIds.has(conversationId)) {
-      console.log(
+      secureLog.log(
         "🔒 [SyncProtection] Conversation déjà synchronisée récemment",
       );
       return false;
@@ -234,7 +235,7 @@ const syncConversationGroups = (
   set: (fn: (state: ChatStoreState) => Partial<ChatStoreState>) => void,
 ) => {
   try {
-    console.log(
+    secureLog.log(
       "🔄 [ChatStore] Synchronisation sécurisée des groupes pour:",
       conversation.id,
     );
@@ -265,11 +266,11 @@ const syncConversationGroups = (
       updatedAllConversations = allConversations.map((c) =>
         c.id === conversationForGroups.id ? conversationForGroups : c,
       );
-      console.log("📝 [ChatStore] Conversation existante mise à jour");
+      secureLog.log("📝 [ChatStore] Conversation existante mise à jour");
     } else {
       // Ajouter en tête SEULEMENT si vraiment nouvelle
       updatedAllConversations = [conversationForGroups, ...allConversations];
-      console.log("➕ [ChatStore] Nouvelle conversation ajoutée aux groupes");
+      secureLog.log("➕ [ChatStore] Nouvelle conversation ajoutée aux groupes");
     }
 
     // 🛡️ PROTECTION: Limiter le nombre de conversations en mémoire
@@ -279,7 +280,7 @@ const syncConversationGroups = (
         0,
         MAX_CONVERSATIONS,
       );
-      console.log("✂️ [ChatStore] Conversations limitées à", MAX_CONVERSATIONS);
+      secureLog.log("✂️ [ChatStore] Conversations limitées à", MAX_CONVERSATIONS);
     }
 
     const updatedGroups = groupConversationsByDate(updatedAllConversations);
@@ -293,9 +294,9 @@ const syncConversationGroups = (
     // Enregistrer la synchronisation
     syncProtection.recordSync(conversation.id);
 
-    console.log("✅ [ChatStore] Groupes synchronisés avec succès");
+    secureLog.log("✅ [ChatStore] Groupes synchronisés avec succès");
   } catch (error) {
-    console.error("❌ [ChatStore] Erreur synchronisation groupes:", error);
+    secureLog.error("❌ [ChatStore] Erreur synchronisation groupes:", error);
     // Ne pas faire planter l'application si la sync échoue
   }
 };
@@ -312,19 +313,19 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   // MÉTHODE loadConversations AVEC PROTECTION MAXIMALE
   loadConversations: async (userId: string) => {
     if (!userId) {
-      console.warn("⚠️ [ChatStore] Pas d'userId fourni");
+      secureLog.warn("⚠️ [ChatStore] Pas d'userId fourni");
       return;
     }
 
     // PROTECTION STRICTE: Vérification absolue
     if (!globalLoadingProtection.canLoad(userId)) {
-      console.log(
+      secureLog.log(
         "🚫 [ChatStore] Chargement DÉFINITIVEMENT BLOQUÉ par protection globale",
       );
       return;
     }
 
-    console.log(
+    secureLog.log(
       "🟢 [ChatStore] Protection OK - SEUL chargement autorisé pour les 30 prochaines minutes",
     );
 
@@ -337,13 +338,13 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     set({ isLoading: true, isLoadingHistory: true });
 
     try {
-      console.log("📡 [ChatStore] Appel API loadUserConversations...");
+      secureLog.log("📡 [ChatStore] Appel API loadUserConversations...");
 
       // ✅ CORRECTION: Ajout du paramètre limit=100
       const conversationsData = await loadUserConversations(userId, 999);
 
       if (!conversationsData || !conversationsData.conversations) {
-        console.log("📭 [ChatStore] Aucune conversation trouvée");
+        secureLog.log("📭 [ChatStore] Aucune conversation trouvée");
         set({
           conversations: [],
           conversationGroups: [],
@@ -357,7 +358,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       }
 
       const userConversations = conversationsData.conversations;
-      console.log(
+      secureLog.log(
         "✅ [ChatStore] Conversations récupérées:",
         userConversations.length,
       );
@@ -410,11 +411,11 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       // MARQUER LE SUCCÈS AVEC CACHE ULTRA-LONG (30 minutes)
       globalLoadingProtection.recordSuccess();
 
-      console.log(
+      secureLog.log(
         "✅ [ChatStore] État mis à jour - AUCUN autre chargement pendant 30 minutes",
       );
     } catch (error) {
-      console.error("❌ [ChatStore] Erreur chargement:", error);
+      secureLog.error("❌ [ChatStore] Erreur chargement:", error);
       set({
         conversations: [],
         conversationGroups: [],
@@ -424,20 +425,20 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
       // En cas d'erreur, pas de retry automatique
       globalLoadingProtection.isLoading = false;
-      console.log("❌ [ChatStore] Erreur - pas de retry, attendre 10 minutes");
+      secureLog.log("❌ [ChatStore] Erreur - pas de retry, attendre 10 minutes");
       throw error;
     } finally {
       // UNLOCK DIFFÉRÉ DE 60 SECONDES pour éviter toute race condition
       setTimeout(() => {
         globalLoadingProtection.isLoading = false;
-        console.log("🔓 [ChatStore] Lock libéré après délai de sécurité");
+        secureLog.log("🔓 [ChatStore] Lock libéré après délai de sécurité");
       }, 60000); // 1 minute de délai de sécurité
     }
   },
 
   deleteConversation: async (id: string) => {
     try {
-      console.log("🗑️ [ChatStore] Suppression conversation:", id);
+      secureLog.log("🗑️ [ChatStore] Suppression conversation:", id);
 
       const state = get();
       const updatedConversations = state.conversations.filter(
@@ -460,15 +461,15 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       });
 
       await conversationService.deleteConversation(id);
-      console.log("✅ [ChatStore] Conversation supprimée côté serveur");
+      secureLog.log("✅ [ChatStore] Conversation supprimée côté serveur");
     } catch (error) {
-      console.error("❌ [ChatStore] Erreur suppression conversation:", error);
+      secureLog.error("❌ [ChatStore] Erreur suppression conversation:", error);
     }
   },
 
   clearAllConversations: async (userId?: string) => {
     try {
-      console.log("🗑️ [ChatStore] Suppression toutes conversations");
+      secureLog.log("🗑️ [ChatStore] Suppression toutes conversations");
 
       // Reset complet de la protection
       globalLoadingProtection.forceReset();
@@ -482,18 +483,18 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
       if (userId) {
         await conversationService.clearAllUserConversations(userId);
-        console.log(
+        secureLog.log(
           "✅ [ChatStore] Toutes conversations supprimées côté serveur",
         );
       }
     } catch (error) {
-      console.error("❌ [ChatStore] Erreur suppression conversations:", error);
+      secureLog.error("❌ [ChatStore] Erreur suppression conversations:", error);
     }
   },
 
   refreshConversations: async (userId: string) => {
     // Reset SEULEMENT pour refresh manuel
-    console.log("🔄 [ChatStore] Refresh manuel - Reset protection");
+    secureLog.log("🔄 [ChatStore] Refresh manuel - Reset protection");
     globalLoadingProtection.forceReset();
     globalLoadingProtection.lastSuccessfulLoad = 0;
 
@@ -549,14 +550,14 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
   loadConversation: async (conversationId: string) => {
     if (!conversationId) {
-      console.warn("⚠️ [ChatStore] ID conversation requis");
+      secureLog.warn("⚠️ [ChatStore] ID conversation requis");
       return;
     }
 
     set({ isLoadingConversation: true });
 
     try {
-      console.log("📖 [ChatStore] Chargement conversation:", conversationId);
+      secureLog.log("📖 [ChatStore] Chargement conversation:", conversationId);
 
       try {
         const fullConversation =
@@ -569,7 +570,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           fullConversation.messages &&
           fullConversation.messages.length > 0
         ) {
-          console.log(
+          secureLog.log(
             "✅ [ChatStore] Conversation chargée depuis serveur avec messages complets",
           );
           set({
@@ -579,7 +580,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           return;
         }
       } catch (serviceError) {
-        console.warn(
+        secureLog.warn(
           "⚠️ [ChatStore] Service getConversationWithMessages non disponible:",
           serviceError,
         );
@@ -622,7 +623,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           currentConversation: conversationWithMessages,
           isLoadingConversation: false,
         });
-        console.log("✅ [ChatStore] Conversation chargée depuis cache local");
+        secureLog.log("✅ [ChatStore] Conversation chargée depuis cache local");
         return;
       }
 
@@ -652,19 +653,19 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         isLoadingConversation: false,
       });
     } catch (error) {
-      console.error("❌ [ChatStore] Erreur chargement conversation:", error);
+      secureLog.error("❌ [ChatStore] Erreur chargement conversation:", error);
       set({ isLoadingConversation: false });
     }
   },
 
   createNewConversation: () => {
-    console.log("✨ [ChatStore] Nouvelle conversation");
+    secureLog.log("✨ [ChatStore] Nouvelle conversation");
     set({ currentConversation: null });
   },
 
   // 🛡️ ADDMESSAGE SÉCURISÉ AVEC SYNCHRONISATION
   addMessage: (message: Message) => {
-    console.log(
+    secureLog.log(
       "💬 [ChatStore] Ajout message:",
       message.id,
       "User:",
@@ -675,7 +676,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
     // 🛡️ PROTECTION 1: Éviter les doublons
     if (state.currentConversation?.messages?.some((m) => m.id === message.id)) {
-      console.log("⚠️ [ChatStore] Message déjà existant, ignoré");
+      secureLog.log("⚠️ [ChatStore] Message déjà existant, ignoré");
       return;
     }
 
@@ -695,7 +696,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       };
 
       set({ currentConversation: tempConversation });
-      console.log(
+      secureLog.log(
         "🆕 [ChatStore] Conversation temporaire créée:",
         tempConversation.id,
       );
@@ -715,7 +716,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         state.currentConversation.id.startsWith("temp-"))
     ) {
       updatedId = message.conversation_id;
-      console.log(
+      secureLog.log(
         "🔄 [ChatStore] ID conversation mis à jour:",
         state.currentConversation.id,
         "→",
@@ -749,7 +750,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       syncConversationGroups(updatedConversation, state, set);
     }
 
-    console.log(
+    secureLog.log(
       "✅ [ChatStore] Message ajouté - Total:",
       updatedMessages.length,
       "Conv ID:",
@@ -775,7 +776,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
        state.currentConversation.id.startsWith("temp-"))
     ) {
       effectiveId = updates.conversation_id;
-      console.log(
+      secureLog.log(
         "🔄 [ChatStore] ID conversation mis à jour via updateMessage:",
         state.currentConversation.id,
         "→",
@@ -794,7 +795,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   setCurrentConversation: (conversation: ConversationWithMessages | null) => {
-    console.log(
+    secureLog.log(
       "🔄 [ChatStore] setCurrentConversation appelée:",
       conversation?.id,
       "Messages:",

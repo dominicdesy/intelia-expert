@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/languages/i18n";
 import { LanguageSelector } from "@/app/page_components"; // ✅ Utiliser la version factorisée
+import { secureLog } from "@/lib/utils/secureLogger";
 
 // Logo Intelia
 const InteliaLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
@@ -28,7 +29,7 @@ export default function ForgotPasswordPage() {
         const parsed = JSON.parse(raw);
         saved = parsed?.state?.currentLanguage;
         if (saved && saved !== currentLanguage) {
-          console.log(
+          secureLog.log(
             `[FORGOT] Resynchronisation immédiate: ${currentLanguage} → ${saved}`,
           );
           changeLanguage(saved); // ⬅️ Aligner immédiatement sur la langue stockée
@@ -38,7 +39,7 @@ export default function ForgotPasswordPage() {
       // Synchroniser <html lang="...">
       document.documentElement.setAttribute("lang", saved || currentLanguage);
     } catch (error) {
-      console.warn("[FORGOT] Erreur lecture localStorage:", error);
+      secureLog.warn("[FORGOT] Erreur lecture localStorage:", error);
     }
   }, [currentLanguage, changeLanguage]);
 
