@@ -93,28 +93,31 @@ $env:ANTHROPIC_API_KEY="sk-ant-api03-..."
 ### Extraction basique
 
 ```bash
-python llm/scripts/extract_pdf_tables_claude_vision.py input.pdf output.xlsx
+cd rag/performance_extractor
+python extract_pdf_tables_claude_vision.py input.pdf output.xlsx
 ```
 
 ### Extraction de pages spécifiques
 
 ```bash
+cd rag/performance_extractor
+
 # Extraire seulement les pages 4 à 6
-python llm/scripts/extract_pdf_tables_claude_vision.py input.pdf output.xlsx 4 6
+python extract_pdf_tables_claude_vision.py input.pdf output.xlsx 4 6
 
 # Extraire la page 10
-python llm/scripts/extract_pdf_tables_claude_vision.py input.pdf output.xlsx 10 10
+python extract_pdf_tables_claude_vision.py input.pdf output.xlsx 10 10
 ```
 
 ### Exemple complet (Cobb500)
 
 ```bash
-cd C:\intelia_gpt\intelia-expert
+cd C:\intelia_gpt\intelia-expert\rag\performance_extractor
 
 # Extraire les tables de performance (pages 4-6)
-python llm/scripts/extract_pdf_tables_claude_vision.py \
-  "rag/documents/Sources/public/species/broiler/breeds/cobb/2022-Cobb500-Broiler-Performance-Nutrition-Supplement.pdf" \
-  "cobb500_tables.xlsx" \
+python extract_pdf_tables_claude_vision.py \
+  "../documents/Sources/public/species/broiler/breeds/cobb/2022-Cobb500-Broiler-Performance-Nutrition-Supplement.pdf" \
+  "../documents/PerformanceMetrics/Cobb500_Tables.xlsx" \
   4 6
 
 # Résultat: 3 feuilles créées (mixed_metric, male_metric, female_metric)
@@ -378,11 +381,14 @@ assert original_df.equals(extracted_df), "Extraction differs from golden!"
 
 ## Scripts Disponibles
 
+**Emplacement:** `rag/performance_extractor/`
+
 ### 1. `extract_pdf_tables_claude_vision.py`
 
 **Principal script d'extraction**
 
 ```bash
+cd rag/performance_extractor
 python extract_pdf_tables_claude_vision.py <pdf> <output.xlsx> [start] [end]
 ```
 
@@ -391,12 +397,14 @@ python extract_pdf_tables_claude_vision.py <pdf> <output.xlsx> [start] [end]
 - Extraction intelligente via Claude Vision
 - Génération Excel avec métadonnées
 - Support de plages de pages
+- Sortie automatique vers `rag/documents/PerformanceMetrics/`
 
 ### 2. `merge_excel_files.py`
 
 **Fusion de plusieurs fichiers Excel**
 
 ```bash
+cd rag/performance_extractor
 python merge_excel_files.py output.xlsx file1.xlsx file2.xlsx file3.xlsx
 ```
 
@@ -412,6 +420,13 @@ Utilise `extract_table()` avec détection heuristique. Problèmes:
 - Pas générique
 
 ❌ **Non recommandé** - Utiliser Claude Vision à la place
+
+### README Complet
+
+Voir `rag/performance_extractor/README.md` pour:
+- Exemples d'utilisation détaillés
+- Workflow typique
+- Guide d'intégration RAG
 
 ---
 
