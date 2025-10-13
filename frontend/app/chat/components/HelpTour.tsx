@@ -119,7 +119,6 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
     }
 
     setBubblePosition({ top, left });
-  }
   }, [currentStep, steps]);
 
   useEffect(() => {
