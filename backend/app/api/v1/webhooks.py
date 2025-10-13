@@ -57,7 +57,7 @@ class SupabaseWebhookPayload(BaseModel):
     type: str  # Type d'événement
     table: Optional[str] = None
     record: Optional[Dict[str, Any]] = None
-    schema: Optional[str] = None
+    db_schema: Optional[str] = None  # Renamed from 'schema' to avoid shadowing BaseModel attribute
     old_record: Optional[Dict[str, Any]] = None
 
 

@@ -243,8 +243,8 @@ async def periodic_stats_update():
 async def lifespan(app: FastAPI):
     # ========== INITIALISATION AU DEMARRAGE ==========
     # 🔧 VERSION TRACKING
-    VERSION = "4.3.2"
-    BUILD = "20251008-003"  # Webhooks router + Version tracking
+    VERSION = "4.3.3"
+    BUILD = "20251012-001"  # Pydantic warning fix + Conversation sharing feature
     COMMIT = os.getenv("COMMIT_SHA", "unknown")[:8]
 
     logger.info("=" * 80)
