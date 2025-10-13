@@ -32,6 +32,7 @@ import { UserMenuButton } from "./components/UserMenuButton";
 import { ZohoSalesIQ } from "./components/ZohoSalesIQ";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
 import { LoadingMessage } from "./components/LoadingMessage";
+import ShareConversationButton from "./components/ShareConversationButton";
 
 // Composant ChatInput optimisé avec React.memo
 const ChatInput = React.memo(
@@ -1267,6 +1268,11 @@ function ChatInterface() {
             </div>
 
             <div className="flex items-center space-x-2">
+              {currentConversation &&
+               currentConversation.id !== "welcome" &&
+               !currentConversation.id.startsWith("temp-") && (
+                <ShareConversationButton conversationId={currentConversation.id} />
+              )}
               <div className="header-icon-container user-menu-container">
                 <UserMenuButton />
               </div>

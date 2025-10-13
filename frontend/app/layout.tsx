@@ -7,6 +7,7 @@ import { AuthProvider } from "@/components/providers/AuthProvider";
 import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import { AdProvider } from "@/components/AdSystem/AdProvider";
 import { Toaster } from "react-hot-toast";
+import packageJson from "../package.json";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -63,6 +64,17 @@ export const metadata: Metadata = {
     ],
   },
 };
+
+// Script de log de version
+const versionLogScript = `
+  console.log('\\n' + '='.repeat(60));
+  console.log('🚀 Intelia Expert Frontend');
+  console.log('='.repeat(60));
+  console.log('📦 Version: ${packageJson.version}');
+  console.log('🌍 Environment: ' + (typeof window !== 'undefined' ? (window.location.hostname === 'localhost' ? 'development' : 'production') : 'unknown'));
+  console.log('⏰ Loaded at: ' + new Date().toISOString());
+  console.log('='.repeat(60) + '\\n');
+`;
 
 // Script anti-flash optimisé avec gestion correcte des event listeners
 const antiFlashScript = `
@@ -194,6 +206,9 @@ export default function RootLayout({
   return (
     <html lang="fr" className="h-full">
       <head>
+        {/* SCRIPT DE VERSION - S'exécute en premier */}
+        <script dangerouslySetInnerHTML={{ __html: versionLogScript }} />
+
         {/* SCRIPT ANTI-FLASH - DOIT ÊTRE EN PREMIER */}
         <script dangerouslySetInnerHTML={{ __html: antiFlashScript }} />
 
