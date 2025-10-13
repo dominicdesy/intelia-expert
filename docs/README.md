@@ -2,6 +2,8 @@
 
 Bienvenue dans la documentation complète du projet Intelia Expert.
 
+> **📌 Instructions Claude Code:** [CLAUDE_INSTRUCTIONS.md](./CLAUDE_INSTRUCTIONS.md) - Guide pour les interactions avec Claude Code (conventions, architecture, workflow)
+
 ## 📚 Structure de la Documentation
 
 ### 📊 [Reports](./reports/)
