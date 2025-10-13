@@ -567,5 +567,20 @@
   "about.lastUpdated": "Ostatnia aktualizacja",
   "about.license": "Licencja",
   "about.backToHome": "Powrót do strony głównej",
-  "nav.about": "O nas"
+  "nav.about": "O nas",
+  "help.buttonTitle": "Pomoc - Jak korzystać z platformy",
+  "help.close": "Zamknij pomoc",
+  "help.previous": "Poprzedni",
+  "help.next": "Następny",
+  "help.finish": "Zakończ",
+  "help.inputTitle": "Pole wejściowe",
+  "help.inputDesc": "Zadaj tutaj swoje pytanie. Bądź konkretny, aby uzyskać odpowiednie odpowiedzi.",
+  "help.sendTitle": "Przycisk wysyłania",
+  "help.sendDesc": "Kliknij tutaj lub naciśnij Enter, aby wysłać swoje pytanie.",
+  "help.newChatTitle": "Nowa rozmowa",
+  "help.newChatDesc": "Utwórz nową rozmowę, aby zadać pytania na inny temat.",
+  "help.historyTitle": "Historia",
+  "help.historyDesc": "Znajdź wszystkie swoje poprzednie rozmowy uporządkowane według daty.",
+  "help.profileTitle": "Menu użytkownika",
+  "help.profileDesc": "Uzyskaj dostęp do swojego profilu, ustawień i opcji konta."
 }

@@ -568,5 +568,20 @@
   "about.lastUpdated": "Terakhir Diperbarui",
   "about.license": "Lisensi",
   "about.backToHome": "Kembali ke Beranda",
-  "nav.about": "Tentang"
+  "nav.about": "Tentang",
+  "help.buttonTitle": "Bantuan - Cara menggunakan platform",
+  "help.close": "Tutup bantuan",
+  "help.previous": "Sebelumnya",
+  "help.next": "Berikutnya",
+  "help.finish": "Selesai",
+  "help.inputTitle": "Bidang input",
+  "help.inputDesc": "Ajukan pertanyaan Anda di sini. Jadilah spesifik untuk mendapatkan jawaban yang relevan.",
+  "help.sendTitle": "Tombol kirim",
+  "help.sendDesc": "Klik di sini atau tekan Enter untuk mengirim pertanyaan Anda.",
+  "help.newChatTitle": "Percakapan baru",
+  "help.newChatDesc": "Buat percakapan baru untuk mengajukan pertanyaan tentang topik lain.",
+  "help.historyTitle": "Riwayat",
+  "help.historyDesc": "Temukan semua percakapan sebelumnya Anda yang diorganisir berdasarkan tanggal.",
+  "help.profileTitle": "Menu pengguna",
+  "help.profileDesc": "Akses profil, pengaturan, dan opsi akun Anda."
 }

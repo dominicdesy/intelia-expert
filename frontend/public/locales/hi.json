@@ -567,5 +567,20 @@
   "about.lastUpdated": "अंतिम अपडेट",
   "about.license": "लाइसेंस",
   "about.backToHome": "होम पर वापस जाएं",
-  "nav.about": "के बारे में"
+  "nav.about": "के बारे में",
+  "help.buttonTitle": "सहायता - प्लेटफ़ॉर्म का उपयोग कैसे करें",
+  "help.close": "सहायता बंद करें",
+  "help.previous": "पिछला",
+  "help.next": "अगला",
+  "help.finish": "समाप्त करें",
+  "help.inputTitle": "इनपुट फ़ील्ड",
+  "help.inputDesc": "यहाँ अपना प्रश्न पूछें। प्रासंगिक उत्तर प्राप्त करने के लिए विशिष्ट रहें।",
+  "help.sendTitle": "भेजें बटन",
+  "help.sendDesc": "अपना प्रश्न भेजने के लिए यहाँ क्लिक करें या Enter दबाएं।",
+  "help.newChatTitle": "नई बातचीत",
+  "help.newChatDesc": "किसी अन्य विषय पर प्रश्न पूछने के लिए एक नई बातचीत बनाएं।",
+  "help.historyTitle": "इतिहास",
+  "help.historyDesc": "दिनांक के अनुसार व्यवस्थित अपनी सभी पिछली बातचीत ढूंढें।",
+  "help.profileTitle": "उपयोगकर्ता मेनू",
+  "help.profileDesc": "अपनी प्रोफ़ाइल, सेटिंग्स और खाता विकल्पों तक पहुंचें।"
 }

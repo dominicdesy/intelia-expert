@@ -33,6 +33,7 @@ import { ZohoSalesIQ } from "./components/ZohoSalesIQ";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
 import { LoadingMessage } from "./components/LoadingMessage";
 import ShareConversationButton from "./components/ShareConversationButton";
+import { HelpButton, HelpTour } from "./components/HelpTour";
 import { secureLog } from "@/lib/utils/secureLogger";
 
 // Composant ChatInput optimisé avec React.memo
@@ -359,6 +360,7 @@ function ChatInterface() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const [clarificationState, setClarificationState] = useState<{
     messageId: string;
@@ -1274,6 +1276,7 @@ function ChatInterface() {
                !currentConversation.id.startsWith("temp-") && (
                 <ShareConversationButton conversationId={currentConversation.id} />
               )}
+              <HelpButton onClick={() => setIsHelpOpen(true)} />
               <div className="header-icon-container user-menu-container">
                 <UserMenuButton />
               </div>
@@ -1383,6 +1386,11 @@ function ChatInterface() {
         onSubmit={handleFeedbackSubmit}
         feedbackType={feedbackModal.feedbackType ?? undefined}
         isSubmitting={isSubmittingFeedback}
+      />
+
+      <HelpTour
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
       />
     </>
   );

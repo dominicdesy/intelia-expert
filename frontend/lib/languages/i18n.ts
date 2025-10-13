@@ -750,6 +750,25 @@ export interface TranslationKeys {
   "about.lastUpdated": string;
   "about.license": string;
   "about.backToHome": string;
+
+  // ===========================================
+  // HELP TOUR
+  // ===========================================
+  "help.buttonTitle": string;
+  "help.close": string;
+  "help.previous": string;
+  "help.next": string;
+  "help.finish": string;
+  "help.inputTitle": string;
+  "help.inputDesc": string;
+  "help.sendTitle": string;
+  "help.sendDesc": string;
+  "help.newChatTitle": string;
+  "help.newChatDesc": string;
+  "help.historyTitle": string;
+  "help.historyDesc": string;
+  "help.profileTitle": string;
+  "help.profileDesc": string;
 }
 
 // SYSTÈME DE NOTIFICATION POUR FORCER LES RE-RENDERS

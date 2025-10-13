@@ -567,5 +567,20 @@
   "about.lastUpdated": "最后更新",
   "about.license": "许可证",
   "about.backToHome": "返回首页",
-  "nav.about": "关于"
+  "nav.about": "关于",
+  "help.buttonTitle": "帮助 - 如何使用平台",
+  "help.close": "关闭帮助",
+  "help.previous": "上一步",
+  "help.next": "下一步",
+  "help.finish": "完成",
+  "help.inputTitle": "输入框",
+  "help.inputDesc": "在这里提出您的问题。具体一点以获得相关答案。",
+  "help.sendTitle": "发送按钮",
+  "help.sendDesc": "点击这里或按Enter键发送您的问题。",
+  "help.newChatTitle": "新对话",
+  "help.newChatDesc": "创建新对话以提问其他主题的问题。",
+  "help.historyTitle": "历史记录",
+  "help.historyDesc": "查找按日期组织的所有以前的对话。",
+  "help.profileTitle": "用户菜单",
+  "help.profileDesc": "访问您的个人资料、设置和账户选项。"
 }

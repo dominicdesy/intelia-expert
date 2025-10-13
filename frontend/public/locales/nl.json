@@ -567,5 +567,20 @@
   "about.lastUpdated": "Laatst bijgewerkt",
   "about.license": "Licentie",
   "about.backToHome": "Terug naar home",
-  "nav.about": "Over"
+  "nav.about": "Over",
+  "help.buttonTitle": "Help - Hoe de platform te gebruiken",
+  "help.close": "Help sluiten",
+  "help.previous": "Vorige",
+  "help.next": "Volgende",
+  "help.finish": "Voltooien",
+  "help.inputTitle": "Invoerveld",
+  "help.inputDesc": "Stel hier uw vraag. Wees specifiek om relevante antwoorden te krijgen.",
+  "help.sendTitle": "Verstuur knop",
+  "help.sendDesc": "Klik hier of druk op Enter om uw vraag te versturen.",
+  "help.newChatTitle": "Nieuw gesprek",
+  "help.newChatDesc": "Maak een nieuw gesprek aan om vragen te stellen over een ander onderwerp.",
+  "help.historyTitle": "Geschiedenis",
+  "help.historyDesc": "Vind al uw eerdere gesprekken georganiseerd op datum.",
+  "help.profileTitle": "Gebruikersmenu",
+  "help.profileDesc": "Toegang tot uw profiel, instellingen en account opties."
 }

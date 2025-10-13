@@ -567,5 +567,20 @@
   "about.lastUpdated": "อัปเดตล่าสุด",
   "about.license": "ใบอนุญาต",
   "about.backToHome": "กลับสู่หน้าแรก",
-  "nav.about": "เกี่ยวกับ"
+  "nav.about": "เกี่ยวกับ",
+  "help.buttonTitle": "ความช่วยเหลือ - วิธีใช้แพลตฟอร์ม",
+  "help.close": "ปิดความช่วยเหลือ",
+  "help.previous": "ก่อนหน้า",
+  "help.next": "ถัดไป",
+  "help.finish": "เสร็จสิ้น",
+  "help.inputTitle": "ช่องป้อนข้อมูล",
+  "help.inputDesc": "ถามคำถามของคุณที่นี่ ระบุให้ชัดเจนเพื่อรับคำตอบที่เกี่ยวข้อง",
+  "help.sendTitle": "ปุ่มส่ง",
+  "help.sendDesc": "คลิกที่นี่หรือกด Enter เพื่อส่งคำถามของคุณ",
+  "help.newChatTitle": "การสนทนาใหม่",
+  "help.newChatDesc": "สร้างการสนทนาใหม่เพื่อถามคำถามเกี่ยวกับหัวข้ออื่น",
+  "help.historyTitle": "ประวัติ",
+  "help.historyDesc": "ค้นหาการสนทนาก่อนหน้านี้ทั้งหมดของคุณที่จัดระเบียบตามวันที่",
+  "help.profileTitle": "เมนูผู้ใช้",
+  "help.profileDesc": "เข้าถึงโปรไฟล์ การตั้งค่า และตัวเลือกบัญชีของคุณ"
 }
