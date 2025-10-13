@@ -31,7 +31,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
 
   // Options du formulaire
   const [anonymize, setAnonymize] = useState(true);
-  const [expiresInDays, setExpiresInDays] = useState<number | null>(30);
+  const [expiresInDays, setExpiresInDays] = useState<number>(30);
 
   const getAuthToken = async (): Promise<string | null> => {
     try {
@@ -180,18 +180,13 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
                         {t("share.expiration")}
                       </label>
                       <select
-                        value={expiresInDays === null ? "never" : expiresInDays}
-                        onChange={(e) =>
-                          setExpiresInDays(
-                            e.target.value === "never" ? null : parseInt(e.target.value)
-                          )
-                        }
+                        value={expiresInDays}
+                        onChange={(e) => setExpiresInDays(parseInt(e.target.value))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value="7">{t("share.expiration.7days")}</option>
                         <option value="30">{t("share.expiration.30days")}</option>
                         <option value="90">{t("share.expiration.90days")}</option>
-                        <option value="never">{t("share.expiration.never")}</option>
                       </select>
                     </div>
                   </div>
