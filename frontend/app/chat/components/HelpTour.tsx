@@ -83,7 +83,7 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
 
     // Calculer la position de la bulle
     const bubbleWidth = 320;
-    const bubbleHeight = 150;
+    const bubbleHeight = 220; // Hauteur estimée pour le positionnement
     const padding = 20;
 
     let top = 0;
@@ -114,8 +114,9 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
       left = window.innerWidth - bubbleWidth - 10;
     }
     if (top < 10) top = 10;
-    if (top + bubbleHeight > window.innerHeight - 10) {
-      top = window.innerHeight - bubbleHeight - 10;
+    // Plus de marge en bas pour s'assurer que tout le contenu est visible
+    if (top + bubbleHeight > window.innerHeight - 30) {
+      top = window.innerHeight - bubbleHeight - 30;
     }
 
     setBubblePosition({ top, left });
@@ -233,7 +234,6 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
           top: bubblePosition.top,
           left: bubblePosition.left,
           width: "320px",
-          maxHeight: "200px",
           animation: "fadeInScale 0.3s ease-out",
         }}
       >
