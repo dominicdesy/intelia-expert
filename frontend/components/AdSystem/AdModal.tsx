@@ -15,6 +15,8 @@ interface AdData {
   users?: string;
   duration?: string;
   features: string[];
+  headerTitle?: string;
+  ctaSubtext?: string;
 }
 
 interface AdModalProps {
