@@ -285,11 +285,14 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
             {Array.from({ length: steps.length }).map((_, index) => (
               <div
                 key={index}
-                className={`h-2 rounded-full transition-all duration-300 ${
+                className={`h-2 w-2 rounded-full transition-transform duration-300 ${
                   index === currentStep
-                    ? "w-6 bg-blue-600"
-                    : "w-2 bg-gray-300"
+                    ? "scale-x-[3] bg-blue-600"
+                    : "scale-x-100 bg-gray-300"
                 }`}
+                style={{
+                  transformOrigin: 'left center'
+                }}
               />
             ))}
           </div>

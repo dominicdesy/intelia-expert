@@ -213,11 +213,7 @@ export default function RootLayout({
         {/* SCRIPT ANTI-FLASH - DOIT ÊTRE EN PREMIER */}
         <script dangerouslySetInnerHTML={{ __html: antiFlashScript }} />
 
-        {/* Meta tags critiques pour iOS */}
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-        />
+        {/* Meta tags critiques pour iOS - viewport est géré par l'export au-dessus */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="format-detection" content="telephone=no" />
