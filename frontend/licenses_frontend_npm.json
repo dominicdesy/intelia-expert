@@ -1,0 +1,77 @@
+npm warn config production Use `--omit=dev` instead.
+{
+  "version": "1.0.0",
+  "name": "intelia-expert-frontend",
+  "dependencies": {
+    "@aws-sdk/client-s3": {
+      "version": "3.879.0",
+      "resolved": "https://registry.npmjs.org/@aws-sdk/client-s3/-/client-s3-3.879.0.tgz",
+      "overridden": false
+    },
+    "@aws-sdk/s3-request-presigner": {
+      "version": "3.879.0",
+      "resolved": "https://registry.npmjs.org/@aws-sdk/s3-request-presigner/-/s3-request-presigner-3.879.0.tgz",
+      "overridden": false
+    },
+    "@headlessui/react": {
+      "version": "1.7.19",
+      "resolved": "https://registry.npmjs.org/@headlessui/react/-/react-1.7.19.tgz",
+      "overridden": false
+    },
+    "@heroicons/react": {
+      "version": "2.2.0",
+      "resolved": "https://registry.npmjs.org/@heroicons/react/-/react-2.2.0.tgz",
+      "overridden": false
+    },
+    "@supabase/auth-helpers-nextjs": {
+      "version": "0.8.7",
+      "resolved": "https://registry.npmjs.org/@supabase/auth-helpers-nextjs/-/auth-helpers-nextjs-0.8.7.tgz",
+      "overridden": false
+    },
+    "@supabase/supabase-js": {
+      "version": "2.56.1",
+      "resolved": "https://registry.npmjs.org/@supabase/supabase-js/-/supabase-js-2.56.1.tgz",
+      "overridden": false
+    },
+    "framer-motion": {
+      "version": "10.18.0",
+      "resolved": "https://registry.npmjs.org/framer-motion/-/framer-motion-10.18.0.tgz",
+      "overridden": false
+    },
+    "lucide-react": {
+      "version": "0.525.0",
+      "resolved": "https://registry.npmjs.org/lucide-react/-/lucide-react-0.525.0.tgz",
+      "overridden": false
+    },
+    "next": {
+      "version": "14.2.32",
+      "resolved": "https://registry.npmjs.org/next/-/next-14.2.32.tgz",
+      "overridden": false
+    },
+    "react-dom": {
+      "version": "18.3.1",
+      "resolved": "https://registry.npmjs.org/react-dom/-/react-dom-18.3.1.tgz",
+      "overridden": false
+    },
+    "react-hot-toast": {
+      "version": "2.6.0",
+      "resolved": "https://registry.npmjs.org/react-hot-toast/-/react-hot-toast-2.6.0.tgz",
+      "overridden": false
+    },
+    "react-markdown": {
+      "version": "9.1.0",
+      "resolved": "https://registry.npmjs.org/react-markdown/-/react-markdown-9.1.0.tgz",
+      "overridden": false
+    },
+    "react": {
+      "version": "18.3.1",
+      "resolved": "https://registry.npmjs.org/react/-/react-18.3.1.tgz",
+      "overridden": false
+    },
+    "zustand": {
+      "version": "4.5.7",
+      "resolved": "https://registry.npmjs.org/zustand/-/zustand-4.5.7.tgz",
+      "overridden": false
+    }
+  }
+}

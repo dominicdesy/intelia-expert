@@ -27,7 +27,8 @@
       "Read(//c/Users/desy.dominic/OneDrive - Intelia Technologies/Desktop/**)",
       "Bash(npm run dev:*)",
       "Bash(git push:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(openssl rand:*)"
     ],
     "deny": [],
     "ask": []

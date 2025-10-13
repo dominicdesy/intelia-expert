@@ -29,7 +29,15 @@
       "Bash(python:*)",
       "Bash($env:PYTHONIOENCODING=\"utf-8\")",
       "Bash(Out-String -Width 200)",
-      "Bash(PYTHONIOENCODING=utf-8 python check_gdpr_compliance.py)"
+      "Bash(PYTHONIOENCODING=utf-8 python check_gdpr_compliance.py)",
+      "Bash(PYTHONIOENCODING=utf-8 python:*)",
+      "Bash(git rm:*)",
+      "Bash(echo $env:ANTHROPIC_API_KEY)",
+      "Bash(Select-Object -First 20)",
+      "Bash(del test_extraction_output.xlsx test_extraction_output_v2.xlsx test_claude_vision_page6.xlsx temp_nutrition_pages.xlsx temp_yield_pages.xlsx Cobb500_extracted_claude_vision.xlsx)",
+      "Bash(taskkill:*)",
+      "Bash(awk:*)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []

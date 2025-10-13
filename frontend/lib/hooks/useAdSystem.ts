@@ -144,46 +144,58 @@ export const useAdSystem = () => {
     }
   }, [isAuthenticated, user, AD_CRITERIA]);
 
-  // Obtenir une publicité personnalisée
-  const getPersonalizedAd = useCallback(async (): Promise<AdData> => {
-    const baseAd: AdData = {
-      id: "farming-pro-2024",
-      title: "FarmPro Analytics",
-      description:
-        "Optimisez vos performances agricoles avec notre plateforme IA spécialisée en élevage avicole. Analyses prédictives, suivi en temps réel et conseils personnalisés pour maximiser vos rendements.",
-      imageUrl: "/images/logo.png",
-      ctaText: "Essai gratuit 30 jours",
-      ctaUrl: "https://farmpro-analytics.com/trial?ref=intelia",
-      company: "FarmPro Solutions",
-      rating: 4.8,
-      users: "10K+",
-      duration: "Essai gratuit",
-      features: [
-        "Analyses prédictives IA",
-        "Suivi temps réel",
-        "Rapports automatisés",
-        "Support expert 24/7",
-        "Intégration IoT",
-        "Mobile & desktop",
-      ],
-    };
+  // Obtenir une publicité personnalisée avec rotation et multi-langue
+  const getPersonalizedAd = useCallback(async (): Promise<AdData | null> => {
+    // Import dynamique du catalogue
+    const { selectNextAd, getAdTranslations } = await import("@/lib/ads/ads-catalog");
+    const { useTranslation } = await import("@/lib/languages/i18n");
 
-    // Personnalisation selon le type d'utilisateur
-    if (user?.user_type === "veterinary") {
-      baseAd.title = "VetPro Clinical";
-      baseAd.description =
-        "Plateforme de diagnostic vétérinaire avicole avec IA. Aide au diagnostic, base de données médicamenteuse et suivi clinique intégré.";
-      baseAd.features = [
-        "Aide au diagnostic IA",
-        "Base médicamenteuse",
-        "Dossiers patients",
-        "Analyses laboratoire",
-        "Protocoles standards",
-        "Téléconsultation",
-      ];
+    // Sélectionner la prochaine pub selon le type d'utilisateur
+    const selectedAd = selectNextAd(user?.user_type);
+
+    if (!selectedAd) {
+      secureLog.warn("[useAdSystem] Aucune publicité disponible");
+      return null;
     }
 
-    return baseAd;
+    // Obtenir la langue actuelle (via le store de langue)
+    const languageStore = localStorage.getItem("intelia-language");
+    let currentLanguage = "fr"; // Défaut
+
+    try {
+      if (languageStore) {
+        const parsed = JSON.parse(languageStore);
+        currentLanguage = parsed?.state?.currentLanguage || "fr";
+      }
+    } catch {
+      currentLanguage = "fr";
+    }
+
+    // Obtenir les traductions pour cette pub et cette langue
+    const translations = getAdTranslations(selectedAd, currentLanguage);
+
+    secureLog.log(`[useAdSystem] Pub sélectionnée: ${selectedAd.id}, langue: ${currentLanguage}`);
+
+    // Construire l'objet AdData avec les traductions
+    const adData: AdData = {
+      id: selectedAd.id,
+      title: translations.mainTitle,
+      description: translations.description,
+      imageUrl: selectedAd.imageUrl,
+      ctaText: translations.ctaText,
+      ctaUrl: selectedAd.ctaUrl,
+      company: translations.companyName,
+      features: [
+        translations.feature1,
+        translations.feature2,
+        translations.feature3,
+      ],
+      // Nouvelles propriétés pour le modal amélioré
+      headerTitle: translations.headerTitle,
+      ctaSubtext: translations.ctaSubtext,
+    };
+
+    return adData;
   }, [user]);
 
   // Déclencher l'affichage de la publicité

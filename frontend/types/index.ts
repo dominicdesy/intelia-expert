@@ -994,6 +994,9 @@ export interface AdData {
   users?: string;
   duration?: string;
   features: string[];
+  // Nouvelles propriétés pour le système multi-langue
+  headerTitle?: string;
+  ctaSubtext?: string;
 }
 
 export interface UserSessionStats {

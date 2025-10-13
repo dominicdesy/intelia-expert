@@ -30,7 +30,7 @@ export const AdModal: React.FC<AdModalProps> = ({
   adData,
   onAdClick,
 }) => {
-  const [timeLeft, setTimeLeft] = useState(15);
+  const [timeLeft, setTimeLeft] = useState(4);
   const [canClose, setCanClose] = useState(false);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export const AdModal: React.FC<AdModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setTimeLeft(15);
+      setTimeLeft(4);
       setCanClose(false);
     }
   }, [isOpen]);
@@ -76,7 +76,7 @@ export const AdModal: React.FC<AdModalProps> = ({
         <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white">
           <div className="flex items-center space-x-2">
             <Brain className="w-6 h-6 text-blue-200 animate-pulse" />
-            <span className="font-bold text-lg">AI Innovation for Poultry Industry</span>
+            <span className="font-bold text-lg">{adData.headerTitle || adData.title}</span>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -112,27 +112,28 @@ export const AdModal: React.FC<AdModalProps> = ({
             <div className="lg:w-1/2 space-y-6">
               <div>
                 <h2 className="text-3xl font-bold text-gray-900 mb-4 leading-tight">
-                  Why should the poultry industry embrace AI — now?
+                  {adData.title}
                 </h2>
-                <p className="text-gray-700 text-lg leading-relaxed">
-                  From early issue detection to better productivity and decision-making, discover <span className="font-bold text-blue-600">10 compelling reasons</span> to accelerate digital adoption.
-                </p>
+                <p
+                  className="text-gray-700 text-lg leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: adData.description }}
+                />
               </div>
 
               {/* Points clés avec icônes */}
               <div className="space-y-3">
-                <div className="flex items-start space-x-3">
-                  <Zap className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-1" />
-                  <p className="text-gray-600">Early disease detection & prevention</p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <TrendingUp className="w-5 h-5 text-green-500 flex-shrink-0 mt-1" />
-                  <p className="text-gray-600">Enhanced productivity & efficiency</p>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <Brain className="w-5 h-5 text-blue-500 flex-shrink-0 mt-1" />
-                  <p className="text-gray-600">Data-driven decision making</p>
-                </div>
+                {adData.features.slice(0, 3).map((feature, index) => {
+                  const icons = [Zap, TrendingUp, Brain];
+                  const colors = ["text-yellow-500", "text-green-500", "text-blue-500"];
+                  const Icon = icons[index % icons.length];
+
+                  return (
+                    <div key={index} className="flex items-start space-x-3">
+                      <Icon className={`w-5 h-5 ${colors[index % colors.length]} flex-shrink-0 mt-1`} />
+                      <p className="text-gray-600">{feature}</p>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* CTA Button */}
@@ -140,12 +141,12 @@ export const AdModal: React.FC<AdModalProps> = ({
                 onClick={handleAdClick}
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 px-8 rounded-xl font-bold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 flex items-center justify-center space-x-3 shadow-xl hover:shadow-2xl transform hover:scale-105"
               >
-                <span>Read the Full Article</span>
+                <span>{adData.ctaText}</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
 
               <p className="text-center text-sm text-gray-500">
-                📖 Discover all 10 reasons in the complete guide
+                {adData.ctaSubtext || "📖"}
               </p>
             </div>
           </div>
@@ -154,7 +155,7 @@ export const AdModal: React.FC<AdModalProps> = ({
         {/* Footer */}
         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-blue-50 border-t text-center">
           <p className="text-xs text-gray-600">
-            Intelia Technologies
+            {adData.company}
           </p>
         </div>
       </div>
