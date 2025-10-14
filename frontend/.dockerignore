@@ -75,4 +75,4 @@ storybook-static
 !public/
 !public/fonts/**
 !public/images/**
-!public/locales/**
+!public/locales/**# Force rebuild 13 oct. 2025 23:29:46
