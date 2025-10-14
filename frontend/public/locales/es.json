@@ -68,6 +68,7 @@
   "validation.password.special": "Al menos un carácter especial",
   "nav.conversationSidebar": "Barra lateral de conversaciones",
   "nav.closeSidebar": "Cerrar barra lateral",
+  "common.and": "y",
   "common.or": "o",
   "common.optional": "opcional",
   "common.appName": "Intelia Expert",

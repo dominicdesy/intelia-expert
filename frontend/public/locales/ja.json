@@ -67,6 +67,7 @@
   "validation.password.special": "最低1つの特殊文字",
   "nav.conversationSidebar": "会話サイドバー",
   "nav.closeSidebar": "サイドバーを閉じる",
+  "common.and": "と",
   "common.or": "または",
   "common.optional": "オプション",
   "common.appName": "Intelia Expert",

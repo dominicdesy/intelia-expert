@@ -67,6 +67,7 @@
   "validation.password.special": "Mindestens ein Sonderzeichen",
   "nav.conversationSidebar": "Gespräche-Seitenleiste",
   "nav.closeSidebar": "Seitenleiste schließen",
+  "common.and": "und",
   "common.or": "oder",
   "common.optional": "optional",
   "common.appName": "Intelia Expert",

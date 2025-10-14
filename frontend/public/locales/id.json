@@ -67,6 +67,7 @@
   "validation.password.special": "Minimal satu karakter khusus",
   "nav.conversationSidebar": "Sidebar percakapan",
   "nav.closeSidebar": "Tutup sidebar",
+  "common.and": "dan",
   "common.or": "atau",
   "common.optional": "opsional",
   "common.appName": "Intelia Expert",

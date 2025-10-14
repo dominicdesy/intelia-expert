@@ -67,6 +67,7 @@
   "validation.password.special": "至少一个特殊字符",
   "nav.conversationSidebar": "对话侧边栏",
   "nav.closeSidebar": "关闭侧边栏",
+  "common.and": "和",
   "common.or": "或",
   "common.optional": "可选",
   "common.appName": "Intelia Expert",

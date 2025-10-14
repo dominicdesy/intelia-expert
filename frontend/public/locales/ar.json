@@ -67,6 +67,7 @@
   "validation.password.special": "حرف خاص واحد على الأقل",
   "nav.conversationSidebar": "شريط المحادثات الجانبي",
   "nav.closeSidebar": "إغلاق الشريط الجانبي",
+  "common.and": "و",
   "common.or": "أو",
   "common.optional": "اختياري",
   "common.appName": "إنتيليا إكسبرت",

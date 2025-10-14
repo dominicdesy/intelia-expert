@@ -67,6 +67,7 @@
   "validation.password.special": "En az bir özel karakter",
   "nav.conversationSidebar": "Konuşmalar kenar çubuğu",
   "nav.closeSidebar": "Kenar çubuğunu kapat",
+  "common.and": "ve",
   "common.or": "veya",
   "common.optional": "isteğe bağlı",
   "common.appName": "Intelia Expert",

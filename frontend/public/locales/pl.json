@@ -67,6 +67,7 @@
   "validation.password.special": "Co najmniej jeden znak specjalny",
   "nav.conversationSidebar": "Pasek boczny rozmów",
   "nav.closeSidebar": "Zamknij pasek boczny",
+  "common.and": "i",
   "common.or": "lub",
   "common.optional": "opcjonalne",
   "common.appName": "Intelia Expert",

@@ -67,6 +67,7 @@
   "validation.password.special": "อย่างน้อยหนึ่งตัวอักษรพิเศษ",
   "nav.conversationSidebar": "แถบด้านข้างการสนทนา",
   "nav.closeSidebar": "ปิดแถบด้านข้าง",
+  "common.and": "และ",
   "common.or": "หรือ",
   "common.optional": "ไม่บังคับ",
   "common.appName": "Intelia Expert",
