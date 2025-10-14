@@ -1,5 +1,5 @@
 "use client";
-// Build: 1.0.0.4 - Fix SignupModal setTimeout
+// Build: 1.0.0.5 - FINAL FIX: AdModal setTimeout (THE REAL CULPRIT)
 
 import React, { useState, Suspense, useEffect } from "react";
 import Link from "next/link";

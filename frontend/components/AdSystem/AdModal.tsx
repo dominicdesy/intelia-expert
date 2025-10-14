@@ -34,10 +34,21 @@ export const AdModal: React.FC<AdModalProps> = ({
 }) => {
   const [timeLeft, setTimeLeft] = useState(4);
   const [canClose, setCanClose] = useState(false);
+  const isMountedRef = React.useRef(true); // Protection démontage
+
+  // Cleanup au démontage
+  React.useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen && timeLeft > 0) {
       const timer = setTimeout(() => {
+        // PROTECTION: Vérifier que le composant est toujours monté
+        if (!isMountedRef.current) return;
+
         setTimeLeft((prev) => {
           if (prev <= 1) {
             setCanClose(true);
