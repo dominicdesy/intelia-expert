@@ -361,6 +361,7 @@ function ChatInterface() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [logoAlignment, setLogoAlignment] = useState<"flex-start" | "center">("center");
 
   const [clarificationState, setClarificationState] = useState<{
     messageId: string;
@@ -603,6 +604,32 @@ function ChatInterface() {
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Détection de la largeur pour l'alignement du logo (solution JavaScript inline)
+  useEffect(() => {
+    if (!isMountedRef.current) return;
+
+    const updateLogoAlignment = () => {
+      if (isMountedRef.current) {
+        // iPhone screen width is typically < 640px
+        setLogoAlignment(window.innerWidth < 640 ? "flex-start" : "center");
+      }
+    };
+
+    // Initial update
+    updateLogoAlignment();
+
+    // Listen for resize
+    window.addEventListener('resize', updateLogoAlignment);
+
+    // Also listen for orientation change on mobile
+    window.addEventListener('orientationchange', updateLogoAlignment);
+
+    return () => {
+      window.removeEventListener('resize', updateLogoAlignment);
+      window.removeEventListener('orientationchange', updateLogoAlignment);
+    };
   }, []);
 
   // Gestion clavier mobile
@@ -1322,7 +1349,10 @@ function ChatInterface() {
               </div>
             </div>
 
-            <div className="flex-1 min-w-0 flex items-center space-x-3 logo-container-intelia">
+            <div
+              className="flex-1 min-w-0 flex items-center space-x-3 logo-container-intelia"
+              style={{ justifyContent: logoAlignment }}
+            >
               <div className="w-10 h-10 grid place-items-center">
                 <InteliaLogo className="h-8 w-auto" />
               </div>
