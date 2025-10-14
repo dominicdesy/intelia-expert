@@ -1250,15 +1250,13 @@ function ChatInterface() {
       {/* Mobile-specific styles for chat page only */}
       <style dangerouslySetInnerHTML={{
         __html: `
-          /* iPhone logo alignment fix */
-          @media screen and (max-width: 640px) {
-            header .flex-1 {
-              justify-content: flex-start !important;
-            }
+          /* iPhone logo alignment fix - FORCED */
+          .logo-container-intelia {
+            justify-content: flex-start !important;
           }
 
           @media screen and (min-width: 641px) {
-            header .flex-1 {
+            .logo-container-intelia {
               justify-content: center !important;
             }
           }
@@ -1324,7 +1322,7 @@ function ChatInterface() {
               </div>
             </div>
 
-            <div className="flex-1 min-w-0 flex justify-start sm:justify-center items-center space-x-3">
+            <div className="flex-1 min-w-0 flex items-center space-x-3 logo-container-intelia">
               <div className="w-10 h-10 grid place-items-center">
                 <InteliaLogo className="h-8 w-auto" />
               </div>
