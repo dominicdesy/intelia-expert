@@ -1,4 +1,5 @@
 "use client";
+// Build: 1.0.0.2 - Force rebuild to clear Next.js cache
 
 import React, { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
