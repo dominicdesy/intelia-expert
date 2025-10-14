@@ -18,20 +18,21 @@ export default function AuthCallback() {
       try {
         secureLog.log("[AuthCallback] Début traitement callback Supabase");
         secureLog.log("[AuthCallback] URL complète:", window.location.href);
-        console.log("[AuthCallback PROD] Version: 1.0.0.15");
+        console.log("[AuthCallback PROD] Version: 1.0.0.17");
 
         // PRIORITÉ 1: Vérifier s'il y a un token_hash dans les query params (lien d'invitation personnalisé)
         const urlParams = new URLSearchParams(window.location.search);
         const tokenHash = urlParams.get("token_hash") || urlParams.get("token");
         const typeParam = urlParams.get("type");
 
-        secureLog.log("[AuthCallback] Query params:", {
+        console.log("[AuthCallback PROD] Query params:", {
           hasTokenHash: !!tokenHash,
           type: typeParam,
         });
 
         // Si token_hash présent (invitation avec custom domain), échanger via backend
         if (tokenHash && typeParam === "invite") {
+          console.log("[AuthCallback PROD] BRANCH 1: Token hash trouvé");
           secureLog.log("[AuthCallback] Token hash trouvé, échange via backend...");
 
           const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -75,16 +76,19 @@ export default function AuthCallback() {
         }
 
         // PRIORITÉ 2: Vérifier s'il y a des tokens dans le hash (OAuth standard)
+        console.log("[AuthCallback PROD] Checking hash for tokens...");
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get("access_token");
         const refreshToken = hashParams.get("refresh_token");
 
-        secureLog.log("[AuthCallback] Tokens dans hash:", {
+        console.log("[AuthCallback PROD] Tokens dans hash:", {
           hasAccessToken: !!accessToken,
           hasRefreshToken: !!refreshToken,
+          hash: window.location.hash
         });
 
         if (accessToken && refreshToken) {
+          console.log("[AuthCallback PROD] BRANCH 2: Tokens trouvés dans hash");
           secureLog.log("[AuthCallback] Tokens trouvés dans hash, création session locale...");
 
           // Créer une session Supabase locale avec les tokens
@@ -129,8 +133,9 @@ export default function AuthCallback() {
           }
         } else {
           // PRIORITÉ 3: Pas de tokens - vérifier si session existe déjà
-          secureLog.log("[AuthCallback] Aucun token trouvé, vérification session existante...");
+          console.log("[AuthCallback PROD] BRANCH 3: Aucun token trouvé, vérification session existante...");
           const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+          console.log("[AuthCallback PROD] getSession result:", { hasSession: !!sessionData.session, hasError: !!sessionError });
 
           if (sessionError || !sessionData.session) {
             secureLog.warn("[AuthCallback] Pas de tokens et pas de session existante");
