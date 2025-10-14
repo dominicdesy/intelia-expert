@@ -1848,12 +1848,8 @@ class CompleteInvitationProfileRequest(BaseModel):
     fullName: str
     email: EmailStr
     country: str
-    phone: Optional[str] = None
-    linkedinProfile: Optional[str] = None
     companyName: Optional[str] = None
     companyWebsite: Optional[str] = None
-    companyLinkedin: Optional[str] = None
-    jobTitle: Optional[str] = None
 
 
 class CompleteInvitationProfileResponse(BaseModel):
@@ -2024,12 +2020,8 @@ async def complete_invitation_profile(request: CompleteInvitationProfileRequest)
             "last_name": request.lastName,
             "full_name": request.fullName,
             "country": request.country,
-            "phone": request.phone,
-            "linkedin_profile": request.linkedinProfile,
             "company_name": request.companyName,
             "company_website": request.companyWebsite,
-            "linkedin_corporate": request.companyLinkedin,
-            "job_title": request.jobTitle,
             "user_type": "user",
             "language": payload.get("user_metadata", {}).get("language", "fr"),
             "created_at": datetime.utcnow().isoformat(),
