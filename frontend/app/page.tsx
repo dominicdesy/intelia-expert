@@ -115,6 +115,14 @@ function AuthCallbackHandler() {
   const searchParams = useSearchParams();
   const { t } = useTranslation();
   const [authMessage, setAuthMessage] = useState("");
+  const isMountedRef = React.useRef(true);
+
+  // Cleanup au démontage
+  React.useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   React.useEffect(() => {
     const authStatus = searchParams?.get("auth");
@@ -138,6 +146,8 @@ function AuthCallbackHandler() {
     }
 
     const timeoutId = setTimeout(() => {
+      // PROTECTION: Vérifier que le composant est toujours monté avant setState
+      if (!isMountedRef.current) return;
       setAuthMessage("");
     }, 3000);
 
@@ -183,7 +193,7 @@ function LoginPageContent() {
       setEmail(savedData.lastEmail);
       setRememberMe(true);
     }
-  }, []);
+  }, []); // Pas besoin de protection ici car opération synchrone
 
   // États pour le signup
   const [signupData, setSignupData] = useState({
