@@ -334,7 +334,7 @@ const ProcessingStatus = ({ result }: { result: ProcessingResult }) => {
 
       {result.success && result.step === "completion" && (
         <div className="text-sm text-gray-600">
-          <p>{t("invitation.redirecting.dashboard")}</p>
+          <p>{t("invitation.redirecting.login") || "Redirection vers la page de connexion..."}</p>
           <div className="mt-2">
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
@@ -812,13 +812,13 @@ function InvitationAcceptPageContent() {
       setProcessingResult({
         success: true,
         step: "completion",
-        message: `${t("invitation.success.welcome")}, ${formData.firstName}`,
+        message: `${t("invitation.success.welcome")}, ${formData.firstName}! ${t("invitation.pleaseLogin")}`,
       });
 
       setTimeout(() => {
-        secureLog.log("[InvitationAccept] Redirection vers chat");
-        router.push(completionResult.redirect_url || "/chat");
-      }, 2000);
+        secureLog.log("[InvitationAccept] Redirection vers login avec succès");
+        router.push(`/auth/login?success=${encodeURIComponent(t("invitation.accountCreatedPleaseLogin"))}`);
+      }, 3000);
     } catch (error: any) {
       secureLog.error("[InvitationAccept] Erreur finalisation compte:", error);
 
