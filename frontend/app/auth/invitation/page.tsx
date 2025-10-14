@@ -391,16 +391,10 @@ function InvitationAcceptPageContent() {
     confirmPassword: "",
     firstName: "",
     lastName: "",
-    linkedinProfile: "",
     email: "",
     country: "",
-    countryCode: "",
-    areaCode: "",
-    phoneNumber: "",
     companyName: "",
     companyWebsite: "",
-    companyLinkedin: "",
-    jobTitle: "",
   });
 
   const [errors, setErrors] = useState<string[]>([]);
@@ -639,17 +633,7 @@ function InvitationAcceptPageContent() {
   }, [router, searchParams, hasProcessedToken, t]);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => {
-      const newData = { ...prev, [field]: value };
-
-      if (field === "country" && value && countryCodeMap[value]) {
-        newData.countryCode = countryCodeMap[value];
-        newData.areaCode = "";
-        newData.phoneNumber = "";
-      }
-
-      return newData;
-    });
+    setFormData((prev) => ({ ...prev, [field]: value }));
 
     if (errors.length > 0) {
       setErrors([]);
@@ -690,37 +674,6 @@ function InvitationAcceptPageContent() {
       validationErrors.push(t("validation.required.country"));
     }
 
-    if (
-      !validatePhone(
-        formData.countryCode,
-        formData.areaCode,
-        formData.phoneNumber,
-        formData.country,
-        countryCodeMap,
-      )
-    ) {
-      const hasUserEnteredPhoneData =
-        formData.areaCode.trim() || formData.phoneNumber.trim();
-
-      if (hasUserEnteredPhoneData) {
-        const missingFields = [];
-        if (!formData.countryCode.trim())
-          missingFields.push(t("profile.countryCode"));
-        if (!formData.areaCode.trim())
-          missingFields.push(t("profile.areaCode"));
-        if (!formData.phoneNumber.trim())
-          missingFields.push(t("profile.phoneNumber"));
-
-        if (missingFields.length > 0) {
-          validationErrors.push(
-            `${t("validation.phone.incomplete")}: ${missingFields.join(", ")}`,
-          );
-        } else {
-          validationErrors.push(t("validation.phone.invalid"));
-        }
-      }
-    }
-
     return validationErrors;
   };
 
@@ -752,17 +705,10 @@ function InvitationAcceptPageContent() {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim(),
-        linkedinProfile: formData.linkedinProfile.trim() || null,
         country: formData.country,
-        phone:
-          formData.countryCode && formData.areaCode && formData.phoneNumber
-            ? `${formData.countryCode} ${formData.areaCode}-${formData.phoneNumber}`
-            : null,
         company: formData.companyName.trim() || t("common.notSpecified"),
         companyName: formData.companyName.trim() || null,
         companyWebsite: formData.companyWebsite.trim() || null,
-        companyLinkedin: formData.companyLinkedin.trim() || null,
-        jobTitle: formData.jobTitle.trim() || t("common.notSpecified"),
         password: formData.password,
       };
 
@@ -901,14 +847,7 @@ function InvitationAcceptPageContent() {
       formData.firstName.trim() &&
       formData.lastName.trim() &&
       formData.email.trim() &&
-      formData.country &&
-      validatePhone(
-        formData.countryCode,
-        formData.areaCode,
-        formData.phoneNumber,
-        formData.country,
-        countryCodeMap,
-      )
+      formData.country
     );
   };
 
@@ -1099,22 +1038,6 @@ function InvitationAcceptPageContent() {
                       />
                     </div>
                   </div>
-
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t("profile.linkedinProfile")} {t("common.optional")}
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.linkedinProfile}
-                      onChange={(e) =>
-                        handleInputChange("linkedinProfile", e.target.value)
-                      }
-                      placeholder={t("placeholder.linkedinPersonal")}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isProcessing}
-                    />
-                  </div>
                 </div>
 
                 {/* Section Contact */}
@@ -1180,63 +1103,6 @@ function InvitationAcceptPageContent() {
                       </select>
                     )}
                   </div>
-
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t("profile.phone")} {t("common.optional")}
-                    </label>
-                    <p className="text-xs text-gray-500 mb-2">
-                      {t("invitation.phoneAutoFill")}
-                    </p>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">
-                          {t("profile.countryCode")}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="+1"
-                          value={formData.countryCode}
-                          onChange={(e) =>
-                            handleInputChange("countryCode", e.target.value)
-                          }
-                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm bg-gray-50"
-                          disabled={isProcessing}
-                          readOnly
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">
-                          {t("profile.areaCode")}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="514"
-                          value={formData.areaCode}
-                          onChange={(e) =>
-                            handleInputChange("areaCode", e.target.value)
-                          }
-                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                          disabled={isProcessing}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">
-                          {t("profile.phoneNumber")}
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="1234567"
-                          value={formData.phoneNumber}
-                          onChange={(e) =>
-                            handleInputChange("phoneNumber", e.target.value)
-                          }
-                          className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                          disabled={isProcessing}
-                        />
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Section Entreprise */}
@@ -1272,38 +1138,6 @@ function InvitationAcceptPageContent() {
                         handleInputChange("companyWebsite", e.target.value)
                       }
                       placeholder={t("placeholder.companyWebsite")}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isProcessing}
-                    />
-                  </div>
-
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t("profile.companyLinkedin")} {t("common.optional")}
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.companyLinkedin}
-                      onChange={(e) =>
-                        handleInputChange("companyLinkedin", e.target.value)
-                      }
-                      placeholder={t("placeholder.linkedinCorporate")}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                      disabled={isProcessing}
-                    />
-                  </div>
-
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {t("profile.jobTitle")} {t("common.optional")}
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.jobTitle}
-                      onChange={(e) =>
-                        handleInputChange("jobTitle", e.target.value)
-                      }
-                      placeholder={t("placeholder.jobTitle")}
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                       disabled={isProcessing}
                     />
