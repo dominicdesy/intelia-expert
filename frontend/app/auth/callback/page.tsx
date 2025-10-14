@@ -14,67 +14,12 @@ export default function AuthCallback() {
         secureLog.log("[AuthCallback] Début traitement callback Supabase");
         secureLog.log("[AuthCallback] URL complète:", window.location.href);
 
-        // D'abord, vérifier s'il y a un token de vérification Supabase dans l'URL originale
-        // (le lien d'invitation contient: ?token=xxx&type=invite&redirect_to=...)
-        const urlParams = new URLSearchParams(window.location.search);
-        const verificationToken = urlParams.get("token") || urlParams.get("verification_token");
-        const type = urlParams.get("type");
-
-        secureLog.log("[AuthCallback] Query params:", {
-          hasVerificationToken: !!verificationToken,
-          type,
-        });
-
-        // Si on a un token de vérification, l'échanger via le backend
-        if (verificationToken && type === "invite") {
-          secureLog.log("[AuthCallback] Token de vérification trouvé, échange via backend...");
-
-          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-          const exchangeResponse = await fetch(
-            `${API_BASE_URL}/v1/auth/invitations/exchange-token`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                token: verificationToken,
-              }),
-            }
-          );
-
-          const exchangeResult = await exchangeResponse.json();
-          secureLog.log("[AuthCallback] Résultat échange:", exchangeResult);
-
-          if (!exchangeResult.success || !exchangeResult.access_token) {
-            secureLog.error("[AuthCallback] Échec échange token:", exchangeResult.error);
-            router.push(`/auth/login?error=${encodeURIComponent(exchangeResult.error || "token_exchange_failed")}`);
-            return;
-          }
-
-          // Créer une session avec les tokens échangés
-          const { data, error } = await supabase.auth.setSession({
-            access_token: exchangeResult.access_token,
-            refresh_token: exchangeResult.refresh_token,
-          });
-
-          if (error) {
-            secureLog.error("[AuthCallback] Erreur création session:", error);
-            router.push("/auth/login?error=session_creation_failed");
-            return;
-          }
-
-          secureLog.log("[AuthCallback] Session créée avec succès pour:", exchangeResult.user_email);
-          router.push("/auth/invitation");
-          return;
-        }
-
-        // Fallback: Vérifier s'il y a des tokens dans le hash (cas standard sans custom domain)
+        // Vérifier s'il y a des tokens dans le hash (passés par Supabase après vérification)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get("access_token");
         const refreshToken = hashParams.get("refresh_token");
 
-        secureLog.log("[AuthCallback] Hash params:", {
+        secureLog.log("[AuthCallback] Tokens dans hash:", {
           hasAccessToken: !!accessToken,
           hasRefreshToken: !!refreshToken,
         });
@@ -99,13 +44,17 @@ export default function AuthCallback() {
             userMetadata: data.session?.user?.user_metadata,
           });
 
-          // Vérifier le type de callback via user_metadata
+          // Déterminer la redirection selon le type dans user_metadata
           const invitationType = data.session?.user?.user_metadata?.invitation_type;
 
-          if (invitationType === "invite" || type === "invite" || type === "invitation") {
+          // Vérifier aussi le query param "type" si présent
+          const urlParams = new URLSearchParams(window.location.search);
+          const typeParam = urlParams.get("type");
+
+          if (invitationType === "invite" || typeParam === "invite" || typeParam === "invitation") {
             secureLog.log("[AuthCallback] Type invitation détecté, redirection vers /auth/invitation");
             router.push("/auth/invitation");
-          } else if (type === "recovery") {
+          } else if (typeParam === "recovery") {
             secureLog.log("[AuthCallback] Type recovery détecté, redirection vers /auth/reset-password");
             router.push("/auth/reset-password");
           } else {
@@ -115,6 +64,7 @@ export default function AuthCallback() {
           }
         } else {
           // Pas de tokens dans le hash - vérifier si session existe déjà
+          secureLog.log("[AuthCallback] Aucun token dans hash, vérification session existante...");
           const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
           if (sessionError || !sessionData.session) {
