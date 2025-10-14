@@ -18,7 +18,7 @@ export default function AuthCallback() {
       try {
         secureLog.log("[AuthCallback] Début traitement callback Supabase");
         secureLog.log("[AuthCallback] URL complète:", window.location.href);
-        console.log("[AuthCallback PROD] Version: 1.0.0.17");
+        console.log("[AuthCallback PROD] Version: 1.0.0.18");
 
         // PRIORITÉ 1: Vérifier s'il y a un token_hash dans les query params (lien d'invitation personnalisé)
         const urlParams = new URLSearchParams(window.location.search);
@@ -132,13 +132,42 @@ export default function AuthCallback() {
             router.push("/chat");
           }
         } else {
-          // PRIORITÉ 3: Pas de tokens - vérifier si session existe déjà
-          console.log("[AuthCallback PROD] BRANCH 3: Aucun token trouvé, vérification session existante...");
-          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-          console.log("[AuthCallback PROD] getSession result:", { hasSession: !!sessionData.session, hasError: !!sessionError });
+          // PRIORITÉ 3: Pas de tokens - vérifier si session existe déjà (avec retry)
+          console.log("[AuthCallback PROD] BRANCH 3: Aucun token trouvé, vérification session existante avec retry...");
+
+          // Fonction de retry pour gérer les délais de création de session
+          const checkSessionWithRetry = async (maxAttempts = 4, delayMs = 300) => {
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              console.log(`[AuthCallback PROD] Tentative ${attempt}/${maxAttempts} de récupération de session...`);
+
+              const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+              console.log(`[AuthCallback PROD] Tentative ${attempt} - getSession result:`, {
+                hasSession: !!sessionData.session,
+                hasError: !!sessionError,
+                user: sessionData.session?.user?.email || 'none'
+              });
+
+              if (sessionData.session && !sessionError) {
+                console.log(`[AuthCallback PROD] ✅ Session trouvée à la tentative ${attempt}`);
+                return { sessionData, sessionError };
+              }
+
+              if (attempt < maxAttempts) {
+                console.log(`[AuthCallback PROD] Pas de session, attente de ${delayMs}ms avant retry...`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+              }
+            }
+
+            console.log(`[AuthCallback PROD] ❌ Aucune session trouvée après ${maxAttempts} tentatives`);
+            return { sessionData: { session: null }, sessionError: null };
+          };
+
+          const { sessionData, sessionError } = await checkSessionWithRetry();
 
           if (sessionError || !sessionData.session) {
-            secureLog.warn("[AuthCallback] Pas de tokens et pas de session existante");
+            console.log("[AuthCallback PROD] Échec final: Pas de tokens et pas de session existante");
+            secureLog.warn("[AuthCallback] Pas de tokens et pas de session existante après retry");
             router.push("/?error=no_session");
             return;
           }

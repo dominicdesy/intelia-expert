@@ -48,7 +48,21 @@
       "Bash(do echo -n \"$key: \")",
       "Bash(curl -s \"https://expert-api-gpqgk.ondigitalocean.app/api/v1/auth/debug/reset-config\")",
       "Bash(del add-otp-hint-translation.py)",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "Bash(gh workflow run:*)",
+      "Bash(gh run list:*)",
+      "Bash(node:*)",
+      "Bash(npm run dev)",
+      "Bash(if exist .next rmdir /s /q .next)",
+      "Bash(if [ -d .next ])",
+      "Bash(then rm -rf .next)",
+      "Bash(else echo \"Pas de cache à supprimer\")",
+      "Bash(fi)",
+      "WebSearch",
+      "Bash(del C:/intelia_gpt/intelia-expert/frontend/add_translation_keys.py)",
+      "Bash(dir \"C:\\intelia_gpt\\intelia-expert\\frontend\\app\\auth\\callback\")",
+      "Bash(curl -s \"https://expert.intelia.com/auth/callback\" -I)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []
