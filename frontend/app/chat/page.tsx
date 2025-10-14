@@ -542,8 +542,16 @@ function ChatInterface() {
       isMountedRef.current = false;
       document.body.classList.remove("keyboard-open");
       hasLoadedConversationsRef.current = false;
+
+      // Cleanup: Retirer les styles mobiles quand on quitte la page chat
+      if (isMobileDevice) {
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+        document.body.style.overflow = '';
+      }
     };
-  }, []);
+  }, [isMobileDevice]);
 
   // OAuth via store unifié
   useEffect(() => {
@@ -1239,6 +1247,48 @@ function ChatInterface() {
 
   return (
     <>
+      {/* Mobile-specific styles for chat page only */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @media screen and (max-width: 768px) {
+            body {
+              position: fixed;
+              width: 100%;
+              height: 100%;
+              overflow: hidden;
+            }
+
+            .chat-main-container {
+              position: relative;
+              width: 100vw;
+              height: 100vh;
+              height: 100dvh;
+              overflow: hidden;
+              display: flex;
+              flex-direction: column;
+            }
+
+            .chat-scroll-area {
+              flex: 1;
+              overflow-y: auto;
+              overflow-x: hidden;
+              -webkit-overflow-scrolling: touch;
+              overscroll-behavior: contain;
+            }
+
+            .chat-input-fixed {
+              position: sticky;
+              bottom: 0;
+              left: 0;
+              right: 0;
+              z-index: 1000;
+              background: white;
+              border-top: 1px solid #e5e7eb;
+              padding-bottom: env(safe-area-inset-bottom);
+            }
+          }
+        `
+      }} />
       <ZohoSalesIQ user={user} />
       <div
         className={`bg-gray-50 flex flex-col relative z-0 ${isMobileDevice ? "chat-main-container" : "min-h-dvh h-screen"}`}

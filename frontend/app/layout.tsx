@@ -344,44 +344,7 @@ export default function RootLayout({
               min-height: 100dvh;
             }
             
-            /* Correction spécifique iPhone */
-            @media screen and (max-width: 768px) {
-              body {
-                position: fixed;
-                width: 100%;
-                height: 100%;
-                overflow: hidden;
-              }
-              
-              .chat-main-container {
-                position: relative;
-                width: 100vw;
-                height: 100vh;
-                height: 100dvh;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-              }
-              
-              .chat-scroll-area {
-                flex: 1;
-                overflow-y: auto;
-                overflow-x: hidden;
-                -webkit-overflow-scrolling: touch;
-                overscroll-behavior: contain;
-              }
-              
-              .chat-input-fixed {
-                position: sticky;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                z-index: 1000;
-                background: white;
-                border-top: 1px solid #e5e7eb;
-                padding-bottom: env(safe-area-inset-bottom);
-              }
-            }
+            /* Chat-specific mobile styles moved to chat/page.tsx */
             
             /* Prévention zoom iOS sur focus input */
             @media screen and (max-width: 768px) {

@@ -863,6 +863,8 @@ export const useAuthStore = create<AuthState>()(
             apiData.company_website = data.companyWebsite;
           if (data.linkedinCorporate !== undefined)
             apiData.linkedin_corporate = data.linkedinCorporate;
+          if (data.language !== undefined)
+            apiData.language = data.language;
 
           secureLog.log(
             "[AuthStore] Sending to backend API: /users/profile",

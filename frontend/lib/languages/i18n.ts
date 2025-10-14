@@ -1169,6 +1169,24 @@ export const useTranslation = () => {
       secureLog.warn("[i18n] Erreur sauvegarde langue:", error);
     }
 
+    // NOUVEAU: Synchroniser avec le profil Supabase
+    try {
+      // Import dynamique pour éviter circular dependency
+      const { useAuthStore } = await import("@/lib/stores/auth");
+      const authStore = useAuthStore.getState();
+
+      if (authStore.isAuthenticated && authStore.user) {
+        secureLog.log("[i18n] Synchronisation langue avec profil Supabase...");
+        await authStore.updateProfile({ language: newLanguage });
+        secureLog.log("[i18n] Langue synchronisée avec le profil Supabase");
+      } else {
+        secureLog.log("[i18n] Utilisateur non connecté, pas de sync Supabase");
+      }
+    } catch (error) {
+      secureLog.warn("[i18n] Erreur sync profil Supabase:", error);
+      // Ne pas bloquer si la sync échoue - l'utilisateur a quand même sa langue dans localStorage
+    }
+
     // Forcer le rechargement complet des traductions
     await loadTranslations(newLanguage);
 

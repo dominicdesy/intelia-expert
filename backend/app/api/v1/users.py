@@ -65,16 +65,21 @@ class UserProfileUpdate(BaseModel):
     @validator("language")
     def validate_language(cls, v):
         if v and v not in [
-            "fr",
+            "ar",
+            "de",
             "en",
             "es",
-            "de",
+            "fr",
+            "hi",
+            "id",
             "it",
-            "pt",
+            "ja",
             "nl",
             "pl",
-            "hi",
+            "pt",
             "th",
+            "tr",
+            "vi",
             "zh",
         ]:
             raise ValueError("Langue non supportée")
