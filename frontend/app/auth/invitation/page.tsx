@@ -839,8 +839,10 @@ function InvitationAcceptPageContent() {
           secureLog.error("[InvitationAccept] Erreur nettoyage localStorage:", error);
         }
 
-        secureLog.log("[InvitationAccept] Redirection vers login avec succès");
-        router.push(`/?success=${encodeURIComponent(t("invitation.accountCreatedPleaseLogin"))}`);
+        secureLog.log("[InvitationAccept] Redirection vers login avec rechargement complet...");
+        // Utiliser window.location.href au lieu de router.push() pour forcer un rechargement complet
+        // Cela garantit que tous les stores React et la session sont complètement nettoyés
+        window.location.href = `/?success=${encodeURIComponent(t("invitation.accountCreatedPleaseLogin"))}`;
       }, 3000);
     } catch (error: any) {
       secureLog.error("[InvitationAccept] Erreur finalisation compte:", error);
