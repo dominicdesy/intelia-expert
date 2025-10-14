@@ -2010,11 +2010,10 @@ async def complete_invitation_profile(request: CompleteInvitationProfileRequest)
 
         logger.info(f"[InvitationComplete] Mot de passe défini pour {user_id}")
 
-        # 3. Créer l'entrée dans la table users avec toutes les données du profil
-        logger.info("[InvitationComplete] Création du profil dans la table users...")
+        # 3. Mettre à jour l'entrée dans la table users (créée automatiquement par le trigger on_auth_user_created)
+        logger.info("[InvitationComplete] Mise à jour du profil dans la table users...")
 
         user_profile = {
-            "auth_user_id": user_id,
             "email": request.email,
             "first_name": request.firstName,
             "last_name": request.lastName,
@@ -2024,21 +2023,25 @@ async def complete_invitation_profile(request: CompleteInvitationProfileRequest)
             "company_website": request.companyWebsite,
             "user_type": "user",
             "language": payload.get("user_metadata", {}).get("language", "fr"),
-            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
         }
 
         # Filtrer les valeurs None
         user_profile = {k: v for k, v in user_profile.items() if v is not None}
 
-        insert_response = admin_client.table("users").insert(user_profile).execute()
+        # UPSERT : UPDATE si l'utilisateur existe (créé par trigger), sinon INSERT
+        upsert_response = admin_client.table("users").upsert(
+            {**user_profile, "auth_user_id": user_id},
+            on_conflict="auth_user_id"
+        ).execute()
 
-        if not insert_response.data:
-            logger.error("[InvitationComplete] Échec création profil dans users")
+        if not upsert_response.data:
+            logger.error("[InvitationComplete] Échec mise à jour profil dans users")
             raise HTTPException(
-                status_code=500, detail="Erreur lors de la création du profil"
+                status_code=500, detail="Erreur lors de la finalisation du profil"
             )
 
-        logger.info(f"[InvitationComplete] Profil créé dans users pour {request.email}")
+        logger.info(f"[InvitationComplete] Profil finalisé dans users pour {request.email}")
 
         # 4. Marquer l'invitation comme acceptée dans la table invitations
         try:
