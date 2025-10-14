@@ -602,7 +602,7 @@ function InvitationAcceptPageContent() {
               step: "validation",
               message: t("invitation.errors.noInvitation"),
             });
-            setTimeout(() => router.push("/auth/login"), 2000);
+            setTimeout(() => router.push("/"), 2000);
           }
         }
       } catch (error) {
@@ -617,7 +617,7 @@ function InvitationAcceptPageContent() {
 
         setTimeout(() => {
           router.push(
-            "/auth/login?error=" +
+            "/?error=" +
               encodeURIComponent(
                 error instanceof Error
                   ? error.message
@@ -817,7 +817,7 @@ function InvitationAcceptPageContent() {
 
       setTimeout(() => {
         secureLog.log("[InvitationAccept] Redirection vers login avec succès");
-        router.push(`/auth/login?success=${encodeURIComponent(t("invitation.accountCreatedPleaseLogin"))}`);
+        router.push(`/?success=${encodeURIComponent(t("invitation.accountCreatedPleaseLogin"))}`);
       }, 3000);
     } catch (error: any) {
       secureLog.error("[InvitationAccept] Erreur finalisation compte:", error);
