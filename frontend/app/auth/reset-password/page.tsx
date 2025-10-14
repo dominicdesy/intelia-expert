@@ -493,10 +493,10 @@ function ResetPasswordPageContent() {
 
     // NOUVEAU: Valider l'email pour les codes OTP
     if (isOtpToken && !formData.email.trim()) {
-      validationErrors.push(t("validation.required.email") || "Email is required");
+      validationErrors.push(t("validation.required.email"));
     }
     if (isOtpToken && formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      validationErrors.push(t("validation.email.invalid") || "Invalid email format");
+      validationErrors.push("Invalid email format");
     }
 
     if (!formData.newPassword) {
@@ -650,19 +650,19 @@ function ResetPasswordPageContent() {
             {isOtpToken && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {t("resetPassword.emailLabel") || "Email"}
+                  {t("forgotPassword.emailLabel")}
                 </label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder={t("resetPassword.emailPlaceholder") || "Enter your email"}
+                  placeholder={t("forgotPassword.emailPlaceholder")}
                   disabled={isLoading}
                   autoComplete="email"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  {t("resetPassword.otpEmailHint") || "Enter the email address you used to request the password reset"}
+                  Enter the email address you used to request the password reset
                 </p>
               </div>
             )}
