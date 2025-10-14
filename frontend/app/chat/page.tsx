@@ -1250,6 +1250,19 @@ function ChatInterface() {
       {/* Mobile-specific styles for chat page only */}
       <style dangerouslySetInnerHTML={{
         __html: `
+          /* iPhone logo alignment fix */
+          @media screen and (max-width: 640px) {
+            header .flex-1 {
+              justify-content: flex-start !important;
+            }
+          }
+
+          @media screen and (min-width: 641px) {
+            header .flex-1 {
+              justify-content: center !important;
+            }
+          }
+
           @media screen and (max-width: 768px) {
             body {
               position: fixed;
