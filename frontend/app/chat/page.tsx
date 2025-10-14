@@ -361,14 +361,6 @@ function ChatInterface() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [logoAlignment, setLogoAlignment] = useState<"flex-start" | "center">("center");
-  const [debugInfo, setDebugInfo] = useState<{
-    userAgent: string;
-    isIPhone: boolean;
-    isIPad: boolean;
-    windowWidth: number;
-    logoAlignment: string;
-  } | null>(null);
 
   const [clarificationState, setClarificationState] = useState<{
     messageId: string;
@@ -611,49 +603,6 @@ function ChatInterface() {
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Détection spécifique iPhone pour l'alignement du logo
-  useEffect(() => {
-    if (!isMountedRef.current) return;
-
-    const updateLogoAlignment = () => {
-      if (!isMountedRef.current) return;
-
-      const userAgent = navigator.userAgent.toLowerCase();
-      const isIPhone = /iphone/.test(userAgent);
-      const isIPad = /ipad/.test(userAgent) ||
-                     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      const windowWidth = window.innerWidth;
-
-      // FORCER À GAUCHE POUR TOUS LES DEVICES (TEST)
-      let alignment: "flex-start" | "center" = "flex-start";
-
-      console.log("🔵 INTELIA DEBUG FORCE: TOUS devices - Logo à GAUCHE");
-
-      setLogoAlignment(alignment);
-
-      // Store debug info (ALWAYS for debugging - will show on all devices)
-      setDebugInfo({
-        userAgent: navigator.userAgent,
-        isIPhone,
-        isIPad,
-        windowWidth,
-        logoAlignment: alignment,
-      });
-    };
-
-    // Initial update
-    updateLogoAlignment();
-
-    // Listen for resize and orientation change
-    window.addEventListener('resize', updateLogoAlignment);
-    window.addEventListener('orientationchange', updateLogoAlignment);
-
-    return () => {
-      window.removeEventListener('resize', updateLogoAlignment);
-      window.removeEventListener('orientationchange', updateLogoAlignment);
-    };
   }, []);
 
   // Gestion clavier mobile
@@ -1497,77 +1446,6 @@ function ChatInterface() {
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
       />
-
-      {/* Debug panel - visible sur mobile seulement */}
-      {debugInfo && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '60px',
-            left: '10px',
-            right: '10px',
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            color: 'white',
-            padding: '15px',
-            borderRadius: '8px',
-            zIndex: 9999,
-            fontSize: '11px',
-            lineHeight: '1.5',
-            maxHeight: '300px',
-            overflow: 'auto',
-            fontFamily: 'monospace',
-          }}
-        >
-          <div style={{ marginBottom: '10px', fontSize: '13px', fontWeight: 'bold', color: '#4ade80' }}>
-            🔍 DEBUG LOGO IPHONE
-          </div>
-          <div style={{ marginBottom: '5px' }}>
-            <strong style={{ color: '#60a5fa' }}>iPhone détecté:</strong>{' '}
-            <span style={{ color: debugInfo.isIPhone ? '#4ade80' : '#f87171' }}>
-              {debugInfo.isIPhone ? '✅ OUI' : '❌ NON'}
-            </span>
-          </div>
-          <div style={{ marginBottom: '5px' }}>
-            <strong style={{ color: '#60a5fa' }}>iPad détecté:</strong>{' '}
-            <span style={{ color: debugInfo.isIPad ? '#fbbf24' : '#9ca3af' }}>
-              {debugInfo.isIPad ? '⚠️ OUI' : 'NON'}
-            </span>
-          </div>
-          <div style={{ marginBottom: '5px' }}>
-            <strong style={{ color: '#60a5fa' }}>Largeur fenêtre:</strong>{' '}
-            <span style={{ color: '#fbbf24' }}>{debugInfo.windowWidth}px</span>
-          </div>
-          <div style={{ marginBottom: '5px' }}>
-            <strong style={{ color: '#60a5fa' }}>Alignement calculé:</strong>{' '}
-            <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>
-              {debugInfo.logoAlignment}
-            </span>
-            {debugInfo.logoAlignment === 'flex-start' ? ' ⬅️' : ' ↔️'}
-          </div>
-          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #4b5563', fontSize: '10px' }}>
-            <strong style={{ color: '#60a5fa' }}>User Agent:</strong>
-            <div style={{ color: '#9ca3af', marginTop: '5px', wordBreak: 'break-all' }}>
-              {debugInfo.userAgent.substring(0, 150)}...
-            </div>
-          </div>
-          <button
-            onClick={() => setDebugInfo(null)}
-            style={{
-              marginTop: '10px',
-              padding: '8px 16px',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '12px',
-              cursor: 'pointer',
-              width: '100%',
-            }}
-          >
-            ✕ Fermer Debug
-          </button>
-        </div>
-      )}
     </>
   );
 }

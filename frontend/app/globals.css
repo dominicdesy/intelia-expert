@@ -231,34 +231,33 @@
     @apply header-button bg-blue-600 text-white hover:bg-blue-700 text-sm;
   }
   
-  /* Style forcé pour HistoryMenu - CORRIGÉ pour cibler seulement le bouton */
+  /* Style pour HistoryMenu - Nettoyé des !important inutiles */
   .history-menu-container > button {
-    width: 40px !important;
-    height: 40px !important;
-    border: 1px solid rgb(229 231 235) !important;
-    border-radius: 0.5rem !important;
-    display: flex !important;
-    align-items: center !important;
-    /* justify-content retiré - laisse les composants le contrôler */
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    /* justify-content géré par Tailwind/inline styles */
   }
-  
-  /* Style forcé pour UserMenuButton - Carré arrondi bleu */
+
+  /* Style pour UserMenuButton - Nettoyé des !important inutiles */
   .user-menu-container > * {
-    width: 40px !important;
-    height: 40px !important;
-    background-color: rgb(37 99 235) !important;
-    color: white !important;
-    border-radius: 0.5rem !important;
-    border-radius: 8px !important; /* Force explicite */
-    display: flex !important;
-    align-items: center !important;
-    /* justify-content retiré - laisse les composants le contrôler */
-    font-size: 0.875rem !important;
-    transition: background-color 0.2s !important;
+    width: 40px;
+    height: 40px;
+    background-color: rgb(37 99 235);
+    color: white;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    /* justify-content géré par Tailwind/inline styles */
+    font-size: 0.875rem;
+    transition: background-color 0.2s;
   }
-  
+
   .user-menu-container > *:hover {
-    background-color: rgb(29 78 216) !important;
+    background-color: rgb(29 78 216);
   }
   
   .notification-badge {
