@@ -312,6 +312,7 @@
   "forgotPassword.tooManyAttempts": "محاولات كثيرة جداً. يرجى المحاولة مجدداً خلال دقائق قليلة",
   "forgotPassword.connectionError": "مشكلة في الاتصال. تحقق من اتصالك بالإنترنت",
   "forgotPassword.genericError": "خطأ في إرسال بريد إعادة التعيين",
+  "forgotPassword.otpEmailHint": "أدخل عنوان البريد الإلكتروني الذي استخدمته لطلب إعادة التعيين",
   "invitation.validating": "جاري التحقق من دعوتك...",
   "invitation.processing": "جاري المعالجة...",
   "invitation.completeProfile": "أكمل ملفك الشخصي",

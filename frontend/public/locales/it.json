@@ -311,6 +311,7 @@
   "forgotPassword.tooManyAttempts": "Troppi tentativi. Riprova tra qualche minuto",
   "forgotPassword.connectionError": "Problema di connessione. Verifica la tua connessione internet",
   "forgotPassword.genericError": "Errore durante l'invio dell'email di reset",
+  "forgotPassword.otpEmailHint": "Inserisci l'indirizzo email utilizzato per richiedere il ripristino",
   "invitation.validating": "Validazione del tuo invito...",
   "invitation.processing": "Elaborazione...",
   "invitation.completeProfile": "Completa il tuo profilo",

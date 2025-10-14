@@ -314,6 +314,7 @@
   "forgotPassword.tooManyAttempts": "Trop de tentatives. Veuillez réessayer dans quelques minutes",
   "forgotPassword.connectionError": "Problème de connexion. Vérifiez votre connexion internet",
   "forgotPassword.genericError": "Erreur lors de l'envoi du courriel de réinitialisation",
+  "forgotPassword.otpEmailHint": "Entrez l'adresse courriel que vous avez utilisée pour demander la réinitialisation",
   "invitation.validating": "Validation de votre invitation...",
   "invitation.processing": "Traitement en cours...",
   "invitation.completeProfile": "Complétez votre profil",

@@ -312,6 +312,7 @@
   "forgotPassword.tooManyAttempts": "Quá nhiều lần thử. Vui lòng thử lại sau vài phút",
   "forgotPassword.connectionError": "Sự cố kết nối. Kiểm tra kết nối internet của bạn",
   "forgotPassword.genericError": "Lỗi gửi email đặt lại",
+  "forgotPassword.otpEmailHint": "Nhập địa chỉ email mà bạn đã sử dụng để yêu cầu đặt lại",
   "invitation.validating": "Đang xác thực lời mời của bạn...",
   "invitation.processing": "Đang xử lý...",
   "invitation.completeProfile": "Hoàn thiện hồ sơ của bạn",

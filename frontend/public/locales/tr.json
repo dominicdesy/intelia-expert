@@ -312,6 +312,7 @@
   "forgotPassword.tooManyAttempts": "Çok fazla deneme. Lütfen birkaç dakika içinde tekrar deneyin",
   "forgotPassword.connectionError": "Bağlantı sorunu. İnternet bağlantınızı kontrol edin",
   "forgotPassword.genericError": "Sıfırlama e-postası gönderilirken hata",
+  "forgotPassword.otpEmailHint": "Şifre sıfırlama talebinde kullandığınız e-posta adresini girin",
   "invitation.validating": "Davetiyeniz doğrulanıyor...",
   "invitation.processing": "İşleniyor...",
   "invitation.completeProfile": "Profilinizi tamamlayın",

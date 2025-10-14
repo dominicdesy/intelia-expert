@@ -312,6 +312,7 @@
   "forgotPassword.tooManyAttempts": "Zu viele Versuche. Bitte versuchen Sie es in einigen Minuten erneut",
   "forgotPassword.connectionError": "Verbindungsproblem. Überprüfen Sie Ihre Internetverbindung",
   "forgotPassword.genericError": "Fehler beim Senden der Zurücksetzungs-E-Mail",
+  "forgotPassword.otpEmailHint": "Geben Sie die E-Mail-Adresse ein, mit der Sie das Zurücksetzen angefordert haben",
   "invitation.validating": "Ihre Einladung wird validiert...",
   "invitation.processing": "Verarbeitung...",
   "invitation.completeProfile": "Vervollständigen Sie Ihr Profil",

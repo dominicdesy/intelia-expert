@@ -312,6 +312,7 @@
   "forgotPassword.tooManyAttempts": "試行回数が多すぎます。数分後に再試行してください",
   "forgotPassword.connectionError": "接続の問題。インターネット接続を確認してください",
   "forgotPassword.genericError": "リセットメールの送信エラー",
+  "forgotPassword.otpEmailHint": "リセットをリクエストした際に使用したメールアドレスを入力してください",
   "invitation.validating": "招待を検証中...",
   "invitation.processing": "処理中...",
   "invitation.completeProfile": "プロフィールを完成させる",

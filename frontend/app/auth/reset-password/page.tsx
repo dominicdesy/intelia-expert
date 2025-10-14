@@ -662,7 +662,7 @@ function ResetPasswordPageContent() {
                   autoComplete="email"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Enter the email address you used to request the password reset
+                  {t("forgotPassword.otpEmailHint")}
                 </p>
               </div>
             )}

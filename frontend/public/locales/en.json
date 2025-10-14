@@ -314,6 +314,7 @@
   "forgotPassword.tooManyAttempts": "Too many attempts. Please try again in a few minutes",
   "forgotPassword.connectionError": "Connection problem. Check your internet connection",
   "forgotPassword.genericError": "Error sending reset email",
+  "forgotPassword.otpEmailHint": "Enter the email address you used to request the password reset",
   "invitation.validating": "Validating your invitation...",
   "invitation.processing": "Processing...",
   "invitation.completeProfile": "Complete your profile",

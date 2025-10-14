@@ -311,6 +311,7 @@
   "forgotPassword.tooManyAttempts": "बहुत सारी कोशिशें। कृपया कुछ मिनटों में पुनः प्रयास करें",
   "forgotPassword.connectionError": "कनेक्शन समस्या। अपना इंटरनेट कनेक्शन जांचें",
   "forgotPassword.genericError": "रीसेट ईमेल भेजने में त्रुटि",
+  "forgotPassword.otpEmailHint": "पासवर्ड रीसेट का अनुरोध करने के लिए उपयोग किया गया ईमेल पता दर्ज करें",
   "invitation.validating": "आपका आमंत्रण सत्यापित किया जा रहा है...",
   "invitation.processing": "प्रक्रिया चल रही है...",
   "invitation.completeProfile": "अपनी प्रोफ़ाइल पूरी करें",

@@ -310,6 +310,7 @@
   "forgotPassword.tooManyAttempts": "Te veel pogingen. Probeer over enkele minuten opnieuw",
   "forgotPassword.connectionError": "Verbindingsprobleem. Controleer uw internetverbinding",
   "forgotPassword.genericError": "Fout bij verzenden reset e-mail",
+  "forgotPassword.otpEmailHint": "Voer het e-mailadres in dat u gebruikt hebt om het resetten aan te vragen",
   "invitation.validating": "Uw uitnodiging valideren...",
   "invitation.processing": "Verwerking bezig...",
   "invitation.completeProfile": "Voltooi uw profiel",

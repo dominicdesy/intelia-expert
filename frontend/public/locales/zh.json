@@ -310,6 +310,7 @@
   "forgotPassword.tooManyAttempts": "尝试次数过多。请几分钟后重试",
   "forgotPassword.connectionError": "连接问题。请检查您的网络连接",
   "forgotPassword.genericError": "发送重置邮件时出错",
+  "forgotPassword.otpEmailHint": "输入您用于请求重置的电子邮件地址",
   "invitation.validating": "正在验证您的邀请...",
   "invitation.processing": "处理中...",
   "invitation.completeProfile": "完善您的个人资料",

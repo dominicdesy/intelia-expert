@@ -311,6 +311,7 @@
   "forgotPassword.tooManyAttempts": "Terlalu banyak percobaan. Silakan coba lagi dalam beberapa menit",
   "forgotPassword.connectionError": "Masalah koneksi. Periksa koneksi internet Anda",
   "forgotPassword.genericError": "Kesalahan saat mengirim email reset",
+  "forgotPassword.otpEmailHint": "Masukkan alamat email yang Anda gunakan untuk meminta reset",
   "invitation.validating": "Memvalidasi undangan Anda...",
   "invitation.processing": "Memproses...",
   "invitation.completeProfile": "Lengkapi profil Anda",

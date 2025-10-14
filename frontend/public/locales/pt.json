@@ -309,6 +309,7 @@
   "forgotPassword.tooManyAttempts": "Muitas tentativas. Tente novamente em alguns minutos",
   "forgotPassword.connectionError": "Problema de conexão. Verifique sua conexão com a internet",
   "forgotPassword.genericError": "Erro ao enviar email de redefinição",
+  "forgotPassword.otpEmailHint": "Digite o endereço de e-mail que você usou para solicitar a redefinição",
   "invitation.validating": "Validando seu convite...",
   "invitation.processing": "Processando...",
   "invitation.completeProfile": "Complete seu perfil",

@@ -116,6 +116,7 @@
   "forgotPassword.tooManyAttempts": "Demasiados intentos. Por favor intente de nuevo en unos minutos",
   "forgotPassword.connectionError": "Problema de conexión. Verifique su conexión a internet",
   "forgotPassword.genericError": "Error al enviar el email de restablecimiento",
+  "forgotPassword.otpEmailHint": "Ingrese la dirección de correo electrónico que utilizó para solicitar el restablecimiento",
   "verification.title": "Verificación de Email",
   "verification.subtitle": "Intelia Expert - Asistente IA especializado",
   "verification.verifying": "Verificando...",

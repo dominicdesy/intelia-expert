@@ -310,6 +310,7 @@
   "forgotPassword.tooManyAttempts": "ลองมากเกินไป กรุณาลองใหม่ใน่ไม่กี่นาที",
   "forgotPassword.connectionError": "ปัญหาการเชื่อมต่อ ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตของคุณ",
   "forgotPassword.genericError": "ข้อผิดพลาดในการส่งอีเมลรีเซ็ต",
+  "forgotPassword.otpEmailHint": "ป้อนที่อยู่อีเมลที่คุณใช้เพื่อขอรีเซ็ต",
   "invitation.validating": "กำลังตรวจสอบคำเชิญของคุณ...",
   "invitation.processing": "กำลังประมวลผล...",
   "invitation.completeProfile": "กรอกโปรไฟล์ของคุณให้สมบูรณ์",
