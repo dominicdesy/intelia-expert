@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS medical_images (
     -- Identifiants
     image_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,
+    user_id VARCHAR(255) NOT NULL,  -- ID utilisateur (pas de FK vers Supabase)
 
     -- Stockage
     s3_key TEXT NOT NULL UNIQUE,
@@ -19,10 +19,7 @@ CREATE TABLE IF NOT EXISTS medical_images (
     -- Analyse (rempli après traitement par LLM)
     analyzed BOOLEAN DEFAULT FALSE,
     analysis_result JSONB,
-    analysis_timestamp TIMESTAMP WITH TIME ZONE,
-
-    -- Index
-    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+    analysis_timestamp TIMESTAMP WITH TIME ZONE
 );
 
 -- Index pour recherche rapide par utilisateur
