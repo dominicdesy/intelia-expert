@@ -264,12 +264,12 @@ export default function RootLayout({
             }
             
             html:not(.language-ready) body::after {
-              content: 'Intelia Expert';
+              content: 'TEST OVERLAY 🔴';
               position: fixed;
               top: 50%;
               left: 50%;
               transform: translate(-50%, -50%);
-              color: white;
+              color: red;
               font-size: 24px;
               font-weight: 600;
               z-index: 1000000;
