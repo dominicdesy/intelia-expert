@@ -1295,7 +1295,8 @@ function ChatInterface() {
         style={containerStyle}
       >
         <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
-          <div className="flex items-center justify-between">
+          {/* Sur iPhone: flex-start pour logo à gauche. Sur desktop: justify-between pour logo centré */}
+          <div className={`flex items-center ${isMobileDevice ? 'justify-start' : 'justify-between'}`}>
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleNewConversation}
@@ -1309,20 +1310,31 @@ function ChatInterface() {
               <div className="header-icon-container history-menu-container">
                 <HistoryMenu />
               </div>
+
+              {/* Logo affiché juste après les boutons sur mobile */}
+              {isMobileDevice && (
+                <div className="flex items-center space-x-3 ml-2">
+                  <div className="w-10 h-10 grid place-items-center">
+                    <InteliaLogo className="h-8 w-auto" />
+                  </div>
+                  <h1 className="text-lg font-medium text-gray-900 truncate">
+                    {t("common.appName")}
+                  </h1>
+                </div>
+              )}
             </div>
 
-            <div
-              className="flex-1 min-w-0 flex items-center space-x-3"
-              style={{ justifyContent: 'flex-start' }}
-            >
-              {/* SOLUTION DÉFINITIVE: inline style a priorité absolue sur tout CSS */}
-              <div className="w-10 h-10 grid place-items-center">
-                <InteliaLogo className="h-8 w-auto" />
+            {/* Logo centré sur desktop seulement */}
+            {!isMobileDevice && (
+              <div className="flex-1 min-w-0 flex items-center justify-center space-x-3">
+                <div className="w-10 h-10 grid place-items-center">
+                  <InteliaLogo className="h-8 w-auto" />
+                </div>
+                <h1 className="text-lg font-medium text-gray-900 truncate">
+                  {t("common.appName")}
+                </h1>
               </div>
-              <h1 className="text-lg font-medium text-gray-900 truncate">
-                {t("common.appName")}
-              </h1>
-            </div>
+            )}
 
             <div className="flex items-center space-x-2">
               {currentConversation &&
