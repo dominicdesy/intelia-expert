@@ -5,6 +5,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/languages/i18n";
 import { secureLog } from "@/lib/utils/secureLogger";
+import { supabase } from "@/lib/supabase/client";
 
 // ==================== CONFIGURATION DES PAYS AVEC FALLBACK ====================
 // Pays de fallback (les plus communs) en cas d'échec de l'API
@@ -416,6 +417,90 @@ function InvitationAcceptPageContent() {
 
         secureLog.log("[InvitationAccept] Début traitement invitation");
 
+        // NOUVEAU: Vérifier d'abord s'il y a une session Supabase active
+        // (cas où l'utilisateur a cliqué sur le lien d'invitation et Supabase a créé la session)
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionData?.session) {
+          secureLog.log("[InvitationAccept] Session Supabase active détectée");
+          const accessToken = sessionData.session.access_token;
+
+          if (accessToken) {
+            secureLog.log("[InvitationAccept] Token extrait de la session, validation via backend...");
+            setMessage(t("invitation.validating"));
+            setHasProcessedToken(true);
+
+            const API_BASE_URL =
+              process.env.NEXT_PUBLIC_API_URL ||
+              process.env.NEXT_PUBLIC_API_BASE_URL;
+            const validateResponse = await fetch(
+              `${API_BASE_URL}/v1/auth/invitations/validate-token`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  access_token: accessToken,
+                }),
+              },
+            );
+
+            if (!validateResponse.ok) {
+              const errorData = await validateResponse.json();
+              setProcessingResult({
+                success: false,
+                step: "validation",
+                message:
+                  errorData.detail || t("invitation.errors.tokenValidation"),
+                details: errorData,
+              });
+              throw new Error(
+                errorData.detail || t("invitation.errors.tokenValidation"),
+              );
+            }
+
+            const validationResult = await validateResponse.json();
+            secureLog.log(`[InvitationAccept] Token validé: ${validationResult.user_email} `);
+
+            setProcessingResult({
+              success: true,
+              step: "validation",
+              message: `${t("invitation.success.tokenValidated")}: ${validationResult.user_email}`,
+              details: validationResult,
+            });
+
+            setUserInfo({
+              email: validationResult.user_email,
+              inviterName: validationResult.inviter_name,
+              personalMessage: validationResult.invitation_data?.personal_message,
+              language: validationResult.invitation_data?.language,
+              invitationDate: validationResult.invitation_data?.invitation_date,
+              accessToken: accessToken,
+            });
+
+            setFormData((prev) => ({
+              ...prev,
+              email: validationResult.user_email,
+            }));
+
+            secureLog.log("[InvitationAccept] Passage au mode set-password");
+            setStatus("set-password");
+            setMessage(t("invitation.completeProfile"));
+
+            setTimeout(() => {
+              window.history.replaceState(
+                {},
+                document.title,
+                window.location.pathname,
+              );
+            }, 100);
+
+            return; // Sortir ici car on a traité avec succès
+          }
+        }
+
+        // Fallback: Vérifier les tokens dans l'URL (ancien comportement)
         const hash = window.location.hash;
         const token = searchParams.get("token");
         const type = searchParams.get("type");

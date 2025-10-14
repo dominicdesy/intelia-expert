@@ -149,6 +149,7 @@ export interface TranslationKeys {
   "forgotPassword.tooManyAttempts": string;
   "forgotPassword.connectionError": string;
   "forgotPassword.genericError": string;
+  "forgotPassword.otpEmailHint": string;
 
   // ===========================================
   // EMAIL VERIFICATION

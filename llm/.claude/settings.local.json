@@ -38,7 +38,17 @@
       "Bash(taskkill:*)",
       "Bash(awk:*)",
       "Bash(git reset:*)",
-      "WebFetch(domain:www.facebook.com)"
+      "WebFetch(domain:www.facebook.com)",
+      "Bash(git fetch:*)",
+      "Bash(del \"C:\\intelia_gpt\\intelia-expert\\frontend\\update_translations.py\")",
+      "Bash(dir \"C:\\intelia_gpt\\intelia-expert\\backend\\sql\")",
+      "Bash(do echo \"=== $dir ===\")",
+      "Bash(dir \"C:\\intelia_gpt\\intelia-expert\\backend\\sql$dir\")",
+      "Bash(del add_signup_button_translations.py)",
+      "Bash(do echo -n \"$key: \")",
+      "Bash(curl -s \"https://expert-api-gpqgk.ondigitalocean.app/api/v1/auth/debug/reset-config\")",
+      "Bash(del add-otp-hint-translation.py)",
+      "Bash(npm run build)"
     ],
     "deny": [],
     "ask": []
