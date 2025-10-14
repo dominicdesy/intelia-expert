@@ -589,13 +589,21 @@ class SupabaseInvitationService:
                 options={
                     "redirect_to": redirect_to,
                     "data": {
+                        # Pour l'email template
                         "invited_by": inviter_email,
                         "inviter_name": inviter_name,
                         "personal_message": personal_message,
                         "language": language,
                         "invitation_date": datetime.now().isoformat(),
                         "is_resend": is_resend,
-                        "invitation_type": "invite",  # Ajouter un marker dans user_metadata
+                        "invitation_type": "invite",
+                    },
+                    "user_metadata": {
+                        # Pour le profil utilisateur (copié dans auth.users)
+                        "invitation_type": "invite",
+                        "invited_by": inviter_email,
+                        "inviter_name": inviter_name,
+                        "language": language,
                     },
                 },
             )
