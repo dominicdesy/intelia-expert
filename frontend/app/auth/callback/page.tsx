@@ -96,10 +96,13 @@ export default function AuthCallback() {
           secureLog.log("[AuthCallback] Session créée avec succès:", {
             user: data.session?.user?.email,
             expiresAt: data.session?.expires_at,
+            userMetadata: data.session?.user?.user_metadata,
           });
 
-          // Vérifier le type de callback
-          if (type === "invite" || type === "invitation") {
+          // Vérifier le type de callback via user_metadata
+          const invitationType = data.session?.user?.user_metadata?.invitation_type;
+
+          if (invitationType === "invite" || type === "invite" || type === "invitation") {
             secureLog.log("[AuthCallback] Type invitation détecté, redirection vers /auth/invitation");
             router.push("/auth/invitation");
           } else if (type === "recovery") {

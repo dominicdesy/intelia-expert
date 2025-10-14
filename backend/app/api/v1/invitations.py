@@ -578,8 +578,10 @@ class SupabaseInvitationService:
     ) -> Dict[str, Any]:
         """Envoie une invitation via Supabase Auth"""
         try:
-            # URL de redirection après inscription - CORRECTION: Utiliser callback pour gérer les tokens cross-domain
-            redirect_to = f"{self.frontend_url}/auth/callback?type=invite"
+            # URL de redirection après inscription
+            # IMPORTANT: Utiliser callback pour créer session locale avec les tokens du hash
+            # Supabase passera les tokens dans le hash fragment de l'URL
+            redirect_to = f"{self.frontend_url}/auth/callback"
 
             # Envoyer l'invitation via Supabase Auth
             response = self.admin_client.auth.admin.invite_user_by_email(
@@ -593,6 +595,7 @@ class SupabaseInvitationService:
                         "language": language,
                         "invitation_date": datetime.now().isoformat(),
                         "is_resend": is_resend,
+                        "invitation_type": "invite",  # Ajouter un marker dans user_metadata
                     },
                 },
             )
