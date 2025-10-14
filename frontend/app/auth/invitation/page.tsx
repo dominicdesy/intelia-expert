@@ -815,7 +815,10 @@ function InvitationAcceptPageContent() {
         message: `${t("invitation.success.welcome")}, ${formData.firstName}! ${t("invitation.pleaseLogin")}`,
       });
 
-      setTimeout(() => {
+      // IMPORTANT: Déconnecter la session Supabase temporaire AVANT de rediriger vers login
+      setTimeout(async () => {
+        secureLog.log("[InvitationAccept] Déconnexion session temporaire avant redirection...");
+        await supabase.auth.signOut();
         secureLog.log("[InvitationAccept] Redirection vers login avec succès");
         router.push(`/?success=${encodeURIComponent(t("invitation.accountCreatedPleaseLogin"))}`);
       }, 3000);
