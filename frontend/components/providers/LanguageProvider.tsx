@@ -10,6 +10,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const { changeLanguage, currentLanguage } = useTranslation();
   const hasInitializedRef = useRef(false);
   const isInitializingRef = useRef(false);
+  const isMountedRef = useRef(true); // AJOUT: Protection démontage
+
+  // Cleanup au démontage - DOIT ÊTRE EN PREMIER
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Initialisation UNE SEULE FOIS - MAIS SANS ÉCRASER I18N
@@ -25,17 +33,25 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           secureLog.log(`[LanguageProvider] Synchronisation avec i18n, langue actuelle: ${currentLanguage} `);
 
           // Attendre que i18n.ts termine son initialisation
-          setTimeout(() => {
+          const timeoutId = setTimeout(() => {
+            // PROTECTION: Vérifier que le composant est toujours monté
+            if (!isMountedRef.current) return;
+
             document.documentElement.classList.add("language-ready");
             // Émettre l'événement pour le script anti-flash
             window.dispatchEvent(new Event("languageReady"));
             secureLog.log("[LanguageProvider] 🎯 Interface prête - Flash évité");
           }, 500); // Délai augmenté pour iOS/iPad
+
+          // Cleanup du timeout
+          return () => clearTimeout(timeoutId);
         } catch (error) {
           secureLog.error("[LanguageProvider] Erreur initialisation:", error);
           // En cas d'erreur, forcer l'affichage pour éviter un écran noir
-          document.documentElement.classList.add("language-ready");
-          window.dispatchEvent(new Event("languageReady"));
+          if (isMountedRef.current) {
+            document.documentElement.classList.add("language-ready");
+            window.dispatchEvent(new Event("languageReady"));
+          }
         } finally {
           hasInitializedRef.current = true;
           isInitializingRef.current = false;
@@ -49,6 +65,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   // ÉCOUTER les changements de langue et les propager
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
+      if (!isMountedRef.current) return; // PROTECTION
+
       if (e.key === "intelia-language" && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
@@ -63,8 +81,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
             document.documentElement.classList.remove("language-ready");
 
             changeLanguage(newLang).then(() => {
+              // PROTECTION: Vérifier que le composant est toujours monté
+              if (!isMountedRef.current) return;
+
               // Remettre la classe après le changement
               setTimeout(() => {
+                if (!isMountedRef.current) return;
                 document.documentElement.classList.add("language-ready");
               }, 100);
             });
@@ -84,6 +106,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   // Timeout de sécurité pour éviter un écran noir permanent
   useEffect(() => {
     const safetyTimer = setTimeout(() => {
+      // PROTECTION: Vérifier que le composant est toujours monté
+      if (!isMountedRef.current) return;
+
       if (!document.documentElement.classList.contains("language-ready")) {
         secureLog.warn(
           "[LanguageProvider] ⚠️ Timeout sécurité atteint - Affichage forcé",
