@@ -11,11 +11,10 @@ import { Toaster } from "react-hot-toast";
 const inter = Inter({ subsets: ["latin"] });
 
 // Export séparé pour le viewport (nouvelle méthode)
+// FIX iOS: Retirer maximumScale et userScalable pour un rendu respirable
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
 };
 
@@ -106,10 +105,11 @@ const antiFlashScript = `
     function markAsReady(source) {
       if (isReady) return; // Éviter les appels multiples
       isReady = true;
-      
+
       document.documentElement.classList.add('language-ready');
+      document.body.classList.add('anti-flash-done'); // FIX iOS: marquer le body
       console.log('[AntiFlash] ✅ Interface prête (' + source + ')');
-      
+
       // Nettoyer tous les event listeners
       cleanupEventListeners();
     }
@@ -236,18 +236,26 @@ export default function RootLayout({
         <style
           dangerouslySetInnerHTML={{
             __html: `
-            /* === SOLUTION ANTI-FLASH === */
-            /* IMPORTANT: Doit être en premier */
-            html {
+            /* === SOLUTION ANTI-FLASH (FIX iOS) === */
+            /* Ne plus cacher html (problème iOS), cacher seulement body */
+            body {
               opacity: 0;
               visibility: hidden;
               transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
             }
-            
-            html.language-ready {
+
+            html.language-ready body {
               opacity: 1;
               visibility: visible;
               transition: opacity 0.2s ease-in-out;
+            }
+
+            /* Fallback CSS pur après 3s (secours si script bloqué sur iOS) */
+            @keyframes revealFallback {
+              to { opacity: 1; visibility: visible; }
+            }
+            body:not(.anti-flash-done) {
+              animation: revealFallback 0s linear 3s forwards;
             }
             
             /* Loader élégant pendant l'initialisation */
@@ -264,12 +272,12 @@ export default function RootLayout({
             }
             
             html:not(.language-ready) body::after {
-              content: 'TEST OVERLAY 🔴';
+              content: 'Intelia Expert';
               position: fixed;
               top: 50%;
               left: 50%;
               transform: translate(-50%, -50%);
-              color: red;
+              color: white;
               font-size: 24px;
               font-weight: 600;
               z-index: 1000000;

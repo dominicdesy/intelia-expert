@@ -1375,8 +1375,8 @@ function ChatInterface() {
               <div className="w-10 h-10 grid place-items-center">
                 <InteliaLogo className="h-8 w-auto" />
               </div>
-              <h1 className="text-lg font-medium text-red-600 truncate">
-                TEST VERSION 🔴
+              <h1 className="text-lg font-medium text-gray-900 truncate">
+                {t("common.appName")}
               </h1>
             </div>
 
