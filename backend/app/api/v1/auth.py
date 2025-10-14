@@ -2091,6 +2091,130 @@ async def complete_invitation_profile(request: CompleteInvitationProfileRequest)
         )
 
 
+# === ENDPOINT ÉCHANGE TOKEN INVITATION ===
+class ExchangeInvitationTokenRequest(BaseModel):
+    token: str  # Token de vérification Supabase
+
+
+class ExchangeInvitationTokenResponse(BaseModel):
+    success: bool
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    expires_in: Optional[int] = None
+    user_email: Optional[str] = None
+    error: Optional[str] = None
+
+
+@router.post("/invitations/exchange-token", response_model=ExchangeInvitationTokenResponse)
+async def exchange_invitation_token(request: ExchangeInvitationTokenRequest):
+    """
+    Échange un token de vérification d'invitation contre des tokens d'accès.
+    Nécessaire avec le custom domain auth.intelia.com qui ne passe pas les tokens dans le hash.
+    """
+    logger.info("[ExchangeToken] Début échange token d'invitation")
+
+    if not SUPABASE_AVAILABLE:
+        logger.error("[ExchangeToken] Supabase non disponible")
+        return ExchangeInvitationTokenResponse(
+            success=False,
+            error="Service d'invitation non disponible"
+        )
+
+    supabase_url = os.getenv("SUPABASE_URL")
+    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+    if not supabase_url or not service_role_key:
+        logger.error("[ExchangeToken] Configuration Supabase manquante")
+        return ExchangeInvitationTokenResponse(
+            success=False,
+            error="Configuration service manquante"
+        )
+
+    try:
+        # Utiliser l'API Supabase Admin pour vérifier le token d'invitation
+        import requests
+
+        logger.info(f"[ExchangeToken] Vérification token: {request.token[:20]}...")
+
+        # Appeler l'endpoint Supabase de vérification d'invitation
+        verify_url = f"{supabase_url}/auth/v1/verify"
+        headers = {
+            "apikey": service_role_key,
+            "Content-Type": "application/json"
+        }
+
+        # Construire l'URL de vérification avec le token et redirect_to
+        verify_params = {
+            "token": request.token,
+            "type": "invite",
+        }
+
+        response = requests.get(verify_url, params=verify_params, headers=headers, allow_redirects=False)
+
+        logger.info(f"[ExchangeToken] Status code: {response.status_code}")
+        logger.info(f"[ExchangeToken] Response headers: {dict(response.headers)}")
+
+        # Si la réponse est une redirection avec tokens dans le fragment
+        if response.status_code in [302, 303, 307, 308]:
+            location = response.headers.get("Location", "")
+            logger.info(f"[ExchangeToken] Redirection vers: {location}")
+
+            # Extraire les tokens du fragment de l'URL de redirection
+            if "#" in location:
+                fragment = location.split("#")[1]
+                fragment_params = dict(param.split("=") for param in fragment.split("&") if "=" in param)
+
+                access_token = fragment_params.get("access_token")
+                refresh_token = fragment_params.get("refresh_token")
+                expires_in = fragment_params.get("expires_in")
+
+                if access_token and refresh_token:
+                    # Décoder le token pour obtenir l'email
+                    try:
+                        payload = jwt.decode(
+                            access_token,
+                            options={"verify_signature": False}  # Pas besoin de vérifier ici, Supabase l'a déjà fait
+                        )
+                        user_email = payload.get("email")
+
+                        logger.info(f"[ExchangeToken] Tokens extraits avec succès pour {user_email}")
+
+                        return ExchangeInvitationTokenResponse(
+                            success=True,
+                            access_token=access_token,
+                            refresh_token=refresh_token,
+                            expires_in=int(expires_in) if expires_in else 3600,
+                            user_email=user_email
+                        )
+                    except Exception as e:
+                        logger.warning(f"[ExchangeToken] Erreur décodage token: {e}")
+                        # Retourner quand même les tokens même si le décodage échoue
+                        return ExchangeInvitationTokenResponse(
+                            success=True,
+                            access_token=access_token,
+                            refresh_token=refresh_token,
+                            expires_in=int(expires_in) if expires_in else 3600
+                        )
+
+        # Si pas de redirection ou pas de tokens, erreur
+        logger.error(f"[ExchangeToken] Échec vérification token. Status: {response.status_code}")
+        logger.error(f"[ExchangeToken] Response: {response.text[:500]}")
+
+        return ExchangeInvitationTokenResponse(
+            success=False,
+            error=f"Token d'invitation invalide ou expiré (status: {response.status_code})"
+        )
+
+    except Exception as e:
+        logger.error(f"[ExchangeToken] Erreur inattendue: {str(e)}")
+        import traceback
+        logger.error(f"[ExchangeToken] Traceback: {traceback.format_exc()}")
+        return ExchangeInvitationTokenResponse(
+            success=False,
+            error=f"Erreur lors de l'échange du token: {str(e)}"
+        )
+
+
 # === ENDPOINTS EXISTANTS (CONSERVÉS) ===
 @router.post("/delete-data", response_model=DeleteDataResponse)
 async def delete_user_data(current_user: Dict[str, Any] = Depends(get_current_user)):

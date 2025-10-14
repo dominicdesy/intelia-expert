@@ -13,20 +13,70 @@ export default function AuthCallback() {
       try {
         secureLog.log("[AuthCallback] Début traitement callback Supabase");
         secureLog.log("[AuthCallback] URL complète:", window.location.href);
-        secureLog.log("[AuthCallback] Hash complet:", window.location.hash);
-        secureLog.log("[AuthCallback] Search params:", window.location.search);
 
-        // Vérifier s'il y a un hash dans l'URL (tokens Supabase)
+        // D'abord, vérifier s'il y a un token de vérification Supabase dans l'URL originale
+        // (le lien d'invitation contient: ?token=xxx&type=invite&redirect_to=...)
+        const urlParams = new URLSearchParams(window.location.search);
+        const verificationToken = urlParams.get("token") || urlParams.get("verification_token");
+        const type = urlParams.get("type");
+
+        secureLog.log("[AuthCallback] Query params:", {
+          hasVerificationToken: !!verificationToken,
+          type,
+        });
+
+        // Si on a un token de vérification, l'échanger via le backend
+        if (verificationToken && type === "invite") {
+          secureLog.log("[AuthCallback] Token de vérification trouvé, échange via backend...");
+
+          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+          const exchangeResponse = await fetch(
+            `${API_BASE_URL}/v1/auth/invitations/exchange-token`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                token: verificationToken,
+              }),
+            }
+          );
+
+          const exchangeResult = await exchangeResponse.json();
+          secureLog.log("[AuthCallback] Résultat échange:", exchangeResult);
+
+          if (!exchangeResult.success || !exchangeResult.access_token) {
+            secureLog.error("[AuthCallback] Échec échange token:", exchangeResult.error);
+            router.push(`/auth/login?error=${encodeURIComponent(exchangeResult.error || "token_exchange_failed")}`);
+            return;
+          }
+
+          // Créer une session avec les tokens échangés
+          const { data, error } = await supabase.auth.setSession({
+            access_token: exchangeResult.access_token,
+            refresh_token: exchangeResult.refresh_token,
+          });
+
+          if (error) {
+            secureLog.error("[AuthCallback] Erreur création session:", error);
+            router.push("/auth/login?error=session_creation_failed");
+            return;
+          }
+
+          secureLog.log("[AuthCallback] Session créée avec succès pour:", exchangeResult.user_email);
+          router.push("/auth/invitation");
+          return;
+        }
+
+        // Fallback: Vérifier s'il y a des tokens dans le hash (cas standard sans custom domain)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get("access_token");
         const refreshToken = hashParams.get("refresh_token");
-        const type = hashParams.get("type");
 
         secureLog.log("[AuthCallback] Hash params:", {
           hasAccessToken: !!accessToken,
           hasRefreshToken: !!refreshToken,
-          type,
-          fullHash: window.location.hash,
         });
 
         if (accessToken && refreshToken) {
