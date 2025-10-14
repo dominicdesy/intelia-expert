@@ -639,16 +639,14 @@ function ChatInterface() {
 
       setLogoAlignment(alignment);
 
-      // Store debug info (only on mobile for debugging)
-      if (isIPhone || isIPad || windowWidth < 1024) {
-        setDebugInfo({
-          userAgent: navigator.userAgent,
-          isIPhone,
-          isIPad,
-          windowWidth,
-          logoAlignment: alignment,
-        });
-      }
+      // Store debug info (ALWAYS for debugging - will show on all devices)
+      setDebugInfo({
+        userAgent: navigator.userAgent,
+        isIPhone,
+        isIPad,
+        windowWidth,
+        logoAlignment: alignment,
+      });
     };
 
     // Initial update
