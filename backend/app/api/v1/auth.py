@@ -1827,6 +1827,270 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
     )
 
 
+# === NOUVEAUX MODÈLES POUR INVITATIONS ===
+class ValidateInvitationTokenRequest(BaseModel):
+    access_token: str
+
+
+class ValidateInvitationTokenResponse(BaseModel):
+    success: bool
+    user_email: str
+    user_id: str
+    inviter_name: Optional[str] = None
+    invitation_data: Optional[Dict[str, Any]] = None
+
+
+class CompleteInvitationProfileRequest(BaseModel):
+    access_token: str
+    password: str
+    firstName: str
+    lastName: str
+    fullName: str
+    email: EmailStr
+    country: str
+    phone: Optional[str] = None
+    linkedinProfile: Optional[str] = None
+    companyName: Optional[str] = None
+    companyWebsite: Optional[str] = None
+    companyLinkedin: Optional[str] = None
+    jobTitle: Optional[str] = None
+
+
+class CompleteInvitationProfileResponse(BaseModel):
+    success: bool
+    message: str
+    redirect_url: str
+
+
+# === NOUVEAUX ENDPOINTS POUR INVITATIONS ===
+
+
+@router.post("/invitations/validate-token", response_model=ValidateInvitationTokenResponse)
+async def validate_invitation_token(request: ValidateInvitationTokenRequest):
+    """
+    Valide un token d'invitation Supabase et retourne les informations de l'invitation
+    """
+    logger.info("[InvitationValidate] Début validation token d'invitation")
+
+    if not SUPABASE_AVAILABLE:
+        logger.error("[InvitationValidate] Supabase non disponible")
+        raise HTTPException(
+            status_code=500, detail="Service d'invitation non disponible"
+        )
+
+    try:
+        # Décoder le token pour extraire les informations
+        payload = None
+        for secret_name, secret_value in JWT_SECRETS:
+            try:
+                payload = jwt.decode(
+                    request.access_token,
+                    secret_value,
+                    algorithms=[JWT_ALGORITHM],
+                    options={"verify_aud": False},
+                )
+                logger.info(f"[InvitationValidate] Token décodé avec {secret_name}")
+                break
+            except Exception:
+                continue
+
+        if not payload:
+            logger.error("[InvitationValidate] Impossible de décoder le token")
+            raise HTTPException(
+                status_code=400, detail="Token d'invitation invalide"
+            )
+
+        # Extraire les informations utilisateur
+        user_email = payload.get("email")
+        user_id = payload.get("sub") or payload.get("user_id")
+        user_metadata = payload.get("user_metadata", {})
+
+        if not user_email or not user_id:
+            logger.error("[InvitationValidate] Token sans email ou user_id")
+            raise HTTPException(
+                status_code=400, detail="Token d'invitation incomplet"
+            )
+
+        # Extraire les données d'invitation du user_metadata
+        inviter_name = user_metadata.get("inviter_name")
+        personal_message = user_metadata.get("personal_message")
+        language = user_metadata.get("language", "fr")
+        invitation_date = user_metadata.get("invitation_date")
+        invited_by = user_metadata.get("invited_by")
+
+        logger.info(f"[InvitationValidate] Invitation valide pour {user_email}")
+        logger.info(f"[InvitationValidate] Invité par: {inviter_name} ({invited_by})")
+
+        return ValidateInvitationTokenResponse(
+            success=True,
+            user_email=user_email,
+            user_id=user_id,
+            inviter_name=inviter_name,
+            invitation_data={
+                "personal_message": personal_message,
+                "language": language,
+                "invitation_date": invitation_date,
+                "invited_by": invited_by,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[InvitationValidate] Erreur inattendue: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail="Erreur lors de la validation du token"
+        )
+
+
+@router.post("/invitations/complete-profile", response_model=CompleteInvitationProfileResponse)
+async def complete_invitation_profile(request: CompleteInvitationProfileRequest):
+    """
+    Finalise le profil de l'utilisateur invité en définissant son mot de passe
+    et en créant son entrée dans la table users
+    """
+    logger.info(f"[InvitationComplete] Début finalisation profil pour {request.email}")
+
+    if not SUPABASE_AVAILABLE:
+        logger.error("[InvitationComplete] Supabase non disponible")
+        raise HTTPException(
+            status_code=500, detail="Service d'invitation non disponible"
+        )
+
+    # Configuration Supabase
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
+    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+    if not supabase_url or not supabase_anon_key or not service_role_key:
+        logger.error("[InvitationComplete] Configuration Supabase manquante")
+        raise HTTPException(status_code=500, detail="Configuration service manquante")
+
+    try:
+        # 1. Décoder le token pour obtenir le user_id
+        payload = None
+        for secret_name, secret_value in JWT_SECRETS:
+            try:
+                payload = jwt.decode(
+                    request.access_token,
+                    secret_value,
+                    algorithms=[JWT_ALGORITHM],
+                    options={"verify_aud": False},
+                )
+                logger.info(f"[InvitationComplete] Token décodé avec {secret_name}")
+                break
+            except Exception:
+                continue
+
+        if not payload:
+            logger.error("[InvitationComplete] Token invalide")
+            raise HTTPException(
+                status_code=400, detail="Token d'invitation invalide"
+            )
+
+        user_id = payload.get("sub") or payload.get("user_id")
+        if not user_id:
+            logger.error("[InvitationComplete] user_id manquant dans le token")
+            raise HTTPException(
+                status_code=400, detail="Token d'invitation incomplet"
+            )
+
+        logger.info(f"[InvitationComplete] User ID extrait: {user_id}")
+
+        # 2. Mettre à jour le mot de passe de l'utilisateur avec Service Role Key
+        admin_client = create_client(supabase_url, service_role_key)
+
+        logger.info("[InvitationComplete] Mise à jour mot de passe...")
+        password_update_result = admin_client.auth.admin.update_user_by_id(
+            user_id,
+            {"password": request.password}
+        )
+
+        if not password_update_result.user:
+            logger.error("[InvitationComplete] Échec mise à jour mot de passe")
+            raise HTTPException(
+                status_code=500, detail="Erreur lors de la configuration du mot de passe"
+            )
+
+        logger.info(f"[InvitationComplete] Mot de passe défini pour {user_id}")
+
+        # 3. Créer l'entrée dans la table users avec toutes les données du profil
+        logger.info("[InvitationComplete] Création du profil dans la table users...")
+
+        user_profile = {
+            "auth_user_id": user_id,
+            "email": request.email,
+            "first_name": request.firstName,
+            "last_name": request.lastName,
+            "full_name": request.fullName,
+            "country": request.country,
+            "phone": request.phone,
+            "linkedin_profile": request.linkedinProfile,
+            "company_name": request.companyName,
+            "company_website": request.companyWebsite,
+            "linkedin_corporate": request.companyLinkedin,
+            "job_title": request.jobTitle,
+            "user_type": "user",
+            "language": payload.get("user_metadata", {}).get("language", "fr"),
+            "created_at": datetime.utcnow().isoformat(),
+        }
+
+        # Filtrer les valeurs None
+        user_profile = {k: v for k, v in user_profile.items() if v is not None}
+
+        insert_response = admin_client.table("users").insert(user_profile).execute()
+
+        if not insert_response.data:
+            logger.error("[InvitationComplete] Échec création profil dans users")
+            raise HTTPException(
+                status_code=500, detail="Erreur lors de la création du profil"
+            )
+
+        logger.info(f"[InvitationComplete] Profil créé dans users pour {request.email}")
+
+        # 4. Marquer l'invitation comme acceptée dans la table invitations
+        try:
+            invited_by_email = payload.get("user_metadata", {}).get("invited_by")
+            if invited_by_email:
+                logger.info(f"[InvitationComplete] Marquage invitation acceptée pour {request.email}")
+                admin_client.table("invitations").update({
+                    "status": "accepted",
+                    "accepted_at": datetime.utcnow().isoformat(),
+                    "accepted_user_id": user_id,
+                }).eq("email", request.email).eq("status", "pending").execute()
+        except Exception as e:
+            logger.warning(f"[InvitationComplete] Erreur marquage invitation: {e}")
+            # Ne pas bloquer le flux si le marquage échoue
+
+        # 5. Confirmer l'email automatiquement pour les invitations
+        try:
+            logger.info(f"[InvitationComplete] Confirmation automatique de l'email pour {user_id}")
+            admin_client.auth.admin.update_user_by_id(
+                user_id,
+                {"email_confirm": True}
+            )
+        except Exception as e:
+            logger.warning(f"[InvitationComplete] Erreur confirmation email: {e}")
+
+        logger.info(f"[InvitationComplete] Profil finalisé avec succès pour {request.email}")
+
+        return CompleteInvitationProfileResponse(
+            success=True,
+            message="Profil créé avec succès. Vous pouvez maintenant vous connecter.",
+            redirect_url="/chat",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[InvitationComplete] Erreur inattendue: {str(e)}")
+        import traceback
+        logger.error(f"[InvitationComplete] Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500, detail=f"Erreur lors de la finalisation du profil: {str(e)}"
+        )
+
+
 # === ENDPOINTS EXISTANTS (CONSERVÉS) ===
 @router.post("/delete-data", response_model=DeleteDataResponse)
 async def delete_user_data(current_user: Dict[str, Any] = Depends(get_current_user)):
