@@ -1311,7 +1311,7 @@ function ChatInterface() {
               </div>
             </div>
 
-            <div className="flex-1 min-w-0 flex justify-start md:justify-center items-center space-x-3">
+            <div className="flex-1 min-w-0 flex justify-start sm:justify-center items-center space-x-3">
               <div className="w-10 h-10 grid place-items-center">
                 <InteliaLogo className="h-8 w-auto" />
               </div>
