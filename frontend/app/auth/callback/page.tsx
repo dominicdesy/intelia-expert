@@ -93,7 +93,7 @@ export default function AuthCallback() {
             throw error;
           }
 
-          secureLog.log("[AuthCallback] Session créée avec succès:", {
+          console.log("[AuthCallback PROD] Session créée:", {
             user: data.session?.user?.email,
             expiresAt: data.session?.expires_at,
             userMetadata: data.session?.user?.user_metadata,
@@ -102,15 +102,24 @@ export default function AuthCallback() {
           // Déterminer la redirection selon le type dans user_metadata
           const invitationType = data.session?.user?.user_metadata?.invitation_type;
 
+          console.log("[AuthCallback PROD] invitationType:", invitationType);
+          console.log("[AuthCallback PROD] typeParam:", typeParam);
+          console.log("[AuthCallback PROD] Vérification:", {
+            invitationType,
+            is_invite_match: invitationType === "invite",
+            typeParam_invite: typeParam === "invite",
+            will_redirect_to_invitation: invitationType === "invite" || typeParam === "invite" || typeParam === "invitation"
+          });
+
           if (invitationType === "invite" || typeParam === "invite" || typeParam === "invitation") {
-            secureLog.log("[AuthCallback] Type invitation détecté, redirection vers /auth/invitation");
+            console.log("[AuthCallback PROD] ✅ REDIRECTION VERS /auth/invitation");
             router.push("/auth/invitation");
           } else if (typeParam === "recovery") {
-            secureLog.log("[AuthCallback] Type recovery détecté, redirection vers /auth/reset-password");
+            console.log("[AuthCallback PROD] REDIRECTION VERS /auth/reset-password");
             router.push("/auth/reset-password");
           } else {
             // Par défaut, rediriger vers le chat
-            secureLog.log("[AuthCallback] Type par défaut, redirection vers /chat");
+            console.log("[AuthCallback PROD] REDIRECTION VERS /chat (par défaut)");
             router.push("/chat");
           }
         } else {
@@ -124,19 +133,25 @@ export default function AuthCallback() {
             return;
           }
 
-          secureLog.log("[AuthCallback] Session existante trouvée, vérification du type...");
+          console.log("[AuthCallback PROD] Session existante trouvée:", {
+            user: sessionData.session?.user?.email,
+            metadata: sessionData.session?.user?.user_metadata,
+          });
 
           // Vérifier le type même avec une session existante
           const invitationType = sessionData.session?.user?.user_metadata?.invitation_type;
 
+          console.log("[AuthCallback PROD] Session existante - invitationType:", invitationType);
+          console.log("[AuthCallback PROD] Session existante - typeParam:", typeParam);
+
           if (invitationType === "invite" || typeParam === "invite" || typeParam === "invitation") {
-            secureLog.log("[AuthCallback] Type invitation détecté avec session existante, redirection vers /auth/invitation");
+            console.log("[AuthCallback PROD] ✅ REDIRECTION VERS /auth/invitation (session existante)");
             router.push("/auth/invitation");
           } else if (typeParam === "recovery") {
-            secureLog.log("[AuthCallback] Type recovery détecté avec session existante, redirection vers /auth/reset-password");
+            console.log("[AuthCallback PROD] REDIRECTION VERS /auth/reset-password (session existante)");
             router.push("/auth/reset-password");
           } else {
-            secureLog.log("[AuthCallback] Aucun type spécial, redirection vers /chat");
+            console.log("[AuthCallback PROD] REDIRECTION VERS /chat (session existante, par défaut)");
             router.push("/chat");
           }
         }
