@@ -13,6 +13,7 @@ export default function AuthCallback() {
       try {
         secureLog.log("[AuthCallback] Début traitement callback Supabase");
         secureLog.log("[AuthCallback] URL complète:", window.location.href);
+        secureLog.log("[AuthCallback] Version: 1.0.0.13");
 
         // PRIORITÉ 1: Vérifier s'il y a un token_hash dans les query params (lien d'invitation personnalisé)
         const urlParams = new URLSearchParams(window.location.search);
