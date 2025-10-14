@@ -581,7 +581,8 @@ class SupabaseInvitationService:
             # URL de redirection après inscription
             # IMPORTANT: Utiliser callback pour créer session locale avec les tokens du hash
             # Supabase passera les tokens dans le hash fragment de l'URL
-            redirect_to = f"{self.frontend_url}/auth/callback"
+            # IMPORTANT: Le trailing slash est CRITIQUE pour éviter la redirection 308 qui perd le hash
+            redirect_to = f"{self.frontend_url}/auth/callback/"
 
             # Envoyer l'invitation via Supabase Auth
             response = self.admin_client.auth.admin.invite_user_by_email(
