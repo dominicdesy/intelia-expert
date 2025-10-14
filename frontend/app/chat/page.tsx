@@ -606,24 +606,31 @@ function ChatInterface() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Détection de la largeur pour l'alignement du logo (solution JavaScript inline)
+  // Détection spécifique iPhone pour l'alignement du logo
   useEffect(() => {
     if (!isMountedRef.current) return;
 
     const updateLogoAlignment = () => {
-      if (isMountedRef.current) {
-        // iPhone screen width is typically < 640px
-        setLogoAlignment(window.innerWidth < 640 ? "flex-start" : "center");
+      if (!isMountedRef.current) return;
+
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isIPhone = /iphone/.test(userAgent);
+      const isIPad = /ipad/.test(userAgent) ||
+                     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      // iPhone only = left, iPad and Desktop = center
+      if (isIPhone && !isIPad) {
+        setLogoAlignment("flex-start");
+      } else {
+        setLogoAlignment("center");
       }
     };
 
     // Initial update
     updateLogoAlignment();
 
-    // Listen for resize
+    // Listen for resize and orientation change
     window.addEventListener('resize', updateLogoAlignment);
-
-    // Also listen for orientation change on mobile
     window.addEventListener('orientationchange', updateLogoAlignment);
 
     return () => {
