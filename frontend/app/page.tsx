@@ -159,7 +159,7 @@ function AuthCallbackHandler() {
 // PAGE LOGIN COMPLÈTE - VERSION UNIFIÉE
 function LoginPageContent() {
   const router = useRouter();
-  const { t, currentLanguage } = useTranslation();
+  const { t, currentLanguage, loading: translationsLoading } = useTranslation();
   const { login, register, loginWithOAuth, isOAuthLoading } = useAuthStore(); // Store unifié avec OAuth
 
   // États simples
@@ -171,6 +171,11 @@ function LoginPageContent() {
   const [success, setSuccess] = useState("");
   const [showSignup, setShowSignup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Afficher un état de chargement pendant que les traductions chargent
+  if (translationsLoading) {
+    return <LoadingFallback />;
+  }
 
   // Chargement du rememberMe au démarrage
   useEffect(() => {
@@ -849,10 +854,8 @@ function LoginPageContent() {
   );
 }
 
-// Composant fallback corrigé
+// Composant fallback sans traductions (pour éviter d'afficher les clés)
 const LoadingFallback = () => {
-  const { t } = useTranslation();
-
   return (
     <div className="min-h-screen bg-white flex items-center justify-center">
       <div className="text-center">
@@ -862,25 +865,13 @@ const LoadingFallback = () => {
           className="w-16 h-16 mx-auto mb-4 object-contain drop-shadow-lg"
         />
         <div className="w-12 h-12 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-gray-600">{t("common.loading")}</p>
       </div>
     </div>
   );
 };
 
-// ✅ PAGE PRINCIPALE avec Force Refresh - AJOUTEZ CECI
+// PAGE PRINCIPALE avec gestion du chargement des traductions
 export default function LoginPage() {
-  // 🚀 SOLUTION 1: Force Refresh au chargement
-  useEffect(() => {
-    const hasRefreshed = sessionStorage.getItem("page-refreshed");
-
-    if (!hasRefreshed) {
-      sessionStorage.setItem("page-refreshed", "true");
-      window.location.reload();
-      return;
-    }
-  }, []);
-
   return (
     <Suspense fallback={<LoadingFallback />}>
       <LoginPageContent />
