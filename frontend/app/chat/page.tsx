@@ -620,8 +620,10 @@ function ChatInterface() {
 
       // iPhone only = left, iPad and Desktop = center
       if (isIPhone && !isIPad) {
+        console.log("🔵 INTELIA DEBUG: iPhone détecté - Logo à GAUCHE");
         setLogoAlignment("flex-start");
       } else {
+        console.log("🔵 INTELIA DEBUG: iPad/Desktop - Logo CENTRÉ");
         setLogoAlignment("center");
       }
     };
