@@ -7,7 +7,6 @@ import { AuthProvider } from "@/components/providers/AuthProvider";
 import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import { AdProvider } from "@/components/AdSystem/AdProvider";
 import { Toaster } from "react-hot-toast";
-import packageJson from "../package.json";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -70,7 +69,7 @@ const versionLogScript = `
   console.log('\\n' + '='.repeat(60));
   console.log('🚀 Intelia Expert Frontend');
   console.log('='.repeat(60));
-  console.log('📦 Version: ${packageJson.version}');
+  console.log('📦 Version: 1.0.0.8');
   console.log('🌍 Environment: ' + (typeof window !== 'undefined' ? (window.location.hostname === 'localhost' ? 'development' : 'production') : 'unknown'));
   console.log('⏰ Loaded at: ' + new Date().toISOString());
   console.log('='.repeat(60) + '\\n');

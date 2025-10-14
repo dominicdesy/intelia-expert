@@ -38,10 +38,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const publicRoutes = [
       "/",
-      "/auth/login",
       "/auth/signup",
       "/auth/forgot-password",
       "/auth/reset-password",
+      "/auth/verify-email",
+      "/auth/invitation",
       "/privacy",
       "/terms",
     ];

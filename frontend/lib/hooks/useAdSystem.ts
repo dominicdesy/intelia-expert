@@ -32,6 +32,8 @@ export const useAdSystem = () => {
 
   // Vérifier les critères d'affichage de publicité
   const checkAdEligibility = useCallback(async () => {
+    // PROTECTION: Vérifier que le composant est toujours monté
+    if (!isMountedRef.current) return;
     if (!isAuthenticated || !user) return;
 
     try {
@@ -130,6 +132,8 @@ export const useAdSystem = () => {
           eligible: stats.qualifiesForAd,
         });
 
+        // PROTECTION: Vérifier que le composant est toujours monté avant setState
+        if (!isMountedRef.current) return;
         setSessionStats(stats);
 
         // TEST FORCÉ EN DÉVELOPPEMENT

@@ -1,5 +1,5 @@
 "use client";
-// Build: 1.0.0.6 - COMPREHENSIVE FIX: useAdSystem + signup setTimeout + FORCE REBUILD
+// Build: 1.0.0.8 - CRITICAL HYDRATION FIXES: packageJson removal + route mismatch + useAdSystem protection
 
 import React, { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
