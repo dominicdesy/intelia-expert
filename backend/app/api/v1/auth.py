@@ -2030,9 +2030,10 @@ async def complete_invitation_profile(request: CompleteInvitationProfileRequest)
         user_profile = {k: v for k, v in user_profile.items() if v is not None}
 
         # UPSERT : UPDATE si l'utilisateur existe (créé par trigger), sinon INSERT
+        # Le conflit est sur email car c'est la colonne avec contrainte UNIQUE (users_email_key)
         upsert_response = admin_client.table("users").upsert(
             {**user_profile, "auth_user_id": user_id},
-            on_conflict="auth_user_id"
+            on_conflict="email"
         ).execute()
 
         if not upsert_response.data:
