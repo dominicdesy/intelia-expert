@@ -249,6 +249,7 @@ function PageContent() {
   const hasCheckedAuth = useRef(false);
   const redirectLock = useRef(false);
   const sessionInitialized = useRef(false);
+  const isMountedRef = useRef(true); // Protection démontage
 
   const [currentLanguage, setCurrentLanguage] = useState<Language>("fr");
   const t = useMemo(() => translations[currentLanguage], [currentLanguage]);
@@ -400,6 +401,9 @@ function PageContent() {
 
       // Retour au mode login après création
       setTimeout(() => {
+        // PROTECTION: Vérifier que le composant est toujours monté
+        if (!isMountedRef.current) return;
+
         setIsSignupMode(false);
         setLoginData((prev) => ({ ...prev, email: signupData.email }));
       }, 2000);
@@ -425,6 +429,13 @@ function PageContent() {
     setLocalError("");
     setLocalSuccess("");
   };
+
+  // Cleanup au démontage
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Effects d'initialisation
   useEffect(() => {

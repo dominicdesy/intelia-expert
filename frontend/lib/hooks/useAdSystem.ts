@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuthStore } from "@/lib/stores/auth";
 import type {
   AdData,
@@ -18,6 +18,14 @@ export const useAdSystem = () => {
   );
   const [showAd, setShowAd] = useState(false);
   const [currentAd, setCurrentAd] = useState<AdData | null>(null);
+  const isMountedRef = useRef(true); // Protection démontage
+
+  // Cleanup au démontage
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Utiliser la configuration depuis types/index.ts
   const AD_CRITERIA = AD_CONFIG.TRIGGERS;
@@ -230,6 +238,8 @@ export const useAdSystem = () => {
 
     // Fermer la modal
     setTimeout(() => {
+      // PROTECTION: Vérifier que le composant est toujours monté
+      if (!isMountedRef.current) return;
       setShowAd(false);
       setCurrentAd(null);
     }, 1000);
