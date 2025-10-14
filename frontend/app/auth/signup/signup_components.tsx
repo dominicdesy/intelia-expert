@@ -4,6 +4,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import type { Language } from "@/types";
+import { useTranslation } from "@/lib/languages/i18n";
 
 // Logo Intelia
 export const InteliaLogo = ({
@@ -250,6 +251,8 @@ export const PasswordMatchIndicator = ({
   password: string;
   confirmPassword: string;
 }) => {
+  const { t } = useTranslation();
+
   if (!password || !confirmPassword) return null;
 
   const match = confirmPassword === password;
@@ -271,7 +274,7 @@ export const PasswordMatchIndicator = ({
               d="M5 13l4 4L19 7"
             />
           </svg>
-          Les mots de passe correspondent
+          {t("validation.password.match")}
         </span>
       ) : (
         <span className="text-red-600 flex items-center">
@@ -288,7 +291,7 @@ export const PasswordMatchIndicator = ({
               d="M6 18L18 6M6 6l12 12"
             />
           </svg>
-          Les mots de passe ne correspondent pas
+          {t("validation.password.mismatch")}
         </span>
       )}
     </div>
@@ -297,31 +300,40 @@ export const PasswordMatchIndicator = ({
 
 // Loading Spinner
 export const LoadingSpinner = ({
-  text = "Chargement...",
+  text,
 }: {
   text?: string;
-}) => (
-  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
-    <div className="text-center">
-      <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-      <p className="text-gray-600">{text}</p>
+}) => {
+  const { t } = useTranslation();
+  const displayText = text || t("common.loading");
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+      <div className="text-center">
+        <InteliaLogo className="w-16 h-16 mx-auto mb-4" />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">{displayText}</p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Footer avec liens
-export const AuthFooter = ({ t }: { t: any }) => (
-  <div className="mt-6 text-center">
-    <p className="text-xs text-gray-500">
-      {t.gdprNotice}{" "}
-      <Link href="/terms" className="text-blue-600 hover:text-blue-500">
-        {t.terms}
-      </Link>{" "}
-      et notre{" "}
-      <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
-        {t.privacy}
-      </Link>
-    </p>
-  </div>
-);
+export const AuthFooter = ({ t }: { t: any }) => {
+  const { t: safeT } = useTranslation();
+
+  return (
+    <div className="mt-6 text-center">
+      <p className="text-xs text-gray-500">
+        {t.gdprNotice}{" "}
+        <Link href="/terms" className="text-blue-600 hover:text-blue-500">
+          {t.terms}
+        </Link>{" "}
+        {safeT("legal.and")}{" "}
+        <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
+          {t.privacy}
+        </Link>
+      </p>
+    </div>
+  );
+};

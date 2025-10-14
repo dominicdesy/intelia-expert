@@ -245,7 +245,7 @@ export default function ForgotPasswordPage() {
               type="button"
               onClick={() =>
                 window.open(
-                  "mailto:support@intelia.com?subject=Problème réinitialisation mot de passe",
+                  `mailto:${t("contact.supportEmail")}?subject=${encodeURIComponent(t("forgotPassword.supportSubject"))}`,
                   "_blank",
                 )
               }

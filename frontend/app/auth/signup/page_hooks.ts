@@ -136,25 +136,27 @@ export const validateEmail = (email: string): boolean => {
 };
 
 // Validation mot de passe
+// Note: Ces erreurs ne sont plus utilisées directement.
+// Utilisez plutôt les clés i18n: validation.password.minLength, uppercase, lowercase, number, special
 export const validatePassword = (
   password: string,
 ): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
   if (password.length < 8) {
-    errors.push("Au moins 8 caractères");
+    errors.push("validation.password.minLength");
   }
   if (!/[A-Z]/.test(password)) {
-    errors.push("Une majuscule");
+    errors.push("validation.password.uppercase");
   }
   if (!/[a-z]/.test(password)) {
-    errors.push("Une minuscule");
+    errors.push("validation.password.lowercase");
   }
   if (!/[0-9]/.test(password)) {
-    errors.push("Un chiffre");
+    errors.push("validation.password.number");
   }
   if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push("Un caractère spécial");
+    errors.push("validation.password.special");
   }
 
   return {
