@@ -245,7 +245,7 @@ export default function ForgotPasswordPage() {
               type="button"
               onClick={() =>
                 window.open(
-                  `mailto:${t("contact.supportEmail")}?subject=${encodeURIComponent(t("forgotPassword.supportSubject"))}`,
+                  `mailto:${t("contact.supportEmail")}?subject=${encodeURIComponent("Password Reset Issue - Intelia Expert")}`,
                   "_blank",
                 )
               }
