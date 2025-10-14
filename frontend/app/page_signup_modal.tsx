@@ -398,6 +398,14 @@ export function SignupModal({
 }: SignupModalProps) {
   // CORRECTION : Utiliser seulement t, pas loading pour éviter la boucle
   const { t } = useTranslation();
+  const isMountedRef = React.useRef(true); // Protection démontage
+
+  // Cleanup au démontage
+  React.useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Fonction de fallback pour les traductions
   const safeT = (key: string) => {
@@ -478,6 +486,8 @@ export function SignupModal({
 
         // Passer en mode login après 4 secondes
         setTimeout(() => {
+          // PROTECTION: Vérifier que le composant est toujours monté
+          if (!isMountedRef.current) return;
           toggleMode();
         }, 4000);
       }
@@ -487,6 +497,8 @@ export function SignupModal({
 
       // Revenir à l'état normal après 3 secondes
       setTimeout(() => {
+        // PROTECTION: Vérifier que le composant est toujours monté
+        if (!isMountedRef.current) return;
         setButtonState("idle");
       }, 3000);
     }

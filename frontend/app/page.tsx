@@ -1,5 +1,5 @@
 "use client";
-// Build: 1.0.0.3 - FINAL FIX for React error #310
+// Build: 1.0.0.4 - Fix SignupModal setTimeout
 
 import React, { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
