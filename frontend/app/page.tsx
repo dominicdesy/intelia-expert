@@ -1,5 +1,5 @@
 "use client";
-// Build: 1.0.0.2 - Force rebuild to clear Next.js cache
+// Build: 1.0.0.3 - FINAL FIX for React error #310
 
 import React, { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
@@ -171,6 +171,14 @@ function LoginPageContent() {
   const router = useRouter();
   const { t, currentLanguage, loading: translationsLoading } = useTranslation();
   const { login, register, loginWithOAuth, isOAuthLoading } = useAuthStore(); // Store unifié avec OAuth
+  const isMountedRef = React.useRef(true); // Protection démontage
+
+  // Cleanup au démontage
+  React.useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // États simples
   const [email, setEmail] = useState("");
@@ -341,6 +349,8 @@ function LoginPageContent() {
 
       // Fermer la modal après succès
       const timeoutId = setTimeout(() => {
+        // PROTECTION: Vérifier que le composant est toujours monté
+        if (!isMountedRef.current) return;
         setShowSignup(false);
         setSuccess("");
       }, 2000);
@@ -428,6 +438,8 @@ function LoginPageContent() {
       setSuccess(t("auth.success") || "Connexion réussie");
 
       const timeoutId = setTimeout(() => {
+        // PROTECTION: Vérifier que le composant est toujours monté
+        if (!isMountedRef.current) return;
         router.push("/chat");
       }, 1000);
     } catch (error: any) {
