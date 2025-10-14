@@ -12,6 +12,9 @@ export default function AuthCallback() {
     const handleCallback = async () => {
       try {
         secureLog.log("[AuthCallback] Début traitement callback Supabase");
+        secureLog.log("[AuthCallback] URL complète:", window.location.href);
+        secureLog.log("[AuthCallback] Hash complet:", window.location.hash);
+        secureLog.log("[AuthCallback] Search params:", window.location.search);
 
         // Vérifier s'il y a un hash dans l'URL (tokens Supabase)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -23,6 +26,7 @@ export default function AuthCallback() {
           hasAccessToken: !!accessToken,
           hasRefreshToken: !!refreshToken,
           type,
+          fullHash: window.location.hash,
         });
 
         if (accessToken && refreshToken) {
