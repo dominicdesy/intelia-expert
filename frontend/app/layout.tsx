@@ -8,7 +8,6 @@ import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import { AdProvider } from "@/components/AdSystem/AdProvider";
 import { Toaster } from "react-hot-toast";
 import packageJson from "../package.json";
-import { secureLog } from "@/lib/utils/secureLogger";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -68,19 +67,19 @@ export const metadata: Metadata = {
 
 // Script de log de version
 const versionLogScript = `
-  secureLog.log('\\n' + '='.repeat(60));
-  secureLog.log('🚀 Intelia Expert Frontend');
-  secureLog.log('='.repeat(60));
-  secureLog.log('📦 Version: ${packageJson.version}');
-  secureLog.log('🌍 Environment: ' + (typeof window !== 'undefined' ? (window.location.hostname === 'localhost' ? 'development' : 'production') : 'unknown'));
-  secureLog.log('⏰ Loaded at: ' + new Date().toISOString());
-  secureLog.log('='.repeat(60) + '\\n');
+  console.log('\\n' + '='.repeat(60));
+  console.log('🚀 Intelia Expert Frontend');
+  console.log('='.repeat(60));
+  console.log('📦 Version: ${packageJson.version}');
+  console.log('🌍 Environment: ' + (typeof window !== 'undefined' ? (window.location.hostname === 'localhost' ? 'development' : 'production') : 'unknown'));
+  console.log('⏰ Loaded at: ' + new Date().toISOString());
+  console.log('='.repeat(60) + '\\n');
 `;
 
 // Script anti-flash optimisé avec gestion correcte des event listeners
 const antiFlashScript = `
   (function() {
-    secureLog.log('[AntiFlash] Initialisation...');
+    console.log('[AntiFlash] Initialisation...');
     
     // Variables pour stocker les références des handlers
     let languageReadyHandler = null;
@@ -110,7 +109,7 @@ const antiFlashScript = `
       isReady = true;
       
       document.documentElement.classList.add('language-ready');
-      secureLog.log('[AntiFlash] ✅ Interface prête (' + source + ')');
+      console.log('[AntiFlash] ✅ Interface prête (' + source + ')');
       
       // Nettoyer tous les event listeners
       cleanupEventListeners();
@@ -126,7 +125,7 @@ const antiFlashScript = `
           const storedLang = parsed?.state?.currentLanguage;
           
           if (storedLang && ['ar', 'en', 'fr', 'es', 'de', 'pt', 'nl', 'pl', 'zh', 'hi', 'th', 'tr', 'vi', 'ja', 'id', 'it'].includes(storedLang)) {
-            secureLog.log('[AntiFlash] Langue trouvée dans Zustand:', storedLang);
+            console.log('[AntiFlash] Langue trouvée dans Zustand:', storedLang);
             return storedLang;
           }
         }
@@ -134,14 +133,14 @@ const antiFlashScript = `
         // 2. Fallback: langue du navigateur
         const browserLang = navigator.language.split('-')[0];
         if (['ar', 'en', 'fr', 'es', 'de', 'pt', 'nl', 'pl', 'zh', 'hi', 'th', 'tr', 'vi', 'ja', 'id', 'it'].includes(browserLang)) {
-          secureLog.log('[AntiFlash] Langue depuis navigateur:', browserLang);
+          console.log('[AntiFlash] Langue depuis navigateur:', browserLang);
           return browserLang;
         }
         
-        secureLog.log('[AntiFlash] Langue par défaut: fr');
+        console.log('[AntiFlash] Langue par défaut: fr');
         return 'fr';
       } catch (e) {
-        secureLog.warn('[AntiFlash] Erreur détection langue:', e);
+        console.warn('[AntiFlash] Erreur détection langue:', e);
         return 'fr';
       }
     }
@@ -162,12 +161,12 @@ const antiFlashScript = `
     // Définir la direction RTL si nécessaire
     const direction = isRTLLanguage(preferredLang) ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('dir', direction);
-    secureLog.log('[AntiFlash] Direction:', direction);
+    console.log('[AntiFlash] Direction:', direction);
     
     // Timeout de sécurité absolu (3 secondes max)
     const SAFETY_TIMEOUT = 3000;
     safetyTimer = setTimeout(function() {
-      secureLog.warn('[AntiFlash] ⚠️ Timeout sécurité - Affichage forcé');
+      console.warn('[AntiFlash] ⚠️ Timeout sécurité - Affichage forcé');
       markAsReady('safety-timeout');
     }, SAFETY_TIMEOUT);
 
@@ -183,7 +182,7 @@ const antiFlashScript = `
     domContentLoadedHandler = function() {
       setTimeout(function() {
         if (!isReady) {
-          secureLog.warn('[AntiFlash] ⚠️ Timeout DOM - Affichage forcé');
+          console.warn('[AntiFlash] ⚠️ Timeout DOM - Affichage forcé');
           markAsReady('dom-content-loaded');
         }
       }, 500);
@@ -196,7 +195,7 @@ const antiFlashScript = `
       // Document déjà prêt
       setTimeout(function() {
         if (!isReady) {
-          secureLog.warn('[AntiFlash] ⚠️ Document ready - Affichage forcé');
+          console.warn('[AntiFlash] ⚠️ Document ready - Affichage forcé');
           markAsReady('document-already-ready');
         }
       }, 100);
