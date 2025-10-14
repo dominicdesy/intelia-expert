@@ -818,8 +818,27 @@ function InvitationAcceptPageContent() {
       // IMPORTANT: Déconnecter la session Supabase temporaire AVANT de rediriger vers login
       setTimeout(async () => {
         secureLog.log("[InvitationAccept] Déconnexion session temporaire avant redirection...");
-        // Utiliser scope: 'local' pour éviter l'erreur 403 (le client anonyme ne peut pas faire de signOut global)
-        await supabase.auth.signOut({ scope: 'local' });
+
+        // ✅ SOLUTION : Nettoyer directement le localStorage au lieu d'utiliser supabase.auth.signOut()
+        // Car même avec scope:'local', le client anonyme Supabase n'a pas les permissions nécessaires (403)
+        try {
+          // Nettoyer tous les items Supabase dans localStorage
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('sb-') || key.includes('supabase')) {
+              localStorage.removeItem(key);
+              secureLog.log(`[InvitationAccept] Suppression ${key} du localStorage`);
+            }
+          });
+
+          // Nettoyer également le store auth de l'application si présent
+          localStorage.removeItem('intelia-expert-auth');
+          localStorage.removeItem('intelia-auth-store');
+
+          secureLog.log("[InvitationAccept] LocalStorage nettoyé avec succès");
+        } catch (error) {
+          secureLog.error("[InvitationAccept] Erreur nettoyage localStorage:", error);
+        }
+
         secureLog.log("[InvitationAccept] Redirection vers login avec succès");
         router.push(`/?success=${encodeURIComponent(t("invitation.accountCreatedPleaseLogin"))}`);
       }, 3000);
