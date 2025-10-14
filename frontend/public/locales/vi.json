@@ -584,5 +584,7 @@
   "help.profileTitle": "Menu người dùng",
   "help.profileDesc": "Truy cập hồ sơ, cài đặt và các tùy chọn tài khoản của bạn.",
   "gdpr.signupNotice": "Bằng cách nhấp vào \"Tạo tài khoản\", bạn đồng ý với",
-  "legal.and": "và"
+  "legal.and": "và",
+  "auth.creating": "Đang tạo...",
+  "auth.accountCreated": "Đã tạo tài khoản!"
 }

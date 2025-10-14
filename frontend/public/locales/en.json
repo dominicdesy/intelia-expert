@@ -584,5 +584,7 @@
   "help.historyTitle": "History",
   "help.historyDesc": "Find all your previous conversations organized by date.",
   "help.profileTitle": "User Menu",
-  "help.profileDesc": "Access your profile, settings, and account options."
+  "help.profileDesc": "Access your profile, settings, and account options.",
+  "auth.creating": "Creating...",
+  "auth.accountCreated": "Account created!"
 }

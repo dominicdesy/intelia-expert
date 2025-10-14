@@ -584,5 +584,7 @@
   "help.profileTitle": "เมนูผู้ใช้",
   "help.profileDesc": "เข้าถึงโปรไฟล์ การตั้งค่า และตัวเลือกบัญชีของคุณ",
   "gdpr.signupNotice": "โดยการคลิก \"สร้างบัญชี\" คุณยอมรับ",
-  "legal.and": "และ"
+  "legal.and": "และ",
+  "auth.creating": "กำลังสร้าง...",
+  "auth.accountCreated": "สร้างบัญชีแล้ว!"
 }

@@ -584,5 +584,7 @@
   "help.profileTitle": "Gebruikersmenu",
   "help.profileDesc": "Toegang tot uw profiel, instellingen en account opties.",
   "gdpr.signupNotice": "Door op \"Account maken\" te klikken, gaat u akkoord met onze",
-  "legal.and": "en ons"
+  "legal.and": "en ons",
+  "auth.creating": "Bezig met aanmaken...",
+  "auth.accountCreated": "Account aangemaakt!"
 }

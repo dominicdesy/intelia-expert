@@ -505,7 +505,7 @@ export function SignupModal({
         return (
           <div className="flex items-center space-x-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            <span>Création en cours...</span>
+            <span>{safeT("auth.creating")}</span>
           </div>
         );
       case "success":
@@ -522,7 +522,7 @@ export function SignupModal({
                 clipRule="evenodd"
               />
             </svg>
-            <span>Compte créé!</span>
+            <span>{safeT("auth.accountCreated")}</span>
           </div>
         );
       case "error":
@@ -539,7 +539,7 @@ export function SignupModal({
                 clipRule="evenodd"
               />
             </svg>
-            <span>Erreur</span>
+            <span>{safeT("error.generic")}</span>
           </div>
         );
       default:

@@ -584,5 +584,7 @@
   "help.historyTitle": "Historial",
   "help.historyDesc": "Encuentre todas sus conversaciones anteriores organizadas por fecha.",
   "help.profileTitle": "Menú de usuario",
-  "help.profileDesc": "Acceda a su perfil, configuración y opciones de cuenta."
+  "help.profileDesc": "Acceda a su perfil, configuración y opciones de cuenta.",
+  "auth.creating": "Creando...",
+  "auth.accountCreated": "¡Cuenta creada!"
 }

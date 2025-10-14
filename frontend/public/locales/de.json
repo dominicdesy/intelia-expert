@@ -584,5 +584,7 @@
   "help.historyTitle": "Verlauf",
   "help.historyDesc": "Finden Sie alle Ihre früheren Gespräche nach Datum sortiert.",
   "help.profileTitle": "Benutzermenü",
-  "help.profileDesc": "Greifen Sie auf Ihr Profil, Einstellungen und Kontooptionen zu."
+  "help.profileDesc": "Greifen Sie auf Ihr Profil, Einstellungen und Kontooptionen zu.",
+  "auth.creating": "Wird erstellt...",
+  "auth.accountCreated": "Konto erstellt!"
 }

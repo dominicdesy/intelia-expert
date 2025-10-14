@@ -585,5 +585,7 @@
   "help.profileTitle": "Menu pengguna",
   "help.profileDesc": "Akses profil, pengaturan, dan opsi akun Anda.",
   "gdpr.signupNotice": "Dengan mengklik \"Buat akun\", Anda menyetujui",
-  "legal.and": "dan"
+  "legal.and": "dan",
+  "auth.creating": "Membuat...",
+  "auth.accountCreated": "Akun dibuat!"
 }

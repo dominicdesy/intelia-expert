@@ -584,5 +584,7 @@
   "help.profileTitle": "قائمة المستخدم",
   "help.profileDesc": "الوصول إلى ملفك الشخصي والإعدادات وخيارات الحساب.",
   "gdpr.signupNotice": "بالنقر على \"إنشاء حساب\"، فإنك توافق على",
-  "legal.and": "و"
+  "legal.and": "و",
+  "auth.creating": "جارٍ الإنشاء...",
+  "auth.accountCreated": "تم إنشاء الحساب!"
 }

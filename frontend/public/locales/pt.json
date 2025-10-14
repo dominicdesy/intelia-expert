@@ -583,5 +583,7 @@
   "help.profileTitle": "Menu do usuário",
   "help.profileDesc": "Acesse seu perfil, configurações e opções de conta.",
   "gdpr.signupNotice": "Ao clicar em \"Criar conta\", você concorda com nossos",
-  "legal.and": "e nossa"
+  "legal.and": "e nossa",
+  "auth.creating": "Criando...",
+  "auth.accountCreated": "Conta criada!"
 }
