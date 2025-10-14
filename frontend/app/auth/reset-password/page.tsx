@@ -418,12 +418,14 @@ function ResetPasswordPageContent() {
   const [formData, setFormData] = useState({
     newPassword: "",
     confirmPassword: "",
+    email: "",  // NOUVEAU: pour les codes OTP
   });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [success, setSuccess] = useState(false);
   const [tokenValid, setTokenValid] = useState<boolean | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [isOtpToken, setIsOtpToken] = useState(false);  // NOUVEAU: détecter si c'est un OTP
 
   // 🌍 DÉTECTION DE LANGUE DEPUIS L'URL
   useEffect(() => {
@@ -458,6 +460,16 @@ function ResetPasswordPageContent() {
       return;
     }
 
+    // NOUVEAU: Détecter si c'est un code OTP (court, 6-8 chiffres)
+    const isShortOtp = finalToken.length <= 10 && /^\d+$/.test(finalToken);
+    if (isShortOtp) {
+      secureLog.log(`[ResetPassword] Code OTP détecté (${finalToken.length} chiffres)`);
+      setIsOtpToken(true);
+    } else {
+      secureLog.log(`[ResetPassword] Token JWT détecté (${finalToken.length} chars)`);
+      setIsOtpToken(false);
+    }
+
     setToken(finalToken);
     setTokenValid(true);
   }, [searchParams]);
@@ -478,6 +490,14 @@ function ResetPasswordPageContent() {
 
   const handleSubmit = async () => {
     const validationErrors: string[] = [];
+
+    // NOUVEAU: Valider l'email pour les codes OTP
+    if (isOtpToken && !formData.email.trim()) {
+      validationErrors.push(t("validation.required.email") || "Email is required");
+    }
+    if (isOtpToken && formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      validationErrors.push(t("validation.email.invalid") || "Invalid email format");
+    }
 
     if (!formData.newPassword) {
       validationErrors.push(t("validation.required.password"));
@@ -501,6 +521,17 @@ function ResetPasswordPageContent() {
     setErrors([]);
 
     try {
+      // NOUVEAU: Inclure l'email pour les codes OTP
+      const requestBody: any = {
+        token: token,
+        new_password: formData.newPassword,
+      };
+
+      if (isOtpToken && formData.email.trim()) {
+        requestBody.email = formData.email.trim();
+        secureLog.log(`[ResetPassword] Envoi OTP avec email: ${formData.email.trim()}`);
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/auth/confirm-reset-password`,
         {
@@ -508,10 +539,7 @@ function ResetPasswordPageContent() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            token: token,
-            new_password: formData.newPassword,
-          }),
+          body: JSON.stringify(requestBody),
         },
       );
 
@@ -539,7 +567,11 @@ function ResetPasswordPageContent() {
   };
 
   const isFormValid = () => {
+    // NOUVEAU: Valider aussi l'email pour les codes OTP
+    const emailValid = !isOtpToken || (formData.email.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()));
+
     return (
+      emailValid &&
       formData.newPassword &&
       formData.confirmPassword &&
       formData.newPassword === formData.confirmPassword &&
@@ -614,6 +646,27 @@ function ResetPasswordPageContent() {
         {/* Formulaire */}
         <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
           <div className="space-y-6">
+            {/* NOUVEAU: Champ email pour les codes OTP */}
+            {isOtpToken && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t("resetPassword.emailLabel") || "Email"}
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
+                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder={t("resetPassword.emailPlaceholder") || "Enter your email"}
+                  disabled={isLoading}
+                  autoComplete="email"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {t("resetPassword.otpEmailHint") || "Enter the email address you used to request the password reset"}
+                </p>
+              </div>
+            )}
+
             <PasswordField
               value={formData.newPassword}
               onChange={(value) => handleInputChange("newPassword", value)}

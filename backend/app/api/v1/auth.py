@@ -133,6 +133,7 @@ class ValidateResetTokenRequest(BaseModel):
 class ConfirmResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+    email: Optional[EmailStr] = None  # NOUVEAU: email optionnel pour codes OTP
 
 
 class ForgotPasswordResponse(BaseModel):
@@ -1675,7 +1676,12 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
 
     # === ANALYSE DU TOKEN D'ABORD ===
     logger.info("[ConfirmReset] === ANALYSE DU TOKEN ===")
-    user_email = None
+
+    # NOUVEAU: Utiliser l'email fourni dans la requête si disponible (pour OTP)
+    user_email = request.email if request.email else None
+    if user_email:
+        logger.info(f"[ConfirmReset] Email fourni dans la requête: {user_email}")
+
     token_type = None
 
     try:
@@ -1710,11 +1716,19 @@ async def confirm_reset_password(request: ConfirmResetPasswordRequest):
                     detail="Token expiré. Demandez un nouveau lien de réinitialisation.",
                 )
 
-        user_email = token_payload.get("email")
+        # Si pas d'email fourni, essayer d'extraire du token
+        if not user_email:
+            user_email = token_payload.get("email")
+            if user_email:
+                logger.info(f"[ConfirmReset] Email extrait du token: {user_email}")
+
         token_type = token_payload.get("aud") or token_payload.get("token_type")
 
     except Exception as decode_error:
         logger.error(f"[ConfirmReset] Erreur analyse token: {decode_error}")
+        # Si c'est un OTP court et qu'on a l'email de la requête, continuer
+        if user_email and len(request.token) < 10:
+            logger.info(f"[ConfirmReset] Token court ({len(request.token)} chars) détecté comme OTP, email fourni: {user_email}")
 
     # === MÉTHODE 1 : VERIFY OTP AVEC EMAIL (PRIORITÉ ÉLEVÉE) ===
     if user_email:
