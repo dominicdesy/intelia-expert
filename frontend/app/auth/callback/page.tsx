@@ -123,8 +123,21 @@ export default function AuthCallback() {
             return;
           }
 
-          secureLog.log("[AuthCallback] Session existante trouvée, redirection...");
-          router.push("/chat");
+          secureLog.log("[AuthCallback] Session existante trouvée, vérification du type...");
+
+          // Vérifier le type même avec une session existante
+          const invitationType = sessionData.session?.user?.user_metadata?.invitation_type;
+
+          if (invitationType === "invite" || typeParam === "invite" || typeParam === "invitation") {
+            secureLog.log("[AuthCallback] Type invitation détecté avec session existante, redirection vers /auth/invitation");
+            router.push("/auth/invitation");
+          } else if (typeParam === "recovery") {
+            secureLog.log("[AuthCallback] Type recovery détecté avec session existante, redirection vers /auth/reset-password");
+            router.push("/auth/reset-password");
+          } else {
+            secureLog.log("[AuthCallback] Aucun type spécial, redirection vers /chat");
+            router.push("/chat");
+          }
         }
       } catch (error) {
         secureLog.error("[AuthCallback] Erreur traitement callback:", error);
