@@ -64,14 +64,14 @@ export const metadata: Metadata = {
   },
 };
 
-// Script de log de version
+// Script de log de version (sans emojis pour éviter les problèmes de compilation)
 const versionLogScript = `
   console.log('\\n' + '='.repeat(60));
-  console.log('🚀 Intelia Expert Frontend');
+  console.log('Intelia Expert Frontend');
   console.log('='.repeat(60));
-  console.log('📦 Version: 1.0.0.8');
-  console.log('🌍 Environment: ' + (typeof window !== 'undefined' ? (window.location.hostname === 'localhost' ? 'development' : 'production') : 'unknown'));
-  console.log('⏰ Loaded at: ' + new Date().toISOString());
+  console.log('Version: 1.0.0.9');
+  console.log('Environment: ' + (typeof window !== 'undefined' ? (window.location.hostname === 'localhost' ? 'development' : 'production') : 'unknown'));
+  console.log('Loaded at: ' + new Date().toISOString());
   console.log('='.repeat(60) + '\\n');
 `;
 
@@ -153,9 +153,8 @@ const antiFlashScript = `
     // Initialisation immédiate
     const preferredLang = getPreferredLanguage();
 
-    // Marquer la langue détectée
+    // Marquer la langue détectée (sans data-lang pour éviter warning hydration)
     document.documentElement.setAttribute('lang', preferredLang);
-    document.documentElement.setAttribute('data-lang', preferredLang);
 
     // Définir la direction RTL si nécessaire
     const direction = isRTLLanguage(preferredLang) ? 'rtl' : 'ltr';
@@ -214,7 +213,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className="h-full">
+    <html lang="fr" dir="ltr" className="h-full" suppressHydrationWarning>
       <head>
         {/* SCRIPT DE VERSION - S'exécute en premier */}
         <script dangerouslySetInnerHTML={{ __html: versionLogScript }} />
@@ -526,6 +525,7 @@ export default function RootLayout({
       </head>
       <body
         className={`${inter.className} h-full antialiased mobile-safe-container`}
+        suppressHydrationWarning
       >
         <AuthProvider>
           <LanguageProvider>

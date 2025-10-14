@@ -28,7 +28,7 @@ function extractKeys(obj, prefix = '') {
 
 const availableKeys = new Set(extractKeys(enTranslations));
 
-console.log(`📋 Total clés disponibles dans en.json: ${availableKeys.size}\n`);
+console.log(`Total clés disponibles dans en.json: ${availableKeys.size}\n`);
 
 // Extraire toutes les clés utilisées dans le code
 try {
@@ -39,15 +39,15 @@ try {
 
   const usedKeys = output.trim().split('\n').filter(k => k && k.includes('.'));
 
-  console.log(`🔍 Total clés utilisées dans le code: ${usedKeys.length}\n`);
+  console.log(`Total clés utilisées dans le code: ${usedKeys.length}\n`);
 
   // Trouver les clés manquantes
   const missingKeys = usedKeys.filter(key => !availableKeys.has(key));
 
   if (missingKeys.length === 0) {
-    console.log('✅ Toutes les clés de traduction existent !');
+    console.log('OK - Toutes les clés de traduction existent !');
   } else {
-    console.log(`❌ ${missingKeys.length} clés manquantes détectées:\n`);
+    console.log(`ERREUR - ${missingKeys.length} clés manquantes détectées:\n`);
     missingKeys.forEach(key => {
       console.log(`   - ${key}`);
     });

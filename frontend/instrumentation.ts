@@ -12,11 +12,11 @@ export async function register() {
   const timestamp = new Date().toISOString();
 
   console.log('\n' + '='.repeat(60));
-  console.log('🚀 Intelia Expert Frontend - Starting up');
+  console.log('Intelia Expert Frontend - Starting up');
   console.log('='.repeat(60));
-  console.log(`📦 Version: ${version}`);
-  console.log(`🌍 Environment: ${environment}`);
-  console.log(`⏰ Timestamp: ${timestamp}`);
-  console.log(`🔧 Node version: ${process.version}`);
+  console.log(`Version: ${version}`);
+  console.log(`Environment: ${environment}`);
+  console.log(`Timestamp: ${timestamp}`);
+  console.log(`Node version: ${process.version}`);
   console.log('='.repeat(60) + '\n');
 }

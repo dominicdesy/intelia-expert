@@ -1,5 +1,5 @@
 "use client";
-// Build: 1.0.0.8 - CRITICAL HYDRATION FIXES: packageJson removal + route mismatch + useAdSystem protection
+// Build: 1.0.0.9 - FINAL FIX: React hooks order + hydration warnings resolved
 
 import React, { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
@@ -190,21 +190,7 @@ function LoginPageContent() {
   const [showSignup, setShowSignup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Afficher un état de chargement pendant que les traductions chargent
-  if (translationsLoading) {
-    return <LoadingFallback />;
-  }
-
-  // Chargement du rememberMe au démarrage
-  useEffect(() => {
-    const savedData = rememberMeUtils.load();
-    if (savedData.rememberMe && savedData.lastEmail) {
-      setEmail(savedData.lastEmail);
-      setRememberMe(true);
-    }
-  }, []); // Pas besoin de protection ici car opération synchrone
-
-  // États pour le signup
+  // États pour le signup - DOIVENT être AVANT tout return conditionnel
   const [signupData, setSignupData] = useState({
     email: "",
     password: "",
@@ -222,6 +208,21 @@ function LoginPageContent() {
   });
 
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Chargement du rememberMe au démarrage
+  // IMPORTANT: Tous les hooks DOIVENT être AVANT tout return conditionnel (règle des hooks)
+  useEffect(() => {
+    const savedData = rememberMeUtils.load();
+    if (savedData.rememberMe && savedData.lastEmail) {
+      setEmail(savedData.lastEmail);
+      setRememberMe(true);
+    }
+  }, []); // Pas besoin de protection ici car opération synchrone
+
+  // Afficher un état de chargement pendant que les traductions chargent
+  if (translationsLoading) {
+    return <LoadingFallback />;
+  }
 
   // Fonctions de validation
   const validatePassword = (password: string) => {

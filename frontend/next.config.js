@@ -157,6 +157,6 @@ const nextConfig = {
 };
 
 // Log simplifié
-console.log("🚀 Next.js config loaded:", process.env.NODE_ENV);
+console.log("Next.js config loaded:", process.env.NODE_ENV);
 
 module.exports = nextConfig;
