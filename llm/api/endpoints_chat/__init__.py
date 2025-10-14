@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_chat/__init__.py - Main entry point for chat endpoints
-Version 5.0.1 - Modular chat endpoints with factory pattern
+Version 5.0.2 - Modular chat endpoints with factory pattern + Vision support
 """
 
 from utils.types import Dict, Any
@@ -10,6 +10,7 @@ from fastapi import APIRouter
 from .json_routes import create_json_routes
 from .chat_routes import create_chat_routes
 from .misc_routes import create_misc_routes
+from .vision_routes import create_vision_routes
 
 
 def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
@@ -20,6 +21,7 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
     - JSON routes: validation, ingestion, search, upload
     - Chat routes: chat principal et expert
     - Misc routes: OOD, tests, stats
+    - Vision routes: analyse d'images médicales avec Claude Vision
 
     Args:
         services: Dictionnaire des services disponibles
@@ -39,11 +41,13 @@ def create_chat_endpoints(services: Dict[str, Any]) -> APIRouter:
     json_router = create_json_routes(get_service)
     chat_router = create_chat_routes(get_service)
     misc_router = create_misc_routes(get_service)
+    vision_router = create_vision_routes(get_service)
 
     # Inclure tous les sous-routers dans le router principal
     router.include_router(json_router, tags=["JSON System"])
     router.include_router(chat_router, tags=["Chat"])
     router.include_router(misc_router, tags=["Miscellaneous"])
+    router.include_router(vision_router, tags=["Vision"])
 
     return router
 

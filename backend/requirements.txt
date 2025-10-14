@@ -32,3 +32,6 @@ toml==0.10.2
 # Security & Serialization
 msgpack>=1.0.7  # Secure serialization (replaces pickle)
 defusedxml>=0.7.1  # Secure XML parsing
+
+# AWS S3 (pour upload images médicales)
+boto3>=1.28.0

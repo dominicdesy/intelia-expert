@@ -338,6 +338,24 @@ except Exception as e:
     qa_quality_router = None
     logger.error("ERREUR import qa_quality router: %s", e)
 
+# Images router (upload S3 images médicales)
+IMAGES_AVAILABLE = False
+try:
+    from .images import router as images_router
+
+    IMAGES_AVAILABLE = True
+    logger.info(
+        "Images router importé avec %d routes", len(images_router.routes)
+    )
+except ImportError:
+    IMAGES_AVAILABLE = False
+    images_router = None
+    logger.warning("Images router non disponible (normal si pas encore créé)")
+except Exception as e:
+    IMAGES_AVAILABLE = False
+    images_router = None
+    logger.error("ERREUR import images router: %s", e)
+
 # Création du router principal
 logger.info("Création du router principal v1...")
 router = APIRouter(prefix="/v1")
@@ -501,6 +519,14 @@ if QA_QUALITY_AVAILABLE and qa_quality_router:
     logger.info("QA Quality router maintenant disponible sur /v1/qa-quality/*")
 else:
     logger.warning("QA Quality router non monté (module non disponible)")
+
+# Images (upload S3 images médicales)
+if IMAGES_AVAILABLE and images_router:
+    router.include_router(images_router, tags=["Images"])
+    logger.info("Images router monté")
+    logger.info("Images router maintenant disponible sur /v1/images/*")
+else:
+    logger.warning("Images router non monté (module non disponible)")
 
 # Résumé final
 total_routes = len(router.routes)
