@@ -229,6 +229,8 @@ export interface TranslationKeys {
   "invitation.success.tokenValidated": string;
   "invitation.success.accountCreated": string;
   "invitation.success.welcome": string;
+  "invitation.pleaseLogin": string;
+  "invitation.accountCreatedPleaseLogin": string;
 
   // ===========================================
   // NAVIGATION
