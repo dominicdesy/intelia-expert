@@ -583,5 +583,7 @@
   "help.historyTitle": "Riwayat",
   "help.historyDesc": "Temukan semua percakapan sebelumnya Anda yang diorganisir berdasarkan tanggal.",
   "help.profileTitle": "Menu pengguna",
-  "help.profileDesc": "Akses profil, pengaturan, dan opsi akun Anda."
+  "help.profileDesc": "Akses profil, pengaturan, dan opsi akun Anda.",
+  "gdpr.signupNotice": "Dengan mengklik \"Buat akun\", Anda menyetujui",
+  "legal.and": "dan"
 }

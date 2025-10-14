@@ -582,5 +582,7 @@
   "help.historyTitle": "Historia",
   "help.historyDesc": "Znajdź wszystkie swoje poprzednie rozmowy uporządkowane według daty.",
   "help.profileTitle": "Menu użytkownika",
-  "help.profileDesc": "Uzyskaj dostęp do swojego profilu, ustawień i opcji konta."
+  "help.profileDesc": "Uzyskaj dostęp do swojego profilu, ustawień i opcji konta.",
+  "gdpr.signupNotice": "Klikając \"Utwórz konto\", akceptujesz nasze",
+  "legal.and": "i naszą"
 }

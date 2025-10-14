@@ -104,8 +104,8 @@ export const AdModal: React.FC<AdModalProps> = ({
             {/* Image principale */}
             <div className="lg:w-1/2">
               <img
-                src="/images/poultry-ai-ad.jpg"
-                alt="AI in Poultry Industry"
+                src={adData.imageUrl}
+                alt={adData.title}
                 className="w-full h-full object-cover rounded-xl shadow-lg"
               />
             </div>

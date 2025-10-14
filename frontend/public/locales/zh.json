@@ -582,5 +582,7 @@
   "help.historyTitle": "历史记录",
   "help.historyDesc": "查找按日期组织的所有以前的对话。",
   "help.profileTitle": "用户菜单",
-  "help.profileDesc": "访问您的个人资料、设置和账户选项。"
+  "help.profileDesc": "访问您的个人资料、设置和账户选项。",
+  "gdpr.signupNotice": "点击\"创建账户\"即表示您同意我们的",
+  "legal.and": "和"
 }

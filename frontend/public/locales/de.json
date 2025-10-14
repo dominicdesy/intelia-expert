@@ -230,6 +230,8 @@
   "chat.feedbackGeneralError": "Allgemeiner Feedback-Fehler:",
   "chat.redirectingInProgress": "Weiterleitung läuft...",
   "gdpr.notice": "Durch die Anmeldung stimmen Sie unseren Nutzungsbedingungen und Datenschutzrichtlinien zu.",
+  "gdpr.signupNotice": "Durch Klicken auf \"Konto erstellen\" stimmen Sie unseren",
+  "legal.and": "und unserer",
   "legal.terms": "Nutzungsbedingungen",
   "legal.privacy": "Datenschutzrichtlinie",
   "login.email": "E-Mail-Adresse",

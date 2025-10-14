@@ -582,5 +582,7 @@
   "help.historyTitle": "Geçmiş",
   "help.historyDesc": "Tarihe göre düzenlenmiş tüm önceki konuşmalarınızı bulun.",
   "help.profileTitle": "Kullanıcı Menüsü",
-  "help.profileDesc": "Profilinize, ayarlarınıza ve hesap seçeneklerinize erişin."
+  "help.profileDesc": "Profilinize, ayarlarınıza ve hesap seçeneklerinize erişin.",
+  "gdpr.signupNotice": "\"Hesap oluştur\"a tıklayarak,",
+  "legal.and": "ve"
 }

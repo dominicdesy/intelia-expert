@@ -582,5 +582,7 @@
   "help.historyTitle": "Lịch sử",
   "help.historyDesc": "Tìm tất cả các cuộc trò chuyện trước đây của bạn được sắp xếp theo ngày.",
   "help.profileTitle": "Menu người dùng",
-  "help.profileDesc": "Truy cập hồ sơ, cài đặt và các tùy chọn tài khoản của bạn."
+  "help.profileDesc": "Truy cập hồ sơ, cài đặt và các tùy chọn tài khoản của bạn.",
+  "gdpr.signupNotice": "Bằng cách nhấp vào \"Tạo tài khoản\", bạn đồng ý với",
+  "legal.and": "và"
 }

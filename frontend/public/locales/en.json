@@ -231,6 +231,8 @@
   "chat.feedbackGeneralError": "General feedback error:",
   "chat.redirectingInProgress": "Redirecting in progress...",
   "gdpr.notice": "By signing in, you agree to our terms of service and privacy policy.",
+  "gdpr.signupNotice": "By clicking \"Create account\", you agree to our",
+  "legal.and": "and our",
   "legal.terms": "Terms of Service",
   "legal.privacy": "Privacy Policy",
   "login.email": "Email address",

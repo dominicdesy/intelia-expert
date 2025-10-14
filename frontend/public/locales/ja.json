@@ -582,5 +582,7 @@
   "help.historyTitle": "履歴",
   "help.historyDesc": "日付別に整理された以前の会話をすべて見つけます。",
   "help.profileTitle": "ユーザーメニュー",
-  "help.profileDesc": "プロフィール、設定、アカウントオプションにアクセスします。"
+  "help.profileDesc": "プロフィール、設定、アカウントオプションにアクセスします。",
+  "gdpr.signupNotice": "「アカウントを作成」をクリックすることで、当社の",
+  "legal.and": "と"
 }

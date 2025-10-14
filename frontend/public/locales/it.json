@@ -583,5 +583,7 @@
   "help.historyTitle": "Cronologia",
   "help.historyDesc": "Trova tutte le tue conversazioni precedenti organizzate per data.",
   "help.profileTitle": "Menu utente",
-  "help.profileDesc": "Accedi al tuo profilo, impostazioni e opzioni dell'account."
+  "help.profileDesc": "Accedi al tuo profilo, impostazioni e opzioni dell'account.",
+  "gdpr.signupNotice": "Facendo clic su \"Crea account\", accetti i nostri",
+  "legal.and": "e la nostra"
 }

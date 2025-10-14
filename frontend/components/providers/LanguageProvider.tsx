@@ -27,12 +27,15 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           // Attendre que i18n.ts termine son initialisation
           setTimeout(() => {
             document.documentElement.classList.add("language-ready");
+            // Émettre l'événement pour le script anti-flash
+            window.dispatchEvent(new Event("languageReady"));
             secureLog.log("[LanguageProvider] 🎯 Interface prête - Flash évité");
-          }, 200); // Délai plus long pour laisser i18n.ts finir
+          }, 500); // Délai augmenté pour iOS/iPad
         } catch (error) {
           secureLog.error("[LanguageProvider] Erreur initialisation:", error);
           // En cas d'erreur, forcer l'affichage pour éviter un écran noir
           document.documentElement.classList.add("language-ready");
+          window.dispatchEvent(new Event("languageReady"));
         } finally {
           hasInitializedRef.current = true;
           isInitializingRef.current = false;
@@ -86,6 +89,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           "[LanguageProvider] ⚠️ Timeout sécurité atteint - Affichage forcé",
         );
         document.documentElement.classList.add("language-ready");
+        window.dispatchEvent(new Event("languageReady"));
       }
     }, 3000); // 3 secondes max pour laisser le temps à i18n.ts
 

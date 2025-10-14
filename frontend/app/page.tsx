@@ -45,7 +45,7 @@ const LanguageSelector = () => {
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="flex items-center space-x-2 px-4 py-2.5 text-sm bg-white border border-blue-200 rounded-xl shadow-sm hover:bg-blue-50 transition-all duration-300 text-blue-700 relative z-50"
+        className="flex items-center space-x-2 px-4 py-2.5 text-sm bg-white border border-blue-200 rounded-xl shadow-sm hover:bg-blue-50 transition-all duration-300 text-blue-700 relative z-[10000]"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
       >
@@ -69,10 +69,10 @@ const LanguageSelector = () => {
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-[9999]"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-blue-200 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto">
+          <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-blue-200 rounded-xl shadow-xl z-[10001] max-h-64 overflow-y-auto">
             {availableLanguages.map((lang) => (
               <button
                 key={lang.code}
@@ -480,7 +480,7 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-white">
+    <div className="min-h-screen relative overflow-auto bg-white">
       {/* Background avec lignes de démarcation bleues */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Formes géométriques bleues subtiles */}
@@ -488,7 +488,7 @@ function LoginPageContent() {
       </div>
 
       {/* Sélecteur de langue */}
-      <div className="absolute top-6 right-6 z-[1000]">
+      <div className="absolute top-6 right-6 z-[10000]">
         <LanguageSelector />
       </div>
 

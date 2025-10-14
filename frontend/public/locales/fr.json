@@ -231,6 +231,8 @@
   "chat.feedbackGeneralError": "Erreur générale feedback:",
   "chat.redirectingInProgress": "Redirection en cours...",
   "gdpr.notice": "En vous connectant, vous acceptez nos conditions d'utilisation et notre politique de confidentialité.",
+  "gdpr.signupNotice": "En cliquant sur « Créer un compte », vous acceptez nos",
+  "legal.and": "et notre",
   "legal.terms": "Conditions d'utilisation",
   "legal.privacy": "Politique de confidentialité",
   "login.email": "Adresse courriel",

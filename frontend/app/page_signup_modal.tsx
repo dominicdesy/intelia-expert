@@ -887,7 +887,7 @@ export function SignupModal({
           {/* Texte légal */}
           <div className="mb-10 mt-0 text-center">
             <p className="text-xs text-gray-500 leading-relaxed">
-              En cliquant sur « Créer un compte », vous acceptez nos{" "}
+              {safeT("gdpr.signupNotice")}{" "}
               <a
                 href="/terms"
                 target="_blank"
@@ -896,7 +896,7 @@ export function SignupModal({
               >
                 {safeT("legal.terms")}
               </a>{" "}
-              et notre{" "}
+              {safeT("legal.and")}{" "}
               <a
                 href="/privacy"
                 target="_blank"
