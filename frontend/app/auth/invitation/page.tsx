@@ -818,7 +818,8 @@ function InvitationAcceptPageContent() {
       // IMPORTANT: Déconnecter la session Supabase temporaire AVANT de rediriger vers login
       setTimeout(async () => {
         secureLog.log("[InvitationAccept] Déconnexion session temporaire avant redirection...");
-        await supabase.auth.signOut();
+        // Utiliser scope: 'local' pour éviter l'erreur 403 (le client anonyme ne peut pas faire de signOut global)
+        await supabase.auth.signOut({ scope: 'local' });
         secureLog.log("[InvitationAccept] Redirection vers login avec succès");
         router.push(`/?success=${encodeURIComponent(t("invitation.accountCreatedPleaseLogin"))}`);
       }, 3000);

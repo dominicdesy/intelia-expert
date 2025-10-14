@@ -1,0 +1,717 @@
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="x-apple-disable-message-reformatting" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Intelia Expert - Invitation</title>
+</head>
+<body style="margin:0;padding:0;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7f9;">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="padding:32px 40px 24px;text-align:center;border-bottom:1px solid #e5e7eb;">
+              <div style="font-size:24px;font-weight:700;color:#111827;">Intelia Technologies</div>
+              <div style="font-size:14px;color:#6b7280;margin-top:4px;">Intelia Expert</div>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding:40px 40px 32px;">
+
+              {{ if eq .Data.language "fr" }}
+                <!-- French -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Invitation à rejoindre Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Bonjour{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  Vous avez été invité(e) à créer un compte sur <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} par <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Cliquez sur le bouton ci-dessous pour accepter l'invitation et créer votre compte :
+                </p>
+
+                <!-- Button -->
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Accepter l'invitation
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Ou copiez et collez ce lien dans votre navigateur :
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Important :</strong> Ce lien d'invitation est valide pour une durée limitée. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer ce courriel en toute sécurité.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "en" }}
+                <!-- English -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Invitation to join Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Hello{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  You've been invited to create an account on <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} by <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Click the button below to accept the invitation and create your account:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Accept the invitation
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Or copy and paste this link into your browser:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Important:</strong> This invitation link is valid for a limited time. If you did not request this, you can safely ignore this email.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "es" }}
+                <!-- Spanish -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Invitación para unirse a Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Hola{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  Has sido invitado(a) a crear una cuenta en <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} por <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Haz clic en el botón a continuación para aceptar la invitación y crear tu cuenta:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Aceptar la invitación
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  O copia y pega este enlace en tu navegador:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Importante:</strong> Este enlace de invitación es válido por tiempo limitado. Si no solicitaste esto, puedes ignorar este correo de forma segura.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "de" }}
+                <!-- German -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Einladung zu Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Hallo{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  Sie wurden eingeladen, ein Konto bei <strong>Intelia Expert</strong> zu erstellen{{ if .Data.invited_by_email }} von <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Klicken Sie auf die Schaltfläche unten, um die Einladung anzunehmen und Ihr Konto zu erstellen:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Einladung annehmen
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Oder kopieren Sie diesen Link in Ihren Browser:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Wichtig:</strong> Dieser Einladungslink ist zeitlich begrenzt gültig. Wenn Sie dies nicht angefordert haben, können Sie diese E-Mail sicher ignorieren.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "pt" }}
+                <!-- Portuguese -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Convite para participar do Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Olá{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  Você foi convidado(a) a criar uma conta no <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} por <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Clique no botão abaixo para aceitar o convite e criar sua conta:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Aceitar o convite
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Ou copie e cole este link no seu navegador:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Importante:</strong> Este link de convite é válido por tempo limitado. Se você não solicitou isso, pode ignorar este e-mail com segurança.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "it" }}
+                <!-- Italian -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Invito a partecipare a Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Ciao{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  Sei stato(a) invitato(a) a creare un account su <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} da <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Fai clic sul pulsante qui sotto per accettare l'invito e creare il tuo account:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Accetta l'invito
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Oppure copia e incolla questo link nel tuo browser:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Importante:</strong> Questo link di invito è valido per un periodo limitato. Se non hai richiesto questo, puoi ignorare questa email in tutta sicurezza.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "nl" }}
+                <!-- Dutch -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Uitnodiging om lid te worden van Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Hallo{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  Je bent uitgenodigd om een account aan te maken bij <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} door <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Klik op de knop hieronder om de uitnodiging te accepteren en je account aan te maken:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Accepteer de uitnodiging
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Of kopieer en plak deze link in je browser:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Belangrijk:</strong> Deze uitnodigingslink is beperkt geldig. Als je dit niet hebt aangevraagd, kun je deze e-mail veilig negeren.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "pl" }}
+                <!-- Polish -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Zaproszenie do dołączenia do Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Cześć{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  Zostałeś(-aś) zaproszony(-a) do utworzenia konta w <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} przez <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Kliknij poniższy przycisk, aby zaakceptować zaproszenie i utworzyć konto:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Zaakceptuj zaproszenie
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Lub skopiuj i wklej ten link do przeglądarki:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Ważne:</strong> Ten link zaproszenia jest ważny przez ograniczony czas. Jeśli nie prosiłeś(-aś) o to, możesz bezpiecznie zignorować tę wiadomość.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "zh" }}
+                <!-- Chinese -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">加入 Intelia Expert 的邀请</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">您好{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }}，</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  您已被邀请在 <strong>Intelia Expert</strong> 创建帐户{{ if .Data.invited_by_email }}，邀请者为 <strong>{{ .Data.invited_by_email }}</strong>{{ end }}。
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  点击下方按钮接受邀请并创建您的帐户：
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        接受邀请
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  或复制并粘贴此链接到您的浏览器：
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>重要：</strong>此邀请链接仅在有限时间内有效。如果您未请求此操作，可以安全地忽略此邮件。
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "hi" }}
+                <!-- Hindi -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Intelia Expert में शामिल होने का निमंत्रण</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">नमस्ते{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  आपको <strong>Intelia Expert</strong> पर खाता बनाने के लिए आमंत्रित किया गया है{{ if .Data.invited_by_email }} <strong>{{ .Data.invited_by_email }}</strong> द्वारा{{ end }}।
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  निमंत्रण स्वीकार करने और अपना खाता बनाने के लिए नीचे दिए गए बटन पर क्लिक करें:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        निमंत्रण स्वीकार करें
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  या इस लिंक को कॉपी करके अपने ब्राउज़र में पेस्ट करें:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>महत्वपूर्ण:</strong> यह निमंत्रण लिंक सीमित समय के लिए मान्य है। यदि आपने इसका अनुरोध नहीं किया है, तो आप इस ईमेल को सुरक्षित रूप से अनदेखा कर सकते हैं।
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "id" }}
+                <!-- Indonesian -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Undangan untuk bergabung dengan Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Halo{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  Anda telah diundang untuk membuat akun di <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} oleh <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Klik tombol di bawah ini untuk menerima undangan dan membuat akun Anda:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Terima undangan
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Atau salin dan tempel tautan ini ke browser Anda:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Penting:</strong> Tautan undangan ini berlaku untuk waktu terbatas. Jika Anda tidak meminta ini, Anda dapat dengan aman mengabaikan email ini.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "th" }}
+                <!-- Thai -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">คำเชิญให้เข้าร่วม Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">สวัสดี{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  คุณได้รับเชิญให้สร้างบัญชีใน <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} โดย <strong>{{ .Data.invited_by_email }}</strong>{{ end }}
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  คลิกปุ่มด้านล่างเพื่อยอมรับคำเชิญและสร้างบัญชีของคุณ:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        ยอมรับคำเชิญ
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  หรือคัดลอกและวางลิงก์นี้ในเบราว์เซอร์ของคุณ:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>สำคัญ:</strong> ลิงก์คำเชิญนี้ใช้ได้เพียงระยะเวลาจำกัด หากคุณไม่ได้ขอสิ่งนี้ คุณสามารถเพิกเฉยอีเมลนี้ได้อย่างปลอดภัย
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "ja" }}
+                <!-- Japanese -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Intelia Expert への招待</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">こんにちは{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }}さん、</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  <strong>Intelia Expert</strong> のアカウント作成に招待されました{{ if .Data.invited_by_email }}。招待者: <strong>{{ .Data.invited_by_email }}</strong>{{ end }}。
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  下のボタンをクリックして招待を受け入れ、アカウントを作成してください：
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        招待を受け入れる
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  または、このリンクをブラウザにコピー＆ペーストしてください：
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>重要：</strong>この招待リンクは期間限定で有効です。このリクエストに覚えがない場合は、このメールを無視しても問題ありません。
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "tr" }}
+                <!-- Turkish -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Intelia Expert'e katılma daveti</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Merhaba{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  <strong>Intelia Expert</strong>'te hesap oluşturmak için davet edildiniz{{ if .Data.invited_by_email }}, davet eden: <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Daveti kabul etmek ve hesabınızı oluşturmak için aşağıdaki düğmeye tıklayın:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Daveti kabul et
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Veya bu bağlantıyı kopyalayıp tarayıcınıza yapıştırın:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Önemli:</strong> Bu davet bağlantısı sınırlı bir süre için geçerlidir. Bunu talep etmediyseniz, bu e-postayı güvenle görmezden gelebilirsiniz.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "vi" }}
+                <!-- Vietnamese -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Lời mời tham gia Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Xin chào{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  Bạn đã được mời tạo tài khoản trên <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} bởi <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Nhấp vào nút bên dưới để chấp nhận lời mời và tạo tài khoản của bạn:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Chấp nhận lời mời
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Hoặc sao chép và dán liên kết này vào trình duyệt của bạn:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Quan trọng:</strong> Liên kết lời mời này chỉ có hiệu lực trong thời gian giới hạn. Nếu bạn không yêu cầu điều này, bạn có thể bỏ qua email này một cách an toàn.
+                  </p>
+                </div>
+
+              {{ else if eq .Data.language "ar" }}
+                <!-- Arabic -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">دعوة للانضمام إلى Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">مرحباً{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }}،</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  تمت دعوتك لإنشاء حساب على <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} من قبل <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  انقر على الزر أدناه لقبول الدعوة وإنشاء حسابك:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        قبول الدعوة
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  أو انسخ والصق هذا الرابط في متصفحك:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>هام:</strong> رابط الدعوة هذا صالح لفترة محدودة. إذا لم تطلب هذا، يمكنك تجاهل هذا البريد الإلكتروني بأمان.
+                  </p>
+                </div>
+
+              {{ else }}
+                <!-- Default: English -->
+                <h1 style="margin:0 0 24px;font-size:28px;font-weight:700;color:#111827;line-height:1.2;">Invitation to join Intelia Expert</h1>
+                <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;">Hello{{ if .Data.first_name }} {{ .Data.first_name }}{{ end }},</p>
+                <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">
+                  You've been invited to create an account on <strong>Intelia Expert</strong>{{ if .Data.invited_by_email }} by <strong>{{ .Data.invited_by_email }}</strong>{{ end }}.
+                </p>
+                <p style="margin:0 0 32px;font-size:16px;color:#374151;line-height:1.6;">
+                  Click the button below to accept the invitation and create your account:
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;width:100%;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block;padding:16px 32px;background:#0ea5e9;color:#ffffff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 2px 4px rgba(14,165,233,0.3);">
+                        Accept the invitation
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.5;">
+                  Or copy and paste this link into your browser:
+                </p>
+                <p style="margin:0 0 24px;font-size:13px;color:#0ea5e9;word-break:break-all;line-height:1.5;">
+                  {{ .ConfirmationURL }}
+                </p>
+
+                <div style="padding:16px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:4px;margin-bottom:24px;">
+                  <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5;">
+                    <strong>Important:</strong> This invitation link is valid for a limited time. If you did not request this, you can safely ignore this email.
+                  </p>
+                </div>
+              {{ end }}
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 40px;background:#f9fafb;border-top:1px solid #e5e7eb;text-align:center;">
+              <p style="margin:0 0 8px;font-size:14px;color:#374151;">
+                {{ if eq .Data.language "fr" }}
+                  Cordialement,
+                {{ else if eq .Data.language "es" }}
+                  Atentamente,
+                {{ else if eq .Data.language "de" }}
+                  Mit freundlichen Grüßen,
+                {{ else if eq .Data.language "pt" }}
+                  Atenciosamente,
+                {{ else if eq .Data.language "it" }}
+                  Cordiali saluti,
+                {{ else if eq .Data.language "nl" }}
+                  Met vriendelijke groet,
+                {{ else if eq .Data.language "pl" }}
+                  Z poważaniem,
+                {{ else if eq .Data.language "zh" }}
+                  此致敬礼，
+                {{ else if eq .Data.language "hi" }}
+                  सादर,
+                {{ else if eq .Data.language "id" }}
+                  Hormat kami,
+                {{ else if eq .Data.language "th" }}
+                  ขอแสดงความนับถือ,
+                {{ else if eq .Data.language "ja" }}
+                  敬具,
+                {{ else if eq .Data.language "tr" }}
+                  Saygılarımızla,
+                {{ else if eq .Data.language "vi" }}
+                  Trân trọng,
+                {{ else if eq .Data.language "ar" }}
+                  مع أطيب التحيات،
+                {{ else }}
+                  Best regards,
+                {{ end }}
+              </p>
+              <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#111827;">
+                Intelia Technologies
+              </p>
+              <p style="margin:0;font-size:13px;color:#6b7280;">
+                <a href="https://expert.intelia.com" style="color:#0ea5e9;text-decoration:none;">expert.intelia.com</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Footer text -->
+        <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;text-align:center;">
+          {{ if eq .Data.language "fr" }}
+            Ce courriel a été envoyé à {{ .Email }}
+          {{ else if eq .Data.language "es" }}
+            Este correo fue enviado a {{ .Email }}
+          {{ else if eq .Data.language "de" }}
+            Diese E-Mail wurde an {{ .Email }} gesendet
+          {{ else if eq .Data.language "pt" }}
+            Este e-mail foi enviado para {{ .Email }}
+          {{ else if eq .Data.language "it" }}
+            Questa email è stata inviata a {{ .Email }}
+          {{ else if eq .Data.language "nl" }}
+            Deze e-mail is verzonden naar {{ .Email }}
+          {{ else if eq .Data.language "pl" }}
+            Ten e-mail został wysłany do {{ .Email }}
+          {{ else if eq .Data.language "zh" }}
+            此电子邮件已发送至 {{ .Email }}
+          {{ else if eq .Data.language "hi" }}
+            यह ईमेल {{ .Email }} को भेजा गया था
+          {{ else if eq .Data.language "id" }}
+            Email ini dikirim ke {{ .Email }}
+          {{ else if eq .Data.language "th" }}
+            อีเมลนี้ถูกส่งไปที่ {{ .Email }}
+          {{ else if eq .Data.language "ja" }}
+            このメールは {{ .Email }} に送信されました
+          {{ else if eq .Data.language "tr" }}
+            Bu e-posta {{ .Email }} adresine gönderildi
+          {{ else if eq .Data.language "vi" }}
+            Email này đã được gửi đến {{ .Email }}
+          {{ else if eq .Data.language "ar" }}
+            تم إرسال هذا البريد الإلكتروني إلى {{ .Email }}
+          {{ else }}
+            This email was sent to {{ .Email }}
+          {{ end }}
+        </p>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

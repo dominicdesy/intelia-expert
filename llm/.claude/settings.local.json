@@ -62,7 +62,8 @@
       "Bash(del C:/intelia_gpt/intelia-expert/frontend/add_translation_keys.py)",
       "Bash(dir \"C:\\intelia_gpt\\intelia-expert\\frontend\\app\\auth\\callback\")",
       "Bash(curl -s \"https://expert.intelia.com/auth/callback\" -I)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
