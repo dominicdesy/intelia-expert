@@ -320,8 +320,6 @@ export const LoadingSpinner = ({
 
 // Footer avec liens
 export const AuthFooter = ({ t }: { t: any }) => {
-  const { t: safeT } = useTranslation();
-
   return (
     <div className="mt-6 text-center">
       <p className="text-xs text-gray-500">
@@ -329,7 +327,7 @@ export const AuthFooter = ({ t }: { t: any }) => {
         <Link href="/terms" className="text-blue-600 hover:text-blue-500">
           {t.terms}
         </Link>{" "}
-        {safeT("legal.and")}{" "}
+        {t("common.and") || "and"}{" "}
         <Link href="/privacy" className="text-blue-600 hover:text-blue-500">
           {t.privacy}
         </Link>
