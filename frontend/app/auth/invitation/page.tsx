@@ -334,7 +334,7 @@ const ProcessingStatus = ({ result }: { result: ProcessingResult }) => {
 
       {result.success && result.step === "completion" && (
         <div className="text-sm text-gray-600">
-          <p>{t("invitation.redirecting.login") || "Redirection vers la page de connexion..."}</p>
+          <p>{t("invitation.redirecting.login")}</p>
           <div className="mt-2">
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div

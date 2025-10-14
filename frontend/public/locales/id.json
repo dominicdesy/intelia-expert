@@ -589,5 +589,7 @@
   "gdpr.signupNotice": "Dengan mengklik \"Buat akun\", Anda menyetujui",
   "legal.and": "dan",
   "auth.creating": "Membuat...",
-  "auth.accountCreated": "Akun dibuat!"
+  "auth.accountCreated": "Akun dibuat!",
+  "invitation.pleaseLogin": "Silakan login untuk mengakses akun Anda.",
+  "invitation.accountCreatedPleaseLogin": "Akun Anda berhasil dibuat! Silakan login untuk melanjutkan."
 }

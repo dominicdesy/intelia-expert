@@ -588,5 +588,7 @@
   "gdpr.signupNotice": "\"Hesap oluştur\"a tıklayarak,",
   "legal.and": "ve",
   "auth.creating": "Oluşturuluyor...",
-  "auth.accountCreated": "Hesap oluşturuldu!"
+  "auth.accountCreated": "Hesap oluşturuldu!",
+  "invitation.pleaseLogin": "Hesabınıza erişmek için lütfen giriş yapın.",
+  "invitation.accountCreatedPleaseLogin": "Hesabınız başarıyla oluşturuldu! Devam etmek için lütfen giriş yapın."
 }

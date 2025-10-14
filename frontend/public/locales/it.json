@@ -589,5 +589,7 @@
   "gdpr.signupNotice": "Facendo clic su \"Crea account\", accetti i nostri",
   "legal.and": "e la nostra",
   "auth.creating": "Creazione in corso...",
-  "auth.accountCreated": "Account creato!"
+  "auth.accountCreated": "Account creato!",
+  "invitation.pleaseLogin": "Effettua il login per accedere al tuo account.",
+  "invitation.accountCreatedPleaseLogin": "Il tuo account è stato creato con successo! Effettua il login per continuare."
 }

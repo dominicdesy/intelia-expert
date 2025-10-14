@@ -588,5 +588,7 @@
   "gdpr.signupNotice": "\"खाता बनाएं\" पर क्लिक करके, आप हमारी",
   "legal.and": "और हमारी",
   "auth.creating": "बनाया जा रहा है...",
-  "auth.accountCreated": "खाता बनाया गया!"
+  "auth.accountCreated": "खाता बनाया गया!",
+  "invitation.pleaseLogin": "कृपया अपने खाते तक पहुंचने के लिए लॉगिन करें।",
+  "invitation.accountCreatedPleaseLogin": "आपका खाता सफलतापूर्वक बनाया गया है! जारी रखने के लिए कृपया लॉगिन करें।"
 }

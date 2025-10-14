@@ -587,5 +587,7 @@
   "gdpr.signupNotice": "Ao clicar em \"Criar conta\", você concorda com nossos",
   "legal.and": "e nossa",
   "auth.creating": "Criando...",
-  "auth.accountCreated": "Conta criada!"
+  "auth.accountCreated": "Conta criada!",
+  "invitation.pleaseLogin": "Por favor, faça login para acessar sua conta.",
+  "invitation.accountCreatedPleaseLogin": "Sua conta foi criada com sucesso! Por favor, faça login para continuar."
 }

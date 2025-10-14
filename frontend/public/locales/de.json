@@ -588,5 +588,7 @@
   "help.profileTitle": "Benutzermenü",
   "help.profileDesc": "Greifen Sie auf Ihr Profil, Einstellungen und Kontooptionen zu.",
   "auth.creating": "Wird erstellt...",
-  "auth.accountCreated": "Konto erstellt!"
+  "auth.accountCreated": "Konto erstellt!",
+  "invitation.pleaseLogin": "Bitte melden Sie sich an, um auf Ihr Konto zuzugreifen.",
+  "invitation.accountCreatedPleaseLogin": "Ihr Konto wurde erfolgreich erstellt! Bitte melden Sie sich an, um fortzufahren."
 }

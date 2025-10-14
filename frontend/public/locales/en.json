@@ -349,6 +349,8 @@
   "invitation.success.tokenValidated": "Invitation token validated",
   "invitation.success.accountCreated": "Account created successfully!",
   "invitation.success.welcome": "Welcome! Your Intelia Expert account has been created successfully.",
+  "invitation.pleaseLogin": "Please log in to access your account.",
+  "invitation.accountCreatedPleaseLogin": "Your account has been created successfully! Please log in to continue.",
   "validation.required.firstName": "First name is required",
   "validation.required.lastName": "Last name is required",
   "validation.required.fullName": "Full name is required",

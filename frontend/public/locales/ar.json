@@ -588,5 +588,7 @@
   "gdpr.signupNotice": "بالنقر على \"إنشاء حساب\"، فإنك توافق على",
   "legal.and": "و",
   "auth.creating": "جارٍ الإنشاء...",
-  "auth.accountCreated": "تم إنشاء الحساب!"
+  "auth.accountCreated": "تم إنشاء الحساب!",
+  "invitation.pleaseLogin": "يرجى تسجيل الدخول للوصول إلى حسابك.",
+  "invitation.accountCreatedPleaseLogin": "تم إنشاء حسابك بنجاح! يرجى تسجيل الدخول للمتابعة."
 }

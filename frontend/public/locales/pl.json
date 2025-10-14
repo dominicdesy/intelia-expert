@@ -588,5 +588,7 @@
   "gdpr.signupNotice": "Klikając \"Utwórz konto\", akceptujesz nasze",
   "legal.and": "i naszą",
   "auth.creating": "Tworzenie...",
-  "auth.accountCreated": "Konto utworzone!"
+  "auth.accountCreated": "Konto utworzone!",
+  "invitation.pleaseLogin": "Zaloguj się, aby uzyskać dostęp do swojego konta.",
+  "invitation.accountCreatedPleaseLogin": "Twoje konto zostało pomyślnie utworzone! Zaloguj się, aby kontynuować."
 }

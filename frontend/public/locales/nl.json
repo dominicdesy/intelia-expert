@@ -588,5 +588,7 @@
   "gdpr.signupNotice": "Door op \"Account maken\" te klikken, gaat u akkoord met onze",
   "legal.and": "en ons",
   "auth.creating": "Bezig met aanmaken...",
-  "auth.accountCreated": "Account aangemaakt!"
+  "auth.accountCreated": "Account aangemaakt!",
+  "invitation.pleaseLogin": "Log in om toegang te krijgen tot uw account.",
+  "invitation.accountCreatedPleaseLogin": "Uw account is succesvol aangemaakt! Log in om door te gaan."
 }

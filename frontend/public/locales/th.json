@@ -588,5 +588,7 @@
   "gdpr.signupNotice": "โดยการคลิก \"สร้างบัญชี\" คุณยอมรับ",
   "legal.and": "และ",
   "auth.creating": "กำลังสร้าง...",
-  "auth.accountCreated": "สร้างบัญชีแล้ว!"
+  "auth.accountCreated": "สร้างบัญชีแล้ว!",
+  "invitation.pleaseLogin": "โปรดเข้าสู่ระบบเพื่อเข้าถึงบัญชีของคุณ",
+  "invitation.accountCreatedPleaseLogin": "บัญชีของคุณถูกสร้างเรียบร้อยแล้ว! โปรดเข้าสู่ระบบเพื่อดำเนินการต่อ"
 }

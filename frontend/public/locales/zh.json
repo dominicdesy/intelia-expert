@@ -588,5 +588,7 @@
   "gdpr.signupNotice": "点击\"创建账户\"即表示您同意我们的",
   "legal.and": "和",
   "auth.creating": "创建中...",
-  "auth.accountCreated": "账户已创建！"
+  "auth.accountCreated": "账户已创建！",
+  "invitation.pleaseLogin": "请登录以访问您的帐户。",
+  "invitation.accountCreatedPleaseLogin": "您的帐户已成功创建！请登录以继续。"
 }

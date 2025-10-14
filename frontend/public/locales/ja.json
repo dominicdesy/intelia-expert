@@ -588,5 +588,7 @@
   "gdpr.signupNotice": "「アカウントを作成」をクリックすることで、当社の",
   "legal.and": "と",
   "auth.creating": "作成中...",
-  "auth.accountCreated": "アカウント作成完了!"
+  "auth.accountCreated": "アカウント作成完了!",
+  "invitation.pleaseLogin": "アカウントにアクセスするにはログインしてください。",
+  "invitation.accountCreatedPleaseLogin": "アカウントが正常に作成されました！続行するにはログインしてください。"
 }

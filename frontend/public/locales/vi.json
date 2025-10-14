@@ -588,5 +588,7 @@
   "gdpr.signupNotice": "Bằng cách nhấp vào \"Tạo tài khoản\", bạn đồng ý với",
   "legal.and": "và",
   "auth.creating": "Đang tạo...",
-  "auth.accountCreated": "Đã tạo tài khoản!"
+  "auth.accountCreated": "Đã tạo tài khoản!",
+  "invitation.pleaseLogin": "Vui lòng đăng nhập để truy cập tài khoản của bạn.",
+  "invitation.accountCreatedPleaseLogin": "Tài khoản của bạn đã được tạo thành công! Vui lòng đăng nhập để tiếp tục."
 }
