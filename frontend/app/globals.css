@@ -3,62 +3,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === SOLUTION ANTI-FLASH POUR LES LANGUES === */
-/* IMPORTANT : Ajouté en premier pour éviter tout conflit */
-
-/* Masquer le contenu pendant l'initialisation des langues */
-html {
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
-}
-
-/* Afficher une fois que les langues sont prêtes */
-html.language-ready {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.2s ease-in-out;
-}
-
-/* Loader pendant l'initialisation - Ne s'affiche que si nécessaire */
-html:not(.language-ready) body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  z-index: 99999;
-  display: block;
-}
-
-html:not(.language-ready) body::after {
-  content: 'Intelia Expert';
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  font-size: 24px;
-  font-weight: 600;
-  z-index: 100000;
-  opacity: 0.9;
-  animation: pulse 1.5s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
-/* Responsive pour le loader */
-@media (max-width: 768px) {
-  html:not(.language-ready) body::after {
-    font-size: 20px;
-  }
-}
+/* === ANTI-FLASH SUPPRIMÉ === */
+/* L'anti-flash est maintenant géré UNIQUEMENT dans layout.tsx */
+/* Ceci évite les conflits et le double-masquage */
 
 /* Base styles avec optimisations mobile */
 @layer base {
@@ -292,7 +239,7 @@ html:not(.language-ready) body::after {
     border-radius: 0.5rem !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: center !important;
+    /* justify-content retiré - laisse les composants le contrôler */
   }
   
   /* Style forcé pour UserMenuButton - Carré arrondi bleu */
@@ -305,7 +252,7 @@ html:not(.language-ready) body::after {
     border-radius: 8px !important; /* Force explicite */
     display: flex !important;
     align-items: center !important;
-    justify-content: center !important;
+    /* justify-content retiré - laisse les composants le contrôler */
     font-size: 0.875rem !important;
     transition: background-color 0.2s !important;
   }
@@ -338,7 +285,7 @@ html:not(.language-ready) body::after {
     z-index: 9998 !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: center !important;
+    /* justify-content retiré - les modales utilisent Tailwind */
     background-color: rgba(0, 0, 0, 0.5) !important;
   }
   
@@ -365,7 +312,7 @@ html:not(.language-ready) body::after {
     z-index: 9999 !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: center !important;
+    /* justify-content retiré - utilise Tailwind justify-center */
     padding: 1rem !important;
     background-color: rgba(0, 0, 0, 0.5) !important;
   }
@@ -447,7 +394,7 @@ html:not(.language-ready) body::after {
     z-index: 99998 !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: center !important;
+    /* justify-content retiré - utilise Tailwind */
   }
 
   /* === STYLES POUR LES RELANCES PROACTIVES === */
@@ -519,7 +466,7 @@ html:not(.language-ready) body::after {
     height: 20px !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: center !important;
+    /* justify-content: center laissé car c'est un petit bouton isolé */
   }
   
   .proactive-notification-close:hover {
