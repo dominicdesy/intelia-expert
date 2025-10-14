@@ -11,14 +11,18 @@ export default function AuthCallback() {
   useEffect(() => {
     console.log("🔵 [DEBUG] useEffect callback déclenché");
 
+    // CAPTURE IMMÉDIATE du hash AVANT qu'il ne soit perdu
+    const initialHash = window.location.hash;
+    const initialHref = window.location.href;
+    console.log("🔵 [DEBUG] Hash capturé immédiatement:", initialHash);
+    console.log("🔵 [DEBUG] URL complète:", initialHref);
+
     const handleCallback = async () => {
       console.log("🔵 [DEBUG] handleCallback appelé");
-      console.log("🔵 [DEBUG] URL:", window.location.href);
 
       try {
         secureLog.log("[AuthCallback] Début traitement callback Supabase");
-        secureLog.log("[AuthCallback] URL complète:", window.location.href);
-        console.log("[AuthCallback PROD] Version: 1.0.0.18");
+        console.log("[AuthCallback PROD] Version: 1.0.0.19");
 
         // PRIORITÉ 1: Vérifier s'il y a un token_hash dans les query params (lien d'invitation personnalisé)
         const urlParams = new URLSearchParams(window.location.search);
@@ -76,15 +80,22 @@ export default function AuthCallback() {
         }
 
         // PRIORITÉ 2: Vérifier s'il y a des tokens dans le hash (OAuth standard)
+        // Utiliser le hash capturé immédiatement au début du useEffect
         console.log("[AuthCallback PROD] Checking hash for tokens...");
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        console.log("[AuthCallback PROD] Hash au moment de la vérification:", window.location.hash);
+        console.log("[AuthCallback PROD] Hash capturé initialement:", initialHash);
+
+        const hashParams = new URLSearchParams(initialHash.substring(1));
         const accessToken = hashParams.get("access_token");
         const refreshToken = hashParams.get("refresh_token");
+        const hashType = hashParams.get("type");
 
         console.log("[AuthCallback PROD] Tokens dans hash:", {
           hasAccessToken: !!accessToken,
           hasRefreshToken: !!refreshToken,
-          hash: window.location.hash
+          hashNow: window.location.hash,
+          hashInitial: initialHash,
+          hashType: hashType
         });
 
         if (accessToken && refreshToken) {
@@ -108,22 +119,24 @@ export default function AuthCallback() {
             userMetadata: data.session?.user?.user_metadata,
           });
 
-          // Déterminer la redirection selon le type dans user_metadata
+          // Déterminer la redirection selon le type dans user_metadata ou hash
           const invitationType = data.session?.user?.user_metadata?.invitation_type;
 
           console.log("[AuthCallback PROD] invitationType:", invitationType);
           console.log("[AuthCallback PROD] typeParam:", typeParam);
+          console.log("[AuthCallback PROD] hashType:", hashType);
           console.log("[AuthCallback PROD] Vérification:", {
             invitationType,
             is_invite_match: invitationType === "invite",
             typeParam_invite: typeParam === "invite",
-            will_redirect_to_invitation: invitationType === "invite" || typeParam === "invite" || typeParam === "invitation"
+            hashType_invite: hashType === "invite",
+            will_redirect_to_invitation: invitationType === "invite" || typeParam === "invite" || hashType === "invite"
           });
 
-          if (invitationType === "invite" || typeParam === "invite" || typeParam === "invitation") {
+          if (invitationType === "invite" || typeParam === "invite" || hashType === "invite") {
             console.log("[AuthCallback PROD] ✅ REDIRECTION VERS /auth/invitation");
             router.push("/auth/invitation");
-          } else if (typeParam === "recovery") {
+          } else if (typeParam === "recovery" || hashType === "recovery") {
             console.log("[AuthCallback PROD] REDIRECTION VERS /auth/reset-password");
             router.push("/auth/reset-password");
           } else {
@@ -200,9 +213,11 @@ export default function AuthCallback() {
       }
     };
 
-    // Délai pour s'assurer que le hash est bien chargé
-    const timer = setTimeout(handleCallback, 100);
-    return () => clearTimeout(timer);
+    // Exécuter immédiatement (pas de délai pour éviter de perdre le hash)
+    handleCallback();
+
+    // Cleanup function
+    return () => {};
   }, [router]);
 
   return (
