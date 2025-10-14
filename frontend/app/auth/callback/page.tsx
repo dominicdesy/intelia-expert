@@ -47,7 +47,7 @@ export default function AuthCallback() {
 
           if (!exchangeResult.success || !exchangeResult.access_token) {
             secureLog.error("[AuthCallback] Échec échange token:", exchangeResult.error);
-            router.push(`/auth/login?error=${encodeURIComponent(exchangeResult.error || "token_exchange_failed")}`);
+            router.push(`/?error=${encodeURIComponent(exchangeResult.error || "token_exchange_failed")}`);
             return;
           }
 
@@ -59,7 +59,7 @@ export default function AuthCallback() {
 
           if (error) {
             secureLog.error("[AuthCallback] Erreur création session:", error);
-            router.push("/auth/login?error=session_creation_failed");
+            router.push("/?error=session_creation_failed");
             return;
           }
 
@@ -119,7 +119,7 @@ export default function AuthCallback() {
 
           if (sessionError || !sessionData.session) {
             secureLog.warn("[AuthCallback] Pas de tokens et pas de session existante");
-            router.push("/auth/login?error=no_session");
+            router.push("/?error=no_session");
             return;
           }
 
@@ -128,7 +128,7 @@ export default function AuthCallback() {
         }
       } catch (error) {
         secureLog.error("[AuthCallback] Erreur traitement callback:", error);
-        router.push("/auth/login?error=callback_failed");
+        router.push("/?error=callback_failed");
       }
     };
 
