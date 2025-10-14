@@ -37,7 +37,7 @@ interface InvitationResponse {
 export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
   onClose,
 }) => {
-  const { t } = useTranslation();
+  const { t, currentLanguage } = useTranslation(); // ✅ Récupérer la langue actuelle de l'interface
   const { user } = useAuthStore(); // ✅ Store unifié uniquement
   const [emails, setEmails] = useState("");
   const [personalMessage, setPersonalMessage] = useState("");
@@ -85,13 +85,12 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
         email: user.email,
         name: user.name || user.firstName || user.email.split("@")[0],
         id: user.id || user.user_id,
-        language: user.language || "fr",
       };
     }
 
     secureLog.log("[InviteFriendModal] Aucun utilisateur dans le store unifié");
     return null;
-  }, [user]);
+  }, [user]); // ✅ Langue retirée de currentUser car elle vient maintenant de useTranslation()
 
   // Validation side effect (conservé)
   useEffect(() => {
@@ -176,7 +175,7 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
           currentUser.email?.split("@")[0] ||
           "Intelia User",
         inviter_email: currentUser.email,
-        language: currentUser.language || "fr",
+        language: currentLanguage || "fr", // ✅ Utiliser la langue ACTUELLE de l'interface, pas celle du profil
         force_send: false,
       };
 
