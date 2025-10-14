@@ -15,7 +15,7 @@ import { Message } from "../../types";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useTranslation } from "@/lib/languages/i18n";
 import { useChatStore } from "./hooks/useChatStore";
-import { generateAIResponse } from "./services/apiService";
+import { generateAIResponse, generateVisionResponse } from "./services/apiService";
 import { conversationService } from "./services/conversationService";
 
 import {
@@ -26,6 +26,8 @@ import {
   ArrowDownIcon,
   ThumbUpIcon,
   ThumbDownIcon,
+  CameraIcon,
+  XMarkIcon,
 } from "./utils/icons";
 import { HistoryMenu } from "./components/HistoryMenu";
 import { UserMenuButton } from "./components/UserMenuButton";
@@ -46,6 +48,9 @@ const ChatInput = React.memo(
     clarificationState,
     isMobileDevice,
     inputRef,
+    selectedImage,
+    onImageSelect,
+    onImageRemove,
     t,
   }: {
     inputMessage: string;
@@ -55,8 +60,13 @@ const ChatInput = React.memo(
     clarificationState: any;
     isMobileDevice: boolean;
     inputRef: React.RefObject<HTMLInputElement>;
+    selectedImage: File | null;
+    onImageSelect: (file: File) => void;
+    onImageRemove: () => void;
     t: (key: string) => string;
   }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -82,49 +92,122 @@ const ChatInput = React.memo(
       [onSendMessage],
     );
 
-    return (
-      <div
-        className={`flex items-center min-h-[48px] w-full ${isMobileDevice ? "mobile-input-container" : "space-x-3"}`}
-      >
-        <div
-          className={`flex-1 ${isMobileDevice ? "mobile-input-wrapper" : ""}`}
-        >
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputMessage}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              clarificationState
-                ? t("chat.clarificationPlaceholder")
-                : t("chat.placeholder")
-            }
-            className={`w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm flex items-center ${isMobileDevice ? "ios-input-fix" : ""}`}
-            disabled={isLoadingChat}
-            aria-label={t("chat.placeholder")}
-            style={{
-              fontSize: isMobileDevice ? "16px" : "14px",
-              WebkitAppearance: "none",
-              borderRadius: isMobileDevice ? "25px" : "9999px",
-            }}
-          />
-        </div>
+    const handleCameraClick = useCallback(() => {
+      fileInputRef.current?.click();
+    }, []);
 
-        <button
-          onClick={handleButtonClick}
-          disabled={isLoadingChat || !inputMessage.trim()}
-          className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${isMobileDevice ? "mobile-send-button" : ""}`}
-          title={isLoadingChat ? t("chat.sending") : t("chat.send")}
-          aria-label={isLoadingChat ? t("chat.sending") : t("chat.send")}
-          style={{
-            minWidth: "48px",
-            width: "48px",
-            height: "48px",
-          }}
+    const handleFileChange = useCallback(
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && file.type.startsWith("image/")) {
+          onImageSelect(file);
+        }
+        // Reset input pour permettre de sélectionner la même image à nouveau
+        e.target.value = "";
+      },
+      [onImageSelect],
+    );
+
+    return (
+      <div className="w-full space-y-2">
+        {/* Image Preview */}
+        {selectedImage && (
+          <div className="flex items-center space-x-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <img
+              src={URL.createObjectURL(selectedImage)}
+              alt="Preview"
+              className="h-16 w-16 object-cover rounded"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-gray-700 truncate">
+                {selectedImage.name}
+              </p>
+              <p className="text-xs text-gray-500">
+                {(selectedImage.size / 1024).toFixed(1)} KB
+              </p>
+            </div>
+            <button
+              onClick={onImageRemove}
+              className="flex-shrink-0 p-1 text-gray-500 hover:text-red-600 transition-colors"
+              title="Retirer l'image"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
+        {/* Input Area */}
+        <div
+          className={`flex items-center min-h-[48px] w-full ${isMobileDevice ? "mobile-input-container" : "space-x-2"}`}
         >
-          <PaperAirplaneIcon />
-        </button>
+          <div
+            className={`flex-1 ${isMobileDevice ? "mobile-input-wrapper" : ""}`}
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputMessage}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                clarificationState
+                  ? t("chat.clarificationPlaceholder")
+                  : selectedImage
+                    ? "Décrivez ce que vous voulez savoir..."
+                    : t("chat.placeholder")
+              }
+              className={`w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm flex items-center ${isMobileDevice ? "ios-input-fix" : ""}`}
+              disabled={isLoadingChat}
+              aria-label={t("chat.placeholder")}
+              style={{
+                fontSize: isMobileDevice ? "16px" : "14px",
+                WebkitAppearance: "none",
+                borderRadius: isMobileDevice ? "25px" : "9999px",
+              }}
+            />
+          </div>
+
+          {/* Hidden File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+
+          {/* Camera Button */}
+          <button
+            onClick={handleCameraClick}
+            disabled={isLoadingChat}
+            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-gray-600 hover:text-blue-600 disabled:text-gray-300 transition-colors rounded-full hover:bg-gray-100 ${selectedImage ? "bg-blue-50 text-blue-600" : ""}`}
+            title="Ajouter une image"
+            aria-label="Ajouter une image"
+            style={{
+              minWidth: "48px",
+              width: "48px",
+              height: "48px",
+            }}
+          >
+            <CameraIcon />
+          </button>
+
+          {/* Send Button */}
+          <button
+            onClick={handleButtonClick}
+            disabled={isLoadingChat || (!inputMessage.trim() && !selectedImage)}
+            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${isMobileDevice ? "mobile-send-button" : ""}`}
+            title={isLoadingChat ? t("chat.sending") : t("chat.send")}
+            aria-label={isLoadingChat ? t("chat.sending") : t("chat.send")}
+            style={{
+              minWidth: "48px",
+              width: "48px",
+              height: "48px",
+            }}
+          >
+            <PaperAirplaneIcon />
+          </button>
+        </div>
       </div>
     );
   },
@@ -351,6 +434,7 @@ function ChatInterface() {
 
   // États séparés pour éviter les cascades de re-renders
   const [inputMessage, setInputMessage] = useState("");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -523,6 +607,17 @@ function ChatInterface() {
     cleaned = cleaned.replace(/\n+\s*$/, "");
 
     return cleaned.trim();
+  }, []);
+
+  // Image handlers
+  const handleImageSelect = useCallback((file: File) => {
+    if (!isMountedRef.current) return;
+    setSelectedImage(file);
+  }, []);
+
+  const handleImageRemove = useCallback(() => {
+    if (!isMountedRef.current) return;
+    setSelectedImage(null);
   }, []);
 
   const processedMessages = useMemo(() => {
@@ -824,8 +919,10 @@ function ChatInterface() {
 	// FONCTION CORRIGÉE POUR STREAMING - Élimine le scintillement
 	const handleSendMessage = useCallback(async () => {
 	  const safeText = inputMessage;
+	  const imageToSend = selectedImage;
 
-	  if (!safeText.trim() || !isMountedRef.current) return;
+	  // Allow send if there's either text or an image
+	  if ((!safeText.trim() && !imageToSend) || !isMountedRef.current) return;
 
 	  const userMessage: Message = {
 		id: Date.now().toString(),
@@ -847,6 +944,7 @@ function ChatInterface() {
 	  // Ajouter le message utilisateur
 	  addMessage(userMessage);
 	  setInputMessage("");
+	  setSelectedImage(null); // Clear the selected image
 	  setIsLoadingChat(true);
 	  setShouldAutoScroll(true);
 	  setIsUserScrolling(false);
@@ -856,70 +954,99 @@ function ChatInterface() {
 	  let messageCreated = false;
 
 	  try {
-		let finalQuestionOrSafeText: string;
+		let response;
 
-		if (clarificationState) {
-		  finalQuestionOrSafeText =
-			clarificationState.originalQuestion + " " + safeText.trim();
-		  setClarificationState(null);
+		// IMAGE ANALYSIS PATH
+		if (imageToSend) {
+		  secureLog.log("[Chat] Sending image for analysis");
+
+		  // Call vision API
+		  response = await generateVisionResponse(
+			imageToSend,
+			safeText.trim() || "Analysez cette image médicale.",
+			user,
+			currentLanguage,
+			conversationIdToSend,
+		  );
+
+		  // Create assistant message immediately with the response
+		  assistantId = `ai-${Date.now()}`;
+		  addMessage({
+			id: assistantId,
+			content: response.response,
+			isUser: false,
+			timestamp: new Date(),
+			conversation_id: response.conversation_id,
+		  });
+		  messageCreated = true;
+
+		// REGULAR TEXT CHAT PATH
 		} else {
-		  finalQuestionOrSafeText = safeText.trim();
-		}
+		  let finalQuestionOrSafeText: string;
 
-		const optimalLevel = undefined;
+		  if (clarificationState) {
+			finalQuestionOrSafeText =
+			  clarificationState.originalQuestion + " " + safeText.trim();
+			setClarificationState(null);
+		  } else {
+			finalQuestionOrSafeText = safeText.trim();
+		  }
 
-		// APPEL AVEC CALLBACKS DE STREAMING
-		const response = await generateAIResponse(
-		  finalQuestionOrSafeText,
-		  user,
-		  currentLanguage,
-		  conversationIdToSend,
-		  optimalLevel,
-		  clarificationState !== null,
-		  clarificationState?.originalQuestion,
-		  clarificationState ? { answer: safeText.trim() } : undefined,
-		  {
-			onDelta: (chunk: string) => {
-			  if (!messageCreated) {
-				assistantId = `ai-${Date.now()}`;
+		  const optimalLevel = undefined;
+
+		  // APPEL AVEC CALLBACKS DE STREAMING
+		  response = await generateAIResponse(
+			finalQuestionOrSafeText,
+			user,
+			currentLanguage,
+			conversationIdToSend,
+			optimalLevel,
+			clarificationState !== null,
+			clarificationState?.originalQuestion,
+			clarificationState ? { answer: safeText.trim() } : undefined,
+			{
+			  onDelta: (chunk: string) => {
+				if (!messageCreated) {
+				  assistantId = `ai-${Date.now()}`;
+				  addMessage({
+					id: assistantId,
+					content: chunk,
+					isUser: false,
+					timestamp: new Date(),
+				  });
+				  messageCreated = true;
+				  setIsLoadingChat(false);
+				} else if (assistantId) {
+				  const currentMessage = useChatStore
+					.getState()
+					.currentConversation?.messages.find(
+					  (m) => m.id === assistantId,
+					);
+				  if (currentMessage) {
+					updateMessage(assistantId, {
+					  content: (currentMessage.content || "") + chunk,
+					});
+				  }
+				}
+			  },
+			  onFinal: (fullText: string) => {
+				if (assistantId) {
+				  updateMessage(assistantId, {
+					content: fullText,
+				  });
+				}
+			  },
+			  onFollowup: (followupMessage: string) => {
 				addMessage({
-				  id: assistantId,
-				  content: chunk,
+				  id: `followup-${Date.now()}`,
+				  content: followupMessage,
 				  isUser: false,
 				  timestamp: new Date(),
 				});
-				messageCreated = true;
-				setIsLoadingChat(false);
-			  } else if (assistantId) {
-				const currentMessage = useChatStore
-				  .getState()
-				  .currentConversation?.messages.find(
-					(m) => m.id === assistantId,
-				  );
-				if (currentMessage) {
-				  updateMessage(assistantId, {
-					content: (currentMessage.content || "") + chunk,
-				  });
-				}
-			  }
+			  },
 			},
-			onFinal: (fullText: string) => {
-			  if (assistantId) {
-				updateMessage(assistantId, {
-				  content: fullText,
-				});
-			  }
-			},
-			onFollowup: (followupMessage: string) => {
-			  addMessage({
-				id: `followup-${Date.now()}`,
-				content: followupMessage,
-				isUser: false,
-				timestamp: new Date(),
-			  });
-			},
-		  },
-		);
+		  );
+		}
 
 		if (!isMountedRef.current) return;
 
@@ -1033,6 +1160,7 @@ function ChatInterface() {
 	  }
 	}, [
 	  inputMessage,
+	  selectedImage,
 	  currentConversation,
 	  addMessage,
 	  updateMessage,
@@ -1421,6 +1549,9 @@ function ChatInterface() {
                 clarificationState={clarificationState}
                 isMobileDevice={isMobileDevice}
                 inputRef={inputRef}
+                selectedImage={selectedImage}
+                onImageSelect={handleImageSelect}
+                onImageRemove={handleImageRemove}
                 t={t}
               />
 

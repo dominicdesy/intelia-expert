@@ -1234,5 +1234,184 @@ export const handleEnhancedNetworkError = (error: any): string => {
   return error?.message || "Une erreur inattendue s'est produite.";
 };
 
+/**
+ * NOUVELLE FONCTION: Analyse d'image médicale avec Claude Vision API
+ */
+export const generateVisionResponse = async (
+  imageFile: File,
+  message: string,
+  user: any,
+  language: string = "fr",
+  conversationId?: string,
+): Promise<EnhancedAIResponse> => {
+  if (!imageFile) {
+    throw new Error("Image requise");
+  }
+
+  if (!user || !user.id) {
+    throw new Error("Utilisateur requis");
+  }
+
+  const finalConversationId = conversationId || generateUUID();
+
+  secureLog.log("[apiService] VISION: Analyse d'image médicale:", {
+    image_name: imageFile.name,
+    image_size: imageFile.size,
+    message_preview: message.substring(0, 50) + "...",
+    session_id: finalConversationId.substring(0, 8) + "...",
+    user_id: user.id,
+  });
+
+  try {
+    // Récupérer tenant_id
+    let tenant_id = "ten_demo";
+
+    try {
+      const authHeaders = await getAuthHeaders();
+      const profileResponse = await fetch(`${API_BASE_URL}/users/profile`, {
+        method: "GET",
+        headers: authHeaders,
+      });
+
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        tenant_id =
+          profileData.tenant_id ||
+          profileData.organization_id ||
+          `user_${user.id}`;
+      } else {
+        tenant_id = `user_${user.id}`;
+      }
+    } catch (error) {
+      secureLog.warn("[apiService] Erreur récupération tenant_id:", error);
+      tenant_id = `user_${user.id}`;
+    }
+
+    // Créer FormData pour l'upload multipart
+    const formData = new FormData();
+    formData.append("file", imageFile);
+    formData.append("message", message);
+    formData.append("tenant_id", tenant_id);
+    formData.append("language", language);
+    formData.append("use_rag_context", "true");
+
+    secureLog.log("[apiService] Envoi vers /llm/chat-with-image...");
+
+    // Appel API Vision
+    const response = await fetch("/llm/chat-with-image", {
+      method: "POST",
+      body: formData, // Pas de Content-Type header - le navigateur le gère automatiquement
+    });
+
+    if (!response.ok) {
+      let errorInfo: any = null;
+      try {
+        const text = await response.text();
+        errorInfo = JSON.parse(text);
+      } catch {
+        errorInfo = {
+          error: `http_${response.status}`,
+          message: `Erreur HTTP ${response.status}`,
+        };
+      }
+
+      secureLog.error("[apiService] Erreur Vision API:", errorInfo);
+      throw new Error(errorInfo?.detail || errorInfo?.message || `Erreur ${response.status}`);
+    }
+
+    const visionData = await response.json();
+    secureLog.log("[apiService] Vision API - Réponse reçue:", {
+      success: visionData.success,
+      analysis_length: visionData.analysis?.length || 0,
+      model: visionData.metadata?.model,
+      tokens: visionData.metadata?.usage?.total_tokens,
+    });
+
+    if (!visionData.success || !visionData.analysis) {
+      throw new Error("Erreur d'analyse d'image");
+    }
+
+    const finalResponse = visionData.analysis;
+
+    // Sauvegarder la conversation (avec l'image en métadonnées)
+    try {
+      const headers = await getAuthHeaders();
+      const payload = {
+        conversation_id: finalConversationId,
+        question: message.trim(),
+        response: finalResponse,
+        user_id: user.id,
+        timestamp: new Date().toISOString(),
+        source: "llm_vision",
+        metadata: {
+          mode: "vision",
+          backend: "llm_backend_vision",
+          image_name: imageFile.name,
+          image_size: imageFile.size,
+          model: visionData.metadata?.model,
+          tokens: visionData.metadata?.usage,
+        },
+      };
+
+      const response_save = await fetch(`${API_BASE_URL}/conversations/save`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (response_save.ok) {
+        secureLog.log("[apiService] Conversation vision sauvegardée");
+      }
+    } catch (saveError) {
+      secureLog.warn("[apiService] Erreur sauvegarde conversation vision:", saveError);
+    }
+
+    // Stocker le session ID
+    storeRecentSessionId(finalConversationId);
+
+    // Construire la réponse dans le format attendu
+    const processedResponse: EnhancedAIResponse = {
+      response: finalResponse,
+      conversation_id: finalConversationId,
+      language: language,
+      timestamp: new Date().toISOString(),
+      mode: "streaming",
+      source: "llm_backend",
+      final_response: finalResponse,
+
+      type: "answer",
+      requires_clarification: false,
+      rag_used: visionData.metadata?.rag_context_used || false,
+      sources: [],
+      confidence_score: 0.9,
+      note: "Généré via Claude Vision API",
+      full_text: finalResponse,
+
+      response_versions: {
+        ultra_concise:
+          finalResponse.length > 200
+            ? finalResponse.substring(0, 150) + "..."
+            : finalResponse,
+        concise:
+          finalResponse.length > 400
+            ? finalResponse.substring(0, 300) + "..."
+            : finalResponse,
+        standard: finalResponse,
+        detailed: finalResponse,
+      },
+    };
+
+    return processedResponse;
+  } catch (error) {
+    secureLog.error("[apiService] Erreur Vision API:", error);
+
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error("Erreur d'analyse d'image avec Claude Vision");
+  }
+};
+
 // Export par défaut
 export default generateAIResponse;
