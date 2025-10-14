@@ -626,16 +626,10 @@ function ChatInterface() {
                      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
       const windowWidth = window.innerWidth;
 
-      let alignment: "flex-start" | "center" = "center";
+      // FORCER À GAUCHE POUR TOUS LES DEVICES (TEST)
+      let alignment: "flex-start" | "center" = "flex-start";
 
-      // iPhone only = left, iPad and Desktop = center
-      if (isIPhone && !isIPad) {
-        console.log("🔵 INTELIA DEBUG: iPhone détecté - Logo à GAUCHE");
-        alignment = "flex-start";
-      } else {
-        console.log("🔵 INTELIA DEBUG: iPad/Desktop - Logo CENTRÉ");
-        alignment = "center";
-      }
+      console.log("🔵 INTELIA DEBUG FORCE: TOUS devices - Logo à GAUCHE");
 
       setLogoAlignment(alignment);
 
