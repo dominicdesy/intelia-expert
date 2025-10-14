@@ -295,27 +295,32 @@ export const useCountries = () => {
 
     // Délai pour éviter les conflits avec l'hydratation
     const timer = setTimeout(async () => {
-      if (isMounted.current) {
-        debugLog(
-          "countries",
-          `Démarrage après délai de 100ms pour ${languageCode}`,
-        );
-        setLoading(true);
-        try {
-          const result = await fetchCountriesGlobal(languageCode);
-          if (isMounted.current) {
-            setCountries(result);
-            setUsingFallback(result === fallbackCountries);
-            setLoading(false);
-          }
-        } catch (error) {
-          debugLog("error", "Erreur dans le timer:", error);
-          if (isMounted.current) {
-            setCountries(fallbackCountries);
-            setUsingFallback(true);
-            setLoading(false);
-          }
-        }
+      // PROTECTION: Vérifier le montage AVANT de commencer
+      if (!isMounted.current) return;
+
+      debugLog(
+        "countries",
+        `Démarrage après délai de 100ms pour ${languageCode}`,
+      );
+      setLoading(true);
+      try {
+        const result = await fetchCountriesGlobal(languageCode);
+
+        // PROTECTION: Vérifier le montage APRÈS l'opération async
+        if (!isMounted.current) return;
+
+        setCountries(result);
+        setUsingFallback(result === fallbackCountries);
+        setLoading(false);
+      } catch (error) {
+        debugLog("error", "Erreur dans le timer:", error);
+
+        // PROTECTION: Vérifier le montage APRÈS l'erreur
+        if (!isMounted.current) return;
+
+        setCountries(fallbackCountries);
+        setUsingFallback(true);
+        setLoading(false);
       }
     }, 100);
 

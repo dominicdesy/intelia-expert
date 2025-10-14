@@ -960,6 +960,7 @@ export const useTranslation = () => {
             secureLog.log(
               `[i18n] Choix utilisateur (localStorage): ${storedLang}`,
             );
+            if (!isMountedRef.current) return; // PROTECTION
             setCurrentLanguage(storedLang);
             return;
           }
@@ -968,6 +969,7 @@ export const useTranslation = () => {
         // PRIORITÉ 2: Navigateur (nouveau défaut)
         const browserLang = detectBrowserLanguage();
         secureLog.log(`[i18n] Langue du navigateur détectée: ${browserLang}`);
+        if (!isMountedRef.current) return; // PROTECTION
         setCurrentLanguage(browserLang);
 
         // PRIORITÉ 3: Supabase (optionnel)
@@ -979,6 +981,7 @@ export const useTranslation = () => {
 
           if (userLang && isValidLanguageCode(userLang) && !storedLang) {
             secureLog.log(`[i18n] Langue Supabase utilisée: ${userLang}`);
+            if (!isMountedRef.current) return; // PROTECTION
             setCurrentLanguage(userLang);
             return;
           }
@@ -991,6 +994,7 @@ export const useTranslation = () => {
           "Erreur initialisation langue, utilisation navigateur par défaut",
         );
         const browserLang = detectBrowserLanguage();
+        if (!isMountedRef.current) return; // PROTECTION
         setCurrentLanguage(browserLang);
       }
     };
@@ -1064,15 +1068,22 @@ export const useTranslation = () => {
   // Charger les traductions quand la langue change
   useEffect(() => {
     const loadLanguage = async () => {
+      if (!isMountedRef.current) return; // Protection démontage
       setLoading(true);
       try {
         const loadedTranslations = await loadTranslations(currentLanguage);
+
+        // PROTECTION: Vérifier que le composant est toujours monté avant state update
+        if (!isMountedRef.current) return;
 
         // IMPORTANT: Mettre à jour les translations AVANT de mettre loading à false
         setTranslations(loadedTranslations);
         setLoading(false);
       } catch (error) {
         secureLog.error("Erreur chargement traductions:", error);
+
+        // PROTECTION: Vérifier que le composant est toujours monté
+        if (!isMountedRef.current) return;
         setLoading(false);
       }
     };
