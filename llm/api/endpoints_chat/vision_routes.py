@@ -44,7 +44,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
         request: Request,
         files: Optional[List[UploadFile]] = File(None),
         image_url: Optional[str] = Form(None),
-        message: Optional[str] = Form(None),
+        message: str = Form(""),
         tenant_id: Optional[str] = Form(None),
         language: Optional[str] = Form(None),
         use_rag_context: bool = Form(True),
