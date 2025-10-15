@@ -343,7 +343,7 @@ export const HistoryMenu = React.memo(() => {
       {notificationBadge}
 
       {isMenuOpen(MENU_ID) && (
-        <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">
+        <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-[60] max-h-[70vh] overflow-hidden flex flex-col">
           <div className="flex-1 overflow-y-auto">{conversationsList}</div>
         </div>
       )}
