@@ -44,7 +44,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
         request: Request,
         files: Optional[List[UploadFile]] = File(None),
         image_url: Optional[str] = Form(None),
-        message: str = Form(...),
+        message: Optional[str] = Form(None),
         tenant_id: Optional[str] = Form(None),
         language: Optional[str] = Form(None),
         use_rag_context: bool = Form(True),
@@ -78,11 +78,20 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     detail="Veuillez fournir soit un/des fichier(s) image(s), soit une URL d'image"
                 )
 
+            # Si message vide et images fournies, utiliser message par défaut
             if not message or not message.strip():
-                raise HTTPException(
-                    status_code=400,
-                    detail="Le message ne peut pas être vide"
-                )
+                images_count = len(files) if files else (1 if image_url else 0)
+                if images_count > 0:
+                    if images_count == 1:
+                        message = "Analysez cette image et donnez un diagnostic vétérinaire détaillé."
+                    else:
+                        message = f"Analysez ces {images_count} images et donnez un diagnostic vétérinaire comparatif."
+                    logger.info(f"[VISION] Message auto-généré: '{message}'")
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Le message ne peut pas être vide"
+                    )
 
             if len(message) > MAX_REQUEST_SIZE:
                 raise HTTPException(
