@@ -73,6 +73,8 @@ async function loadAdHistoryFromBackend(): Promise<string[] | null> {
 export class BackendAdStorage {
   private localStorage: PersistentJSONStorage<string[]>;
   private backendSyncPending: boolean = false;
+  private initPromise: Promise<void> | null = null;
+  private isInitialized: boolean = false;
 
   constructor() {
     this.localStorage = new PersistentJSONStorage<string[]>(AD_HISTORY_KEY);
@@ -83,25 +85,55 @@ export class BackendAdStorage {
    * Restaure dans tous les storages locaux
    */
   async init(): Promise<void> {
-    try {
-      secureLog.log("[BackendAdStorage] Initializing...");
+    // Si déjà initialisé ou en cours, retourner la promesse existante
+    if (this.isInitialized) {
+      return Promise.resolve();
+    }
 
-      // Charger depuis le backend
-      const backendHistory = await loadAdHistoryFromBackend();
+    if (this.initPromise) {
+      return this.initPromise;
+    }
 
-      if (backendHistory && backendHistory.length > 0) {
-        secureLog.log(
-          "[BackendAdStorage] Restoring from backend:",
-          backendHistory
-        );
+    this.initPromise = (async () => {
+      try {
+        secureLog.log("[BackendAdStorage] Initializing...");
 
-        // Restaurer dans le stockage local
-        this.localStorage.set(backendHistory);
-      } else {
-        secureLog.log("[BackendAdStorage] No backend history found");
+        // Charger depuis le backend
+        const backendHistory = await loadAdHistoryFromBackend();
+
+        if (backendHistory && backendHistory.length > 0) {
+          secureLog.log(
+            "[BackendAdStorage] Restoring from backend:",
+            backendHistory
+          );
+
+          // Restaurer dans le stockage local
+          this.localStorage.set(backendHistory);
+        } else {
+          secureLog.log("[BackendAdStorage] No backend history found");
+        }
+
+        this.isInitialized = true;
+      } catch (error) {
+        secureLog.error("[BackendAdStorage] Init error:", error);
+        // Marquer comme initialisé quand même pour ne pas bloquer
+        this.isInitialized = true;
       }
-    } catch (error) {
-      secureLog.error("[BackendAdStorage] Init error:", error);
+    })();
+
+    return this.initPromise;
+  }
+
+  /**
+   * Attend que l'initialisation soit terminée
+   */
+  async waitForInit(): Promise<void> {
+    if (this.isInitialized) {
+      return Promise.resolve();
+    }
+
+    if (this.initPromise) {
+      await this.initPromise;
     }
   }
 

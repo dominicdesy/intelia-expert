@@ -86,9 +86,13 @@ if (typeof window !== "undefined") {
   });
 }
 
-function getAdHistory(): string[] {
+async function getAdHistory(): Promise<string[]> {
   try {
     console.log(`[AdCatalog] 🔍 Lecture historique depuis backend storage`);
+
+    // Attendre que l'initialisation soit terminée
+    await adStorage.waitForInit();
+
     const history = adStorage.get();
     console.log(`[AdCatalog] 🔍 Historique récupéré:`, history);
 
@@ -122,7 +126,7 @@ function addToHistory(adId: string): void {
  * Alternance garantie: pub1 → pub2 → pub1 → pub2
  * NOTE: N'ajoute PAS à l'historique ici - l'historique est ajouté quand la pub est affichée
  */
-export function selectNextAd(userType?: string): Ad | null {
+export async function selectNextAd(userType?: string): Promise<Ad | null> {
   const eligibleAds = getAdsForUserType(userType);
 
   if (eligibleAds.length === 0) {
@@ -136,7 +140,7 @@ export function selectNextAd(userType?: string): Ad | null {
   }
 
   // Logique de rotation stricte
-  const history = getAdHistory();
+  const history = await getAdHistory();
   const lastShownId = history[0]; // La dernière montrée
 
   console.log(`[AdCatalog] Dernière pub affichée: ${lastShownId}, Historique:`, history);
@@ -198,12 +202,12 @@ export function clearAdHistory(): void {
 /**
  * Debug: Affiche l'état du système de pubs
  */
-export function debugAdSystem(): void {
+export async function debugAdSystem(): Promise<void> {
   console.group("📊 [AdCatalog] État du système");
   console.log("Total pubs catalog:", ADS_CATALOG.length);
   console.log("Pubs actives:", getActiveAds().length);
-  console.log("Historique:", getAdHistory());
-  console.log("Prochaine pub:", selectNextAd()?.id);
+  console.log("Historique:", await getAdHistory());
+  console.log("Prochaine pub:", (await selectNextAd())?.id);
   console.groupEnd();
 }
 

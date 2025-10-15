@@ -162,8 +162,8 @@ export const useAdSystem = () => {
     const { selectNextAd, getAdTranslations } = await import("@/lib/ads/ads-catalog");
     const { useTranslation } = await import("@/lib/languages/i18n");
 
-    // Sélectionner la prochaine pub selon le type d'utilisateur
-    const selectedAd = selectNextAd(user?.user_type);
+    // Sélectionner la prochaine pub selon le type d'utilisateur (AWAIT car async maintenant)
+    const selectedAd = await selectNextAd(user?.user_type);
 
     if (!selectedAd) {
       secureLog.warn("[useAdSystem] Aucune publicité disponible");
