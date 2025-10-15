@@ -120,9 +120,10 @@ export class ConversationService {
       return;
     }
 
-    // URL construite proprement
-    this.baseUrl = `${apiBaseUrl}/api/${apiVersion}`;
-    secureLog.log("ConversationService configuré:", apiBaseUrl);
+    // ✅ FIX: Ne pas ajouter /api car NEXT_PUBLIC_API_BASE_URL contient déjà /api
+    // Exemple: https://expert.intelia.com/api + /v1 = https://expert.intelia.com/api/v1
+    this.baseUrl = `${apiBaseUrl}/${apiVersion}`;
+    secureLog.log("ConversationService configuré:", this.baseUrl);
   }
 
   private getAuthToken(): string {
@@ -312,12 +313,16 @@ export class ConversationService {
         },
       );
 
+      secureLog.log("[ConversationService] Response status:", response.status, response.statusText);
+
       if (response.ok) {
         const data = await response.json();
 
-        secureLog.log("[ConversationService] Messages récupérés:", {
+        secureLog.log("[ConversationService] ✅ Messages récupérés:", {
           conversation_id: data.conversation_id,
           message_count: data.message_count || 0,
+          has_messages: !!data.messages,
+          messages_length: data.messages?.length || 0,
         });
 
         if (data.messages && data.messages.length > 0) {

@@ -116,6 +116,7 @@ AUTHENTICATED_USER_PATTERNS = [
     # === ENDPOINTS CONVERSATIONS (sauvegarde personnelle) ===
     "/api/v1/conversations/save",
     "/api/v1/conversations/user/",
+    "/api/v1/conversations/",  # Tous les endpoints conversations (get messages, feedback, etc.)
     # === ENDPOINTS INVITATIONS (tous les utilisateurs authentifiés) ===
     "/api/v1/invitations/",
 ]
