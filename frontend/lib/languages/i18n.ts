@@ -951,42 +951,48 @@ export const useTranslation = () => {
     return unsubscribe;
   }, []);
 
-  // LOGIQUE CORRIGÉE : PRIORITÉ 1 = Supabase (utilisateur connecté), PRIORITÉ 2 = localStorage, PRIORITÉ 3 = Navigateur
+  // LOGIQUE CORRIGÉE : PRIORITÉ 1 = Backend (table users), PRIORITÉ 2 = localStorage, PRIORITÉ 3 = Navigateur
   useEffect(() => {
     const getUserLanguage = async () => {
       try {
-        // PRIORITÉ 1: Supabase (source de vérité pour utilisateurs connectés)
+        // PRIORITÉ 1: Backend - Langue depuis la table public.users (source de vérité)
         try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          const userLang = session?.user?.user_metadata?.language;
+          const authData = localStorage.getItem("intelia-expert-auth");
+          if (authData) {
+            // Import dynamique pour éviter circular dependency
+            const { apiClient } = await import("@/lib/api/client");
+            const response = await apiClient.getSecure<{ language?: string }>("/auth/me");
 
-          if (userLang && isValidLanguageCode(userLang)) {
-            secureLog.log(`[i18n] PRIORITÉ 1 - Langue Supabase (utilisateur connecté): ${userLang}`);
-            if (!isMountedRef.current) return; // PROTECTION
-            setCurrentLanguage(userLang);
+            if (response.success && response.data?.language) {
+              const userLang = response.data.language;
 
-            // Synchroniser localStorage avec Supabase
-            try {
-              const langData = {
-                state: {
-                  currentLanguage: userLang,
-                },
-              };
-              localStorage.setItem("intelia-language", JSON.stringify(langData));
-              secureLog.log("[i18n] localStorage synchronisé avec Supabase");
-            } catch (error) {
-              secureLog.warn("[i18n] Erreur sync localStorage:", error);
+              if (isValidLanguageCode(userLang)) {
+                secureLog.log(`[i18n] PRIORITÉ 1 - Langue backend (table users): ${userLang}`);
+                if (!isMountedRef.current) return; // PROTECTION
+                setCurrentLanguage(userLang);
+
+                // Synchroniser localStorage avec le backend
+                try {
+                  const langData = {
+                    state: {
+                      currentLanguage: userLang,
+                    },
+                  };
+                  localStorage.setItem("intelia-language", JSON.stringify(langData));
+                  secureLog.log("[i18n] localStorage synchronisé avec backend");
+                } catch (error) {
+                  secureLog.warn("[i18n] Erreur sync localStorage:", error);
+                }
+                return;
+              }
             }
-            return;
           }
         } catch (error) {
-          // Si Supabase échoue, continuer avec localStorage
-          secureLog.log("[i18n] Pas de session Supabase, vérification localStorage");
+          // Si le backend échoue, continuer avec localStorage
+          secureLog.log("[i18n] Pas de session authentifiée ou erreur backend, vérification localStorage");
         }
 
-        // PRIORITÉ 2: localStorage (choix précédent si pas de Supabase)
+        // PRIORITÉ 2: localStorage (choix précédent si pas de backend)
         const storedLang = getStoredLanguage();
         if (storedLang && isValidLanguageCode(storedLang)) {
           secureLog.log(
