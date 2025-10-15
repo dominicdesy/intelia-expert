@@ -44,10 +44,10 @@ export const UserMenuButton = () => {
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
-      secureLog.log(t("userMenu.debug.unmounting"));
+      secureLog.log("[UserMenuButton] Unmounting");
       isMountedRef.current = false;
     };
-  }, [t]);
+  }, []); // Pas de dépendances pour éviter re-mount intempestif
 
   // Fonction robuste pour obtenir les initiales utilisateur
   const getUserInitials = useCallback((user: any): string => {
@@ -277,14 +277,12 @@ export const UserMenuButton = () => {
     setShowLanguageModal(false);
   }, []);
 
-  // Écouter le changement de langue pour fermer le menu principal ET forcer le re-render
+  // Écouter le changement de langue pour fermer le menu principal
   useEffect(() => {
     const handleLanguageChanged = () => {
       if (!isMountedRef.current) return;
-      secureLog.log("[UserMenuButton] Langue changée, fermeture du menu et re-render");
+      secureLog.log("[UserMenuButton] Langue changée, fermeture du menu");
       setIsOpen(false);
-      // Forcer un re-render immédiat pour mettre à jour les traductions
-      forceUpdate({});
     };
 
     window.addEventListener("languageChanged", handleLanguageChanged);
@@ -293,6 +291,14 @@ export const UserMenuButton = () => {
       window.removeEventListener("languageChanged", handleLanguageChanged);
     };
   }, []);
+
+  // Forcer un re-render quand currentLanguage change
+  useEffect(() => {
+    secureLog.log(`[UserMenuButton] currentLanguage mis à jour: ${currentLanguage}`);
+    secureLog.log(`[UserMenuButton] Sample translation 'nav.profile': ${t("nav.profile")}`);
+    secureLog.log(`[UserMenuButton] Sample translation 'nav.language': ${t("nav.language")}`);
+    forceUpdate({});
+  }, [currentLanguage, t]);
 
   const closeInviteFriendModal = useCallback(() => {
     if (!isMountedRef.current) return;
