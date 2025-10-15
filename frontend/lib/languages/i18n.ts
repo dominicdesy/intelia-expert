@@ -124,6 +124,8 @@ export interface TranslationKeys {
   "login.passwordLabel": string;
   "login.emailPlaceholder": string;
   "login.passwordPlaceholder": string;
+  "login.showPassword": string;
+  "login.hidePassword": string;
 
   // ===========================================
   // FORGOT PASSWORD
@@ -293,6 +295,7 @@ export interface TranslationKeys {
   "chat.feedbackSendError": string;
   "chat.feedbackGeneralError": string;
   "chat.redirectingInProgress": string;
+  "chat.uploadImages": string;
 
   // ===========================================
   // CONVERSATION HISTORY - NOUVELLES CLÉS AJOUTÉES
