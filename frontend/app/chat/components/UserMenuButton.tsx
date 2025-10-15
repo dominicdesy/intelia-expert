@@ -27,6 +27,7 @@ export const UserMenuButton = () => {
   const router = useRouter();
   const { user } = useAuthStore(); // ✅ CORRECTION: Retiré 'logout' du destructuring
   const { t, currentLanguage } = useTranslation(); // Ajout de currentLanguage pour forcer re-render
+  const [, forceUpdate] = useState({});
 
   // États des modales
   const [isOpen, setIsOpen] = useState(false);
@@ -276,12 +277,14 @@ export const UserMenuButton = () => {
     setShowLanguageModal(false);
   }, []);
 
-  // Écouter le changement de langue pour fermer le menu principal
+  // Écouter le changement de langue pour fermer le menu principal ET forcer le re-render
   useEffect(() => {
     const handleLanguageChanged = () => {
       if (!isMountedRef.current) return;
-      secureLog.log("[UserMenuButton] Langue changée, fermeture du menu");
+      secureLog.log("[UserMenuButton] Langue changée, fermeture du menu et re-render");
       setIsOpen(false);
+      // Forcer un re-render immédiat pour mettre à jour les traductions
+      forceUpdate({});
     };
 
     window.addEventListener("languageChanged", handleLanguageChanged);
