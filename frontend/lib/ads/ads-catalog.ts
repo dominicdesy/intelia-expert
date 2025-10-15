@@ -6,6 +6,7 @@ import { ad01Config } from "./ad-01-poultry-ai/config";
 import { ad01Translations, type SupportedLanguage } from "./ad-01-poultry-ai/translations";
 import { ad02Config } from "./ad-02-smart-sensors/config";
 import { ad02Translations } from "./ad-02-smart-sensors/translations";
+import { PersistentJSONStorage } from "../utils/persistentStorage";
 
 // Type pour une publicité complète
 export interface Ad {
@@ -73,17 +74,29 @@ export function getAdsForUserType(userType?: string): Ad[] {
 }
 
 /**
- * Système de rotation intelligent
+ * Système de rotation intelligent avec stockage persistant multi-méthodes
  * Évite de montrer la même pub deux fois de suite
  */
 const AD_HISTORY_KEY = "intelia_ad_history";
 const MAX_HISTORY_SIZE = 10; // Garder les 10 dernières pubs montrées
 
+// Utiliser le stockage persistant (cookie + localStorage + sessionStorage)
+const adHistoryStorage = new PersistentJSONStorage<string[]>(AD_HISTORY_KEY);
+
 function getAdHistory(): string[] {
   try {
-    const history = localStorage.getItem(AD_HISTORY_KEY);
-    return history ? JSON.parse(history) : [];
-  } catch {
+    console.log(`[AdCatalog] 🔍 Lecture de la clé: ${AD_HISTORY_KEY}`);
+    const history = adHistoryStorage.get();
+    console.log(`[AdCatalog] 🔍 Historique récupéré:`, history);
+
+    if (!history || !Array.isArray(history)) {
+      console.log(`[AdCatalog] 🔍 Pas de données valides, retour tableau vide`);
+      return [];
+    }
+
+    return history;
+  } catch (error) {
+    console.error(`[AdCatalog] ❌ Erreur lecture historique:`, error);
     return [];
   }
 }
@@ -101,14 +114,12 @@ function addToHistory(adId: string): void {
     const trimmedHistory = history.slice(0, MAX_HISTORY_SIZE);
     console.log(`[AdCatalog] 🔵 Après trim:`, trimmedHistory);
 
-    const jsonString = JSON.stringify(trimmedHistory);
-    console.log(`[AdCatalog] 🔵 JSON à sauvegarder:`, jsonString);
-
-    localStorage.setItem(AD_HISTORY_KEY, jsonString);
-    console.log(`[AdCatalog] 🔵 Sauvegarde dans localStorage réussie`);
+    // Sauvegarder avec le système persistant (cookie + localStorage + sessionStorage)
+    adHistoryStorage.set(trimmedHistory);
+    console.log(`[AdCatalog] 🔵 Sauvegarde persistante réussie`);
 
     // Vérification immédiate
-    const verification = localStorage.getItem(AD_HISTORY_KEY);
+    const verification = adHistoryStorage.get();
     console.log(`[AdCatalog] 🔵 Vérification immédiate:`, verification);
   } catch (error) {
     console.error("[AdCatalog] ❌ Erreur sauvegarde historique:", error);
@@ -187,8 +198,8 @@ export function getAdTranslations(ad: Ad, language: string) {
  */
 export function clearAdHistory(): void {
   try {
-    localStorage.removeItem(AD_HISTORY_KEY);
-    console.log("[AdCatalog] Historique réinitialisé");
+    adHistoryStorage.remove();
+    console.log("[AdCatalog] Historique réinitialisé (cookie + localStorage + sessionStorage)");
   } catch (error) {
     console.error("[AdCatalog] Erreur réinitialisation historique:", error);
   }
