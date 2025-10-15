@@ -325,11 +325,15 @@ export const UserMenuButton = () => {
         </button>
 
         {isMenuOpen(MENU_ID) && (
-          <div
-            key={currentLanguage}
-            className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[60]"
-            onClick={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}>
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={handleCloseMenu}
+              aria-hidden="true"
+            />
+            <div
+              key={currentLanguage}
+              className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-medium text-gray-900">
                   {user?.name}
@@ -541,6 +545,7 @@ export const UserMenuButton = () => {
                 </button>
               </div>
             </div>
+          </>
         )}
       </div>
 

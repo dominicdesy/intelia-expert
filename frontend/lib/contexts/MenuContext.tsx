@@ -111,22 +111,6 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({
   return (
     <MenuContext.Provider value={value}>
       {children}
-
-      {/* OVERLAY PARTAGÉ - Un seul pour tous les menus */}
-      {openMenuId && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={closeAllMenus}
-          onTouchEnd={(e) => {
-            closeAllMenus();
-          }}
-          aria-hidden="true"
-          style={{
-            background: 'transparent',
-            pointerEvents: 'auto'
-          }}
-        />
-      )}
     </MenuContext.Provider>
   );
 };
