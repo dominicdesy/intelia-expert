@@ -22,7 +22,8 @@ import { InviteFriendModal } from "./modals/InviteFriendModal";
 import { secureLog } from "@/lib/utils/secureLogger";
 
 // UserMenuButton - Version corrigée avec coordination auth store pour React #300
-export const UserMenuButton = React.memo(() => {
+// Note: React.memo() retiré car le composant doit se re-render lors du changement de langue
+export const UserMenuButton = () => {
   const router = useRouter();
   const { user } = useAuthStore(); // ✅ CORRECTION: Retiré 'logout' du destructuring
   const { t, currentLanguage } = useTranslation(); // Ajout de currentLanguage pour forcer re-render
@@ -538,6 +539,4 @@ export const UserMenuButton = React.memo(() => {
       )}
     </>
   );
-});
-
-UserMenuButton.displayName = "UserMenuButton";
+};
