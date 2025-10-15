@@ -789,11 +789,18 @@ export const useAuthStore = create<AuthState>()(
 
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key && key !== "intelia-remember-me-persist") {
+            if (
+              key &&
+              key !== "intelia-remember-me-persist" &&
+              key !== "intelia-language" &&
+              key !== "intelia_ad_history"
+            ) {
               if (
                 key.startsWith("supabase-") ||
                 (key.startsWith("intelia-") &&
-                  key !== "intelia-remember-me-persist") ||
+                  key !== "intelia-remember-me-persist" &&
+                  key !== "intelia-language" &&
+                  key !== "intelia_ad_history") ||
                 key.includes("auth") ||
                 key.includes("session") ||
                 key === "intelia-expert-auth"
