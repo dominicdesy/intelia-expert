@@ -104,7 +104,8 @@ function addToHistory(adId: string): void {
 
 /**
  * Sélectionne la prochaine publicité à afficher
- * Logique anti-répétition intelligente
+ * Logique de rotation stricte: jamais la même pub deux fois de suite
+ * Alternance garantie: pub1 → pub2 → pub1 → pub2
  */
 export function selectNextAd(userType?: string): Ad | null {
   const eligibleAds = getAdsForUserType(userType);
@@ -120,32 +121,29 @@ export function selectNextAd(userType?: string): Ad | null {
     return eligibleAds[0];
   }
 
-  // Logique de rotation intelligente
+  // Logique de rotation stricte
   const history = getAdHistory();
   const lastShownId = history[0]; // La dernière montrée
 
   // Trier par priorité (1 = haute, 2 = moyenne, etc.)
   const sortedAds = [...eligibleAds].sort((a, b) => a.priority - b.priority);
 
-  // Essayer de trouver une pub différente de la dernière
+  // GARANTIE D'ALTERNANCE: Filtrer TOUTES les pubs différentes de la dernière
   const differentAds = sortedAds.filter((ad) => ad.id !== lastShownId);
 
-  // Si toutes les pubs ont été montrées récemment, prendre la moins récente
-  if (differentAds.length === 0) {
-    // Trouver la pub la moins récemment montrée
-    const adNotInRecentHistory = sortedAds.find(
-      (ad) => !history.slice(0, 3).includes(ad.id)
-    );
-
-    const selectedAd = adNotInRecentHistory || sortedAds[0];
+  // S'il y a au moins une pub différente, la choisir
+  if (differentAds.length > 0) {
+    // Prendre la première (plus haute priorité) parmi les pubs différentes
+    const selectedAd = differentAds[0];
     addToHistory(selectedAd.id);
+    console.log(`[AdCatalog] Alternance: ${lastShownId} → ${selectedAd.id}`);
     return selectedAd;
   }
 
-  // Parmi les pubs différentes, prendre celle avec la plus haute priorité
-  const selectedAd = differentAds[0];
+  // Cas edge (ne devrait jamais arriver si eligibleAds.length > 1)
+  // Si toutes les pubs sont identiques à la dernière (impossible normalement)
+  const selectedAd = sortedAds[0];
   addToHistory(selectedAd.id);
-
   return selectedAd;
 }
 
