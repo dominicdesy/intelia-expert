@@ -18,11 +18,8 @@ import { useChatStore } from "./hooks/useChatStore";
 import {
   generateAIResponse,
   generateVisionResponse,
-  analyzeSessionImages,
-  deleteTempImages
 } from "./services/apiService";
 import { conversationService } from "./services/conversationService";
-import { ImageUploadAccumulator } from "./components/ImageUploadAccumulator";
 
 import {
   PaperAirplaneIcon,
@@ -515,20 +512,7 @@ function ChatInterface() {
 
   // États séparés pour éviter les cascades de re-renders
   const [inputMessage, setInputMessage] = useState("");
-  const [uploadSessionId] = useState(() => {
-    // Générer un UUID pour la session d'upload
-    if (typeof crypto !== "undefined" && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    // Fallback pour les navigateurs plus anciens
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-      const r = (Math.random() * 16) | 0;
-      const v = c === "x" ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  });
-  const [uploadedImagesCount, setUploadedImagesCount] = useState(0);
-  const [isAnalyzingImages, setIsAnalyzingImages] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -703,47 +687,14 @@ function ChatInterface() {
     return cleaned.trim();
   }, []);
 
-  // Handler pour l'analyse des images accumulées
-  const handleAnalyzeImages = useCallback(async () => {
-    if (!user || uploadedImagesCount === 0 || !isMountedRef.current) return;
+  // Handlers pour les images
+  const handleImagesSelect = useCallback((files: File[]) => {
+    setSelectedImages(files);
+  }, []);
 
-    setIsAnalyzingImages(true);
-    setIsLoadingChat(true);
-
-    try {
-      const response = await analyzeSessionImages(
-        uploadSessionId,
-        inputMessage || "",
-        user,
-        currentLanguage,
-        undefined, // conversationId
-        true       // cleanupAfter
-      );
-
-      // Add to conversation
-      const assistantId = `ai-${Date.now()}`;
-      addMessage({
-        id: assistantId,
-        content: response.response,
-        isUser: false,
-        timestamp: new Date(),
-        conversation_id: response.conversation_id,
-      });
-
-      // Reset
-      setUploadedImagesCount(0);
-      setInputMessage("");
-
-    } catch (error) {
-      secureLog.error("[Chat] Error analyzing images:", error);
-      handleAuthError(error);
-    } finally {
-      if (isMountedRef.current) {
-        setIsAnalyzingImages(false);
-        setIsLoadingChat(false);
-      }
-    }
-  }, [uploadSessionId, uploadedImagesCount, inputMessage, user, currentLanguage, addMessage, handleAuthError]);
+  const handleImageRemove = useCallback((index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   const processedMessages = useMemo(() => {
     return messages.map((message) => ({
@@ -1041,18 +992,31 @@ function ChatInterface() {
 
 
 
-	// FONCTION POUR CHAT TEXTUEL SIMPLE (images gérées par ImageUploadAccumulator)
+	// FONCTION POUR CHAT (texte + images)
 	const handleSendMessage = useCallback(async () => {
 	  const safeText = inputMessage;
+	  const imagesToSend = selectedImages;
 
-	  // Require text for regular chat
-	  if (!safeText.trim() || !isMountedRef.current) return;
+	  // Allow send if there's either text or images
+	  if ((!safeText.trim() && imagesToSend.length === 0) || !isMountedRef.current) return;
+
+	  // Créer les URLs des images pour l'affichage dans la bulle
+	  let imageUrls: string[] = [];
+	  if (imagesToSend.length > 0) {
+		try {
+		  imageUrls = imagesToSend.map(img => URL.createObjectURL(img));
+		} catch (error) {
+		  console.error("Error creating image URLs:", error);
+		}
+	  }
 
 	  const userMessage: Message = {
 		id: Date.now().toString(),
 		content: safeText.trim(),
 		isUser: true,
 		timestamp: new Date(),
+		imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+		imageUrl: imageUrls.length > 0 ? imageUrls[0] : undefined, // Backward compatibility
 	  };
 
 	  let conversationIdToSend: string | undefined = undefined;
@@ -1068,6 +1032,7 @@ function ChatInterface() {
 	  // Ajouter le message utilisateur
 	  addMessage(userMessage);
 	  setInputMessage("");
+	  setSelectedImages([]); // Clear the selected images
 	  setIsLoadingChat(true);
 	  setShouldAutoScroll(true);
 	  setIsUserScrolling(false);
@@ -1079,8 +1044,38 @@ function ChatInterface() {
 	  try {
 		let response;
 
-		// REGULAR TEXT CHAT PATH ONLY (images handled by ImageUploadAccumulator)
-		{
+		// IMAGE ANALYSIS PATH
+		if (imagesToSend.length > 0) {
+		  secureLog.log(`[Chat] Sending ${imagesToSend.length} image(s) for analysis`);
+
+		  // Enrichir le message avec le nombre d'images si plusieurs
+		  let enrichedMessage = safeText.trim() || t("chat.analyzeImageDefault");
+		  if (imagesToSend.length > 1) {
+		    enrichedMessage = `[${imagesToSend.length} images fournies] ${enrichedMessage}`;
+		  }
+
+		  // Envoyer toutes les images pour analyse
+		  response = await generateVisionResponse(
+			imagesToSend,
+			enrichedMessage,
+			user,
+			currentLanguage,
+			conversationIdToSend,
+		  );
+
+		  // Create assistant message immediately with the response
+		  assistantId = `ai-${Date.now()}`;
+		  addMessage({
+			id: assistantId,
+			content: response.response,
+			isUser: false,
+			timestamp: new Date(),
+			conversation_id: response.conversation_id,
+		  });
+		  messageCreated = true;
+
+		// REGULAR TEXT CHAT PATH
+		} else {
 		  let finalQuestionOrSafeText: string;
 
 		  if (clarificationState) {
@@ -1259,6 +1254,7 @@ function ChatInterface() {
 	  }
 	}, [
 	  inputMessage,
+	  selectedImages,
 	  currentConversation,
 	  addMessage,
 	  updateMessage,
@@ -1639,18 +1635,19 @@ function ChatInterface() {
                 </div>
               )}
 
-              <ImageUploadAccumulator
-                sessionId={uploadSessionId}
-                onImagesReady={(count) => setUploadedImagesCount(count)}
-                onAnalyzeClick={handleAnalyzeImages}
-                disabled={isLoadingChat || isAnalyzingImages}
+              <ChatInput
+                inputMessage={inputMessage}
+                setInputMessage={setInputMessage}
+                onSendMessage={handleSendMessage}
+                isLoadingChat={isLoadingChat}
+                clarificationState={clarificationState}
+                isMobileDevice={isMobileDevice}
+                inputRef={inputRef}
+                selectedImages={selectedImages}
+                onImagesSelect={handleImagesSelect}
+                onImageRemove={handleImageRemove}
+                t={t}
               />
-
-              {uploadedImagesCount > 0 && inputMessage && (
-                <div className="mt-2 p-2 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600">Question: {inputMessage}</p>
-                </div>
-              )}
 
               <div className="text-center mt-2">
                 <p className="text-xs text-gray-500">{t("chat.disclaimer")}</p>
