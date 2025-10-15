@@ -313,7 +313,7 @@ export class ConversationService {
         },
       );
 
-      secureLog.log("[ConversationService] Response status:", response.status, response.statusText);
+      secureLog.log("[ConversationService] Response status:", { status: response.status, statusText: response.statusText });
 
       if (response.ok) {
         const data = await response.json();
