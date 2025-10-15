@@ -30,9 +30,15 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
       position: "top",
     },
     {
-      target: "button[title*='send'], button[aria-label*='Envoyer'], button[title*='Envoyer'], .chat-input-fixed button:last-child",
+      target: "button[title*='send'], button[aria-label*='Envoyer'], button[title*='Envoyer'], button[title*='Sending']",
       title: t("help.sendTitle"),
       description: t("help.sendDesc"),
+      position: "left",
+    },
+    {
+      target: "button[title*='image'], button[aria-label*='image'], button[title*='Ajouter']",
+      title: t("help.cameraTitle"),
+      description: t("help.cameraDesc"),
       position: "left",
     },
     {

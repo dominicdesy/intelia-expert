@@ -590,6 +590,8 @@
   "help.historyDesc": "Find all your previous conversations organized by date.",
   "help.profileTitle": "User Menu",
   "help.profileDesc": "Access your profile, settings, and account options.",
+  "help.cameraTitle": "Image Analysis",
+  "help.cameraDesc": "Click the camera icon to add one or more veterinary images. You can select multiple images at once for comparative analysis. Optionally add a question, then click the arrow to start the analysis.",
   "auth.creating": "Creating...",
   "auth.accountCreated": "Account created!"
 }

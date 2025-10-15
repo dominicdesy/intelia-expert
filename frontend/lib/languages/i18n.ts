@@ -773,6 +773,8 @@ export interface TranslationKeys {
   "help.historyDesc": string;
   "help.profileTitle": string;
   "help.profileDesc": string;
+  "help.cameraTitle": string;
+  "help.cameraDesc": string;
 }
 
 // SYSTÈME DE NOTIFICATION POUR FORCER LES RE-RENDERS
