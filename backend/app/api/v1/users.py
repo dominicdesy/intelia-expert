@@ -47,6 +47,7 @@ class UserProfileUpdate(BaseModel):
     linkedin_corporate: Optional[str] = None
     user_type: Optional[str] = None
     language: Optional[str] = None
+    ad_history: Optional[list] = None  # 🎯 Ad rotation history (last 10 ads shown)
 
     @validator("first_name", "last_name")
     def validate_names(cls, v):
@@ -85,6 +86,18 @@ class UserProfileUpdate(BaseModel):
             raise ValueError("Langue non supportée")
         return v
 
+    @validator("ad_history")
+    def validate_ad_history(cls, v):
+        if v is not None:
+            if not isinstance(v, list):
+                raise ValueError("ad_history doit être une liste")
+            if len(v) > 10:
+                raise ValueError("ad_history ne peut pas contenir plus de 10 éléments")
+            # Vérifier que ce sont des strings
+            if not all(isinstance(item, str) for item in v):
+                raise ValueError("ad_history doit contenir uniquement des chaînes de caractères")
+        return v
+
 
 class UserProfileResponse(BaseModel):
     success: bool
@@ -110,6 +123,7 @@ class UserProfileData(BaseModel):
     linkedin_corporate: Optional[str] = None
     user_type: Optional[str] = None
     language: Optional[str] = None
+    ad_history: Optional[list] = None  # 🎯 Ad rotation history (last 10 ads shown)
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -197,6 +211,7 @@ async def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_us
             linkedin_corporate=profile_data.get("linkedin_corporate"),
             user_type=profile_data.get("user_type", "producer"),
             language=profile_data.get("language", "fr"),
+            ad_history=profile_data.get("ad_history", []),  # 🎯 Ad rotation history
         )
 
     except HTTPException:
@@ -294,6 +309,7 @@ async def update_user_profile(
             "linkedin_corporate",
             "user_type",
             "language",
+            "ad_history",  # 🎯 Ad rotation history
         ]:
             value = getattr(profile_update, field)
             if value is not None:
