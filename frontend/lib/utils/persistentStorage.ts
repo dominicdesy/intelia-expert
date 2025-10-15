@@ -3,14 +3,143 @@
  * Essaie plusieurs méthodes pour garantir la persistance même si localStorage est effacé
  *
  * Ordre de priorité:
- * 1. Cookie (le plus persistant)
- * 2. localStorage (rapide mais peut être effacé)
- * 3. sessionStorage (fallback temporaire)
+ * 1. IndexedDB (le plus persistant - survit à tout)
+ * 2. Cookie (très persistant - 365 jours)
+ * 3. localStorage (rapide mais peut être effacé)
+ * 4. sessionStorage (fallback temporaire)
  */
 
 import { secureLog } from "./secureLogger";
 
 const COOKIE_EXPIRY_DAYS = 365; // 1 an
+const INDEXEDDB_NAME = "InteliaStorage";
+const INDEXEDDB_STORE = "KeyValueStore";
+const INDEXEDDB_VERSION = 1;
+
+/**
+ * Initialise IndexedDB (appelé une seule fois)
+ */
+let indexedDBPromise: Promise<IDBDatabase> | null = null;
+
+function initIndexedDB(): Promise<IDBDatabase> {
+  if (indexedDBPromise) {
+    return indexedDBPromise;
+  }
+
+  indexedDBPromise = new Promise((resolve, reject) => {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      reject(new Error("IndexedDB not available"));
+      return;
+    }
+
+    const request = indexedDB.open(INDEXEDDB_NAME, INDEXEDDB_VERSION);
+
+    request.onerror = () => {
+      secureLog.error("[IndexedDB] Error opening database:", request.error);
+      reject(request.error);
+    };
+
+    request.onsuccess = () => {
+      secureLog.log("[IndexedDB] Database opened successfully");
+      resolve(request.result);
+    };
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+
+      // Créer le store si il n'existe pas
+      if (!db.objectStoreNames.contains(INDEXEDDB_STORE)) {
+        db.createObjectStore(INDEXEDDB_STORE);
+        secureLog.log("[IndexedDB] Object store created");
+      }
+    };
+  });
+
+  return indexedDBPromise;
+}
+
+/**
+ * Écrit dans IndexedDB
+ */
+async function setIndexedDB(key: string, value: string): Promise<void> {
+  try {
+    const db = await initIndexedDB();
+    const transaction = db.transaction([INDEXEDDB_STORE], "readwrite");
+    const store = transaction.objectStore(INDEXEDDB_STORE);
+
+    store.put(value, key);
+
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => {
+        secureLog.log(`[IndexedDB] Saved: ${key}`);
+        resolve();
+      };
+      transaction.onerror = () => {
+        secureLog.error(`[IndexedDB] Save error:`, transaction.error);
+        reject(transaction.error);
+      };
+    });
+  } catch (error) {
+    secureLog.warn(`[IndexedDB] Save failed:`, error);
+  }
+}
+
+/**
+ * Lit depuis IndexedDB
+ */
+async function getIndexedDB(key: string): Promise<string | null> {
+  try {
+    const db = await initIndexedDB();
+    const transaction = db.transaction([INDEXEDDB_STORE], "readonly");
+    const store = transaction.objectStore(INDEXEDDB_STORE);
+    const request = store.get(key);
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => {
+        const value = request.result;
+        if (value) {
+          secureLog.log(`[IndexedDB] Retrieved: ${key}`);
+          resolve(value);
+        } else {
+          resolve(null);
+        }
+      };
+      request.onerror = () => {
+        secureLog.error(`[IndexedDB] Get error:`, request.error);
+        reject(request.error);
+      };
+    });
+  } catch (error) {
+    secureLog.warn(`[IndexedDB] Get failed:`, error);
+    return null;
+  }
+}
+
+/**
+ * Supprime de IndexedDB
+ */
+async function deleteIndexedDB(key: string): Promise<void> {
+  try {
+    const db = await initIndexedDB();
+    const transaction = db.transaction([INDEXEDDB_STORE], "readwrite");
+    const store = transaction.objectStore(INDEXEDDB_STORE);
+
+    store.delete(key);
+
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => {
+        secureLog.log(`[IndexedDB] Deleted: ${key}`);
+        resolve();
+      };
+      transaction.onerror = () => {
+        secureLog.error(`[IndexedDB] Delete error:`, transaction.error);
+        reject(transaction.error);
+      };
+    });
+  } catch (error) {
+    secureLog.warn(`[IndexedDB] Delete failed:`, error);
+  }
+}
 
 /**
  * Écrit dans un cookie persistant
@@ -81,10 +210,15 @@ export class PersistentStorage {
   set(value: string): void {
     secureLog.log(`[PersistentStorage] Saving ${this.key}:`, value);
 
-    // Méthode 1: Cookie (priorité absolue - le plus persistant)
+    // Méthode 1: IndexedDB (priorité absolue - survit à tout)
+    setIndexedDB(this.key, value).catch((error) => {
+      secureLog.warn(`[PersistentStorage] IndexedDB save failed:`, error);
+    });
+
+    // Méthode 2: Cookie (très persistant - 365 jours)
     setCookie(this.key, value);
 
-    // Méthode 2: localStorage (rapide, mais peut être effacé)
+    // Méthode 3: localStorage (rapide, mais peut être effacé)
     try {
       localStorage.setItem(this.key, value);
       secureLog.log(`[PersistentStorage] localStorage saved: ${this.key}`);
@@ -92,7 +226,7 @@ export class PersistentStorage {
       secureLog.warn(`[PersistentStorage] localStorage save failed:`, error);
     }
 
-    // Méthode 3: sessionStorage (fallback temporaire)
+    // Méthode 4: sessionStorage (fallback temporaire)
     try {
       sessionStorage.setItem(this.key, value);
       secureLog.log(`[PersistentStorage] sessionStorage saved: ${this.key}`);
@@ -103,10 +237,14 @@ export class PersistentStorage {
 
   /**
    * Récupère une valeur en essayant toutes les méthodes
-   * Priorité: Cookie > localStorage > sessionStorage
+   * Priorité: IndexedDB > Cookie > localStorage > sessionStorage
+   *
+   * NOTE: Cette méthode retourne null en premier, puis la valeur IndexedDB
+   * arrivera de manière asynchrone. Pour une lecture synchrone immédiate,
+   * on utilise les autres méthodes (cookie, localStorage, sessionStorage).
    */
   get(): string | null {
-    // Méthode 1: Cookie (priorité absolue)
+    // Méthode 1: Cookie (lecture synchrone la plus fiable)
     const cookieValue = getCookie(this.key);
     if (cookieValue) {
       secureLog.log(`[PersistentStorage] Retrieved from cookie: ${this.key}`);
@@ -136,7 +274,7 @@ export class PersistentStorage {
       secureLog.warn(`[PersistentStorage] localStorage get failed:`, error);
     }
 
-    // Méthode 3: sessionStorage (dernier recours)
+    // Méthode 3: sessionStorage
     try {
       const sessionValue = sessionStorage.getItem(this.key);
       if (sessionValue) {
@@ -151,6 +289,26 @@ export class PersistentStorage {
       secureLog.warn(`[PersistentStorage] sessionStorage get failed:`, error);
     }
 
+    // Méthode 4: IndexedDB (asynchrone - restauration en arrière-plan)
+    // On lance la récupération depuis IndexedDB en arrière-plan
+    // Si une valeur existe, elle sera restaurée dans les autres storages
+    getIndexedDB(this.key).then((indexedValue) => {
+      if (indexedValue) {
+        secureLog.log(`[PersistentStorage] Retrieved from IndexedDB (async): ${this.key}`);
+
+        // Restaurer dans tous les autres storages
+        setCookie(this.key, indexedValue);
+        try {
+          localStorage.setItem(this.key, indexedValue);
+          sessionStorage.setItem(this.key, indexedValue);
+        } catch (error) {
+          // Ignorer
+        }
+      }
+    }).catch((error) => {
+      secureLog.warn(`[PersistentStorage] IndexedDB get failed:`, error);
+    });
+
     secureLog.log(`[PersistentStorage] No value found for: ${this.key}`);
     return null;
   }
@@ -161,14 +319,22 @@ export class PersistentStorage {
   remove(): void {
     secureLog.log(`[PersistentStorage] Removing ${this.key}`);
 
+    // Supprimer de IndexedDB
+    deleteIndexedDB(this.key).catch((error) => {
+      secureLog.warn(`[PersistentStorage] IndexedDB delete failed:`, error);
+    });
+
+    // Supprimer du cookie
     deleteCookie(this.key);
 
+    // Supprimer de localStorage
     try {
       localStorage.removeItem(this.key);
     } catch (error) {
       // Ignorer
     }
 
+    // Supprimer de sessionStorage
     try {
       sessionStorage.removeItem(this.key);
     } catch (error) {
