@@ -142,6 +142,7 @@ export const ImageUploadAccumulator: React.FC<ImageUploadAccumulatorProps> = ({
           disabled={disabled || uploading}
           className="hidden"
           id="image-upload-input"
+          aria-label="Sélectionner une image à télécharger"
         />
 
         <label

@@ -216,6 +216,7 @@ const ChatInput = React.memo(
             onChange={handleFileChange}
             className="hidden"
             multiple
+            aria-label={t("chat.uploadImages")}
           />
 
           {/* Send Button */}
