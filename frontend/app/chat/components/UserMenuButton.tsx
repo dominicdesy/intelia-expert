@@ -261,14 +261,14 @@ export const UserMenuButton = () => {
     closeMenuContext(MENU_ID); // ✅ MODIFIÉ
   }, [closeMenuContext]);
 
-  // Helper pour iOS: combine onClick et onTouchEnd
-  const createTouchHandler = useCallback((handler: (e: React.MouseEvent) => void) => {
+  // Helper pour iOS: utilise onMouseDown au lieu de onClick
+  const createTouchHandler = useCallback((handler: () => void) => {
     return {
-      onClick: handler,
-      onTouchEnd: (e: React.TouchEvent) => {
-        e.stopPropagation();
-        handler(e as any);
-      }
+      onMouseDown: (e: React.MouseEvent) => {
+        e.preventDefault();
+        handler();
+      },
+      style: { cursor: 'pointer' }
     };
   }, []);
 
@@ -308,27 +308,26 @@ export const UserMenuButton = () => {
     };
   }, [closeMenuContext]);
 
+  // Ref pour le container du menu
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+
   // Fermer le menu quand on clique en dehors
   useEffect(() => {
     if (!isMenuOpen(MENU_ID)) return;
 
-    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      const target = e.target as HTMLElement;
-      // Si le clic est en dehors du menu et du bouton, fermer
-      if (!target.closest('.user-menu-container')) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
         closeMenuContext(MENU_ID);
       }
     };
 
     // Délai pour éviter que le clic d'ouverture ne ferme immédiatement
     setTimeout(() => {
-      document.addEventListener('click', handleClickOutside);
-      document.addEventListener('touchend', handleClickOutside);
-    }, 10);
+      window.addEventListener('click', handleClickOutside);
+    }, 0);
 
     return () => {
-      document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('touchend', handleClickOutside);
+      window.removeEventListener('click', handleClickOutside);
     };
   }, [isMenuOpen, closeMenuContext]);
 
@@ -349,7 +348,7 @@ export const UserMenuButton = () => {
 
   return (
     <>
-      <div className="relative user-menu-container">
+      <div className="relative user-menu-container" ref={menuContainerRef}>
         <button
           onClick={handleToggleMenu}
           className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"

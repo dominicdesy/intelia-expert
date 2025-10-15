@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
 import { useMenu } from "@/lib/contexts/MenuContext";
 import {
@@ -246,9 +246,8 @@ export const HistoryMenu = React.memo(() => {
                     ? "bg-blue-50 border-l-4 border-blue-500"
                     : ""
                 }`}
-                onClick={(e) => handleConversationClick(conv, e)}
-                onTouchEnd={(e: any) => {
-                  e.stopPropagation();
+                onMouseDown={(e) => {
+                  e.preventDefault();
                   handleConversationClick(conv, e);
                 }}
               >
@@ -309,32 +308,31 @@ export const HistoryMenu = React.memo(() => {
     closeMenuContext(MENU_ID); // ✅ MODIFIÉ
   }, [closeMenuContext]);
 
+  // Ref pour le container du menu
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+
   // Fermer le menu quand on clique en dehors
   useEffect(() => {
     if (!isMenuOpen(MENU_ID)) return;
 
-    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      const target = e.target as HTMLElement;
-      // Si le clic est en dehors du menu et du bouton, fermer
-      if (!target.closest('.history-menu-container')) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
         closeMenuContext(MENU_ID);
       }
     };
 
     // Délai pour éviter que le clic d'ouverture ne ferme immédiatement
     setTimeout(() => {
-      document.addEventListener('click', handleClickOutside);
-      document.addEventListener('touchend', handleClickOutside);
-    }, 10);
+      window.addEventListener('click', handleClickOutside);
+    }, 0);
 
     return () => {
-      document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('touchend', handleClickOutside);
+      window.removeEventListener('click', handleClickOutside);
     };
   }, [isMenuOpen, closeMenuContext]);
 
   return (
-    <div className="relative header-icon-container history-menu-container">
+    <div className="relative header-icon-container history-menu-container" ref={menuContainerRef}>
       <button
         onClick={handleToggle}
         className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"

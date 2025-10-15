@@ -43,7 +43,9 @@
       "Read(//c/intelia_gpt/**)",
       "Bash(git reset:*)",
       "Bash(docker-compose exec backend psql:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "WebSearch",
+      "WebFetch(domain:www.letsbuildui.dev)"
     ],
     "deny": [],
     "ask": []
