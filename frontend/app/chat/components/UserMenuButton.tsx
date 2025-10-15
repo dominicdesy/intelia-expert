@@ -182,7 +182,7 @@ export const UserMenuButton = () => {
       logoutInProgressRef.current = true;
 
       // Fermer le menu immédiatement
-      setIsOpen(false);
+      closeMenuContext(MENU_ID);
 
       // ✅ CORRECTION: Passer l'objet user pour préserver la langue
       await logoutService.performLogout(user);
@@ -191,7 +191,7 @@ export const UserMenuButton = () => {
       // En cas d'erreur, forcer quand même la redirection
       window.location.href = "/";
     }
-  }, [t, user]); // ← Ajout de 'user' dans les dépendances
+  }, [t, user, closeMenuContext]); // ← Ajout de 'closeMenuContext' dans les dépendances
 
   // Handlers des modales avec protection renforcée
   const handleContactClick = useCallback(() => {
