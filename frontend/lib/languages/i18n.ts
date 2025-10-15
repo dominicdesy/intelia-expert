@@ -836,17 +836,17 @@ if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
 }
 
 // Fonction pour récupérer la langue depuis le localStorage
-const getStoredLanguage = (): string => {
+const getStoredLanguage = (): string | null => {
   try {
     const storedLang = localStorage.getItem("intelia-language");
     if (storedLang) {
       const parsed = JSON.parse(storedLang);
-      return parsed?.state?.currentLanguage || detectBrowserLanguage();
+      return parsed?.state?.currentLanguage || null;
     }
   } catch (error) {
     secureLog.warn("Erreur lecture langue stockée:", error);
   }
-  return detectBrowserLanguage();
+  return null;
 };
 
 // Fonction pour charger les traductions depuis les fichiers JSON - AVEC PROTECTION ANTI-BOUCLE
@@ -951,49 +951,57 @@ export const useTranslation = () => {
     return unsubscribe;
   }, []);
 
-  // LOGIQUE MODIFIÉE : PRIORITÉ 1 = localStorage, PRIORITÉ 2 = Navigateur
+  // LOGIQUE CORRIGÉE : PRIORITÉ 1 = Supabase (utilisateur connecté), PRIORITÉ 2 = localStorage, PRIORITÉ 3 = Navigateur
   useEffect(() => {
     const getUserLanguage = async () => {
       try {
-        // PRIORITÉ 1: localStorage (choix explicite de l'utilisateur)
-        const storedLang = getStoredLanguage();
-        if (storedLang && isValidLanguageCode(storedLang)) {
-          // Vérifier si ce n'est PAS la détection automatique du navigateur
-          const browserLang = detectBrowserLanguage();
-          if (storedLang !== browserLang) {
-            // L'utilisateur a fait un choix explicite différent du navigateur
-            secureLog.log(
-              `[i18n] Choix utilisateur (localStorage): ${storedLang}`,
-            );
-            if (!isMountedRef.current) return; // PROTECTION
-            setCurrentLanguage(storedLang);
-            return;
-          }
-        }
-
-        // PRIORITÉ 2: Navigateur (nouveau défaut)
-        const browserLang = detectBrowserLanguage();
-        secureLog.log(`[i18n] Langue du navigateur détectée: ${browserLang}`);
-        if (!isMountedRef.current) return; // PROTECTION
-        setCurrentLanguage(browserLang);
-
-        // PRIORITÉ 3: Supabase (optionnel)
+        // PRIORITÉ 1: Supabase (source de vérité pour utilisateurs connectés)
         try {
           const {
             data: { session },
           } = await supabase.auth.getSession();
           const userLang = session?.user?.user_metadata?.language;
 
-          if (userLang && isValidLanguageCode(userLang) && !storedLang) {
-            secureLog.log(`[i18n] Langue Supabase utilisée: ${userLang}`);
+          if (userLang && isValidLanguageCode(userLang)) {
+            secureLog.log(`[i18n] PRIORITÉ 1 - Langue Supabase (utilisateur connecté): ${userLang}`);
             if (!isMountedRef.current) return; // PROTECTION
             setCurrentLanguage(userLang);
+
+            // Synchroniser localStorage avec Supabase
+            try {
+              const langData = {
+                state: {
+                  currentLanguage: userLang,
+                },
+              };
+              localStorage.setItem("intelia-language", JSON.stringify(langData));
+              secureLog.log("[i18n] localStorage synchronisé avec Supabase");
+            } catch (error) {
+              secureLog.warn("[i18n] Erreur sync localStorage:", error);
+            }
             return;
           }
         } catch (error) {
-          // Ignorer les erreurs Supabase, continuer avec le navigateur
-          secureLog.log("Pas de session Supabase, utilisation langue navigateur");
+          // Si Supabase échoue, continuer avec localStorage
+          secureLog.log("[i18n] Pas de session Supabase, vérification localStorage");
         }
+
+        // PRIORITÉ 2: localStorage (choix précédent si pas de Supabase)
+        const storedLang = getStoredLanguage();
+        if (storedLang && isValidLanguageCode(storedLang)) {
+          secureLog.log(
+            `[i18n] PRIORITÉ 2 - Langue localStorage: ${storedLang}`,
+          );
+          if (!isMountedRef.current) return; // PROTECTION
+          setCurrentLanguage(storedLang);
+          return;
+        }
+
+        // PRIORITÉ 3: Navigateur (détection automatique en dernier recours)
+        const browserLang = detectBrowserLanguage();
+        secureLog.log(`[i18n] PRIORITÉ 3 - Langue navigateur: ${browserLang}`);
+        if (!isMountedRef.current) return; // PROTECTION
+        setCurrentLanguage(browserLang);
       } catch (error) {
         secureLog.log(
           "Erreur initialisation langue, utilisation navigateur par défaut",
