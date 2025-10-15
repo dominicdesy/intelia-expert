@@ -329,19 +329,6 @@ export const UserMenuButton = () => {
             key={currentLanguage}
             className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
             onClick={(e) => {
-              // ✅ Touch-friendly: Laisser passer les clicks des boutons enfants
-              const target = e.target as HTMLElement;
-              if (target.closest('button')) {
-                return; // Les boutons enfants gèrent leur propre onClick
-              }
-              e.stopPropagation();
-            }}
-            onTouchEnd={(e) => {
-              // ✅ Android/iOS: Même logique pour touch
-              const target = e.target as HTMLElement;
-              if (target.closest('button')) {
-                return;
-              }
               e.stopPropagation();
             }}>
               <div className="px-4 py-3 border-b border-gray-100">
