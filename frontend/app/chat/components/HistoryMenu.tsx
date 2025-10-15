@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
 import { useMenu } from "@/lib/contexts/MenuContext";
 import {
@@ -309,8 +309,32 @@ export const HistoryMenu = React.memo(() => {
     closeMenuContext(MENU_ID); // ✅ MODIFIÉ
   }, [closeMenuContext]);
 
+  // Fermer le menu quand on clique en dehors
+  useEffect(() => {
+    if (!isMenuOpen(MENU_ID)) return;
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      // Si le clic est en dehors du menu et du bouton, fermer
+      if (!target.closest('.history-menu-container')) {
+        closeMenuContext(MENU_ID);
+      }
+    };
+
+    // Délai pour éviter que le clic d'ouverture ne ferme immédiatement
+    setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('touchend', handleClickOutside);
+    }, 10);
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchend', handleClickOutside);
+    };
+  }, [isMenuOpen, closeMenuContext]);
+
   return (
-    <div className="relative header-icon-container">
+    <div className="relative header-icon-container history-menu-container">
       <button
         onClick={handleToggle}
         className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
@@ -347,19 +371,11 @@ export const HistoryMenu = React.memo(() => {
       {notificationBadge}
 
       {isMenuOpen(MENU_ID) && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={handleCloseMenu}
-            onTouchEnd={handleCloseMenu}
-            aria-hidden="true"
-          />
-          <div
-            className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col"
-            style={{ touchAction: 'manipulation' }}>
-            <div className="flex-1 overflow-y-auto">{conversationsList}</div>
-          </div>
-        </>
+        <div
+          className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col"
+          style={{ touchAction: 'manipulation' }}>
+          <div className="flex-1 overflow-y-auto">{conversationsList}</div>
+        </div>
       )}
     </div>
   );

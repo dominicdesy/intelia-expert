@@ -308,6 +308,30 @@ export const UserMenuButton = () => {
     };
   }, [closeMenuContext]);
 
+  // Fermer le menu quand on clique en dehors
+  useEffect(() => {
+    if (!isMenuOpen(MENU_ID)) return;
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      // Si le clic est en dehors du menu et du bouton, fermer
+      if (!target.closest('.user-menu-container')) {
+        closeMenuContext(MENU_ID);
+      }
+    };
+
+    // Délai pour éviter que le clic d'ouverture ne ferme immédiatement
+    setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('touchend', handleClickOutside);
+    }, 10);
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchend', handleClickOutside);
+    };
+  }, [isMenuOpen, closeMenuContext]);
+
   // ✅ SOLUTION D: Debug du changement de langue (forceUpdate supprimé - redondant)
   useEffect(() => {
     secureLog.log(`[UserMenuButton] currentLanguage mis à jour: ${currentLanguage}`);
@@ -325,7 +349,7 @@ export const UserMenuButton = () => {
 
   return (
     <>
-      <div className="relative">
+      <div className="relative user-menu-container">
         <button
           onClick={handleToggleMenu}
           className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
@@ -336,17 +360,10 @@ export const UserMenuButton = () => {
         </button>
 
         {isMenuOpen(MENU_ID) && (
-          <>
-            <div
-              className="fixed inset-0 z-40"
-              onClick={handleCloseMenu}
-              onTouchEnd={handleCloseMenu}
-              aria-hidden="true"
-            />
-            <div
-              key={currentLanguage}
-              className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
-              style={{ touchAction: 'manipulation' }}>
+          <div
+            key={currentLanguage}
+            className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+            style={{ touchAction: 'manipulation' }}>
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-medium text-gray-900">
                   {user?.name}
@@ -558,7 +575,6 @@ export const UserMenuButton = () => {
                 </button>
               </div>
             </div>
-          </>
         )}
       </div>
 
