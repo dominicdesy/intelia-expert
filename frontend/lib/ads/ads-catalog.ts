@@ -127,6 +127,8 @@ function addToHistory(adId: string): void {
  * NOTE: N'ajoute PAS à l'historique ici - l'historique est ajouté quand la pub est affichée
  */
 export async function selectNextAd(userType?: string): Promise<Ad | null> {
+  console.log("[AdCatalog] 🎯 selectNextAd() APPELÉE - userType:", userType);
+
   const eligibleAds = getAdsForUserType(userType);
 
   if (eligibleAds.length === 0) {
