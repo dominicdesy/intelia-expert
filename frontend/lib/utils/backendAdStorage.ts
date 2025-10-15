@@ -38,30 +38,34 @@ async function saveAdHistoryToBackend(history: string[]): Promise<void> {
  */
 async function loadAdHistoryFromBackend(): Promise<string[] | null> {
   try {
-    secureLog.log("[BackendAdStorage] Loading from backend...");
+    console.log("[BackendAdStorage] 📡 Loading from backend...");
 
     // Utiliser apiClient pour la cohérence des URLs
     const response = await apiClient.getSecure<any>("auth/me");
 
+    console.log("[BackendAdStorage] 📡 Response:", response);
+
     if (response.success && response.data) {
       const history = response.data.ad_history;
 
+      console.log("[BackendAdStorage] 📡 ad_history field:", history);
+
       if (Array.isArray(history) && history.length > 0) {
-        secureLog.log(
-          "[BackendAdStorage] Ad history loaded from backend:",
+        console.log(
+          "[BackendAdStorage] ✅ Ad history loaded from backend:",
           history
         );
         return history;
       } else {
-        secureLog.log("[BackendAdStorage] No ad_history in user profile");
+        console.log("[BackendAdStorage] ⚠️ No ad_history in user profile");
       }
     } else {
-      secureLog.warn("[BackendAdStorage] Backend load failed:", response.error);
+      console.warn("[BackendAdStorage] ❌ Backend load failed:", response.error);
     }
 
     return null;
   } catch (error) {
-    secureLog.warn("[BackendAdStorage] Backend load error:", error);
+    console.error("[BackendAdStorage] ❌ Backend load error:", error);
     return null;
   }
 }
@@ -96,26 +100,27 @@ export class BackendAdStorage {
 
     this.initPromise = (async () => {
       try {
-        secureLog.log("[BackendAdStorage] Initializing...");
+        console.log("[BackendAdStorage] 🔄 Initializing...");
 
         // Charger depuis le backend
         const backendHistory = await loadAdHistoryFromBackend();
 
         if (backendHistory && backendHistory.length > 0) {
-          secureLog.log(
-            "[BackendAdStorage] Restoring from backend:",
+          console.log(
+            "[BackendAdStorage] ✅ Restoring from backend:",
             backendHistory
           );
 
           // Restaurer dans le stockage local
           this.localStorage.set(backendHistory);
         } else {
-          secureLog.log("[BackendAdStorage] No backend history found");
+          console.log("[BackendAdStorage] ⚠️ No backend history found");
         }
 
         this.isInitialized = true;
+        console.log("[BackendAdStorage] ✅ Initialization complete");
       } catch (error) {
-        secureLog.error("[BackendAdStorage] Init error:", error);
+        console.error("[BackendAdStorage] ❌ Init error:", error);
         // Marquer comme initialisé quand même pour ne pas bloquer
         this.isInitialized = true;
       }
