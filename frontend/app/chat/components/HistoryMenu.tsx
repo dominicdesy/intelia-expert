@@ -347,6 +347,10 @@ export const HistoryMenu = React.memo(() => {
           <div
             className="fixed inset-0 z-40"
             onClick={handleCloseMenu}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              handleCloseMenu();
+            }}
             aria-hidden="true"
           />
           <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">

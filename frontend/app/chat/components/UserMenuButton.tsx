@@ -329,6 +329,10 @@ export const UserMenuButton = () => {
             <div
               className="fixed inset-0 z-40"
               onClick={handleCloseMenu}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                handleCloseMenu();
+              }}
               aria-hidden="true"
             />
             <div
