@@ -1211,6 +1211,7 @@ export interface User {
   phone: string;
   country: string;
   linkedinProfile: string;
+  facebookProfile?: string;
   companyName: string;
   companyWebsite: string;
   linkedinCorporate: string;

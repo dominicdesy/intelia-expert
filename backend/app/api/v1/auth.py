@@ -29,6 +29,40 @@ except ImportError:
 router = APIRouter(prefix="/auth")
 logger = logging.getLogger(__name__)
 
+
+# ==================== HELPER FUNCTIONS ====================
+
+
+def extract_facebook_id_from_avatar_url(avatar_url: str) -> Optional[str]:
+    """
+    Extrait l'ID Facebook depuis l'URL de l'avatar Facebook.
+
+    Format: https://platform-lookaside.fbsbx.com/platform/profilepic/?asid=10161563757712721&...
+    Retourne: "10161563757712721"
+    """
+    if not avatar_url or "fbsbx.com" not in avatar_url:
+        return None
+
+    try:
+        # Chercher le paramètre asid= dans l'URL
+        if "asid=" in avatar_url:
+            # Extraire la valeur après asid=
+            start = avatar_url.index("asid=") + 5
+            end = avatar_url.index("&", start) if "&" in avatar_url[start:] else len(avatar_url)
+            facebook_id = avatar_url[start:end]
+
+            logger.info(f"[Facebook] ID extrait de l'avatar: {facebook_id}")
+            return facebook_id
+    except Exception as e:
+        logger.warning(f"[Facebook] Erreur extraction ID: {e}")
+
+    return None
+
+
+def construct_facebook_profile_url(facebook_id: str) -> str:
+    """Construit l'URL du profil Facebook depuis l'ID."""
+    return f"https://facebook.com/{facebook_id}"
+
 # Configuration JWT MULTI-COMPATIBLE (auth-temp + Supabase)
 # Récupérer les secrets JWT dans l'ordre de priorité
 JWT_SECRETS = []
@@ -2268,6 +2302,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
                             "phone_number": profile_data.get("phone_number"),
                             "phone": profile_data.get("phone"),
                             "linkedin_profile": profile_data.get("linkedin_profile"),
+                            "facebook_profile": profile_data.get("facebook_profile"),  # 🎯 Facebook profile URL
                             "company_name": profile_data.get("company_name"),
                             "company_website": profile_data.get("company_website"),
                             "linkedin_corporate": profile_data.get("linkedin_corporate"),

@@ -23,6 +23,7 @@ interface BackendUserData {
   country_code?: string;
   area_code?: string;
   linkedin_profile?: string;
+  facebook_profile?: string;
   company_name?: string;
   company_website?: string;
   linkedin_corporate?: string;
@@ -306,6 +307,7 @@ export const useAuthStore = create<AuthState>()(
               phone: userData.phone || userData.phone_number || "",
               country: userData.country || "",
               linkedinProfile: userData.linkedin_profile || "",
+              facebookProfile: userData.facebook_profile,
               companyName: userData.company_name || "",
               companyWebsite: userData.company_website || "",
               linkedinCorporate: userData.linkedin_corporate || "",
