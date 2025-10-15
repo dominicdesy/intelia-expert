@@ -248,7 +248,7 @@ export const HistoryMenu = React.memo(() => {
                 }`}
                 onClick={(e) => handleConversationClick(conv, e)}
                 onTouchEnd={(e: any) => {
-                  e.preventDefault();
+                  e.stopPropagation();
                   handleConversationClick(conv, e);
                 }}
               >
@@ -351,13 +351,12 @@ export const HistoryMenu = React.memo(() => {
           <div
             className="fixed inset-0 z-40"
             onClick={handleCloseMenu}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              handleCloseMenu();
-            }}
+            onTouchEnd={handleCloseMenu}
             aria-hidden="true"
           />
-          <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">
+          <div
+            className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col"
+            style={{ touchAction: 'manipulation' }}>
             <div className="flex-1 overflow-y-auto">{conversationsList}</div>
           </div>
         </>

@@ -266,7 +266,7 @@ export const UserMenuButton = () => {
     return {
       onClick: handler,
       onTouchEnd: (e: React.TouchEvent) => {
-        e.preventDefault();
+        e.stopPropagation();
         handler(e as any);
       }
     };
@@ -340,15 +340,13 @@ export const UserMenuButton = () => {
             <div
               className="fixed inset-0 z-40"
               onClick={handleCloseMenu}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                handleCloseMenu();
-              }}
+              onTouchEnd={handleCloseMenu}
               aria-hidden="true"
             />
             <div
               key={currentLanguage}
-              className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+              className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+              style={{ touchAction: 'manipulation' }}>
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-medium text-gray-900">
                   {user?.name}
