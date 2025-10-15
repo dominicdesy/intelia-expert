@@ -25,7 +25,7 @@ import { secureLog } from "@/lib/utils/secureLogger";
 export const UserMenuButton = React.memo(() => {
   const router = useRouter();
   const { user } = useAuthStore(); // ✅ CORRECTION: Retiré 'logout' du destructuring
-  const { t } = useTranslation();
+  const { t, currentLanguage } = useTranslation(); // Ajout de currentLanguage pour forcer re-render
 
   // États des modales
   const [isOpen, setIsOpen] = useState(false);
