@@ -28,7 +28,16 @@
       "Bash(npm run dev:*)",
       "Bash(git push:*)",
       "Bash(curl:*)",
-      "Bash(openssl rand:*)"
+      "Bash(openssl rand:*)",
+      "Bash(pip install:*)",
+      "Bash(find:*)",
+      "Bash(for file in es.json de.json it.json pt.json nl.json pl.json ar.json zh.json ja.json hi.json id.json th.json tr.json vi.json)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(for file in en.json es.json de.json it.json pt.json nl.json pl.json ar.json zh.json ja.json hi.json id.json th.json tr.json vi.json)",
+      "Bash(for file in en.json de.json zh.json vi.json)",
+      "Bash(for file in es.json de.json it.json pt.json)",
+      "Bash(git rm:*)",
+      "Bash(uvicorn:*)"
     ],
     "deny": [],
     "ask": []

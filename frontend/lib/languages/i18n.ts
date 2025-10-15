@@ -777,37 +777,7 @@ export interface TranslationKeys {
   "help.cameraDesc": string;
 }
 
-// SYSTÈME DE NOTIFICATION POUR FORCER LES RE-RENDERS
-class I18nNotificationManager {
-  private static instance: I18nNotificationManager;
-  private subscribers: Array<() => void> = [];
-
-  static getInstance(): I18nNotificationManager {
-    if (!I18nNotificationManager.instance) {
-      I18nNotificationManager.instance = new I18nNotificationManager();
-    }
-    return I18nNotificationManager.instance;
-  }
-
-  subscribe(callback: () => void): () => void {
-    this.subscribers.push(callback);
-    return () => {
-      this.subscribers = this.subscribers.filter((cb) => cb !== callback);
-    };
-  }
-
-  notify(): void {
-    this.subscribers.forEach((callback) => {
-      try {
-        callback();
-      } catch (error) {
-        secureLog.error("Erreur notification i18n:", error);
-      }
-    });
-  }
-}
-
-const notificationManager = I18nNotificationManager.getInstance();
+// ✅ SOLUTION D: NotificationManager supprimé - Système redondant avec useState/useEffect
 
 // Cache pour les traductions chargées
 const translationsCache: Record<string, TranslationKeys> = {};
@@ -831,7 +801,6 @@ if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
     getTranslationsCache: () => translationsCache,
     getErrorCache: () => errorCache,
     clearErrorCache: () => errorCache.clear(),
-    notificationManager,
   };
 }
 
@@ -847,6 +816,31 @@ const getStoredLanguage = (): string | null => {
     secureLog.warn("Erreur lecture langue stockée:", error);
   }
   return null;
+};
+
+// ✅ SOLUTION B: Détection synchrone de la langue pour éviter le flash initial
+const getInitialLanguageSync = (): string => {
+  if (typeof window === 'undefined') return DEFAULT_LANGUAGE;
+
+  try {
+    // Vérifier localStorage en premier (le plus rapide)
+    const stored = localStorage.getItem('intelia-language');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const lang = parsed?.state?.currentLanguage;
+      if (lang && isValidLanguageCode(lang)) {
+        secureLog.log(`[i18n] Init synchrone: langue depuis localStorage = ${lang}`);
+        return lang;
+      }
+    }
+  } catch (error) {
+    secureLog.warn("[i18n] Erreur lecture synchrone localStorage:", error);
+  }
+
+  // Fallback : détection du navigateur
+  const browserLang = detectBrowserLanguage();
+  secureLog.log(`[i18n] Init synchrone: langue navigateur = ${browserLang}`);
+  return browserLang;
 };
 
 // Fonction pour charger les traductions depuis les fichiers JSON - AVEC PROTECTION ANTI-BOUCLE
@@ -866,9 +860,6 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     globalTranslations = translationsCache[language];
     globalLoading = false;
     globalLanguage = language;
-
-    // NOTIFIER TOUS LES COMPOSANTS
-    notificationManager.notify();
 
     return translationsCache[language];
   }
@@ -897,9 +888,6 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
     globalLoading = false;
     globalLanguage = language;
 
-    // NOTIFIER TOUS LES COMPOSANTS
-    notificationManager.notify();
-
     secureLog.log(
       `[i18n] Traductions chargées pour ${language}: ${Object.keys(translations).length} clés`,
     );
@@ -926,30 +914,17 @@ async function loadTranslations(language: string): Promise<TranslationKeys> {
 
 // Hook de traduction - VERSION CORRIGÉE POUR DÉTECTER LA LANGUE DU NAVIGATEUR
 export const useTranslation = () => {
-  // AJOUT: Refs pour cleanup
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  // AJOUT: Ref pour cleanup
   const isMountedRef = useRef(true);
 
-  // Initialiser avec DEFAULT_LANGUAGE comme valeur statique
+  // ✅ SOLUTION B: Initialiser avec détection synchrone pour éliminer le flash anglais
   const [currentLanguage, setCurrentLanguage] =
-    useState<string>(DEFAULT_LANGUAGE);
+    useState<string>(getInitialLanguageSync());
   const [translations, setTranslations] = useState<TranslationKeys>(
     {} as TranslationKeys,
   );
   const [loading, setLoading] = useState(true);
-  const [, forceRender] = useState({}); // Pour forcer les re-renders
-
-  // S'ABONNER AUX NOTIFICATIONS
-  useEffect(() => {
-    const unsubscribe = notificationManager.subscribe(() => {
-      if (isMountedRef.current) {
-        // AJOUT: protection démontage
-        forceRender({});
-      }
-    });
-
-    return unsubscribe;
-  }, []);
+  // ✅ SOLUTION D: forceRender et NotificationManager supprimés - Redondants avec useState/useEffect
 
   // LOGIQUE CORRIGÉE : PRIORITÉ 1 = Backend (table users), PRIORITÉ 2 = localStorage, PRIORITÉ 3 = Navigateur
   useEffect(() => {
@@ -1020,35 +995,7 @@ export const useTranslation = () => {
     getUserLanguage();
   }, []);
 
-  // Vérification continue de localStorage pour éviter le cache corrompu
-  useEffect(() => {
-    // Intervalle pour vérifier périodiquement les changements du localStorage
-    const checkLocalStorageInterval = setInterval(() => {
-      if (!isMountedRef.current) return; // AJOUT: protection démontage
-
-      const storedLang = getStoredLanguage();
-      if (
-        storedLang &&
-        storedLang !== currentLanguage &&
-        isValidLanguageCode(storedLang)
-      ) {
-        secureLog.log(
-          `[i18n] Resynchronisation détectée: ${currentLanguage} → ${storedLang}`,
-        );
-        setCurrentLanguage(storedLang);
-      }
-    }, 1000); // Vérifier toutes les secondes
-
-    intervalRef.current = checkLocalStorageInterval; // AJOUT
-
-    // AJOUT: Nettoyer l'intervalle au démontage
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [currentLanguage]);
+  // ✅ SOLUTION D: Polling interval supprimé - Le storage event listener suffit
 
   // Écouter les événements de localStorage pour une réactivité immédiate
   useEffect(() => {
@@ -1136,12 +1083,6 @@ export const useTranslation = () => {
 
     return () => {
       isMountedRef.current = false;
-
-      // Cleanup final de l'interval si nécessaire
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
     };
   }, []);
 

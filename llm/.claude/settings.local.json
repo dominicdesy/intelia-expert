@@ -63,7 +63,9 @@
       "Bash(dir \"C:\\intelia_gpt\\intelia-expert\\frontend\\app\\auth\\callback\")",
       "Bash(curl -s \"https://expert.intelia.com/auth/callback\" -I)",
       "Bash(git log:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(dir:*)",
+      "WebFetch(domain:expert.intelia.com)"
     ],
     "deny": [],
     "ask": []

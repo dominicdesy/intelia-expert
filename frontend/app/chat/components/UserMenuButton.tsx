@@ -26,8 +26,8 @@ import { secureLog } from "@/lib/utils/secureLogger";
 export const UserMenuButton = () => {
   const router = useRouter();
   const { user } = useAuthStore(); // ✅ CORRECTION: Retiré 'logout' du destructuring
-  const { t, currentLanguage } = useTranslation(); // Ajout de currentLanguage pour forcer re-render
-  const [, forceUpdate] = useState({});
+  const { t, currentLanguage } = useTranslation(); // currentLanguage suffit pour déclencher re-render
+  // ✅ SOLUTION D: forceUpdate supprimé - Redondant avec currentLanguage dans les dépendances
 
   // États des modales
   const [isOpen, setIsOpen] = useState(false);
@@ -292,12 +292,12 @@ export const UserMenuButton = () => {
     };
   }, []);
 
-  // Forcer un re-render quand currentLanguage change
+  // ✅ SOLUTION D: Debug du changement de langue (forceUpdate supprimé - redondant)
   useEffect(() => {
     secureLog.log(`[UserMenuButton] currentLanguage mis à jour: ${currentLanguage}`);
     secureLog.log(`[UserMenuButton] Sample translation 'nav.profile': ${t("nav.profile")}`);
     secureLog.log(`[UserMenuButton] Sample translation 'nav.language': ${t("nav.language")}`);
-    forceUpdate({});
+    // forceUpdate supprimé - Le changement de currentLanguage déclenche déjà un re-render
   }, [currentLanguage, t]);
 
   const closeInviteFriendModal = useCallback(() => {
