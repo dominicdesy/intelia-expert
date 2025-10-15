@@ -37,7 +37,11 @@
       "Bash(for file in en.json de.json zh.json vi.json)",
       "Bash(for file in es.json de.json it.json pt.json)",
       "Bash(git rm:*)",
-      "Bash(uvicorn:*)"
+      "Bash(uvicorn:*)",
+      "Bash(node add-translations.js)",
+      "Read(//c/intelia_gpt/backend/**)",
+      "Read(//c/intelia_gpt/**)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []

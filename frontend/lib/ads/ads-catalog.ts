@@ -62,15 +62,19 @@ export function getActiveAds(): Ad[] {
 
 /**
  * Filtre les publicités par type d'utilisateur
+ * NOTE: Pour l'instant, on retourne toutes les pubs actives sans filtrage
  */
 export function getAdsForUserType(userType?: string): Ad[] {
   const activeAds = getActiveAds();
 
-  if (!userType) return activeAds;
+  // TEMPORAIRE: Désactiver le filtrage par audience - afficher toutes les pubs à tous
+  return activeAds;
 
-  return activeAds.filter((ad) =>
-    ad.targetAudience.includes(userType) || ad.targetAudience.includes("all")
-  );
+  // Code original (désactivé):
+  // if (!userType) return activeAds;
+  // return activeAds.filter((ad) =>
+  //   ad.targetAudience.includes(userType) || ad.targetAudience.includes("all")
+  // );
 }
 
 /**

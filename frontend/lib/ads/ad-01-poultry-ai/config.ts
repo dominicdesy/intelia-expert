@@ -9,7 +9,7 @@ export const ad01Config = {
 
   // Métadonnées pour le tracking
   category: "education",
-  targetAudience: ["farmer", "veterinary", "nutritionist"],
+  targetAudience: ["farmer", "veterinary", "nutritionist", "all"],
   priority: 1, // Plus le nombre est bas, plus la priorité est haute
 
   // Contrôle d'affichage
