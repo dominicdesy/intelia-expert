@@ -1393,17 +1393,6 @@ function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  const getCurrentDate = useCallback(() => {
-    return new Date().toLocaleDateString(
-      currentLanguage === "fr" ? "fr-FR" : "en-US",
-      {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      },
-    );
-  }, [currentLanguage]);
-
   // Calcul des styles dynamiques pour mobile
   const containerStyle = useMemo(() => {
     return isMobileDevice
@@ -1565,14 +1554,6 @@ function ChatInterface() {
             style={chatScrollStyle}
           >
             <div className="max-w-full sm:max-w-4xl mx-auto space-y-6 px-2 sm:px-4">
-              {hasMessages && (
-                <div className="text-center">
-                  <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
-                    {getCurrentDate()}
-                  </span>
-                </div>
-              )}
-
               <MessageList
                 processedMessages={processedMessages}
                 isLoadingChat={isLoadingChat}

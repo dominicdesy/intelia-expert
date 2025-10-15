@@ -106,6 +106,7 @@ function addToHistory(adId: string): void {
  * Sélectionne la prochaine publicité à afficher
  * Logique de rotation stricte: jamais la même pub deux fois de suite
  * Alternance garantie: pub1 → pub2 → pub1 → pub2
+ * NOTE: N'ajoute PAS à l'historique ici - l'historique est ajouté quand la pub est affichée
  */
 export function selectNextAd(userType?: string): Ad | null {
   const eligibleAds = getAdsForUserType(userType);
@@ -117,13 +118,14 @@ export function selectNextAd(userType?: string): Ad | null {
 
   // Si une seule pub, pas de choix
   if (eligibleAds.length === 1) {
-    addToHistory(eligibleAds[0].id);
     return eligibleAds[0];
   }
 
   // Logique de rotation stricte
   const history = getAdHistory();
   const lastShownId = history[0]; // La dernière montrée
+
+  console.log(`[AdCatalog] Dernière pub affichée: ${lastShownId}, Historique:`, history);
 
   // Trier par priorité (1 = haute, 2 = moyenne, etc.)
   const sortedAds = [...eligibleAds].sort((a, b) => a.priority - b.priority);
@@ -135,16 +137,24 @@ export function selectNextAd(userType?: string): Ad | null {
   if (differentAds.length > 0) {
     // Prendre la première (plus haute priorité) parmi les pubs différentes
     const selectedAd = differentAds[0];
-    addToHistory(selectedAd.id);
-    console.log(`[AdCatalog] Alternance: ${lastShownId} → ${selectedAd.id}`);
+    console.log(`[AdCatalog] Sélection alternance: ${lastShownId} → ${selectedAd.id}`);
     return selectedAd;
   }
 
   // Cas edge (ne devrait jamais arriver si eligibleAds.length > 1)
   // Si toutes les pubs sont identiques à la dernière (impossible normalement)
   const selectedAd = sortedAds[0];
-  addToHistory(selectedAd.id);
+  console.log(`[AdCatalog] Sélection par défaut: ${selectedAd.id}`);
   return selectedAd;
+}
+
+/**
+ * Enregistre qu'une publicité a été affichée
+ * À appeler UNIQUEMENT quand la pub est effectivement montrée à l'utilisateur
+ */
+export function markAdAsShown(adId: string): void {
+  addToHistory(adId);
+  console.log(`[AdCatalog] ✅ Pub marquée comme affichée: ${adId}`);
 }
 
 /**

@@ -215,9 +215,20 @@ export const useAdSystem = () => {
     try {
       secureLog.log("🎬 Chargement publicité...");
       const adData = await getPersonalizedAd();
+
+      if (!adData) {
+        secureLog.warn("⚠️ Aucune publicité disponible");
+        return;
+      }
+
       setCurrentAd(adData);
       setShowAd(true);
-      secureLog.log("📺 Publicité affichée:", adData.title);
+
+      // ✅ CORRECTION: Marquer la pub comme affichée MAINTENANT (pas à la sélection)
+      const { markAdAsShown } = await import("@/lib/ads/ads-catalog");
+      markAdAsShown(adData.id);
+
+      secureLog.log("📺 Publicité affichée et enregistrée:", adData.id);
     } catch (error) {
       secureLog.error("❌ Erreur lors du chargement de la publicité:", error);
     }
