@@ -207,22 +207,6 @@ const ChatInput = React.memo(
             className="hidden"
           />
 
-          {/* Camera Button */}
-          <button
-            onClick={handleCameraClick}
-            disabled={isLoadingChat}
-            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-gray-600 hover:text-blue-600 disabled:text-gray-300 transition-colors rounded-full hover:bg-gray-100 ${selectedImage ? "bg-blue-50 text-blue-600" : ""}`}
-            title="Ajouter une image"
-            aria-label="Ajouter une image"
-            style={{
-              minWidth: "48px",
-              width: "48px",
-              height: "48px",
-            }}
-          >
-            <CameraIcon />
-          </button>
-
           {/* Send Button */}
           <button
             onClick={handleButtonClick}
@@ -237,6 +221,22 @@ const ChatInput = React.memo(
             }}
           >
             <PaperAirplaneIcon />
+          </button>
+
+          {/* Camera Button */}
+          <button
+            onClick={handleCameraClick}
+            disabled={isLoadingChat}
+            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-gray-600 hover:text-blue-600 disabled:text-gray-300 transition-colors rounded-full hover:bg-gray-100 ${selectedImage ? "bg-blue-50 text-blue-600" : ""}`}
+            title="Ajouter une image"
+            aria-label="Ajouter une image"
+            style={{
+              minWidth: "48px",
+              width: "48px",
+              height: "48px",
+            }}
+          >
+            <CameraIcon />
           </button>
         </div>
       </div>
