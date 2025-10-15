@@ -1235,17 +1235,21 @@ export const handleEnhancedNetworkError = (error: any): string => {
 };
 
 /**
- * NOUVELLE FONCTION: Analyse d'image médicale avec Claude Vision API
+ * NOUVELLE FONCTION: Analyse d'image(s) médicale(s) avec Claude Vision API
+ * Support pour une ou plusieurs images
  */
 export const generateVisionResponse = async (
-  imageFile: File,
+  imageFiles: File | File[],
   message: string,
   user: any,
   language: string = "fr",
   conversationId?: string,
 ): Promise<EnhancedAIResponse> => {
-  if (!imageFile) {
-    throw new Error("Image requise");
+  // Normaliser en tableau
+  const images = Array.isArray(imageFiles) ? imageFiles : [imageFiles];
+
+  if (images.length === 0) {
+    throw new Error("Au moins une image est requise");
   }
 
   if (!user || !user.id) {
@@ -1254,9 +1258,10 @@ export const generateVisionResponse = async (
 
   const finalConversationId = conversationId || generateUUID();
 
-  secureLog.log("[apiService] VISION: Analyse d'image médicale:", {
-    image_name: imageFile.name,
-    image_size: imageFile.size,
+  secureLog.log("[apiService] VISION: Analyse d'image(s) médicale(s):", {
+    images_count: images.length,
+    images_names: images.map(img => img.name).join(", "),
+    total_size: images.reduce((sum, img) => sum + img.size, 0),
     message_preview: message.substring(0, 50) + "...",
     session_id: finalConversationId.substring(0, 8) + "...",
     user_id: user.id,
@@ -1293,15 +1298,18 @@ export const generateVisionResponse = async (
       : "Answer in English.";
     const enrichedMessage = message ? `${message}\n\n${languageInstruction}` : languageInstruction;
 
-    // Créer FormData pour l'upload multipart
+    // Créer FormData pour l'upload multipart (support multi-images)
     const formData = new FormData();
-    formData.append("file", imageFile);
+    // Ajouter toutes les images avec le même nom de champ "files"
+    images.forEach((image, index) => {
+      formData.append("files", image);
+    });
     formData.append("message", enrichedMessage);
     formData.append("tenant_id", tenant_id);
     formData.append("language", language);
     formData.append("use_rag_context", "true");
 
-    secureLog.log("[apiService] Envoi vers /llm/chat-with-image...");
+    secureLog.log(`[apiService] Envoi de ${images.length} image(s) vers /llm/chat-with-image...`);
 
     // Appel API Vision
     const response = await fetch("/llm/chat-with-image", {
@@ -1339,7 +1347,7 @@ export const generateVisionResponse = async (
 
     const finalResponse = visionData.analysis;
 
-    // Sauvegarder la conversation (avec l'image en métadonnées)
+    // Sauvegarder la conversation (avec les images en métadonnées)
     try {
       const headers = await getAuthHeaders();
       const payload = {
@@ -1352,8 +1360,9 @@ export const generateVisionResponse = async (
         metadata: {
           mode: "vision",
           backend: "llm_backend_vision",
-          image_name: imageFile.name,
-          image_size: imageFile.size,
+          images_count: images.length,
+          images_names: images.map(img => img.name),
+          total_size: images.reduce((sum, img) => sum + img.size, 0),
           model: visionData.metadata?.model,
           tokens: visionData.metadata?.usage,
         },

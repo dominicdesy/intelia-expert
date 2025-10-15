@@ -48,8 +48,8 @@ const ChatInput = React.memo(
     clarificationState,
     isMobileDevice,
     inputRef,
-    selectedImage,
-    onImageSelect,
+    selectedImages,
+    onImagesSelect,
     onImageRemove,
     t,
   }: {
@@ -60,36 +60,36 @@ const ChatInput = React.memo(
     clarificationState: any;
     isMobileDevice: boolean;
     inputRef: React.RefObject<HTMLInputElement>;
-    selectedImage: File | null;
-    onImageSelect: (file: File) => void;
-    onImageRemove: () => void;
+    selectedImages: File[];
+    onImagesSelect: (files: File[]) => void;
+    onImageRemove: (index: number) => void;
     t: (key: string) => string;
   }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-    const [imageError, setImageError] = React.useState(false);
+    const [previewUrls, setPreviewUrls] = React.useState<string[]>([]);
+    const [imageErrors, setImageErrors] = React.useState<boolean[]>([]);
 
-    // Créer l'URL de prévisualisation quand l'image change
+    // Créer les URLs de prévisualisation quand les images changent
     React.useEffect(() => {
-      if (selectedImage) {
+      if (selectedImages.length > 0) {
         try {
-          const url = URL.createObjectURL(selectedImage);
-          setPreviewUrl(url);
-          setImageError(false);
+          const urls = selectedImages.map(img => URL.createObjectURL(img));
+          setPreviewUrls(urls);
+          setImageErrors(new Array(selectedImages.length).fill(false));
 
-          // Nettoyer l'URL lors du démontage
+          // Nettoyer les URLs lors du démontage
           return () => {
-            URL.revokeObjectURL(url);
+            urls.forEach(url => URL.revokeObjectURL(url));
           };
         } catch (error) {
-          console.error("Error creating preview URL:", error);
-          setImageError(true);
+          console.error("Error creating preview URLs:", error);
+          setImageErrors(new Array(selectedImages.length).fill(true));
         }
       } else {
-        setPreviewUrl(null);
-        setImageError(false);
+        setPreviewUrls([]);
+        setImageErrors([]);
       }
-    }, [selectedImage]);
+    }, [selectedImages]);
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
@@ -122,48 +122,55 @@ const ChatInput = React.memo(
 
     const handleFileChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && file.type.startsWith("image/")) {
-          onImageSelect(file);
+        const files = e.target.files;
+        if (files && files.length > 0) {
+          const imageFiles = Array.from(files).filter(file => file.type.startsWith("image/"));
+          if (imageFiles.length > 0) {
+            // Ajouter les nouvelles images aux images existantes
+            onImagesSelect([...selectedImages, ...imageFiles]);
+          }
         }
-        // Reset input pour permettre de sélectionner la même image à nouveau
+        // Reset input pour permettre de sélectionner les mêmes images à nouveau
         e.target.value = "";
       },
-      [onImageSelect],
+      [onImagesSelect, selectedImages],
     );
 
     return (
       <div className="w-full space-y-2">
-        {/* Image Preview */}
-        {selectedImage && (
-          <div className="flex items-center space-x-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-            {previewUrl && !imageError ? (
-              <img
-                src={previewUrl}
-                alt="Preview"
-                className="h-16 w-16 object-cover rounded"
-                onError={() => setImageError(true)}
-              />
-            ) : (
-              <div className="h-16 w-16 bg-gray-200 rounded flex items-center justify-center">
-                <CameraIcon className="w-8 h-8 text-gray-400" />
+        {/* Images Preview Grid */}
+        {selectedImages.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            {selectedImages.map((image, index) => (
+              <div key={index} className="relative group">
+                {previewUrls[index] && !imageErrors[index] ? (
+                  <img
+                    src={previewUrls[index]}
+                    alt={`Preview ${index + 1}`}
+                    className="w-full h-24 object-cover rounded"
+                    onError={() => {
+                      const newErrors = [...imageErrors];
+                      newErrors[index] = true;
+                      setImageErrors(newErrors);
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-24 bg-gray-200 rounded flex items-center justify-center">
+                    <CameraIcon className="w-8 h-8 text-gray-400" />
+                  </div>
+                )}
+                <button
+                  onClick={() => onImageRemove(index)}
+                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  title="Retirer l'image"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
+                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 rounded-b truncate">
+                  {image.name} ({(image.size / 1024).toFixed(1)} KB)
+                </div>
               </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-gray-700 truncate">
-                {selectedImage.name}
-              </p>
-              <p className="text-xs text-gray-500">
-                {(selectedImage.size / 1024).toFixed(1)} KB
-              </p>
-            </div>
-            <button
-              onClick={onImageRemove}
-              className="flex-shrink-0 p-1 text-gray-500 hover:text-red-600 transition-colors"
-              title="Retirer l'image"
-            >
-              <XMarkIcon className="w-5 h-5" />
-            </button>
+            ))}
           </div>
         )}
 
@@ -183,7 +190,7 @@ const ChatInput = React.memo(
               placeholder={
                 clarificationState
                   ? t("chat.clarificationPlaceholder")
-                  : selectedImage
+                  : selectedImages.length > 0
                     ? "Décrivez ce que vous voulez savoir..."
                     : t("chat.placeholder")
               }
@@ -198,19 +205,20 @@ const ChatInput = React.memo(
             />
           </div>
 
-          {/* Hidden File Input */}
+          {/* Hidden File Input - Multiple */}
           <input
             ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={handleFileChange}
             className="hidden"
+            multiple
           />
 
           {/* Send Button */}
           <button
             onClick={handleButtonClick}
-            disabled={isLoadingChat || (!inputMessage.trim() && !selectedImage)}
+            disabled={isLoadingChat || (!inputMessage.trim() && selectedImages.length === 0)}
             className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${isMobileDevice ? "mobile-send-button" : ""}`}
             title={isLoadingChat ? t("chat.sending") : t("chat.send")}
             aria-label={isLoadingChat ? t("chat.sending") : t("chat.send")}
@@ -227,9 +235,9 @@ const ChatInput = React.memo(
           <button
             onClick={handleCameraClick}
             disabled={isLoadingChat}
-            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-gray-600 hover:text-blue-600 disabled:text-gray-300 transition-colors rounded-full hover:bg-gray-100 ${selectedImage ? "bg-blue-50 text-blue-600" : ""}`}
-            title="Ajouter une image"
-            aria-label="Ajouter une image"
+            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-gray-600 hover:text-blue-600 disabled:text-gray-300 transition-colors rounded-full hover:bg-gray-100 ${selectedImages.length > 0 ? "bg-blue-50 text-blue-600" : ""}`}
+            title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+            aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
             style={{
               minWidth: "48px",
               width: "48px",
@@ -237,6 +245,11 @@ const ChatInput = React.memo(
             }}
           >
             <CameraIcon />
+            {selectedImages.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                {selectedImages.length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -285,13 +298,33 @@ const MessageList = React.memo(
             >
               {message.isUser ? (
                 <div className="space-y-2">
-                  {message.imageUrl && (
+                  {/* Support multiple images */}
+                  {message.imageUrls && message.imageUrls.length > 0 ? (
+                    message.imageUrls.length === 1 ? (
+                      <img
+                        src={message.imageUrls[0]}
+                        alt="Image envoyée"
+                        className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 max-w-[400px]">
+                        {message.imageUrls.map((url, idx) => (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt={`Image ${idx + 1}`}
+                            className="w-full h-32 rounded-lg object-cover"
+                          />
+                        ))}
+                      </div>
+                    )
+                  ) : message.imageUrl ? (
                     <img
                       src={message.imageUrl}
                       alt="Image envoyée"
                       className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
                     />
-                  )}
+                  ) : null}
                   {message.content && (
                     <p className="whitespace-pre-wrap leading-relaxed text-sm">
                       {message.content}
@@ -476,7 +509,7 @@ function ChatInterface() {
 
   // États séparés pour éviter les cascades de re-renders
   const [inputMessage, setInputMessage] = useState("");
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -652,14 +685,14 @@ function ChatInterface() {
   }, []);
 
   // Image handlers
-  const handleImageSelect = useCallback((file: File) => {
+  const handleImagesSelect = useCallback((files: File[]) => {
     if (!isMountedRef.current) return;
-    setSelectedImage(file);
+    setSelectedImages(files);
   }, []);
 
-  const handleImageRemove = useCallback(() => {
+  const handleImageRemove = useCallback((index: number) => {
     if (!isMountedRef.current) return;
-    setSelectedImage(null);
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
   }, []);
 
   const processedMessages = useMemo(() => {
@@ -961,18 +994,18 @@ function ChatInterface() {
 	// FONCTION CORRIGÉE POUR STREAMING - Élimine le scintillement
 	const handleSendMessage = useCallback(async () => {
 	  const safeText = inputMessage;
-	  const imageToSend = selectedImage;
+	  const imagesToSend = selectedImages;
 
-	  // Allow send if there's either text or an image
-	  if ((!safeText.trim() && !imageToSend) || !isMountedRef.current) return;
+	  // Allow send if there's either text or images
+	  if ((!safeText.trim() && imagesToSend.length === 0) || !isMountedRef.current) return;
 
-	  // Créer l'URL de l'image pour l'affichage dans la bulle
-	  let imageUrl: string | undefined = undefined;
-	  if (imageToSend) {
+	  // Créer les URLs des images pour l'affichage dans la bulle
+	  let imageUrls: string[] = [];
+	  if (imagesToSend.length > 0) {
 	    try {
-	      imageUrl = URL.createObjectURL(imageToSend);
+	      imageUrls = imagesToSend.map(img => URL.createObjectURL(img));
 	    } catch (error) {
-	      console.error("Error creating image URL:", error);
+	      console.error("Error creating image URLs:", error);
 	    }
 	  }
 
@@ -981,7 +1014,8 @@ function ChatInterface() {
 		content: safeText.trim(),
 		isUser: true,
 		timestamp: new Date(),
-		imageUrl: imageUrl,
+		imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+		imageUrl: imageUrls.length > 0 ? imageUrls[0] : undefined, // Backward compatibility
 	  };
 
 	  let conversationIdToSend: string | undefined = undefined;
@@ -997,7 +1031,7 @@ function ChatInterface() {
 	  // Ajouter le message utilisateur
 	  addMessage(userMessage);
 	  setInputMessage("");
-	  setSelectedImage(null); // Clear the selected image
+	  setSelectedImages([]); // Clear the selected images
 	  setIsLoadingChat(true);
 	  setShouldAutoScroll(true);
 	  setIsUserScrolling(false);
@@ -1010,13 +1044,19 @@ function ChatInterface() {
 		let response;
 
 		// IMAGE ANALYSIS PATH
-		if (imageToSend) {
-		  secureLog.log("[Chat] Sending image for analysis");
+		if (imagesToSend.length > 0) {
+		  secureLog.log(`[Chat] Sending ${imagesToSend.length} image(s) for analysis`);
 
-		  // Call vision API with translated default message
+		  // Enrichir le message avec le nombre d'images si plusieurs
+		  let enrichedMessage = safeText.trim() || t("chat.analyzeImageDefault");
+		  if (imagesToSend.length > 1) {
+		    enrichedMessage = `[${imagesToSend.length} images fournies] ${enrichedMessage}`;
+		  }
+
+		  // Envoyer toutes les images pour analyse
 		  response = await generateVisionResponse(
-			imageToSend,
-			safeText.trim() || t("chat.analyzeImageDefault"),
+			imagesToSend,
+			enrichedMessage,
 			user,
 			currentLanguage,
 			conversationIdToSend,
@@ -1213,7 +1253,7 @@ function ChatInterface() {
 	  }
 	}, [
 	  inputMessage,
-	  selectedImage,
+	  selectedImages,
 	  currentConversation,
 	  addMessage,
 	  updateMessage,
@@ -1602,8 +1642,8 @@ function ChatInterface() {
                 clarificationState={clarificationState}
                 isMobileDevice={isMobileDevice}
                 inputRef={inputRef}
-                selectedImage={selectedImage}
-                onImageSelect={handleImageSelect}
+                selectedImages={selectedImages}
+                onImagesSelect={handleImagesSelect}
                 onImageRemove={handleImageRemove}
                 t={t}
               />

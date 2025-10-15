@@ -401,8 +401,9 @@ export interface Message {
   sources?: DocumentSource[];
   metadata?: MessageMetadata;
 
-  // Image attachée au message
-  imageUrl?: string;
+  // Images attachées au message
+  imageUrl?: string; // Deprecated: use imageUrls instead
+  imageUrls?: string[]; // Support for multiple images
 }
 
 // ==================== NOUVEAUX TYPES AGENT LLM ====================

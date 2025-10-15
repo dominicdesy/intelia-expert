@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_chat/vision_routes.py - Medical image analysis endpoints
-Version 1.0.0 - Claude Vision integration for veterinary diagnostics
+Version 1.1.0 - Claude Vision integration for veterinary diagnostics
+Multi-image support added
 """
 
 import time
 import uuid
 import logging
 import httpx
-from typing import Optional
+from typing import Optional, List
 from utils.types import Any, Callable
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse
@@ -41,7 +42,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
     @router.post(f"{BASE_PATH}/chat-with-image")
     async def chat_with_image(
         request: Request,
-        file: Optional[UploadFile] = File(None),
+        files: Optional[List[UploadFile]] = File(None),
         image_url: Optional[str] = Form(None),
         message: str = Form(...),
         tenant_id: Optional[str] = Form(None),
@@ -49,14 +50,15 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
         use_rag_context: bool = Form(True),
     ):
         """
-        Analyse d'image médicale avec Claude Vision + RAG context optionnel
+        Analyse d'image(s) médicale(s) avec Claude Vision + RAG context optionnel
+        SUPPORT MULTI-IMAGES: Accepte maintenant 1 ou plusieurs images
 
         Accepte soit:
-        - Un fichier image uploadé (multipart/form-data)
+        - Un ou plusieurs fichiers images uploadés (multipart/form-data)
         - Une URL d'image (depuis DigitalOcean Spaces ou autre)
 
         Args:
-            file: Image uploadée (optionnel)
+            files: Images uploadées (optionnel, accepte plusieurs fichiers)
             image_url: URL de l'image (optionnel, prioritaire si fournie)
             message: Question de l'utilisateur sur l'image
             tenant_id: ID du tenant (optionnel)
@@ -70,10 +72,10 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
         try:
             # Validation des paramètres
-            if not file and not image_url:
+            if not files and not image_url:
                 raise HTTPException(
                     status_code=400,
-                    detail="Veuillez fournir soit un fichier image, soit une URL d'image"
+                    detail="Veuillez fournir soit un/des fichier(s) image(s), soit une URL d'image"
                 )
 
             if not message or not message.strip():
@@ -102,17 +104,19 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
             else:
                 detected_language = language
 
+            # Calculer le nombre d'images
+            images_count = len(files) if files else (1 if image_url else 0)
+
             logger.info(
-                f"[VISION] Chat with image - Tenant: {tenant_id}, Language: {detected_language}, "
+                f"[VISION] Chat with {images_count} image(s) - Tenant: {tenant_id}, Language: {detected_language}, "
                 f"Query: '{message[:50]}...'"
             )
 
-            # Récupérer l'image
-            image_data = None
-            content_type = "image/jpeg"
+            # Récupérer les images (support multi-images)
+            images_data = []
 
             if image_url:
-                # Télécharger l'image depuis l'URL
+                # Télécharger l'image depuis l'URL (mode single image)
                 logger.info(f"[VISION] Fetching image from URL: {image_url[:100]}...")
 
                 try:
@@ -125,6 +129,12 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
                         logger.info(f"[VISION] Image fetched - Size: {len(image_data)} bytes, Type: {content_type}")
 
+                        images_data.append({
+                            "data": image_data,
+                            "content_type": content_type,
+                            "filename": "url_image"
+                        })
+
                 except httpx.HTTPError as e:
                     logger.error(f"[VISION] Error fetching image from URL: {e}")
                     raise HTTPException(
@@ -132,30 +142,41 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         detail=f"Impossible de télécharger l'image depuis l'URL: {str(e)}"
                     )
 
-            elif file:
-                # Lire l'image uploadée
-                logger.info(f"[VISION] Reading uploaded file: {file.filename}")
+            elif files:
+                # Lire les images uploadées (support multi-images)
+                logger.info(f"[VISION] Reading {len(files)} uploaded file(s)")
 
-                content_type = file.content_type or "image/jpeg"
-                image_data = await file.read()
-
-                logger.info(f"[VISION] File read - Size: {len(image_data)} bytes, Type: {content_type}")
-
-                # Valider le type de fichier
                 allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
-                if content_type not in allowed_types:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Type de fichier non supporté: {content_type}. Types acceptés: {', '.join(allowed_types)}"
-                    )
-
-                # Valider la taille (max 10MB)
                 max_size = 10 * 1024 * 1024  # 10 MB
-                if len(image_data) > max_size:
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"Image trop volumineuse: {len(image_data) / 1024 / 1024:.1f}MB. Maximum: 10MB"
-                    )
+
+                for idx, file in enumerate(files):
+                    content_type = file.content_type or "image/jpeg"
+
+                    # Valider le type de fichier
+                    if content_type not in allowed_types:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Type de fichier non supporté pour {file.filename}: {content_type}. Types acceptés: {', '.join(allowed_types)}"
+                        )
+
+                    image_data = await file.read()
+
+                    # Valider la taille (max 10MB par image)
+                    if len(image_data) > max_size:
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"Image {file.filename} trop volumineuse: {len(image_data) / 1024 / 1024:.1f}MB. Maximum: 10MB"
+                        )
+
+                    logger.info(f"[VISION] File {idx+1}/{len(files)} read - {file.filename} - Size: {len(image_data)} bytes")
+
+                    images_data.append({
+                        "data": image_data,
+                        "content_type": content_type,
+                        "filename": file.filename
+                    })
+
+                logger.info(f"[VISION] All {len(images_data)} file(s) processed successfully")
 
             # Récupérer le contexte RAG si demandé
             context_docs = []
@@ -196,15 +217,26 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
             # Créer le vision analyzer
             vision_analyzer = create_vision_analyzer(language=detected_language)
 
-            # Analyser l'image
-            logger.info("[VISION] Starting Claude Vision analysis...")
-            analysis_result = await vision_analyzer.analyze_medical_image(
-                image_data=image_data,
-                user_query=message,
-                content_type=content_type,
-                context_docs=context_docs if context_docs else None,
-                language=detected_language,
-            )
+            # Analyser les images (support multi-images)
+            logger.info(f"[VISION] Starting Claude Vision analysis for {len(images_data)} image(s)...")
+
+            if len(images_data) == 1:
+                # Mode single image (backward compatibility)
+                analysis_result = await vision_analyzer.analyze_medical_image(
+                    image_data=images_data[0]["data"],
+                    user_query=message,
+                    content_type=images_data[0]["content_type"],
+                    context_docs=context_docs if context_docs else None,
+                    language=detected_language,
+                )
+            else:
+                # Mode multi-images
+                analysis_result = await vision_analyzer.analyze_multiple_medical_images(
+                    images_data=images_data,
+                    user_query=message,
+                    context_docs=context_docs if context_docs else None,
+                    language=detected_language,
+                )
 
             # Vérifier le succès
             if not analysis_result.get("success"):
@@ -235,7 +267,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
             )
 
             logger.info(
-                f"[VISION] Analysis completed successfully - Time: {processing_time:.2f}s, "
+                f"[VISION] Analysis completed successfully - Images: {len(images_data)}, Time: {processing_time:.2f}s, "
                 f"Tokens: {analysis_result.get('usage', {}).get('total_tokens', 'N/A')}"
             )
 
@@ -249,6 +281,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "model": analysis_result.get("model", "claude-3-5-sonnet-20241022"),
                         "language": detected_language,
                         "tenant_id": tenant_id,
+                        "images_count": len(images_data),
                         "processing_time": round(processing_time, 2),
                         "usage": analysis_result.get("usage", {}),
                         "rag_context_used": len(context_docs) > 0,
