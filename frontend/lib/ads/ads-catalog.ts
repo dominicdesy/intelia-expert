@@ -90,15 +90,28 @@ function getAdHistory(): string[] {
 
 function addToHistory(adId: string): void {
   try {
+    console.log(`[AdCatalog] 🔵 Début addToHistory pour: ${adId}`);
     const history = getAdHistory();
+    console.log(`[AdCatalog] 🔵 Historique actuel:`, history);
+
     history.unshift(adId); // Ajouter au début
+    console.log(`[AdCatalog] 🔵 Après ajout:`, history);
 
     // Garder seulement les N dernières
     const trimmedHistory = history.slice(0, MAX_HISTORY_SIZE);
+    console.log(`[AdCatalog] 🔵 Après trim:`, trimmedHistory);
 
-    localStorage.setItem(AD_HISTORY_KEY, JSON.stringify(trimmedHistory));
+    const jsonString = JSON.stringify(trimmedHistory);
+    console.log(`[AdCatalog] 🔵 JSON à sauvegarder:`, jsonString);
+
+    localStorage.setItem(AD_HISTORY_KEY, jsonString);
+    console.log(`[AdCatalog] 🔵 Sauvegarde dans localStorage réussie`);
+
+    // Vérification immédiate
+    const verification = localStorage.getItem(AD_HISTORY_KEY);
+    console.log(`[AdCatalog] 🔵 Vérification immédiate:`, verification);
   } catch (error) {
-    console.error("[AdCatalog] Erreur sauvegarde historique:", error);
+    console.error("[AdCatalog] ❌ Erreur sauvegarde historique:", error);
   }
 }
 
