@@ -98,7 +98,8 @@ export const logoutService = {
           if (
             key &&
             key !== "intelia-remember-me-persist" &&
-            key !== "intelia-language"
+            key !== "intelia-language" &&
+            key !== "intelia_ad_history" // Préserver l'historique des publicités
           ) {
             // Nettoyage plus cible pour eviter de supprimer les stores Zustand
             if (
@@ -154,7 +155,7 @@ export const logoutService = {
       );
 
       secureLog.log(
-        `[LogoutService] ${keysToRemove.length} cles supprimees, RememberMe et Language preserves, Store auth reinitialise`,
+        `[LogoutService] ${keysToRemove.length} cles supprimees, RememberMe, Language et Ad History preserves, Store auth reinitialise`,
       );
 
       // 6. Restaurer RememberMe si necessaire
