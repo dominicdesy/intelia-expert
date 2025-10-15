@@ -126,43 +126,49 @@ export class ConversationService {
     secureLog.log("ConversationService configuré:", this.baseUrl);
   }
 
-  private getAuthToken(): string {
+  private async getAuthToken(): Promise<string> {
     try {
-      const cookies = document.cookie.split(";");
-      const sbCookie = cookies.find((cookie) =>
-        cookie.trim().startsWith("sb-cdrmjshmkdfwwtsfdvbl-auth-token="),
-      );
+      // Méthode 1: Récupérer depuis intelia-expert-auth (PRIORITÉ)
+      const authData = localStorage.getItem("intelia-expert-auth");
+      if (authData) {
+        const parsed = JSON.parse(authData);
+        if (parsed.access_token) {
+          // Vérifier que le token n'est pas expiré
+          try {
+            const tokenParts = parsed.access_token.split(".");
+            if (tokenParts.length === 3) {
+              const payload = JSON.parse(atob(tokenParts[1]));
+              const now = Math.floor(Date.now() / 1000);
+              const isExpired = payload.exp < now;
 
-      if (sbCookie) {
-        const cookieValue = sbCookie.split("=")[1];
-        const decodedValue = decodeURIComponent(cookieValue);
-        const parsed = JSON.parse(decodedValue);
-
-        if (
-          Array.isArray(parsed) &&
-          parsed[0] &&
-          parsed[0] !== "mock-jwt-token-for-development"
-        ) {
-          return parsed[0];
-        }
-      }
-
-      const sbToken = localStorage.getItem(
-        "sb-cdrmjshmkdfwwtsfdvbl-auth-token",
-      );
-      if (sbToken) {
-        try {
-          const parsed = JSON.parse(sbToken);
-          if (Array.isArray(parsed) && parsed[0]) {
-            return parsed[0];
+              if (!isExpired) {
+                return parsed.access_token;
+              }
+            }
+          } catch (decodeError) {
+            return parsed.access_token;
           }
-        } catch (e) {
-          secureLog.warn(
-            "[ConversationService] Failed to parse localStorage token",
-          );
         }
       }
 
+      // Méthode 2: Fallback vers Supabase store
+      const supabaseStore = localStorage.getItem("supabase-auth-store");
+      if (supabaseStore) {
+        const parsed = JSON.parse(supabaseStore);
+        const possibleTokens = [
+          parsed.state?.session?.access_token,
+          parsed.state?.user?.access_token,
+          parsed.access_token,
+        ];
+
+        for (const token of possibleTokens) {
+          if (token && typeof token === "string" && token.length > 20) {
+            return token;
+          }
+        }
+      }
+
+      secureLog.warn("[ConversationService] No token found");
       return "";
     } catch (error) {
       secureLog.error("[ConversationService] Error getting auth token:", error);
@@ -171,10 +177,10 @@ export class ConversationService {
   }
 
   // Headers GET nettoyés - pas de Content-Type pour éviter preflight CORS
-  private getHeaders(
+  private async getHeaders(
     method: "GET" | "POST" | "PATCH" | "DELETE" = "GET",
-  ): Record<string, string> {
-    const token = this.getAuthToken();
+  ): Promise<Record<string, string>> {
+    const token = await this.getAuthToken();
 
     if (method === "GET") {
       // Seulement Authorization et Accept pour GET - pas de Content-Type
@@ -309,7 +315,7 @@ export class ConversationService {
         `${this.baseUrl}/conversations/${conversationId}/messages`,
         {
           method: "GET",
-          headers: this.getHeaders("GET"),
+          headers: await this.getHeaders("GET"),
         },
       );
 
@@ -407,7 +413,7 @@ export class ConversationService {
         `${this.baseUrl}/v1/conversations/history/${userId}?${params}`,
         {
           method: "GET",
-          headers: this.getHeaders("GET"),
+          headers: await this.getHeaders("GET"),
         },
       );
 
@@ -440,7 +446,7 @@ export class ConversationService {
         `${this.baseUrl}/v1/conversations/${conversationId}`,
         {
           method: "GET",
-          headers: this.getHeaders("GET"),
+          headers: await this.getHeaders("GET"),
         },
       );
 
@@ -609,7 +615,7 @@ export class ConversationService {
             `${this.baseUrl}/conversations/${sessionId}`,
             {
               method: "GET",
-              headers: this.getHeaders("GET"),
+              headers: await this.getHeaders("GET"),
             },
           );
 
@@ -777,7 +783,7 @@ export class ConversationService {
       try {
         const response = await fetch(`${this.baseUrl}${endpoint}`, {
           method: "GET",
-          headers: this.getHeaders("GET"),
+          headers: await this.getHeaders("GET"),
         });
 
         secureLog.log(`${endpoint}: ${response.status} ${response.statusText}`);
@@ -900,7 +906,7 @@ export class ConversationService {
 
       const response = await fetch(`${this.baseUrl}/conversation`, {
         method: "POST",
-        headers: this.getHeaders("POST"),
+        headers: await this.getHeaders("POST"),
         body: JSON.stringify({
           user_id: data.user_id,
           question: data.question,
@@ -967,7 +973,7 @@ export class ConversationService {
         `${this.baseUrl}/conversations/${conversationId}/comment`,
         {
           method: "PATCH",
-          headers: this.getHeaders("PATCH"),
+          headers: await this.getHeaders("PATCH"),
           body: JSON.stringify({
             comment: comment,
             timestamp: new Date().toISOString(),
@@ -1014,7 +1020,7 @@ export class ConversationService {
         `${this.baseUrl}/conversations/${conversationId}/feedback-with-comment`,
         {
           method: "PATCH",
-          headers: this.getHeaders("PATCH"),
+          headers: await this.getHeaders("PATCH"),
           body: JSON.stringify({
             feedback,
             comment: comment || null,
@@ -1079,7 +1085,7 @@ export class ConversationService {
         `${this.baseUrl}/conversations/user/${userId}`,
         {
           method: "DELETE",
-          headers: this.getHeaders("DELETE"),
+          headers: await this.getHeaders("DELETE"),
         },
       );
 
@@ -1114,7 +1120,7 @@ export class ConversationService {
       secureLog.log("Récupération stats feedback:", url);
 
       const response = await fetch(url, {
-        headers: this.getHeaders("GET"),
+        headers: await this.getHeaders("GET"),
       });
 
       if (!response.ok) {
@@ -1139,7 +1145,7 @@ export class ConversationService {
       secureLog.log("Test connectivité service logging...");
 
       const response = await fetch(`${this.baseUrl}/test-comments`, {
-        headers: this.getHeaders("GET"),
+        headers: await this.getHeaders("GET"),
       });
 
       if (response.ok) {
