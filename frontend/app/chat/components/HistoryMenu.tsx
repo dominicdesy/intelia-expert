@@ -247,6 +247,10 @@ export const HistoryMenu = React.memo(() => {
                     : ""
                 }`}
                 onClick={(e) => handleConversationClick(conv, e)}
+                onTouchEnd={(e: any) => {
+                  e.preventDefault();
+                  handleConversationClick(conv, e);
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0 pr-3">

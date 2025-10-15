@@ -261,6 +261,17 @@ export const UserMenuButton = () => {
     closeMenuContext(MENU_ID); // ✅ MODIFIÉ
   }, [closeMenuContext]);
 
+  // Helper pour iOS: combine onClick et onTouchEnd
+  const createTouchHandler = useCallback((handler: (e: React.MouseEvent) => void) => {
+    return {
+      onClick: handler,
+      onTouchEnd: (e: React.TouchEvent) => {
+        e.preventDefault();
+        handler(e as any);
+      }
+    };
+  }, []);
+
   // Fonctions de fermeture des modales avec protection
   const closeUserInfoModal = useCallback(() => {
     if (!isMountedRef.current) return;
@@ -364,7 +375,7 @@ export const UserMenuButton = () => {
               <div className="py-1">
                 {isSuperAdmin && (
                   <button
-                    onClick={handleStatisticsClick}
+                    {...createTouchHandler(handleStatisticsClick)}
                     className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                   >
                     <svg
@@ -386,7 +397,7 @@ export const UserMenuButton = () => {
 
                 {!isSuperAdmin && (
                   <button
-                    onClick={handleAccountClick}
+                    {...createTouchHandler(handleAccountClick)}
                     className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                   >
                     <svg
@@ -407,7 +418,7 @@ export const UserMenuButton = () => {
                 )}
 
                 <button
-                  onClick={handleUserInfoClick}
+                  {...createTouchHandler(handleUserInfoClick)}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <svg
@@ -427,7 +438,7 @@ export const UserMenuButton = () => {
                 </button>
 
                 <button
-                  onClick={handleLanguageClick}
+                  {...createTouchHandler(handleLanguageClick)}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <svg
@@ -447,7 +458,7 @@ export const UserMenuButton = () => {
                 </button>
 
                 <button
-                  onClick={handleInviteFriendClick}
+                  {...createTouchHandler(handleInviteFriendClick)}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <svg
@@ -467,7 +478,7 @@ export const UserMenuButton = () => {
                 </button>
 
                 <button
-                  onClick={handleContactClick}
+                  {...createTouchHandler(handleContactClick)}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <svg
@@ -487,7 +498,7 @@ export const UserMenuButton = () => {
                 </button>
 
                 <button
-                  onClick={handleAboutClick}
+                  {...createTouchHandler(handleAboutClick)}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <svg
@@ -507,7 +518,7 @@ export const UserMenuButton = () => {
                 </button>
 
                 <button
-                  onClick={openPrivacyPolicy}
+                  {...createTouchHandler(openPrivacyPolicy)}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <svg
@@ -529,7 +540,7 @@ export const UserMenuButton = () => {
 
               <div className="border-t border-gray-100 pt-1">
                 <button
-                  onClick={handleLogout}
+                  {...createTouchHandler(handleLogout)}
                   className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                 >
                   <svg
