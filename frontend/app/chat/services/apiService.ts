@@ -1236,19 +1236,16 @@ export const handleEnhancedNetworkError = (error: any): string => {
 
 /**
  * NOUVELLE FONCTION: Analyse d'image(s) médicale(s) avec Claude Vision API
- * Support pour une ou plusieurs images
+ * Flux d'accumulation : Accepte 1 ou plusieurs images pour analyse comparative
  */
 export const generateVisionResponse = async (
-  imageFiles: File | File[],
+  imageFiles: File[],
   message: string,
   user: any,
   language: string = "fr",
   conversationId?: string,
 ): Promise<EnhancedAIResponse> => {
-  // Normaliser en tableau
-  const images = Array.isArray(imageFiles) ? imageFiles : [imageFiles];
-
-  if (images.length === 0) {
+  if (!imageFiles || imageFiles.length === 0) {
     throw new Error("Au moins une image est requise");
   }
 
@@ -1259,9 +1256,9 @@ export const generateVisionResponse = async (
   const finalConversationId = conversationId || generateUUID();
 
   secureLog.log("[apiService] VISION: Analyse d'image(s) médicale(s):", {
-    images_count: images.length,
-    images_names: images.map(img => img.name).join(", "),
-    total_size: images.reduce((sum, img) => sum + img.size, 0),
+    images_count: imageFiles.length,
+    images_names: imageFiles.map(f => f.name).join(", "),
+    total_size: imageFiles.reduce((sum, f) => sum + f.size, 0),
     message_preview: message.substring(0, 50) + "...",
     session_id: finalConversationId.substring(0, 8) + "...",
     user_id: user.id,
@@ -1301,7 +1298,7 @@ export const generateVisionResponse = async (
     // Créer FormData pour l'upload multipart (support multi-images)
     const formData = new FormData();
     // Ajouter toutes les images avec le même nom de champ "files"
-    images.forEach((image, index) => {
+    imageFiles.forEach((image) => {
       formData.append("files", image);
     });
     formData.append("message", enrichedMessage);
@@ -1309,7 +1306,7 @@ export const generateVisionResponse = async (
     formData.append("language", language);
     formData.append("use_rag_context", "true");
 
-    secureLog.log(`[apiService] Envoi de ${images.length} image(s) vers /llm/chat-with-image...`);
+    secureLog.log(`[apiService] Envoi de ${imageFiles.length} image(s) vers /llm/chat-with-image...`);
 
     // Appel API Vision
     const response = await fetch("/llm/chat-with-image", {
@@ -1360,9 +1357,9 @@ export const generateVisionResponse = async (
         metadata: {
           mode: "vision",
           backend: "llm_backend_vision",
-          images_count: images.length,
-          images_names: images.map(img => img.name),
-          total_size: images.reduce((sum, img) => sum + img.size, 0),
+          images_count: imageFiles.length,
+          images_names: imageFiles.map(img => img.name),
+          total_size: imageFiles.reduce((sum, img) => sum + img.size, 0),
           model: visionData.metadata?.model,
           tokens: visionData.metadata?.usage,
         },
@@ -1425,6 +1422,316 @@ export const generateVisionResponse = async (
     }
 
     throw new Error("Erreur d'analyse d'image avec Claude Vision");
+  }
+};
+
+// ===== FONCTIONS UPLOAD PROGRESSIF D'IMAGES =====
+
+/**
+ * Upload une image dans le stockage temporaire
+ * Retourne image_id pour référence
+ */
+export const uploadTempImage = async (
+  imageFile: File,
+  sessionId: string,
+): Promise<{
+  success: boolean;
+  image_id?: string;
+  filename?: string;
+  size?: number;
+  error?: string;
+}> => {
+  try {
+    const formData = new FormData();
+    formData.append("file", imageFile);
+    formData.append("session_id", sessionId);
+
+    secureLog.log(`[apiService] Upload temp image - Session: ${sessionId}, File: ${imageFile.name}`);
+
+    const response = await fetch("/llm/upload-temp-image", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Upload failed" }));
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    secureLog.log(`[apiService] Temp image uploaded - ID: ${data.image_id}`);
+
+    return data;
+  } catch (error) {
+    secureLog.error("[apiService] Erreur upload temp image:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Upload failed",
+    };
+  }
+};
+
+/**
+ * Récupère la liste des images accumulées pour une session
+ */
+export const getTempImages = async (
+  sessionId: string,
+): Promise<{
+  success: boolean;
+  images?: any[];
+  count?: number;
+  error?: string;
+}> => {
+  try {
+    secureLog.log(`[apiService] Get temp images - Session: ${sessionId}`);
+
+    const response = await fetch(`/llm/temp-images/${sessionId}`, {
+      method: "GET",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    secureLog.log(`[apiService] Temp images retrieved - Count: ${data.count}`);
+
+    return data;
+  } catch (error) {
+    secureLog.error("[apiService] Erreur get temp images:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to get images",
+    };
+  }
+};
+
+/**
+ * Analyse toutes les images accumulées dans une session
+ */
+export const analyzeSessionImages = async (
+  sessionId: string,
+  message: string,
+  user: any,
+  language: string = "fr",
+  conversationId?: string,
+  cleanupAfter: boolean = true,
+): Promise<EnhancedAIResponse> => {
+  if (!sessionId) {
+    throw new Error("Session ID requis");
+  }
+
+  if (!user || !user.id) {
+    throw new Error("Utilisateur requis");
+  }
+
+  const finalConversationId = conversationId || generateUUID();
+
+  secureLog.log("[apiService] VISION SESSION: Analyse d'images accumulées:", {
+    session_id: sessionId,
+    message_preview: message.substring(0, 50) + "...",
+    conversation_id: finalConversationId.substring(0, 8) + "...",
+    user_id: user.id,
+  });
+
+  try {
+    // Récupérer tenant_id
+    let tenant_id = "ten_demo";
+
+    try {
+      const authHeaders = await getAuthHeaders();
+      const profileResponse = await fetch(`${API_BASE_URL}/users/profile`, {
+        method: "GET",
+        headers: authHeaders,
+      });
+
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        tenant_id =
+          profileData.tenant_id ||
+          profileData.organization_id ||
+          `user_${user.id}`;
+      } else {
+        tenant_id = `user_${user.id}`;
+      }
+    } catch (error) {
+      secureLog.warn("[apiService] Erreur récupération tenant_id:", error);
+      tenant_id = `user_${user.id}`;
+    }
+
+    // Enrichir le message avec l'instruction de langue
+    const languageInstruction =
+      language === "fr" ? "Répondez en français." : "Answer in English.";
+    const enrichedMessage = message
+      ? `${message}\n\n${languageInstruction}`
+      : languageInstruction;
+
+    // Créer FormData pour l'analyse
+    const formData = new FormData();
+    formData.append("session_id", sessionId);
+    formData.append("message", enrichedMessage);
+    formData.append("tenant_id", tenant_id);
+    formData.append("language", language);
+    formData.append("use_rag_context", "true");
+    formData.append("cleanup_after", cleanupAfter.toString());
+
+    secureLog.log(`[apiService] Envoi requête analyse session ${sessionId}...`);
+
+    // Appel API Vision Session
+    const response = await fetch("/llm/analyze-session-images", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorInfo: any = null;
+      try {
+        const text = await response.text();
+        errorInfo = JSON.parse(text);
+      } catch {
+        errorInfo = {
+          error: `http_${response.status}`,
+          message: `Erreur HTTP ${response.status}`,
+        };
+      }
+
+      secureLog.error("[apiService] Erreur Vision Session API:", errorInfo);
+      throw new Error(
+        errorInfo?.detail || errorInfo?.message || `Erreur ${response.status}`,
+      );
+    }
+
+    const visionData = await response.json();
+    secureLog.log("[apiService] Vision Session API - Réponse reçue:", {
+      success: visionData.success,
+      analysis_length: visionData.analysis?.length || 0,
+      images_count: visionData.metadata?.images_count,
+      model: visionData.metadata?.model,
+      tokens: visionData.metadata?.usage?.total_tokens,
+    });
+
+    if (!visionData.success || !visionData.analysis) {
+      throw new Error("Erreur d'analyse d'images de session");
+    }
+
+    const finalResponse = visionData.analysis;
+
+    // Sauvegarder la conversation
+    try {
+      const headers = await getAuthHeaders();
+      const payload = {
+        conversation_id: finalConversationId,
+        question: message.trim(),
+        response: finalResponse,
+        user_id: user.id,
+        timestamp: new Date().toISOString(),
+        source: "llm_vision_session",
+        metadata: {
+          mode: "vision_session",
+          backend: "llm_backend_vision",
+          session_id: sessionId,
+          images_count: visionData.metadata?.images_count,
+          model: visionData.metadata?.model,
+          tokens: visionData.metadata?.usage,
+        },
+      };
+
+      const response_save = await fetch(`${API_BASE_URL}/conversations/save`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (response_save.ok) {
+        secureLog.log("[apiService] Conversation vision session sauvegardée");
+      }
+    } catch (saveError) {
+      secureLog.warn(
+        "[apiService] Erreur sauvegarde conversation vision session:",
+        saveError,
+      );
+    }
+
+    // Stocker le session ID
+    storeRecentSessionId(finalConversationId);
+
+    // Construire la réponse
+    const processedResponse: EnhancedAIResponse = {
+      response: finalResponse,
+      conversation_id: finalConversationId,
+      language: language,
+      timestamp: new Date().toISOString(),
+      mode: "streaming",
+      source: "llm_backend",
+      final_response: finalResponse,
+
+      type: "answer",
+      requires_clarification: false,
+      rag_used: visionData.metadata?.rag_context_used || false,
+      sources: [],
+      confidence_score: 0.9,
+      note: `Généré via Claude Vision API - ${visionData.metadata?.images_count} image(s)`,
+      full_text: finalResponse,
+
+      response_versions: {
+        ultra_concise:
+          finalResponse.length > 200
+            ? finalResponse.substring(0, 150) + "..."
+            : finalResponse,
+        concise:
+          finalResponse.length > 400
+            ? finalResponse.substring(0, 300) + "..."
+            : finalResponse,
+        standard: finalResponse,
+        detailed: finalResponse,
+      },
+    };
+
+    return processedResponse;
+  } catch (error) {
+    secureLog.error("[apiService] Erreur Vision Session API:", error);
+
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error("Erreur d'analyse d'images de session avec Claude Vision");
+  }
+};
+
+/**
+ * Supprime les images temporaires d'une session
+ */
+export const deleteTempImages = async (
+  sessionId: string,
+): Promise<{
+  success: boolean;
+  deleted_count?: number;
+  error?: string;
+}> => {
+  try {
+    secureLog.log(`[apiService] Delete temp images - Session: ${sessionId}`);
+
+    const response = await fetch(`/llm/temp-images/${sessionId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    secureLog.log(
+      `[apiService] Temp images deleted - Count: ${data.deleted_count}`,
+    );
+
+    return data;
+  } catch (error) {
+    secureLog.error("[apiService] Erreur delete temp images:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete images",
+    };
   }
 };
 

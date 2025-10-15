@@ -15,8 +15,14 @@ import { Message } from "../../types";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useTranslation } from "@/lib/languages/i18n";
 import { useChatStore } from "./hooks/useChatStore";
-import { generateAIResponse, generateVisionResponse } from "./services/apiService";
+import {
+  generateAIResponse,
+  generateVisionResponse,
+  analyzeSessionImages,
+  deleteTempImages
+} from "./services/apiService";
 import { conversationService } from "./services/conversationService";
+import { ImageUploadAccumulator } from "./components/ImageUploadAccumulator";
 
 import {
   PaperAirplaneIcon,
@@ -509,7 +515,20 @@ function ChatInterface() {
 
   // États séparés pour éviter les cascades de re-renders
   const [inputMessage, setInputMessage] = useState("");
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [uploadSessionId] = useState(() => {
+    // Générer un UUID pour la session d'upload
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback pour les navigateurs plus anciens
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  });
+  const [uploadedImagesCount, setUploadedImagesCount] = useState(0);
+  const [isAnalyzingImages, setIsAnalyzingImages] = useState(false);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -684,16 +703,47 @@ function ChatInterface() {
     return cleaned.trim();
   }, []);
 
-  // Image handlers
-  const handleImagesSelect = useCallback((files: File[]) => {
-    if (!isMountedRef.current) return;
-    setSelectedImages(files);
-  }, []);
+  // Handler pour l'analyse des images accumulées
+  const handleAnalyzeImages = useCallback(async () => {
+    if (!user || uploadedImagesCount === 0 || !isMountedRef.current) return;
 
-  const handleImageRemove = useCallback((index: number) => {
-    if (!isMountedRef.current) return;
-    setSelectedImages(prev => prev.filter((_, i) => i !== index));
-  }, []);
+    setIsAnalyzingImages(true);
+    setIsLoadingChat(true);
+
+    try {
+      const response = await analyzeSessionImages(
+        uploadSessionId,
+        inputMessage || "",
+        user,
+        currentLanguage,
+        undefined, // conversationId
+        true       // cleanupAfter
+      );
+
+      // Add to conversation
+      const assistantId = `ai-${Date.now()}`;
+      addMessage({
+        id: assistantId,
+        content: response.response,
+        isUser: false,
+        timestamp: new Date(),
+        conversation_id: response.conversation_id,
+      });
+
+      // Reset
+      setUploadedImagesCount(0);
+      setInputMessage("");
+
+    } catch (error) {
+      secureLog.error("[Chat] Error analyzing images:", error);
+      handleAuthError(error);
+    } finally {
+      if (isMountedRef.current) {
+        setIsAnalyzingImages(false);
+        setIsLoadingChat(false);
+      }
+    }
+  }, [uploadSessionId, uploadedImagesCount, inputMessage, user, currentLanguage, addMessage, handleAuthError]);
 
   const processedMessages = useMemo(() => {
     return messages.map((message) => ({
@@ -1634,19 +1684,18 @@ function ChatInterface() {
                 </div>
               )}
 
-              <ChatInput
-                inputMessage={inputMessage}
-                setInputMessage={setInputMessage}
-                onSendMessage={handleSendMessage}
-                isLoadingChat={isLoadingChat}
-                clarificationState={clarificationState}
-                isMobileDevice={isMobileDevice}
-                inputRef={inputRef}
-                selectedImages={selectedImages}
-                onImagesSelect={handleImagesSelect}
-                onImageRemove={handleImageRemove}
-                t={t}
+              <ImageUploadAccumulator
+                sessionId={uploadSessionId}
+                onImagesReady={(count) => setUploadedImagesCount(count)}
+                onAnalyzeClick={handleAnalyzeImages}
+                disabled={isLoadingChat || isAnalyzingImages}
               />
+
+              {uploadedImagesCount > 0 && inputMessage && (
+                <div className="mt-2 p-2 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Question: {inputMessage}</p>
+                </div>
+              )}
 
               <div className="text-center mt-2">
                 <p className="text-xs text-gray-500">{t("chat.disclaimer")}</p>
