@@ -6,7 +6,7 @@ import { ad01Config } from "./ad-01-poultry-ai/config";
 import { ad01Translations, type SupportedLanguage } from "./ad-01-poultry-ai/translations";
 import { ad02Config } from "./ad-02-smart-sensors/config";
 import { ad02Translations } from "./ad-02-smart-sensors/translations";
-import { PersistentJSONStorage } from "../utils/persistentStorage";
+import { adStorage } from "../utils/backendAdStorage";
 
 // Type pour une publicité complète
 export interface Ad {
@@ -74,25 +74,23 @@ export function getAdsForUserType(userType?: string): Ad[] {
 }
 
 /**
- * Système de rotation intelligent avec stockage persistant multi-méthodes
+ * Système de rotation intelligent avec stockage backend
  * Évite de montrer la même pub deux fois de suite
+ * Fonctionne même en mode navigation privée grâce au stockage Supabase
  */
-const AD_HISTORY_KEY = "intelia_ad_history";
-const MAX_HISTORY_SIZE = 10; // Garder les 10 dernières pubs montrées
 
-// Utiliser le stockage persistant (cookie + localStorage + sessionStorage)
-const adHistoryStorage = new PersistentJSONStorage<string[]>(AD_HISTORY_KEY);
+// Initialiser le stockage backend au chargement du module
+if (typeof window !== "undefined") {
+  adStorage.init().catch((error) => {
+    console.error("[AdCatalog] Failed to init backend storage:", error);
+  });
+}
 
 function getAdHistory(): string[] {
   try {
-    console.log(`[AdCatalog] 🔍 Lecture de la clé: ${AD_HISTORY_KEY}`);
-    const history = adHistoryStorage.get();
+    console.log(`[AdCatalog] 🔍 Lecture historique depuis backend storage`);
+    const history = adStorage.get();
     console.log(`[AdCatalog] 🔍 Historique récupéré:`, history);
-
-    if (!history || !Array.isArray(history)) {
-      console.log(`[AdCatalog] 🔍 Pas de données valides, retour tableau vide`);
-      return [];
-    }
 
     return history;
   } catch (error) {
@@ -103,23 +101,15 @@ function getAdHistory(): string[] {
 
 function addToHistory(adId: string): void {
   try {
-    console.log(`[AdCatalog] 🔵 Début addToHistory pour: ${adId}`);
-    const history = getAdHistory();
-    console.log(`[AdCatalog] 🔵 Historique actuel:`, history);
+    console.log(`[AdCatalog] 🔵 Ajout à l'historique: ${adId}`);
 
-    history.unshift(adId); // Ajouter au début
-    console.log(`[AdCatalog] 🔵 Après ajout:`, history);
+    // Utiliser le backend storage (sauvegarde local + backend)
+    adStorage.addToHistory(adId);
 
-    // Garder seulement les N dernières
-    const trimmedHistory = history.slice(0, MAX_HISTORY_SIZE);
-    console.log(`[AdCatalog] 🔵 Après trim:`, trimmedHistory);
-
-    // Sauvegarder avec le système persistant (cookie + localStorage + sessionStorage)
-    adHistoryStorage.set(trimmedHistory);
-    console.log(`[AdCatalog] 🔵 Sauvegarde persistante réussie`);
+    console.log(`[AdCatalog] 🔵 Sauvegarde backend réussie`);
 
     // Vérification immédiate
-    const verification = adHistoryStorage.get();
+    const verification = adStorage.get();
     console.log(`[AdCatalog] 🔵 Vérification immédiate:`, verification);
   } catch (error) {
     console.error("[AdCatalog] ❌ Erreur sauvegarde historique:", error);
@@ -198,8 +188,8 @@ export function getAdTranslations(ad: Ad, language: string) {
  */
 export function clearAdHistory(): void {
   try {
-    adHistoryStorage.remove();
-    console.log("[AdCatalog] Historique réinitialisé (cookie + localStorage + sessionStorage)");
+    adStorage.clear();
+    console.log("[AdCatalog] Historique réinitialisé (local + backend)");
   } catch (error) {
     console.error("[AdCatalog] Erreur réinitialisation historique:", error);
   }

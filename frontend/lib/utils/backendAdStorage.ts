@@ -1,0 +1,207 @@
+/**
+ * Stockage backend pour l'historique des publicités
+ * Synchronise avec la table users.ad_history dans Supabase
+ * Fonctionne même en mode navigation privée
+ */
+
+import { secureLog } from "./secureLogger";
+import { PersistentJSONStorage } from "./persistentStorage";
+
+const AD_HISTORY_KEY = "intelia_ad_history";
+const MAX_HISTORY_SIZE = 10;
+
+/**
+ * Sauvegarde l'historique des pubs dans le backend (Supabase)
+ */
+async function saveAdHistoryToBackend(history: string[]): Promise<void> {
+  try {
+    // Vérifier l'authentification
+    const authData = localStorage.getItem("intelia-expert-auth");
+    if (!authData) {
+      secureLog.log("[BackendAdStorage] No auth, skipping backend save");
+      return;
+    }
+
+    const { access_token } = JSON.parse(authData);
+
+    // Envoyer au backend
+    const response = await fetch("/api/v1/users/profile", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${access_token}`,
+      },
+      body: JSON.stringify({
+        ad_history: history,
+      }),
+    });
+
+    if (response.ok) {
+      secureLog.log("[BackendAdStorage] Ad history saved to backend:", history);
+    } else {
+      secureLog.warn("[BackendAdStorage] Backend save failed:", response.status);
+    }
+  } catch (error) {
+    secureLog.warn("[BackendAdStorage] Backend save error:", error);
+  }
+}
+
+/**
+ * Récupère l'historique des pubs depuis le backend (Supabase)
+ */
+async function loadAdHistoryFromBackend(): Promise<string[] | null> {
+  try {
+    // Vérifier l'authentification
+    const authData = localStorage.getItem("intelia-expert-auth");
+    if (!authData) {
+      secureLog.log("[BackendAdStorage] No auth, skipping backend load");
+      return null;
+    }
+
+    const { access_token } = JSON.parse(authData);
+
+    // Récupérer depuis le backend
+    const response = await fetch("/api/v1/auth/me", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${access_token}`,
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const history = data.ad_history;
+
+      if (Array.isArray(history) && history.length > 0) {
+        secureLog.log(
+          "[BackendAdStorage] Ad history loaded from backend:",
+          history
+        );
+        return history;
+      }
+    } else {
+      secureLog.warn("[BackendAdStorage] Backend load failed:", response.status);
+    }
+
+    return null;
+  } catch (error) {
+    secureLog.warn("[BackendAdStorage] Backend load error:", error);
+    return null;
+  }
+}
+
+/**
+ * Classe de stockage spécialisée pour l'historique des publicités
+ * Combine stockage local (rapide) et backend (persistant)
+ */
+export class BackendAdStorage {
+  private localStorage: PersistentJSONStorage<string[]>;
+  private backendSyncPending: boolean = false;
+
+  constructor() {
+    this.localStorage = new PersistentJSONStorage<string[]>(AD_HISTORY_KEY);
+  }
+
+  /**
+   * Charge l'historique depuis le backend au démarrage
+   * Restaure dans tous les storages locaux
+   */
+  async init(): Promise<void> {
+    try {
+      secureLog.log("[BackendAdStorage] Initializing...");
+
+      // Charger depuis le backend
+      const backendHistory = await loadAdHistoryFromBackend();
+
+      if (backendHistory && backendHistory.length > 0) {
+        secureLog.log(
+          "[BackendAdStorage] Restoring from backend:",
+          backendHistory
+        );
+
+        // Restaurer dans le stockage local
+        this.localStorage.set(backendHistory);
+      } else {
+        secureLog.log("[BackendAdStorage] No backend history found");
+      }
+    } catch (error) {
+      secureLog.error("[BackendAdStorage] Init error:", error);
+    }
+  }
+
+  /**
+   * Récupère l'historique (priorité: local storage)
+   */
+  get(): string[] {
+    const history = this.localStorage.get();
+    return history || [];
+  }
+
+  /**
+   * Ajoute une pub à l'historique
+   * Sauvegarde dans le local ET le backend
+   */
+  addToHistory(adId: string): void {
+    try {
+      const history = this.get();
+
+      // Ajouter au début
+      history.unshift(adId);
+
+      // Garder seulement les N dernières
+      const trimmedHistory = history.slice(0, MAX_HISTORY_SIZE);
+
+      // Sauvegarder localement (synchrone, rapide)
+      this.localStorage.set(trimmedHistory);
+
+      secureLog.log("[BackendAdStorage] Ad added to history:", adId);
+
+      // Sauvegarder dans le backend (asynchrone, en arrière-plan)
+      if (!this.backendSyncPending) {
+        this.backendSyncPending = true;
+
+        // Debounce: attendre 2 secondes avant de sauvegarder au backend
+        setTimeout(() => {
+          this.syncToBackend();
+        }, 2000);
+      }
+    } catch (error) {
+      secureLog.error("[BackendAdStorage] Add error:", error);
+    }
+  }
+
+  /**
+   * Synchronise l'historique avec le backend
+   */
+  private async syncToBackend(): Promise<void> {
+    try {
+      const history = this.get();
+      await saveAdHistoryToBackend(history);
+    } catch (error) {
+      secureLog.error("[BackendAdStorage] Sync error:", error);
+    } finally {
+      this.backendSyncPending = false;
+    }
+  }
+
+  /**
+   * Efface l'historique (local ET backend)
+   */
+  async clear(): Promise<void> {
+    try {
+      // Effacer localement
+      this.localStorage.remove();
+
+      // Effacer dans le backend
+      await saveAdHistoryToBackend([]);
+
+      secureLog.log("[BackendAdStorage] History cleared");
+    } catch (error) {
+      secureLog.error("[BackendAdStorage] Clear error:", error);
+    }
+  }
+}
+
+// Export une instance singleton
+export const adStorage = new BackendAdStorage();

@@ -3,10 +3,11 @@
  * Essaie plusieurs méthodes pour garantir la persistance même si localStorage est effacé
  *
  * Ordre de priorité:
- * 1. IndexedDB (le plus persistant - survit à tout)
- * 2. Cookie (très persistant - 365 jours)
- * 3. localStorage (rapide mais peut être effacé)
- * 4. sessionStorage (fallback temporaire)
+ * 1. Backend (Supabase users table) - ULTIMATE persistence, survit à navigation privée
+ * 2. IndexedDB (très persistant - mais effacé en mode privé)
+ * 3. Cookie (persistant - 365 jours, mais effacé en mode privé)
+ * 4. localStorage (rapide mais effacé en mode privé)
+ * 5. sessionStorage (fallback temporaire)
  */
 
 import { secureLog } from "./secureLogger";
