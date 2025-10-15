@@ -382,6 +382,7 @@
   "chat.disclaimer": "Intelia Expert può commettere errori. Fai verificare le risposte da un professionista se necessario.",
   "chat.send": "Invia",
   "chat.askQuestion": "Poni la tua domanda all'esperto...",
+  "chat.analyzeImageDefault": "Analizza questa immagine relativa a una malattia avicola.",
   "modal.close": "Chiudi",
   "modal.cancel": "Annulla",
   "modal.save": "Salva",

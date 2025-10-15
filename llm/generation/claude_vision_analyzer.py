@@ -119,6 +119,14 @@ class ClaudeVisionAnalyzer:
             "pt": "Responda APENAS EM PORTUGUÊS.",
             "nl": "Antwoord ALLEEN IN HET NEDERLANDS.",
             "pl": "Odpowiadaj TYLKO PO POLSKU.",
+            "ar": "أجب بالعربية فقط.",
+            "zh": "仅用中文回答。",
+            "ja": "日本語のみで回答してください。",
+            "hi": "केवल हिंदी में उत्तर दें।",
+            "id": "Jawab HANYA DALAM BAHASA INDONESIA.",
+            "th": "ตอบเป็นภาษาไทยเท่านั้น",
+            "tr": "YALNIZCA TÜRKÇE cevap verin.",
+            "vi": "Chỉ trả lời bằng TIẾNG VIỆT.",
         }.get(language, "Respond IN ENGLISH ONLY.")
 
         prompt = f"""Tu es un expert vétérinaire spécialisé en aviculture avec 20+ ans d'expérience en diagnostic de maladies aviaires.

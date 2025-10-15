@@ -383,6 +383,7 @@
   "chat.disclaimer": "Intelia Expert hata yapabilir. Gerekirse yanıtları bir profesyonelle doğrulayın.",
   "chat.send": "Gönder",
   "chat.askQuestion": "Uzmana sorunuzu sorun...",
+  "chat.analyzeImageDefault": "Bu tıbbi görüntüyü analiz edin.",
   "modal.close": "Kapat",
   "modal.cancel": "İptal",
   "modal.save": "Kaydet",

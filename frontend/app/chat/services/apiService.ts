@@ -1287,10 +1287,16 @@ export const generateVisionResponse = async (
       tenant_id = `user_${user.id}`;
     }
 
+    // Enrichir le message avec l'instruction de langue
+    const languageInstruction = language === "fr"
+      ? "Répondez en français."
+      : "Answer in English.";
+    const enrichedMessage = message ? `${message}\n\n${languageInstruction}` : languageInstruction;
+
     // Créer FormData pour l'upload multipart
     const formData = new FormData();
     formData.append("file", imageFile);
-    formData.append("message", message);
+    formData.append("message", enrichedMessage);
     formData.append("tenant_id", tenant_id);
     formData.append("language", language);
     formData.append("use_rag_context", "true");

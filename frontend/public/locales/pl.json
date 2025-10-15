@@ -382,6 +382,7 @@
   "chat.disclaimer": "Intelia Expert może popełniać błędy. W razie potrzeby sprawdź odpowiedzi u profesjonalisty.",
   "chat.send": "Wyślij",
   "chat.askQuestion": "Zadaj pytanie ekspertowi...",
+  "chat.analyzeImageDefault": "Przeanalizuj ten obraz medyczny.",
   "modal.close": "Zamknij",
   "modal.cancel": "Anuluj",
   "modal.save": "Zapisz",

@@ -400,6 +400,9 @@ export interface Message {
   role?: "user" | "assistant";
   sources?: DocumentSource[];
   metadata?: MessageMetadata;
+
+  // Image attachée au message
+  imageUrl?: string;
 }
 
 // ==================== NOUVEAUX TYPES AGENT LLM ====================

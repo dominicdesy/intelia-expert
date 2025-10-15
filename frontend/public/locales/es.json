@@ -213,6 +213,7 @@
   "chat.disclaimer": "Intelia Expert puede cometer errores. Verifique las respuestas con un profesional si es necesario.",
   "chat.send": "Enviar",
   "chat.askQuestion": "Haga su pregunta al experto...",
+  "chat.analyzeImageDefault": "Analice esta imagen relacionada con una enfermedad avícola.",
   "chat.clarificationPlaceholder": "Responda a la pregunta anterior...",
   "chat.clarificationInstruction": "Simplemente responda en el chat con la información solicitada.",
   "chat.clarificationMode": "Modo clarificación: responda la pregunta anterior",

@@ -382,6 +382,7 @@
   "chat.disclaimer": "Intelia Expert में त्रुटियां हो सकती हैं। यदि आवश्यक हो तो किसी पेशेवर से उत्तरों की पुष्टि कराएं।",
   "chat.send": "भेजें",
   "chat.askQuestion": "विशेषज्ञ से अपना प्रश्न पूछें...",
+  "chat.analyzeImageDefault": "इस चिकित्सा छवि का विश्लेषण करें।",
   "modal.close": "बंद करें",
   "modal.cancel": "रद्द करें",
   "modal.save": "सहेजें",

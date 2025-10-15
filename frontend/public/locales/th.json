@@ -382,6 +382,7 @@
   "chat.disclaimer": "Intelia Expert อาจมีข้อผิดพลาด กรุณาตรวจสอบคำตอบกับผู้เชี่ยวชาญหากจำเป็น",
   "chat.send": "ส่ง",
   "chat.askQuestion": "ถามคำถามกับผู้เชี่ยวชาญ...",
+  "chat.analyzeImageDefault": "วิเคราะห์ภาพทางการแพทย์นี้",
   "modal.close": "ปิด",
   "modal.cancel": "ยกเลิก",
   "modal.save": "บันทึก",

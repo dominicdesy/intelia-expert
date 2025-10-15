@@ -387,6 +387,7 @@
   "chat.disclaimer": "Intelia Expert can make mistakes. Please verify the answers with a professional if necessary.",
   "chat.send": "Send",
   "chat.askQuestion": "Ask your question to the expert...",
+  "chat.analyzeImageDefault": "Analyze this image related to a poultry disease.",
   "modal.close": "Close",
   "modal.cancel": "Cancel",
   "modal.save": "Save",

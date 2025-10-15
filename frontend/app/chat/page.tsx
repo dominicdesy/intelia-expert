@@ -66,6 +66,30 @@ const ChatInput = React.memo(
     t: (key: string) => string;
   }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+    const [imageError, setImageError] = React.useState(false);
+
+    // Créer l'URL de prévisualisation quand l'image change
+    React.useEffect(() => {
+      if (selectedImage) {
+        try {
+          const url = URL.createObjectURL(selectedImage);
+          setPreviewUrl(url);
+          setImageError(false);
+
+          // Nettoyer l'URL lors du démontage
+          return () => {
+            URL.revokeObjectURL(url);
+          };
+        } catch (error) {
+          console.error("Error creating preview URL:", error);
+          setImageError(true);
+        }
+      } else {
+        setPreviewUrl(null);
+        setImageError(false);
+      }
+    }, [selectedImage]);
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
@@ -113,11 +137,18 @@ const ChatInput = React.memo(
         {/* Image Preview */}
         {selectedImage && (
           <div className="flex items-center space-x-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-            <img
-              src={URL.createObjectURL(selectedImage)}
-              alt="Preview"
-              className="h-16 w-16 object-cover rounded"
-            />
+            {previewUrl && !imageError ? (
+              <img
+                src={previewUrl}
+                alt="Preview"
+                className="h-16 w-16 object-cover rounded"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className="h-16 w-16 bg-gray-200 rounded flex items-center justify-center">
+                <CameraIcon className="w-8 h-8 text-gray-400" />
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-sm text-gray-700 truncate">
                 {selectedImage.name}
@@ -253,9 +284,20 @@ const MessageList = React.memo(
               className={`px-3 sm:px-4 py-2 rounded-2xl max-w-[85%] sm:max-w-none break-words ${message.isUser ? "bg-blue-600 text-white ml-auto" : "bg-white border border-gray-200 text-gray-900"}`}
             >
               {message.isUser ? (
-                <p className="whitespace-pre-wrap leading-relaxed text-sm">
-                  {message.content}
-                </p>
+                <div className="space-y-2">
+                  {message.imageUrl && (
+                    <img
+                      src={message.imageUrl}
+                      alt="Image envoyée"
+                      className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
+                    />
+                  )}
+                  {message.content && (
+                    <p className="whitespace-pre-wrap leading-relaxed text-sm">
+                      {message.content}
+                    </p>
+                  )}
+                </div>
               ) : (
                 <ReactMarkdown
                   className="prose prose-sm max-w-none break-words prose-p:my-3 prose-li:my-1 prose-ul:my-4 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900"
@@ -924,11 +966,22 @@ function ChatInterface() {
 	  // Allow send if there's either text or an image
 	  if ((!safeText.trim() && !imageToSend) || !isMountedRef.current) return;
 
+	  // Créer l'URL de l'image pour l'affichage dans la bulle
+	  let imageUrl: string | undefined = undefined;
+	  if (imageToSend) {
+	    try {
+	      imageUrl = URL.createObjectURL(imageToSend);
+	    } catch (error) {
+	      console.error("Error creating image URL:", error);
+	    }
+	  }
+
 	  const userMessage: Message = {
 		id: Date.now().toString(),
 		content: safeText.trim(),
 		isUser: true,
 		timestamp: new Date(),
+		imageUrl: imageUrl,
 	  };
 
 	  let conversationIdToSend: string | undefined = undefined;
@@ -960,10 +1013,10 @@ function ChatInterface() {
 		if (imageToSend) {
 		  secureLog.log("[Chat] Sending image for analysis");
 
-		  // Call vision API
+		  // Call vision API with translated default message
 		  response = await generateVisionResponse(
 			imageToSend,
-			safeText.trim() || "Analysez cette image médicale.",
+			safeText.trim() || t("chat.analyzeImageDefault"),
 			user,
 			currentLanguage,
 			conversationIdToSend,

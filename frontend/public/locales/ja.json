@@ -383,6 +383,7 @@
   "chat.disclaimer": "Intelia Expertは間違いを犯す可能性があります。必要に応じて専門家に回答を確認してください。",
   "chat.send": "送信",
   "chat.askQuestion": "エキスパートに質問してください...",
+  "chat.analyzeImageDefault": "この医療画像を分析してください。",
   "modal.close": "閉じる",
   "modal.cancel": "キャンセル",
   "modal.save": "保存",

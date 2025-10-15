@@ -383,6 +383,7 @@
   "chat.disclaimer": "يمكن أن يرتكب إنتيليا إكسبرت أخطاء. يرجى التحقق من الإجابات مع متخصص إذا لزم الأمر.",
   "chat.send": "إرسال",
   "chat.askQuestion": "اطرح سؤالك على الخبير...",
+  "chat.analyzeImageDefault": "قم بتحليل هذه الصورة الطبية.",
   "modal.close": "إغلاق",
   "modal.cancel": "إلغاء",
   "modal.save": "حفظ",
