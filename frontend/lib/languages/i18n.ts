@@ -267,6 +267,7 @@ export interface TranslationKeys {
   "chat.disclaimer": string;
   "chat.send": string;
   "chat.askQuestion": string;
+  "chat.analyzeImageDefault": string;
   "chat.clarificationPlaceholder": string;
   "chat.clarificationInstruction": string;
   "chat.clarificationMode": string;
