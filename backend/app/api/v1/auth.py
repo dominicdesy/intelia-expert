@@ -2272,6 +2272,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
                             "company_website": profile_data.get("company_website"),
                             "linkedin_corporate": profile_data.get("linkedin_corporate"),
                             "language": profile_data.get("language", "fr"),
+                            "ad_history": profile_data.get("ad_history", []),  # 🎯 Ad rotation history
                             "is_admin": current_user.get("is_admin") or profile_data.get("is_admin", False),
                             "preferences": current_user.get("preferences", {}),
                             "profile_id": current_user.get("profile_id"),
