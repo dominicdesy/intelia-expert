@@ -1041,31 +1041,18 @@ function ChatInterface() {
 
 
 
-	// FONCTION CORRIGÉE POUR STREAMING - Élimine le scintillement
+	// FONCTION POUR CHAT TEXTUEL SIMPLE (images gérées par ImageUploadAccumulator)
 	const handleSendMessage = useCallback(async () => {
 	  const safeText = inputMessage;
-	  const imagesToSend = selectedImages;
 
-	  // Allow send if there's either text or images
-	  if ((!safeText.trim() && imagesToSend.length === 0) || !isMountedRef.current) return;
-
-	  // Créer les URLs des images pour l'affichage dans la bulle
-	  let imageUrls: string[] = [];
-	  if (imagesToSend.length > 0) {
-	    try {
-	      imageUrls = imagesToSend.map(img => URL.createObjectURL(img));
-	    } catch (error) {
-	      console.error("Error creating image URLs:", error);
-	    }
-	  }
+	  // Require text for regular chat
+	  if (!safeText.trim() || !isMountedRef.current) return;
 
 	  const userMessage: Message = {
 		id: Date.now().toString(),
 		content: safeText.trim(),
 		isUser: true,
 		timestamp: new Date(),
-		imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-		imageUrl: imageUrls.length > 0 ? imageUrls[0] : undefined, // Backward compatibility
 	  };
 
 	  let conversationIdToSend: string | undefined = undefined;
@@ -1081,7 +1068,6 @@ function ChatInterface() {
 	  // Ajouter le message utilisateur
 	  addMessage(userMessage);
 	  setInputMessage("");
-	  setSelectedImages([]); // Clear the selected images
 	  setIsLoadingChat(true);
 	  setShouldAutoScroll(true);
 	  setIsUserScrolling(false);
@@ -1093,38 +1079,8 @@ function ChatInterface() {
 	  try {
 		let response;
 
-		// IMAGE ANALYSIS PATH
-		if (imagesToSend.length > 0) {
-		  secureLog.log(`[Chat] Sending ${imagesToSend.length} image(s) for analysis`);
-
-		  // Enrichir le message avec le nombre d'images si plusieurs
-		  let enrichedMessage = safeText.trim() || t("chat.analyzeImageDefault");
-		  if (imagesToSend.length > 1) {
-		    enrichedMessage = `[${imagesToSend.length} images fournies] ${enrichedMessage}`;
-		  }
-
-		  // Envoyer toutes les images pour analyse
-		  response = await generateVisionResponse(
-			imagesToSend,
-			enrichedMessage,
-			user,
-			currentLanguage,
-			conversationIdToSend,
-		  );
-
-		  // Create assistant message immediately with the response
-		  assistantId = `ai-${Date.now()}`;
-		  addMessage({
-			id: assistantId,
-			content: response.response,
-			isUser: false,
-			timestamp: new Date(),
-			conversation_id: response.conversation_id,
-		  });
-		  messageCreated = true;
-
-		// REGULAR TEXT CHAT PATH
-		} else {
+		// REGULAR TEXT CHAT PATH ONLY (images handled by ImageUploadAccumulator)
+		{
 		  let finalQuestionOrSafeText: string;
 
 		  if (clarificationState) {
@@ -1303,7 +1259,6 @@ function ChatInterface() {
 	  }
 	}, [
 	  inputMessage,
-	  selectedImages,
 	  currentConversation,
 	  addMessage,
 	  updateMessage,
@@ -1312,7 +1267,7 @@ function ChatInterface() {
 	  currentLanguage,
 	  handleAuthError,
 	  t,
-	  loadConversations, // ⚠️ IMPORTANT: Ajouter cette dépendance
+	  loadConversations,
 	]);
 
 
