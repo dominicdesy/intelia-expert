@@ -39,7 +39,7 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
       target: "button[title*='image'], button[aria-label*='image'], button[title*='Ajouter']",
       title: t("help.cameraTitle"),
       description: t("help.cameraDesc"),
-      position: "left",
+      position: "top",
     },
     {
       target: "button[title*='nouvelle conversation'], button[aria-label*='nouvelle conversation'], button[title*='Nouvelle conversation'], header button:first-child",
