@@ -71,6 +71,7 @@ async def health_check() -> Dict[str, Any]:
             "status": "healthy" if health["postgresql"]["status"] == "healthy" else "unhealthy",
             "backend": "postgresql",
             "architecture": "conversations + messages",
+            "version": "1.1.0",  # Trigger deployment
             "databases": health,
             "timestamp": datetime.utcnow().isoformat(),
         }
