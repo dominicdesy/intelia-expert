@@ -276,6 +276,21 @@ export const UserMenuButton = () => {
     setShowLanguageModal(false);
   }, []);
 
+  // Écouter le changement de langue pour fermer le menu principal
+  useEffect(() => {
+    const handleLanguageChanged = () => {
+      if (!isMountedRef.current) return;
+      secureLog.log("[UserMenuButton] Langue changée, fermeture du menu");
+      setIsOpen(false);
+    };
+
+    window.addEventListener("languageChanged", handleLanguageChanged);
+
+    return () => {
+      window.removeEventListener("languageChanged", handleLanguageChanged);
+    };
+  }, []);
+
   const closeInviteFriendModal = useCallback(() => {
     if (!isMountedRef.current) return;
     setShowInviteFriendModal(false);
