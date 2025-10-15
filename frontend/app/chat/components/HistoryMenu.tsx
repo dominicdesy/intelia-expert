@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
+import { useMenu } from "@/lib/contexts/MenuContext";
 import {
   useConversationGroups,
   useConversationActions,
@@ -12,7 +13,9 @@ import { secureLog } from "@/lib/utils/secureLogger";
 
 export const HistoryMenu = React.memo(() => {
   const { t } = useTranslation();
-  const [isOpen, setIsOpen] = useState(false);
+  // const [isOpen, setIsOpen] = useState(false); // ❌ SUPPRIMÉ - Géré par MenuContext
+  const { isMenuOpen, toggleMenu, closeMenu: closeMenuContext } = useMenu(); // ✅ NOUVEAU
+  const MENU_ID = 'history-menu'; // ✅ NOUVEAU
   const { user } = useAuthStore();
 
   const { conversationGroups, isLoadingHistory, loadConversations } =
@@ -46,10 +49,11 @@ export const HistoryMenu = React.memo(() => {
   );
 
   const handleToggle = useCallback(async () => {
-    secureLog.log(`t("history.toggleClicked") ${isOpen} ${t("history.userPresent")} ${!!user}`);
+    const currentlyOpen = isMenuOpen(MENU_ID);
+    secureLog.log(`[HistoryMenu] Toggle: ${currentlyOpen ? 'closing' : 'opening'}`);
 
-    const newIsOpen = !isOpen;
-    setIsOpen(newIsOpen);
+    toggleMenu(MENU_ID); // ✅ MODIFIÉ
+    const newIsOpen = !currentlyOpen;
 
     if (newIsOpen && user && !isLoadingHistory) {
       secureLog.log(
@@ -63,11 +67,11 @@ export const HistoryMenu = React.memo(() => {
       }
     }
   }, [
-    isOpen,
+    isMenuOpen,
+    toggleMenu,
     user,
     isLoadingHistory,
     loadConversations,
-    t,
   ]);
 
   const handleRefresh = useCallback(
@@ -107,9 +111,9 @@ export const HistoryMenu = React.memo(() => {
       e.preventDefault();
       e.stopPropagation();
       await loadConversation(conv.id);
-      setIsOpen(false);
+      closeMenuContext(MENU_ID); // ✅ MODIFIÉ
     },
-    [loadConversation],
+    [loadConversation, closeMenuContext],
   );
 
   const handleNewConversation = useCallback(
@@ -117,9 +121,9 @@ export const HistoryMenu = React.memo(() => {
       e.preventDefault();
       e.stopPropagation();
       createNewConversation();
-      setIsOpen(false);
+      closeMenuContext(MENU_ID); // ✅ MODIFIÉ
     },
-    [createNewConversation],
+    [createNewConversation, closeMenuContext],
   );
 
   const formatConversationTime = useCallback((timestamp: string): string => {
@@ -145,21 +149,22 @@ export const HistoryMenu = React.memo(() => {
   }, [conversationGroups]);
 
   const debugState = useMemo(() => {
+    const currentlyOpen = isMenuOpen(MENU_ID);
     const state = {
-      isOpen,
+      isOpen: currentlyOpen,
       totalConversations,
       conversationGroupsLength: conversationGroups.length,
       isLoadingHistory,
       hasUser: !!user,
     };
 
-    if (isOpen || totalConversations > 0) {
+    if (currentlyOpen || totalConversations > 0) {
       secureLog.log("[HistoryMenu] État actuel:", state);
     }
 
     return state;
   }, [
-    isOpen,
+    isMenuOpen,
     totalConversations,
     conversationGroups.length,
     isLoadingHistory,
@@ -297,8 +302,8 @@ export const HistoryMenu = React.memo(() => {
   }, [totalConversations]);
 
   const handleCloseMenu = useCallback(() => {
-    setIsOpen(false);
-  }, []);
+    closeMenuContext(MENU_ID); // ✅ MODIFIÉ
+  }, [closeMenuContext]);
 
   return (
     <div className="relative header-icon-container">
@@ -337,13 +342,10 @@ export const HistoryMenu = React.memo(() => {
 
       {notificationBadge}
 
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={handleCloseMenu} />
-          <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">
-            <div className="flex-1 overflow-y-auto">{conversationsList}</div>
-          </div>
-        </>
+      {isMenuOpen(MENU_ID) && (
+        <div className="absolute left-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[70vh] overflow-hidden flex flex-col">
+          <div className="flex-1 overflow-y-auto">{conversationsList}</div>
+        </div>
       )}
     </div>
   );

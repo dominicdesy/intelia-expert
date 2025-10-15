@@ -542,31 +542,79 @@
   }
 }
 
-/* Media queries spécifiques */
-@media (max-width: 640px) {
-  .container {
-    @apply px-3;
+/* === LAYER MOBILE - CONSOLIDATION DE TOUS LES STYLES MOBILES === */
+@layer mobile {
+  /* Styles mobiles de base */
+  @media screen and (max-width: 768px) {
+    /* Body mobile - Position fixed pour éviter scroll issues */
+    body {
+      position: fixed;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Chat page container */
+    .chat-main-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Chat scroll area */
+    .chat-scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    /* Chat input fixed au bas */
+    .chat-input-fixed {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: white;
+      border-top: 1px solid #e5e7eb;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
   }
-  
-  .mobile-padding {
-    @apply p-3;
-  }
-  
-  .mobile-stack {
-    @apply flex-col space-y-2 space-x-0;
-  }
-  
-  /* Responsive pour les notifications proactives sur mobile */
-  .proactive-notification-styles {
-    right: 8px !important;
-    left: 8px !important;
-    max-width: calc(100vw - 16px) !important;
-    top: 70px !important;
-  }
-  
-  .proactive-notification-title,
-  .proactive-notification-message {
-    font-size: 13px !important;
+
+  /* Responsive utilities */
+  @media (max-width: 640px) {
+    .container {
+      @apply px-3;
+    }
+
+    .mobile-padding {
+      @apply p-3;
+    }
+
+    .mobile-stack {
+      @apply flex-col space-y-2 space-x-0;
+    }
+
+    /* Responsive pour les notifications proactives sur mobile */
+    .proactive-notification-styles {
+      right: 8px !important;
+      left: 8px !important;
+      max-width: calc(100vw - 16px) !important;
+      top: 70px !important;
+    }
+
+    .proactive-notification-title,
+    .proactive-notification-message {
+      font-size: 13px !important;
+    }
   }
 }
 

@@ -12,6 +12,7 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { logoutService } from "@/lib/services/logoutService";
 import { useTranslation } from "@/lib/languages/i18n";
 import { PLAN_CONFIGS } from "@/types";
+import { useMenu } from "@/lib/contexts/MenuContext";
 
 // Import des modales avec leur structure complète
 import { UserInfoModal } from "./modals/UserInfoModal";
@@ -29,8 +30,12 @@ export const UserMenuButton = () => {
   const { t, currentLanguage } = useTranslation(); // currentLanguage suffit pour déclencher re-render
   // ✅ SOLUTION D: forceUpdate supprimé - Redondant avec currentLanguage dans les dépendances
 
+  // ✅ NOUVEAU: Utiliser MenuContext au lieu de useState local
+  const { isMenuOpen, toggleMenu, closeMenu: closeMenuContext } = useMenu();
+  const MENU_ID = 'user-menu';
+
   // États des modales
-  const [isOpen, setIsOpen] = useState(false);
+  // const [isOpen, setIsOpen] = useState(false); // ❌ SUPPRIMÉ - Géré par MenuContext
   const [showUserInfoModal, setShowUserInfoModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
@@ -191,49 +196,49 @@ export const UserMenuButton = () => {
   // Handlers des modales avec protection renforcée
   const handleContactClick = useCallback(() => {
     if (!isMountedRef.current) return;
-    setIsOpen(false);
+    closeMenuContext(MENU_ID); // ✅ MODIFIÉ
     setTimeout(() => {
       if (isMountedRef.current) setShowContactModal(true);
     }, 50);
-  }, []);
+  }, [closeMenuContext]);
 
   const handleUserInfoClick = useCallback(() => {
     if (!isMountedRef.current) return;
-    setIsOpen(false);
+    closeMenuContext(MENU_ID); // ✅ MODIFIÉ
     setTimeout(() => {
       if (isMountedRef.current) setShowUserInfoModal(true);
     }, 50);
-  }, []);
+  }, [closeMenuContext]);
 
   const handleAccountClick = useCallback(() => {
     if (!isMountedRef.current) return;
-    setIsOpen(false);
+    closeMenuContext(MENU_ID); // ✅ MODIFIÉ
     setTimeout(() => {
       if (isMountedRef.current) setShowAccountModal(true);
     }, 50);
-  }, []);
+  }, [closeMenuContext]);
 
   const handleLanguageClick = useCallback(() => {
     if (!isMountedRef.current) return;
-    setIsOpen(false);
+    closeMenuContext(MENU_ID); // ✅ MODIFIÉ
     setTimeout(() => {
       if (isMountedRef.current) setShowLanguageModal(true);
     }, 50);
-  }, []);
+  }, [closeMenuContext]);
 
   const handleInviteFriendClick = useCallback(() => {
     if (!isMountedRef.current) return;
-    setIsOpen(false);
+    closeMenuContext(MENU_ID); // ✅ MODIFIÉ
     setTimeout(() => {
       if (isMountedRef.current) setShowInviteFriendModal(true);
     }, 50);
-  }, []);
+  }, [closeMenuContext]);
 
   const handleStatisticsClick = useCallback(() => {
     if (!isMountedRef.current) return;
-    setIsOpen(false);
+    closeMenuContext(MENU_ID); // ✅ MODIFIÉ
     window.open("/admin/statistics", "_blank");
-  }, []);
+  }, [closeMenuContext]);
 
   const openPrivacyPolicy = useCallback(() => {
     window.open("https://intelia.com/privacy-policy/", "_blank");
@@ -241,20 +246,20 @@ export const UserMenuButton = () => {
 
   const handleAboutClick = useCallback(() => {
     if (!isMountedRef.current) return;
-    setIsOpen(false);
+    closeMenuContext(MENU_ID); // ✅ MODIFIÉ
     router.push("/about");
-  }, [router]);
+  }, [router, closeMenuContext]);
 
-  const toggleOpen = useCallback(() => {
+  const handleToggleMenu = useCallback(() => {
     if (!isMountedRef.current) return;
-    secureLog.log(`t("userMenu.debug.toggleOpen") ${isMountedRef.current} ${t("userMenu.debug.currentIsOpen")} ${isOpen}`);
-    setIsOpen((prev) => !prev);
-  }, [isOpen, t]);
+    secureLog.log(`[UserMenu] Toggle menu: ${isMenuOpen(MENU_ID) ? 'closing' : 'opening'}`);
+    toggleMenu(MENU_ID); // ✅ MODIFIÉ
+  }, [toggleMenu, isMenuOpen]);
 
-  const closeMenu = useCallback(() => {
+  const handleCloseMenu = useCallback(() => {
     if (!isMountedRef.current) return;
-    setIsOpen(false);
-  }, []);
+    closeMenuContext(MENU_ID); // ✅ MODIFIÉ
+  }, [closeMenuContext]);
 
   // Fonctions de fermeture des modales avec protection
   const closeUserInfoModal = useCallback(() => {
@@ -282,7 +287,7 @@ export const UserMenuButton = () => {
     const handleLanguageChanged = () => {
       if (!isMountedRef.current) return;
       secureLog.log("[UserMenuButton] Langue changée, fermeture du menu");
-      setIsOpen(false);
+      closeMenuContext(MENU_ID); // ✅ MODIFIÉ
     };
 
     window.addEventListener("languageChanged", handleLanguageChanged);
@@ -290,7 +295,7 @@ export const UserMenuButton = () => {
     return () => {
       window.removeEventListener("languageChanged", handleLanguageChanged);
     };
-  }, []);
+  }, [closeMenuContext]);
 
   // ✅ SOLUTION D: Debug du changement de langue (forceUpdate supprimé - redondant)
   useEffect(() => {
@@ -311,7 +316,7 @@ export const UserMenuButton = () => {
     <>
       <div className="relative">
         <button
-          onClick={toggleOpen}
+          onClick={handleToggleMenu}
           className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors"
           title={t("userMenu.openMenu")}
           aria-label={t("userMenu.openMenu")}
@@ -319,19 +324,26 @@ export const UserMenuButton = () => {
           <span className="text-white text-xs font-medium">{userInitials}</span>
         </button>
 
-        {isOpen && (
-          <>
-            <div
-              className="fixed inset-0 z-40"
-              onClick={closeMenu}
-              onTouchEnd={closeMenu}
-            />
-
-            <div
-              key={currentLanguage}
-              className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
-              onClick={(e) => e.stopPropagation()}
-              onTouchEnd={(e) => e.stopPropagation()}>
+        {isMenuOpen(MENU_ID) && (
+          <div
+            key={currentLanguage}
+            className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+            onClick={(e) => {
+              // ✅ Touch-friendly: Laisser passer les clicks des boutons enfants
+              const target = e.target as HTMLElement;
+              if (target.closest('button')) {
+                return; // Les boutons enfants gèrent leur propre onClick
+              }
+              e.stopPropagation();
+            }}
+            onTouchEnd={(e) => {
+              // ✅ Android/iOS: Même logique pour touch
+              const target = e.target as HTMLElement;
+              if (target.closest('button')) {
+                return;
+              }
+              e.stopPropagation();
+            }}>
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-medium text-gray-900">
                   {user?.name}
@@ -543,7 +555,6 @@ export const UserMenuButton = () => {
                 </button>
               </div>
             </div>
-          </>
         )}
       </div>
 

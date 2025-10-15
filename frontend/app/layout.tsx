@@ -6,6 +6,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import { AdProvider } from "@/components/AdSystem/AdProvider";
+import { MenuProvider } from "@/lib/contexts/MenuContext";
 import { Toaster } from "react-hot-toast";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -74,47 +75,13 @@ const versionLogScript = `
   console.log('='.repeat(60) + '\\n');
 `;
 
-// Script anti-flash optimisé avec gestion correcte des event listeners
+// ✅ Script anti-flash SIMPLIFIÉ - CSS pur avec minimal JavaScript
+// Plus robuste pour Android/iOS, pas d'event listeners complexes
 const antiFlashScript = `
   (function() {
-    console.log('[AntiFlash] Initialisation...');
-    
-    // Variables pour stocker les références des handlers
-    let languageReadyHandler = null;
-    let domContentLoadedHandler = null;
-    let safetyTimer = null;
-    let isReady = false;
-    
-    // Fonction pour nettoyer tous les event listeners
-    function cleanupEventListeners() {
-      if (languageReadyHandler) {
-        window.removeEventListener('languageReady', languageReadyHandler);
-        languageReadyHandler = null;
-      }
-      if (domContentLoadedHandler) {
-        document.removeEventListener('DOMContentLoaded', domContentLoadedHandler);
-        domContentLoadedHandler = null;
-      }
-      if (safetyTimer) {
-        clearTimeout(safetyTimer);
-        safetyTimer = null;
-      }
-    }
-    
-    // Fonction pour marquer comme prêt et nettoyer
-    function markAsReady(source) {
-      if (isReady) return; // Éviter les appels multiples
-      isReady = true;
+    console.log('[AntiFlash] Initialisation simplifiée...');
 
-      document.documentElement.classList.add('language-ready');
-      document.body.classList.add('anti-flash-done'); // FIX iOS: marquer le body
-      console.log('[AntiFlash] ✅ Interface prête (' + source + ')');
-
-      // Nettoyer tous les event listeners
-      cleanupEventListeners();
-    }
-    
-    // Fonction pour obtenir la langue préférée (même logique que LanguageProvider)
+    // Fonction pour obtenir la langue préférée
     function getPreferredLanguage() {
       try {
         // 1. Priorité: localStorage Zustand
@@ -122,9 +89,8 @@ const antiFlashScript = `
         if (zustandData) {
           const parsed = JSON.parse(zustandData);
           const storedLang = parsed?.state?.currentLanguage;
-          
+
           if (storedLang && ['ar', 'en', 'fr', 'es', 'de', 'pt', 'nl', 'pl', 'zh', 'hi', 'th', 'tr', 'vi', 'ja', 'id', 'it'].includes(storedLang)) {
-            console.log('[AntiFlash] Langue trouvée dans Zustand:', storedLang);
             return storedLang;
           }
         }
@@ -132,14 +98,11 @@ const antiFlashScript = `
         // 2. Fallback: langue du navigateur
         const browserLang = navigator.language.split('-')[0];
         if (['ar', 'en', 'fr', 'es', 'de', 'pt', 'nl', 'pl', 'zh', 'hi', 'th', 'tr', 'vi', 'ja', 'id', 'it'].includes(browserLang)) {
-          console.log('[AntiFlash] Langue depuis navigateur:', browserLang);
           return browserLang;
         }
-        
-        console.log('[AntiFlash] Langue par défaut: fr');
+
         return 'fr';
       } catch (e) {
-        console.warn('[AntiFlash] Erreur détection langue:', e);
         return 'fr';
       }
     }
@@ -152,58 +115,26 @@ const antiFlashScript = `
 
     // Initialisation immédiate
     const preferredLang = getPreferredLanguage();
-
-    // Marquer la langue détectée (sans data-lang pour éviter warning hydration)
     document.documentElement.setAttribute('lang', preferredLang);
 
     // Définir la direction RTL si nécessaire
     const direction = isRTLLanguage(preferredLang) ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('dir', direction);
-    console.log('[AntiFlash] Direction:', direction);
-    
-    // Timeout de sécurité absolu (3 secondes max)
-    const SAFETY_TIMEOUT = 3000;
-    safetyTimer = setTimeout(function() {
-      console.warn('[AntiFlash] ⚠️ Timeout sécurité - Affichage forcé');
-      markAsReady('safety-timeout');
-    }, SAFETY_TIMEOUT);
 
-    // Handler pour l'événement languageReady
-    languageReadyHandler = function() {
-      markAsReady('language-ready-event');
-    };
-    
-    // Écouter l'événement de fin d'initialisation
-    window.addEventListener('languageReady', languageReadyHandler);
+    console.log('[AntiFlash] Lang:', preferredLang, 'Dir:', direction);
 
-    // Handler pour DOM ready
-    domContentLoadedHandler = function() {
-      setTimeout(function() {
-        if (!isReady) {
-          console.warn('[AntiFlash] ⚠️ Timeout DOM - Affichage forcé');
-          markAsReady('dom-content-loaded');
-        }
-      }, 500);
-    };
-
-    // Fallback DOM ready
+    // ✅ Marquer comme prêt immédiatement - Le CSS gérera l'affichage progressif
+    // Utiliser DOMContentLoaded avec { once: true } pour auto-cleanup
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', domContentLoadedHandler);
+      document.addEventListener('DOMContentLoaded', function() {
+        document.documentElement.classList.add('language-ready');
+        console.log('[AntiFlash] ✅ Ready on DOMContentLoaded');
+      }, { once: true });
     } else {
       // Document déjà prêt
-      setTimeout(function() {
-        if (!isReady) {
-          console.warn('[AntiFlash] ⚠️ Document ready - Affichage forcé');
-          markAsReady('document-already-ready');
-        }
-      }, 100);
+      document.documentElement.classList.add('language-ready');
+      console.log('[AntiFlash] ✅ Ready immediately');
     }
-    
-    // Cleanup automatique si la page est quittée
-    window.addEventListener('beforeunload', cleanupEventListeners, { once: true });
-    
-    // Cleanup pour les SPA (Single Page Applications)
-    window.addEventListener('pagehide', cleanupEventListeners, { once: true });
   })();
 `;
 
@@ -500,17 +431,19 @@ export default function RootLayout({
       >
         <AuthProvider>
           <LanguageProvider>
-            <AdProvider>
-              {children}
-              <Toaster
-                position="top-center"
-                toastOptions={{
-                  style: {
-                    zIndex: 9999,
-                  },
-                }}
-              />
-            </AdProvider>
+            <MenuProvider>
+              <AdProvider>
+                {children}
+                <Toaster
+                  position="top-center"
+                  toastOptions={{
+                    style: {
+                      zIndex: 9999,
+                    },
+                  }}
+                />
+              </AdProvider>
+            </MenuProvider>
           </LanguageProvider>
         </AuthProvider>
       </body>
