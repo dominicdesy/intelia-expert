@@ -76,7 +76,6 @@ PROTECTED_PATTERNS = [
     # === ENDPOINTS ADMIN STRICTS ===
     "/api/v1/logging/questions",
     "/api/v1/admin/",
-    "/api/v1/invitations/",
     # === ENDPOINTS CACHE ADMIN ===
     "/api/v1/stats-admin/",
     "/api/v1/stats-admin/force-update/",
@@ -117,6 +116,8 @@ AUTHENTICATED_USER_PATTERNS = [
     # === ENDPOINTS CONVERSATIONS (sauvegarde personnelle) ===
     "/api/v1/conversations/save",
     "/api/v1/conversations/user/",
+    # === ENDPOINTS INVITATIONS (tous les utilisateurs authentifiés) ===
+    "/api/v1/invitations/",
 ]
 
 # PATTERNS PUBLICS ÉTENDUS (pour les vérifications par pattern)

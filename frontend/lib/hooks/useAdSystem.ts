@@ -19,6 +19,7 @@ export const useAdSystem = () => {
   const [showAd, setShowAd] = useState(false);
   const [currentAd, setCurrentAd] = useState<AdData | null>(null);
   const isMountedRef = useRef(true); // Protection démontage
+  const isLoadingAdRef = useRef(false); // Protection contre appels multiples
 
   // Cleanup au démontage
   useEffect(() => {
@@ -212,7 +213,20 @@ export const useAdSystem = () => {
 
   // Déclencher l'affichage de la publicité
   const triggerAd = useCallback(async () => {
+    // ✅ PROTECTION: Éviter les appels multiples simultanés
+    if (isLoadingAdRef.current) {
+      secureLog.log("⏸️ Chargement pub déjà en cours, ignoré");
+      return;
+    }
+
+    // ✅ PROTECTION: Ne pas afficher si une pub est déjà visible
+    if (showAd) {
+      secureLog.log("⏸️ Une pub est déjà affichée, ignoré");
+      return;
+    }
+
     try {
+      isLoadingAdRef.current = true;
       secureLog.log("🎬 Chargement publicité...");
       const adData = await getPersonalizedAd();
 
@@ -231,8 +245,10 @@ export const useAdSystem = () => {
       secureLog.log("📺 Publicité affichée et enregistrée:", adData.id);
     } catch (error) {
       secureLog.error("❌ Erreur lors du chargement de la publicité:", error);
+    } finally {
+      isLoadingAdRef.current = false;
     }
-  }, [getPersonalizedAd]);
+  }, [getPersonalizedAd, showAd]);
 
   // Gérer la fermeture de la publicité
   const handleAdClose = useCallback(() => {
