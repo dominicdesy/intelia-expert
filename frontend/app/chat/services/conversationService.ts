@@ -303,8 +303,9 @@ export class ConversationService {
     try {
       secureLog.log(`[ConversationService] Chargement conversation complète: ${conversationId} `);
 
+      // ✅ CORRECTION: Utiliser le nouveau endpoint /conversations/{id}/messages
       const response = await fetch(
-        `${this.baseUrl}/conversations/${conversationId}`,
+        `${this.baseUrl}/conversations/${conversationId}/messages`,
         {
           method: "GET",
           headers: this.getHeaders("GET"),
@@ -314,28 +315,53 @@ export class ConversationService {
       if (response.ok) {
         const data = await response.json();
 
-        secureLog.log("[ConversationService] Données récupérées:", {
-          id: data.conversation?.conversation_id,
-          questionLength: data.conversation?.question?.length || 0,
-          responseLength:
-            (data.conversation?.full_text ?? data.conversation?.response)
-              ?.length || 0,
+        secureLog.log("[ConversationService] Messages récupérés:", {
+          conversation_id: data.conversation_id,
+          message_count: data.message_count || 0,
         });
 
-        if (
-          data.conversation &&
-          data.conversation.question &&
-          data.conversation.response
-        ) {
-          const conversationWithMessages =
-            this.transformToConversationWithMessages(data.conversation);
+        if (data.messages && data.messages.length > 0) {
+          // Transformer les messages du backend vers le format frontend
+          const messages: Message[] = data.messages.map((msg: any, index: number) => ({
+            id: msg.id || `${conversationId}_${msg.role}_${index}`,
+            content: msg.content,
+            isUser: msg.role === "user",
+            timestamp: new Date(msg.created_at || new Date()),
+            conversation_id: conversationId,
+            feedback: msg.feedback || null,
+          }));
 
-          if (conversationWithMessages.messages.length > 0) {
-            secureLog.log(
-              "[ConversationService] Conversation transformée avec messages complets",
-            );
-            return conversationWithMessages;
-          }
+          // Récupérer le titre depuis le premier message utilisateur
+          const firstUserMessage = messages.find(m => m.isUser);
+          const firstQuestion = firstUserMessage?.content || "Conversation";
+          const title = firstQuestion.length > 100
+            ? firstQuestion.substring(0, 100) + "..."
+            : firstQuestion;
+
+          // Récupérer le dernier message de l'assistant pour le preview
+          const lastAssistantMessage = messages.filter(m => !m.isUser).pop();
+          const lastResponse = lastAssistantMessage?.content || "Aucune réponse";
+          const lastMessagePreview = lastResponse.length > 300
+            ? lastResponse.substring(0, 300) + "..."
+            : lastResponse;
+
+          const conversationWithMessages: ConversationWithMessages = {
+            id: conversationId,
+            title: title,
+            preview: firstQuestion,
+            message_count: messages.length,
+            created_at: data.messages[0]?.created_at || new Date().toISOString(),
+            updated_at: data.messages[data.messages.length - 1]?.created_at || new Date().toISOString(),
+            language: "fr",
+            status: "active",
+            last_message_preview: lastMessagePreview,
+            messages: messages,
+          };
+
+          secureLog.log(
+            `[ConversationService] ✅ Conversation transformée: ${messages.length} messages`,
+          );
+          return conversationWithMessages;
         }
       }
 

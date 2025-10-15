@@ -261,6 +261,7 @@ class ConversationService:
                             "language": row["language"],
                             "message_count": row["message_count"],
                             "first_message_preview": row["first_message_preview"],
+                            "preview": row["first_message_preview"],  # ✅ Alias pour compatibilité frontend
                             "last_message_preview": row["last_message_preview"],
                             "status": row["status"],
                             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
