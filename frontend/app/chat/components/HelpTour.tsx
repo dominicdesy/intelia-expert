@@ -92,12 +92,15 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
     const bubbleHeight = 220; // Hauteur estimée pour le positionnement
     const padding = 20;
 
+    // Padding plus important pour l'étape caméra (étape 3, index 2)
+    const topPadding = currentStep === 2 ? 40 : padding;
+
     let top = 0;
     let left = 0;
 
     switch (step.position) {
       case "top":
-        top = rect.top - bubbleHeight - padding;
+        top = rect.top - bubbleHeight - topPadding;
         left = rect.left + rect.width / 2 - bubbleWidth / 2;
         break;
       case "bottom":
