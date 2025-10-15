@@ -174,6 +174,7 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
+      setCurrentStep(0); // Reset to first step
       onClose();
     }
   };
@@ -185,6 +186,7 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
   };
 
   const handleSkip = () => {
+    setCurrentStep(0); // Reset to first step
     onClose();
   };
 
