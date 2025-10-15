@@ -6,6 +6,7 @@
 
 import { secureLog } from "./secureLogger";
 import { PersistentJSONStorage } from "./persistentStorage";
+import { apiClient } from "../api/client";
 
 const AD_HISTORY_KEY = "intelia_ad_history";
 const MAX_HISTORY_SIZE = 10;
@@ -15,31 +16,17 @@ const MAX_HISTORY_SIZE = 10;
  */
 async function saveAdHistoryToBackend(history: string[]): Promise<void> {
   try {
-    // Vérifier l'authentification
-    const authData = localStorage.getItem("intelia-expert-auth");
-    if (!authData) {
-      secureLog.log("[BackendAdStorage] No auth, skipping backend save");
-      return;
-    }
+    secureLog.log("[BackendAdStorage] Saving to backend:", history);
 
-    const { access_token } = JSON.parse(authData);
-
-    // Envoyer au backend
-    const response = await fetch("/api/v1/users/profile", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${access_token}`,
-      },
-      body: JSON.stringify({
-        ad_history: history,
-      }),
+    // Utiliser apiClient pour la cohérence des URLs
+    const response = await apiClient.putSecure("users/profile", {
+      ad_history: history,
     });
 
-    if (response.ok) {
+    if (response.success) {
       secureLog.log("[BackendAdStorage] Ad history saved to backend:", history);
     } else {
-      secureLog.warn("[BackendAdStorage] Backend save failed:", response.status);
+      secureLog.warn("[BackendAdStorage] Backend save failed:", response.error);
     }
   } catch (error) {
     secureLog.warn("[BackendAdStorage] Backend save error:", error);
@@ -51,27 +38,13 @@ async function saveAdHistoryToBackend(history: string[]): Promise<void> {
  */
 async function loadAdHistoryFromBackend(): Promise<string[] | null> {
   try {
-    // Vérifier l'authentification
-    const authData = localStorage.getItem("intelia-expert-auth");
-    if (!authData) {
-      secureLog.log("[BackendAdStorage] No auth, skipping backend load");
-      return null;
-    }
+    secureLog.log("[BackendAdStorage] Loading from backend...");
 
-    const { access_token } = JSON.parse(authData);
+    // Utiliser apiClient pour la cohérence des URLs
+    const response = await apiClient.getSecure<any>("auth/me");
 
-    // Récupérer depuis le backend
-    const response = await fetch("/api/v1/auth/me", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${access_token}`,
-      },
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const history = data.ad_history;
+    if (response.success && response.data) {
+      const history = response.data.ad_history;
 
       if (Array.isArray(history) && history.length > 0) {
         secureLog.log(
@@ -79,9 +52,11 @@ async function loadAdHistoryFromBackend(): Promise<string[] | null> {
           history
         );
         return history;
+      } else {
+        secureLog.log("[BackendAdStorage] No ad_history in user profile");
       }
     } else {
-      secureLog.warn("[BackendAdStorage] Backend load failed:", response.status);
+      secureLog.warn("[BackendAdStorage] Backend load failed:", response.error);
     }
 
     return null;
