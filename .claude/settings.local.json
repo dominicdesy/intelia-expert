@@ -41,7 +41,8 @@
       "Bash(node add-translations.js)",
       "Read(//c/intelia_gpt/backend/**)",
       "Read(//c/intelia_gpt/**)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(docker-compose exec backend psql:*)"
     ],
     "deny": [],
     "ask": []
