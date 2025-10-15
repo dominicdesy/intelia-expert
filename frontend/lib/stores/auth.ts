@@ -331,6 +331,21 @@ export const useAuthStore = create<AuthState>()(
               authErrors: [],
             });
 
+            // ✅ SYNC IMMEDIATE: Synchroniser la langue avec localStorage pour i18n
+            if (appUser.language) {
+              try {
+                const langData = {
+                  state: {
+                    currentLanguage: appUser.language,
+                  },
+                };
+                localStorage.setItem("intelia-language", JSON.stringify(langData));
+                secureLog.log(`[AuthStore] Language synchronized to localStorage: ${appUser.language}`);
+              } catch (error) {
+                secureLog.warn("[AuthStore] Error syncing language to localStorage:", error);
+              }
+            }
+
             secureLog.log("[AuthStore] Auth successful");
           } else {
             set({
