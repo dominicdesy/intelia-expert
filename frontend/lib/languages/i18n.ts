@@ -813,6 +813,11 @@ export interface TranslationKeys {
   "stripe.success.message": string;
   "stripe.success.redirecting": string;
   "stripe.success.activated": string;
+  "stripe.success.immediateAccess": string;
+  "stripe.success.monthlyBilling": string;
+  "stripe.success.confirmationEmail": string;
+  "stripe.success.startNow": string;
+  "stripe.success.viewProfile": string;
   "stripe.success.enjoy": string;
   "stripe.success.thanksForTrust": string;
   "stripe.success.backToChat": string;
