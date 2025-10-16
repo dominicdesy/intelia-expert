@@ -575,7 +575,7 @@ else:
 
 # Stripe Webhooks (événements de paiement)
 if STRIPE_WEBHOOKS_AVAILABLE and stripe_webhooks_router:
-    router.include_router(stripe_webhooks_router, tags=["Stripe-Webhooks"])
+    router.include_router(stripe_webhooks_router, prefix="/stripe", tags=["Stripe-Webhooks"])
     logger.info("Stripe Webhooks router monté")
     logger.info("Stripe Webhooks router maintenant disponible sur /v1/stripe/webhook")
 else:

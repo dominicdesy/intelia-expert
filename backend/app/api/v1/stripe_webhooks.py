@@ -17,7 +17,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Request, HTTPException, Header
 
-router = APIRouter(prefix="/stripe", tags=["stripe-webhooks"])
+router = APIRouter(tags=["stripe-webhooks"])
 logger = logging.getLogger(__name__)
 
 # Configuration
