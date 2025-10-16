@@ -44,6 +44,9 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth/oauth/facebook/login",
     "/api/v1/auth/oauth/linkedin/callback",
     "/api/v1/auth/oauth/facebook/callback",
+    # === ENDPOINTS STRIPE WEBHOOKS PUBLICS ===
+    "/api/v1/stripe/webhook",
+    "/api/v1/stripe/webhook/test",
     # === ENDPOINTS CACHE PUBLICS ===
     "/api/v1/stats-fast/health",
     # === SYSTEM ENDPOINTS (health et status publics uniquement) ===
