@@ -556,12 +556,12 @@ async def cron_analyze_batch(
     import os
 
     # Vérifier le secret du cron
-    expected_secret = os.getenv("CRON_SECRET")
+    expected_secret = os.getenv("CRON_SECRET_KEY")
     if not expected_secret:
-        logger.error("❌ [QA_QUALITY_CRON] CRON_SECRET non configuré dans l'environnement")
+        logger.error("❌ [QA_QUALITY_CRON] CRON_SECRET_KEY non configuré dans l'environnement")
         raise HTTPException(
             status_code=500,
-            detail="CRON_SECRET not configured on server"
+            detail="CRON_SECRET_KEY not configured on server"
         )
 
     if cron_secret != expected_secret:
