@@ -265,10 +265,9 @@ export const UserMenuButton = () => {
   const createTouchHandler = useCallback((handler: () => void) => {
     return {
       onMouseDown: (e: React.MouseEvent) => {
-        e.preventDefault();
         handler();
       },
-      style: { cursor: 'pointer' }
+      style: { cursor: 'pointer', userSelect: 'none' as const }
     };
   }, []);
 
@@ -316,18 +315,20 @@ export const UserMenuButton = () => {
     if (!isMenuOpen(MENU_ID)) return;
 
     const handleClickOutside = (e: MouseEvent) => {
+      // Ignorer si on clique dans le menu ou sur le bouton toggle
       if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
         closeMenuContext(MENU_ID);
       }
     };
 
     // Délai pour éviter que le clic d'ouverture ne ferme immédiatement
-    setTimeout(() => {
-      window.addEventListener('click', handleClickOutside);
-    }, 0);
+    const timer = setTimeout(() => {
+      window.addEventListener('mousedown', handleClickOutside);
+    }, 100);
 
     return () => {
-      window.removeEventListener('click', handleClickOutside);
+      clearTimeout(timer);
+      window.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isMenuOpen, closeMenuContext]);
 
@@ -361,8 +362,11 @@ export const UserMenuButton = () => {
         {isMenuOpen(MENU_ID) && (
           <div
             key={currentLanguage}
-            className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
-            style={{ touchAction: 'manipulation' }}>
+            className="absolute left-auto right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+            style={{
+              touchAction: 'manipulation',
+              maxWidth: 'calc(100vw - 1rem)'
+            }}>
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-sm font-medium text-gray-900">
                   {user?.name}

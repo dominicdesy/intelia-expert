@@ -247,9 +247,9 @@ export const HistoryMenu = React.memo(() => {
                     : ""
                 }`}
                 onMouseDown={(e) => {
-                  e.preventDefault();
                   handleConversationClick(conv, e);
                 }}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0 pr-3">
@@ -322,12 +322,13 @@ export const HistoryMenu = React.memo(() => {
     };
 
     // Délai pour éviter que le clic d'ouverture ne ferme immédiatement
-    setTimeout(() => {
-      window.addEventListener('click', handleClickOutside);
-    }, 0);
+    const timer = setTimeout(() => {
+      window.addEventListener('mousedown', handleClickOutside);
+    }, 100);
 
     return () => {
-      window.removeEventListener('click', handleClickOutside);
+      clearTimeout(timer);
+      window.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isMenuOpen, closeMenuContext]);
 
