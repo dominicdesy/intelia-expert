@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
 import { useAuthStore } from "@/lib/stores/auth";
 import { apiClient } from "@/lib/api/client";
@@ -67,14 +67,6 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
     return null;
   }, [user]);
 
-  // Validation side effect
-  useEffect(() => {
-    if (!currentUser?.email) {
-      setErrors([t("invite.loginRequired")]);
-    } else {
-      setErrors([]);
-    }
-  }, [currentUser, t]);
 
   // Validation des emails
   const validateEmails = (
@@ -108,11 +100,6 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
 
     setErrors([]);
     setResults(null);
-
-    if (!currentUser?.email) {
-      setErrors([t("invite.loginRequired")]);
-      return;
-    }
 
     if (!emails.trim()) {
       setErrors([t("invite.emailRequired")]);
@@ -250,48 +237,6 @@ export const InviteFriendModal: React.FC<InviteFriendModalProps> = ({
     return result.message;
   };
 
-  // Si pas d'utilisateur connecté
-  if (!currentUser?.email) {
-    return (
-      <BaseDialog
-        isOpen={isOpen}
-        onClose={onClose}
-        title={t("nav.inviteFriend")}
-      >
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-8 h-8 text-red-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            {t("invite.loginRequiredTitle")}
-          </h2>
-          <p className="text-sm text-gray-600 mb-4">
-            {t("invite.loginRequired")}
-          </p>
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            {t("modal.close")}
-          </button>
-        </div>
-      </BaseDialog>
-    );
-  }
-
-  // Utilisateur connecté
   return (
     <BaseDialog isOpen={isOpen} onClose={onClose} title={t("nav.inviteFriend")}>
       <div className="space-y-6">
