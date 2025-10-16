@@ -214,20 +214,18 @@ export const UserMenuButton = () => {
             <div className="px-4 py-3 border-b border-gray-100">
               <p className="text-sm font-medium text-gray-900">{user?.name}</p>
               <p className="text-xs text-gray-500">{user?.email}</p>
-              {user?.user_type && (
-                <div className="mt-2">
-                  {!isSuperAdmin && (
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.color} border ${plan.borderColor}`}>
-                      {plan.name}
-                    </span>
-                  )}
-                  {isSuperAdmin && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-                      {t("userMenu.superAdmin")}
-                    </span>
-                  )}
-                </div>
-              )}
+              <div className="mt-2">
+                {!isSuperAdmin && (
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${plan.bgColor} ${plan.color} border ${plan.borderColor}`}>
+                    {t(`plan.${currentPlan}` as any)}
+                  </span>
+                )}
+                {isSuperAdmin && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                    {t("userMenu.superAdmin")}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Menu Items */}

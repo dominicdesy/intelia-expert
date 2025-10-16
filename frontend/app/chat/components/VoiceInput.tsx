@@ -66,11 +66,13 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
 
     // Handle results
     recognition.onresult = (event: any) => {
+      console.log("[VoiceInput] onresult fired, event:", event);
       let interimTranscript = "";
       let finalTranscript = "";
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
+        console.log(`[VoiceInput] Result ${i}: "${transcript}", isFinal: ${event.results[i].isFinal}`);
         if (event.results[i].isFinal) {
           finalTranscript += transcript;
         } else {
@@ -79,16 +81,20 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       }
 
       if (finalTranscript) {
+        console.log("[VoiceInput] Final transcript:", finalTranscript);
         finalTranscriptRef.current = finalTranscript;
       }
     };
 
     // Handle end of speech
     recognition.onend = () => {
+      console.log("[VoiceInput] Speech recognition ended. Final transcript:", finalTranscriptRef.current);
       setIsListening(false);
       if (finalTranscriptRef.current) {
         onTranscript(finalTranscriptRef.current);
         finalTranscriptRef.current = "";
+      } else {
+        console.log("[VoiceInput] No transcript captured - user may not have spoken or microphone issue");
       }
     };
 
@@ -135,6 +141,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       setError(null);
       finalTranscriptRef.current = "";
       try {
+        console.log("[VoiceInput] Starting speech recognition with language:", recognitionRef.current.lang);
         recognitionRef.current.start();
         setIsListening(true);
       } catch (err) {

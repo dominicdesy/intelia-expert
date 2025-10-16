@@ -48,7 +48,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   };
 
   const handleContactUs = () => {
-    window.location.href = "mailto:support@intelia.com?subject=" + encodeURIComponent("Demande d'information - Plan Corporate");
+    window.location.href = "mailto:support@intelia.com?subject=" + encodeURIComponent(t("contact.corporatePlanSubject"));
   };
 
   const plans = Object.entries(PLAN_CONFIGS).map(([key, config]) => ({
@@ -73,7 +73,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {plans.map((plan) => {
               const isCurrentPlan = plan.key === currentPlan;
               const isCorporate = plan.key === "corporate";
@@ -107,7 +107,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
                   {/* Plan Header */}
                   <div className="mb-4">
-                    <h3 className={`text-xl font-bold mb-1 ${plan.color}`}>
+                    <h3 className={`text-lg font-bold mb-1 ${plan.color}`}>
                       {t(`plan.${plan.key}` as any)}
                     </h3>
                     <p className="text-sm text-gray-600">
@@ -123,7 +123,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     ) : plan.price === 0 ? (
                       <div className="text-2xl font-bold text-gray-900">
-                        {t("plan.free")}
+                        {t("plan.essential")}
                       </div>
                     ) : (
                       <div>

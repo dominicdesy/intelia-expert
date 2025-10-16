@@ -378,8 +378,8 @@ export default function AboutPage() {
                   {t("about.versionInfo")}
                 </h3>
                 <div className="text-sm text-gray-600 space-y-1">
-                  <p><span className="font-medium">{t("about.version")}:</span> 1.0.0</p>
-                  <p><span className="font-medium">{t("about.lastUpdated")}:</span> January 2025</p>
+                  <p><span className="font-medium">{t("about.version")}:</span> 1.1.0</p>
+                  <p><span className="font-medium">{t("about.lastUpdated")}:</span> Octobre 2025</p>
                   <p><span className="font-medium">{t("about.license")}:</span> Proprietary</p>
                 </div>
               </div>
