@@ -189,6 +189,29 @@ function LoginPageContent() {
   const [success, setSuccess] = useState("");
   const [showSignup, setShowSignup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Détection mobile
+  useEffect(() => {
+    const detectMobile = () => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+      const isSmallScreen = window.innerWidth <= 768;
+      const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+
+      return (isMobileUA || isIPadOS || (isSmallScreen && hasTouchScreen));
+    };
+
+    setIsMobile(detectMobile());
+
+    const handleResize = () => {
+      setIsMobile(detectMobile());
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // États pour le signup - DOIVENT être AVANT tout return conditionnel
   const [signupData, setSignupData] = useState({
@@ -524,8 +547,8 @@ function LoginPageContent() {
       <div className="relative z-10 flex flex-col justify-center items-center min-h-screen px-4 sm:px-6 lg:px-8">
         <div className="w-full max-w-md">
           {/* Header avec logo */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-6">
+          <div className={isMobile ? 'text-left mb-8' : 'text-center mb-8'}>
+            <div className={`flex mb-6 ${isMobile ? 'justify-start' : 'justify-center'}`}>
               <InteliaLogo className="w-16 h-16" />
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">
