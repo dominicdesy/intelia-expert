@@ -20,7 +20,30 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null);
   const [bubblePosition, setBubblePosition] = useState({ top: 0, left: 0 });
+  const [isMobile, setIsMobile] = useState(false);
   const animationFrameRef = useRef<number>();
+
+  // Détection mobile
+  useEffect(() => {
+    const detectMobile = () => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+      const isSmallScreen = window.innerWidth <= 768;
+      const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+
+      return (isMobileUA || isIPadOS || (isSmallScreen && hasTouchScreen));
+    };
+
+    setIsMobile(detectMobile());
+
+    const handleResize = () => {
+      setIsMobile(detectMobile());
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const steps: HelpStep[] = [
     {
@@ -87,49 +110,79 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
     console.log(`[HelpTour] Position de l'élément:`, rect);
     setSpotlightRect(rect);
 
-    // Calculer la position de la bulle
-    const bubbleWidth = 320;
-    const bubbleHeight = 220; // Hauteur estimée pour le positionnement
-    const padding = 20;
-
-    // Padding plus important pour l'étape caméra (étape 3, index 2)
-    const topPadding = currentStep === 2 ? 40 : padding;
+    // Calculer la position de la bulle - Adaptatif mobile/desktop
+    const bubbleWidth = isMobile ? Math.min(300, window.innerWidth - 40) : 320;
+    const bubbleHeight = isMobile ? 200 : 220;
+    const padding = isMobile ? 12 : 20;
 
     let top = 0;
     let left = 0;
 
-    switch (step.position) {
-      case "top":
-        top = rect.top - bubbleHeight - topPadding;
-        left = rect.left + rect.width / 2 - bubbleWidth / 2;
-        break;
-      case "bottom":
-        top = rect.bottom + padding;
-        left = rect.left + rect.width / 2 - bubbleWidth / 2;
-        break;
-      case "left":
-        top = rect.top + rect.height / 2 - bubbleHeight / 2;
-        left = rect.left - bubbleWidth - padding;
-        break;
-      case "right":
-        top = rect.top + rect.height / 2 - bubbleHeight / 2;
-        left = rect.right + padding;
-        break;
+    if (isMobile) {
+      // Sur mobile : positions simplifiées et optimisées
+      switch (currentStep) {
+        case 0: // Input - Au-dessus de l'input
+          top = rect.top - bubbleHeight - 80;
+          left = (window.innerWidth - bubbleWidth) / 2;
+          break;
+        case 1: // Send button - À gauche du bouton, plus bas
+          top = rect.bottom - bubbleHeight + 40;
+          left = Math.max(10, rect.left - bubbleWidth - padding);
+          break;
+        case 2: // Camera button - Au-dessus, bien espacé
+          top = rect.top - bubbleHeight - 100;
+          left = (window.innerWidth - bubbleWidth) / 2;
+          break;
+        case 3: // New conversation - En-dessous
+          top = rect.bottom + padding + 10;
+          left = Math.max(10, rect.left);
+          break;
+        case 4: // History - En-dessous
+          top = rect.bottom + padding + 10;
+          left = Math.max(10, rect.left);
+          break;
+        case 5: // User menu - En-dessous, aligné à droite
+          top = rect.bottom + padding + 10;
+          left = Math.min(window.innerWidth - bubbleWidth - 10, rect.right - bubbleWidth);
+          break;
+      }
+    } else {
+      // Desktop : logique originale
+      const topPadding = currentStep === 2 ? 40 : padding;
+
+      switch (step.position) {
+        case "top":
+          top = rect.top - bubbleHeight - topPadding;
+          left = rect.left + rect.width / 2 - bubbleWidth / 2;
+          break;
+        case "bottom":
+          top = rect.bottom + padding;
+          left = rect.left + rect.width / 2 - bubbleWidth / 2;
+          break;
+        case "left":
+          top = rect.top + rect.height / 2 - bubbleHeight / 2;
+          left = rect.left - bubbleWidth - padding;
+          break;
+        case "right":
+          top = rect.top + rect.height / 2 - bubbleHeight / 2;
+          left = rect.right + padding;
+          break;
+      }
     }
 
     // Ajuster si la bulle sort de l'écran
-    if (left < 10) left = 10;
-    if (left + bubbleWidth > window.innerWidth - 10) {
-      left = window.innerWidth - bubbleWidth - 10;
+    const margin = isMobile ? 10 : 10;
+    if (left < margin) left = margin;
+    if (left + bubbleWidth > window.innerWidth - margin) {
+      left = window.innerWidth - bubbleWidth - margin;
     }
-    if (top < 10) top = 10;
-    // Plus de marge en bas pour s'assurer que tout le contenu est visible
-    if (top + bubbleHeight > window.innerHeight - 30) {
-      top = window.innerHeight - bubbleHeight - 30;
+    if (top < margin) top = margin;
+    if (top + bubbleHeight > window.innerHeight - (isMobile ? 20 : 30)) {
+      top = window.innerHeight - bubbleHeight - (isMobile ? 20 : 30);
     }
 
     setBubblePosition({ top, left });
-  }, [currentStep, steps]);
+  }, [currentStep, steps, isMobile]);
 
   useEffect(() => {
     if (isOpen) {
@@ -240,11 +293,13 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
 
       {/* Bulle d'aide */}
       <div
-        className="absolute bg-white rounded-2xl shadow-2xl p-6 transition-all duration-300 pointer-events-auto"
+        className={`absolute bg-white rounded-2xl shadow-2xl transition-all duration-300 pointer-events-auto ${
+          isMobile ? 'p-4' : 'p-6'
+        }`}
         style={{
           top: bubblePosition.top,
           left: bubblePosition.left,
-          width: "320px",
+          width: isMobile ? `${Math.min(300, window.innerWidth - 40)}px` : "320px",
           animation: "fadeInScale 0.3s ease-out",
         }}
       >
