@@ -24,7 +24,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const [isManaging, setIsManaging] = useState(false);
 
   const currentPlan = user?.plan || "essential";
-  const userPlan = PLAN_CONFIGS[currentPlan as keyof typeof PLAN_CONFIGS];
+  const userPlan = PLAN_CONFIGS[currentPlan as keyof typeof PLAN_CONFIGS] || PLAN_CONFIGS.essential;
 
   const handleManageSubscription = async () => {
     setIsManaging(true);
