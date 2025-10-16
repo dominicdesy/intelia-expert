@@ -12,11 +12,13 @@ import { Toaster } from "react-hot-toast";
 const inter = Inter({ subsets: ["latin"] });
 
 // Export séparé pour le viewport (nouvelle méthode)
-// FIX iOS: Retirer maximumScale et userScalable pour un rendu respirable
+// FIX iOS fullscreen: viewport-fit=cover + safe-area-inset pour notch
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  viewportFit: "cover",
+  viewportFit: "cover", // Important pour fullscreen avec notch
+  maximumScale: 5, // Permet zoom mais évite l'auto-zoom sur focus
+  userScalable: true,
 };
 
 export const metadata: Metadata = {
@@ -73,6 +75,42 @@ const versionLogScript = `
   console.log('Environment: ' + (window.location.hostname === 'localhost' ? 'development' : 'production'));
   console.log('Loaded at: ' + new Date().toISOString());
   console.log('='.repeat(60) + '\\n');
+`;
+
+// Script pour masquer la barre d'adresse Safari/Edge sur iPhone
+const hideAddressBarScript = `
+  (function() {
+    // Fonction pour masquer la barre d'adresse en scrollant
+    function hideAddressBar() {
+      if (window.scrollY === 0) {
+        window.scrollTo(0, 1);
+      }
+    }
+
+    // Masquer immédiatement si pas déjà scrollé
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+
+    // Exécuter au chargement
+    window.addEventListener('load', function() {
+      setTimeout(hideAddressBar, 0);
+    }, { once: true });
+
+    // Exécuter après DOMContentLoaded aussi
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(hideAddressBar, 100);
+      }, { once: true });
+    } else {
+      setTimeout(hideAddressBar, 0);
+    }
+
+    // Re-masquer après orientation change
+    window.addEventListener('orientationchange', function() {
+      setTimeout(hideAddressBar, 300);
+    });
+  })();
 `;
 
 // ✅ Script anti-flash SIMPLIFIÉ - CSS pur avec minimal JavaScript
@@ -152,11 +190,20 @@ export default function RootLayout({
         {/* SCRIPT ANTI-FLASH - DOIT ÊTRE EN PREMIER */}
         <script dangerouslySetInnerHTML={{ __html: antiFlashScript }} />
 
-        {/* Meta tags critiques pour iOS - viewport est géré par l'export au-dessus */}
+        {/* SCRIPT POUR MASQUER LA BARRE D'ADRESSE - Pour fullscreen */}
+        <script dangerouslySetInnerHTML={{ __html: hideAddressBarScript }} />
+
+        {/* Meta tags PWA pour fullscreen - Safari iOS et Edge iOS */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="format-detection" content="telephone=no" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Intelia Expert" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="format-detection" content="telephone=no" />
+
+        {/* Meta tags pour Edge et autres navigateurs mobiles */}
+        <meta name="application-name" content="Intelia Expert" />
+        <meta name="msapplication-TileColor" content="#2563eb" />
+        <meta name="msapplication-tap-highlight" content="no" />
 
         {/* Icons existants */}
         <link rel="icon" href="/images/favicon.png" type="image/png" />
@@ -275,11 +322,9 @@ export default function RootLayout({
               min-width: 48px;
             }
             
-            /* Viewport dynamique pour clavier */
+            /* Viewport dynamique pour clavier - 100dvh pour fullscreen */
             .dynamic-viewport {
-              height: 100vh;
-              height: 100dvh;
-              min-height: 100vh;
+              height: 100dvh; /* Dynamic viewport height pour clavier mobile */
               min-height: 100dvh;
             }
             

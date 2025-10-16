@@ -531,7 +531,7 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-screen relative overflow-auto bg-white">
+    <div className="min-h-screen relative bg-white overflow-y-auto overflow-x-hidden">
       {/* Background avec lignes de démarcation bleues */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Formes géométriques bleues subtiles */}
@@ -544,11 +544,11 @@ function LoginPageContent() {
       </div>
 
       {/* Contenu principal */}
-      <div className="relative z-10 flex flex-col justify-center items-center min-h-screen px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 flex flex-col justify-center items-center min-h-screen px-4 sm:px-6 lg:px-8 py-8">
         <div className="w-full max-w-md">
           {/* Header avec logo */}
-          <div className="text-left mb-8">
-            <div className="flex mb-6 justify-start">
+          <div className={isMobile ? 'text-left mb-8' : 'text-center mb-8'}>
+            <div className={`flex mb-6 ${isMobile ? 'justify-start' : 'justify-center'}`}>
               <InteliaLogo className="w-16 h-16" />
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">

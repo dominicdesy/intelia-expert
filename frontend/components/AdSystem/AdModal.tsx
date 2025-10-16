@@ -146,8 +146,8 @@ export const AdModal: React.FC<AdModalProps> = ({
           </div>
         </div>
 
-        {/* Contenu principal - Scrollable sur mobile */}
-        <div className={`${isMobile ? 'h-[calc(100vh-60px)] overflow-y-auto' : ''}`}>
+        {/* Contenu principal - Scrollable sur mobile avec 100dvh pour fullscreen */}
+        <div className={`${isMobile ? 'h-[calc(100dvh-60px)] overflow-y-auto' : ''}`}>
           <div className={isMobile ? 'p-4' : 'p-8'}>
             <div className={`flex gap-6 ${isMobile ? 'flex-col' : 'flex-col lg:flex-row gap-8'}`}>
               {/* Image principale */}

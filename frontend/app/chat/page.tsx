@@ -1396,13 +1396,13 @@ function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  // Calcul des styles dynamiques pour mobile
+  // Calcul des styles dynamiques pour mobile - 100dvh pour fullscreen
   const containerStyle = useMemo(() => {
     return isMobileDevice
       ? {
-          height: "100vh",
-          minHeight: "100vh",
-          maxHeight: "100vh",
+          height: "100dvh", // Dynamic viewport height pour fullscreen
+          minHeight: "100dvh",
+          maxHeight: "100dvh",
         }
       : {};
   }, [isMobileDevice]);
@@ -1411,11 +1411,11 @@ function ChatInterface() {
     return isMobileDevice
       ? {
           height: isKeyboardVisible
-            ? `calc(100vh - 140px - ${keyboardHeight}px)`
-            : "calc(100vh - 140px)",
+            ? `calc(100dvh - 140px - ${keyboardHeight}px)` // Dynamic viewport height
+            : "calc(100dvh - 140px)",
           maxHeight: isKeyboardVisible
-            ? `calc(100vh - 140px - ${keyboardHeight}px)`
-            : "calc(100vh - 140px)",
+            ? `calc(100dvh - 140px - ${keyboardHeight}px)`
+            : "calc(100dvh - 140px)",
           overflow: "auto",
           paddingBottom: "1rem",
         }
