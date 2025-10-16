@@ -392,6 +392,24 @@ except Exception as e:
     stripe_webhooks_router = None
     logger.error("ERREUR import stripe_webhooks router: %s", e)
 
+# Usage router (quotas et limites mensuelles)
+USAGE_AVAILABLE = False
+try:
+    from .usage import router as usage_router
+
+    USAGE_AVAILABLE = True
+    logger.info(
+        "Usage router importé avec %d routes", len(usage_router.routes)
+    )
+except ImportError:
+    USAGE_AVAILABLE = False
+    usage_router = None
+    logger.warning("Usage router non disponible (normal si pas encore créé)")
+except Exception as e:
+    USAGE_AVAILABLE = False
+    usage_router = None
+    logger.error("ERREUR import usage router: %s", e)
+
 # Création du router principal
 logger.info("Création du router principal v1...")
 router = APIRouter(prefix="/v1")
@@ -580,6 +598,15 @@ if STRIPE_WEBHOOKS_AVAILABLE and stripe_webhooks_router:
     logger.info("Stripe Webhooks router maintenant disponible sur /v1/stripe/webhook")
 else:
     logger.warning("Stripe Webhooks router non monté (module non disponible)")
+
+# Usage (quotas et limites mensuelles)
+if USAGE_AVAILABLE and usage_router:
+    router.include_router(usage_router, prefix="/usage", tags=["Usage"])
+    logger.info("Usage router monté")
+    logger.info("Usage router maintenant disponible sur /v1/usage/*")
+    logger.info("Système de quotas mensuels activé (Essential: 50 questions/mois)")
+else:
+    logger.warning("Usage router non monté (module non disponible)")
 
 # Résumé final
 total_routes = len(router.routes)

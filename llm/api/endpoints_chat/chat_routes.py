@@ -7,6 +7,8 @@ Version 5.0.2 - Chat endpoint with streaming
 import time
 import uuid
 import logging
+import httpx
+import os
 from utils.types import Any, Callable
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -26,6 +28,98 @@ from monitoring.metrics import get_metrics_collector
 from version import BUILD_ID
 
 logger = logging.getLogger(__name__)
+
+# Backend API URL for quota checking
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "https://expert.intelia.com/api")
+
+
+async def check_user_quota(user_email: str, auth_token: str) -> dict:
+    """
+    Vérifie le quota de l'utilisateur auprès du backend API.
+
+    Args:
+        user_email: Email de l'utilisateur
+        auth_token: Token d'authentification Bearer
+
+    Returns:
+        Dict avec can_ask, questions_used, monthly_quota, etc.
+
+    Raises:
+        HTTPException: Si le quota est dépassé (429) ou erreur serveur
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                f"{BACKEND_API_URL}/v1/usage/check",
+                headers={"Authorization": f"Bearer {auth_token}"}
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                quota_info = data.get("quota", {})
+
+                # Si le quota est dépassé
+                if quota_info.get("can_ask") is False:
+                    logger.warning(f"Quota dépassé pour {user_email}: {quota_info}")
+                    raise HTTPException(
+                        status_code=429,
+                        detail={
+                            "error": "quota_exceeded",
+                            "message": "Vous avez atteint votre limite mensuelle de questions.",
+                            "quota": quota_info
+                        }
+                    )
+
+                return quota_info
+
+            elif response.status_code == 401:
+                logger.warning(f"Authentification invalide pour quota check: {user_email}")
+                # En cas d'erreur d'auth, laisser passer (fail-open)
+                return {"can_ask": True, "quota_enforcement": False, "error": "auth_failed"}
+
+            else:
+                logger.error(f"Erreur quota check API: {response.status_code} - {response.text}")
+                # En cas d'erreur API, laisser passer (fail-open)
+                return {"can_ask": True, "quota_enforcement": False, "error": "api_error"}
+
+    except httpx.TimeoutException:
+        logger.warning("Timeout lors du quota check - laisser passer")
+        return {"can_ask": True, "quota_enforcement": False, "error": "timeout"}
+    except HTTPException:
+        raise  # Re-raise quota exceeded errors
+    except Exception as e:
+        logger.error(f"Erreur inattendue quota check: {e}")
+        # Fail-open: en cas d'erreur, ne pas bloquer l'utilisateur
+        return {"can_ask": True, "quota_enforcement": False, "error": str(e)}
+
+
+async def increment_user_quota(user_email: str, auth_token: str, success: bool = True) -> None:
+    """
+    Incrémente le compteur de questions de l'utilisateur.
+
+    Args:
+        user_email: Email de l'utilisateur
+        auth_token: Token d'authentification Bearer
+        success: Si la question a réussi (True) ou échoué (False)
+    """
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            # On appelle l'endpoint POST pour incrémenter
+            # Note: Cet endpoint n'existe pas encore, on devra le créer
+            response = await client.post(
+                f"{BACKEND_API_URL}/v1/usage/increment",
+                headers={"Authorization": f"Bearer {auth_token}"},
+                json={"success": success}
+            )
+
+            if response.status_code == 200:
+                logger.info(f"Quota incrémenté pour {user_email} (success={success})")
+            else:
+                logger.warning(f"Échec incrémentation quota: {response.status_code}")
+
+    except Exception as e:
+        # Ne pas bloquer si l'incrémentation échoue
+        logger.error(f"Erreur incrémentation quota: {e}")
 
 
 def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
@@ -90,10 +184,33 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
             genetic_line_filter = body.get("genetic_line_filter")
             use_json_search = body.get("use_json_search", True)
             performance_context = body.get("performance_context")
+            user_email = body.get("user_email")  # 🆕 Email utilisateur pour quota checking
 
             # Validation basique
             if not message:
                 raise HTTPException(status_code=400, detail="Message vide")
+
+            # ============================================================
+            # 🆕 QUOTA CHECKING - Vérifier la limite mensuelle
+            # ============================================================
+            auth_token = request.headers.get("Authorization", "").replace("Bearer ", "")
+            if user_email and auth_token:
+                try:
+                    quota_info = await check_user_quota(user_email, auth_token)
+                    logger.info(
+                        f"Quota check pour {user_email}: {quota_info.get('questions_used', 0)}/"
+                        f"{quota_info.get('monthly_quota', 'unlimited')}"
+                    )
+                except HTTPException as quota_error:
+                    # Quota dépassé - retourner erreur 429
+                    logger.warning(f"Quota dépassé pour {user_email}")
+                    return JSONResponse(
+                        status_code=429,
+                        content=quota_error.detail
+                    )
+            else:
+                logger.warning("user_email ou auth_token manquant - quota check ignoré")
+            # ============================================================
 
             if len(message) > MAX_REQUEST_SIZE:
                 raise HTTPException(
@@ -168,6 +285,17 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
             monitoring_collector.record_request(
                 "/chat", total_processing_time, error=False
             )
+
+            # ============================================================
+            # 🆕 QUOTA INCREMENT - Incrémenter le compteur de questions
+            # ============================================================
+            if user_email and auth_token:
+                # Incrémenter de manière asynchrone (fire-and-forget)
+                try:
+                    await increment_user_quota(user_email, auth_token, success=True)
+                except Exception as inc_error:
+                    logger.error(f"Erreur incrémentation quota (non-bloquante): {inc_error}")
+            # ============================================================
 
             # Streaming de la réponse
             return StreamingResponse(
