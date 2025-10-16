@@ -262,6 +262,12 @@ export interface TranslationKeys {
   "chat.helpfulResponse": string;
   "chat.notHelpfulResponse": string;
   "chat.voiceRecording": string;
+  "chat.voiceNoSpeech": string;
+  "chat.voicePermissionDenied": string;
+  "chat.voiceError": string;
+  "chat.voiceNotSupported": string;
+  "chat.voiceStop": string;
+  "chat.voiceStart": string;
   "chat.noConversations": string;
   "chat.loading": string;
   "chat.errorMessage": string;
