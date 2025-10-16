@@ -8,7 +8,8 @@ RUN npm config set fetch-retries 3 \
 
 # Installation de TOUTES les dépendances (dev incluses pour le build)
 COPY package.json package-lock.json* ./
-RUN npm ci --silent
+# Force cache bust for i18next installation (2025-10-16)
+RUN npm ci --silent --prefer-offline=false
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
