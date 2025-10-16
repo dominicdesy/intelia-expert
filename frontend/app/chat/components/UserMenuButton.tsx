@@ -187,9 +187,12 @@ export const UserMenuButton = () => {
     window.open("https://intelia.com/privacy-policy/", "_blank");
   }, []);
 
-  const handleAboutClick = useCallback(() => {
+  const handleAboutClick = useCallback((e?: Event) => {
     if (!isMountedRef.current) return;
-    router.push("/about");
+    // Force navigation on mobile
+    setTimeout(() => {
+      router.push("/about");
+    }, 100);
   }, [router]);
 
   if (!user) return null;
