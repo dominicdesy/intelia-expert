@@ -56,7 +56,8 @@ POULTRY VALUE CHAIN includes:
 - Laboratories: disease diagnostics, feed analysis, quality testing
 - Integration: contract farming, vertical integration, farm-to-plant logistics
 - Data & planning: production planning, data requirements between facilities, forecasting
-- Economics: profitability, costs, efficiency, pricing
+- Economics: profitability, costs, efficiency, pricing, production quotas, supply management
+- Regulations & policy: production quotas, supply management systems, licensing, permits, agricultural regulations, market regulations
 
 OUT-OF-DOMAIN includes:
 - General knowledge (history, geography, politics)
@@ -70,6 +71,8 @@ IMPORTANT CLARIFICATIONS:
 - Questions about vaccines, treatments, diseases, feed, housing, etc. are IN-DOMAIN even without explicit mention of "poultry" or "chicken"
 - Assume the context is poultry production unless clearly stated otherwise
 - Questions about USING tools/technology FOR poultry production are IN-DOMAIN
+- Questions mentioning "chicken", "broiler", "layer", "poultry", "poulet", "volaille", "egg", "hen", etc. are ALWAYS IN-DOMAIN
+- Questions about agricultural regulations, quotas, licensing related to poultry are IN-DOMAIN
 - Examples of IN-DOMAIN questions:
   * "Can I use a vaccine after its expiry date?" → YES (poultry vaccination)
   * "What is the ideal temperature?" → YES (poultry housing)
@@ -79,6 +82,9 @@ IMPORTANT CLARIFICATIONS:
   * "What is white striping?" → YES (poultry meat quality defect)
   * "Is it safe to use AI to raise poultry?" → YES (using technology FOR poultry)
   * "Can I use solar panels for my chicken farm?" → YES (using technology FOR poultry)
+  * "How does the chicken quota system work?" → YES (poultry regulations/economics)
+  * "What are the supply management rules for poultry?" → YES (poultry policy)
+  * "How to get a chicken production license?" → YES (poultry regulations)
 - Examples of OUT-OF-DOMAIN questions:
   * "What is artificial intelligence?" → NO (general tech, not about poultry)
   * "How does solar energy work?" → NO (general tech, not about poultry)
@@ -198,6 +204,16 @@ Answer ONLY with: YES or NO"""
         Appelle simplement is_in_domain() mais retourne format identique
         """
         return self.is_in_domain(query, intent_result, language)
+
+    def clear_cache(self):
+        """Vide le cache de classifications OOD"""
+        cache_size = len(self.cache)
+        self.cache.clear()
+        logger.info(f"🗑️ OOD classification cache cleared ({cache_size} entries removed)")
+
+    def get_cache_size(self) -> int:
+        """Retourne la taille du cache"""
+        return len(self.cache)
 
 
 # Factory function pour compatibilité
