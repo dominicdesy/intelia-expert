@@ -802,7 +802,7 @@ export interface TranslationKeys {
   "stripe.account.badge": string;
   "stripe.account.free": string;
   "stripe.account.upgradeButton": string;
-  "stripe.account.manageButton": string;
+  "stripe.account.manageSubscription": string;
   "stripe.account.managingSubscription": string;
 
   // Customer Portal

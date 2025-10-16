@@ -127,7 +127,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     {t("common.loading")}
                   </span>
                 ) : (
-                  t("stripe.account.manageButton")
+                  t("stripe.account.manageSubscription")
                 )}
               </button>
             )}
