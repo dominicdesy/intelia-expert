@@ -356,6 +356,42 @@ except Exception as e:
     images_router = None
     logger.error("ERREUR import images router: %s", e)
 
+# Stripe Subscriptions router (paiements et abonnements avec Link)
+STRIPE_SUBSCRIPTIONS_AVAILABLE = False
+try:
+    from .stripe_subscriptions import router as stripe_subscriptions_router
+
+    STRIPE_SUBSCRIPTIONS_AVAILABLE = True
+    logger.info(
+        "Stripe Subscriptions router importé avec %d routes", len(stripe_subscriptions_router.routes)
+    )
+except ImportError:
+    STRIPE_SUBSCRIPTIONS_AVAILABLE = False
+    stripe_subscriptions_router = None
+    logger.warning("Stripe Subscriptions router non disponible (normal si pas encore créé)")
+except Exception as e:
+    STRIPE_SUBSCRIPTIONS_AVAILABLE = False
+    stripe_subscriptions_router = None
+    logger.error("ERREUR import stripe_subscriptions router: %s", e)
+
+# Stripe Webhooks router (événements de paiement)
+STRIPE_WEBHOOKS_AVAILABLE = False
+try:
+    from .stripe_webhooks import router as stripe_webhooks_router
+
+    STRIPE_WEBHOOKS_AVAILABLE = True
+    logger.info(
+        "Stripe Webhooks router importé avec %d routes", len(stripe_webhooks_router.routes)
+    )
+except ImportError:
+    STRIPE_WEBHOOKS_AVAILABLE = False
+    stripe_webhooks_router = None
+    logger.warning("Stripe Webhooks router non disponible (normal si pas encore créé)")
+except Exception as e:
+    STRIPE_WEBHOOKS_AVAILABLE = False
+    stripe_webhooks_router = None
+    logger.error("ERREUR import stripe_webhooks router: %s", e)
+
 # Création du router principal
 logger.info("Création du router principal v1...")
 router = APIRouter(prefix="/v1")
@@ -527,6 +563,23 @@ if IMAGES_AVAILABLE and images_router:
     logger.info("Images router maintenant disponible sur /v1/images/*")
 else:
     logger.warning("Images router non monté (module non disponible)")
+
+# Stripe Subscriptions (paiements et abonnements avec Link)
+if STRIPE_SUBSCRIPTIONS_AVAILABLE and stripe_subscriptions_router:
+    router.include_router(stripe_subscriptions_router, tags=["Stripe-Subscriptions"])
+    logger.info("Stripe Subscriptions router monté")
+    logger.info("Stripe Subscriptions router maintenant disponible sur /v1/stripe/*")
+    logger.info("Support Stripe Link activé pour paiements 1-click!")
+else:
+    logger.warning("Stripe Subscriptions router non monté (module non disponible)")
+
+# Stripe Webhooks (événements de paiement)
+if STRIPE_WEBHOOKS_AVAILABLE and stripe_webhooks_router:
+    router.include_router(stripe_webhooks_router, tags=["Stripe-Webhooks"])
+    logger.info("Stripe Webhooks router monté")
+    logger.info("Stripe Webhooks router maintenant disponible sur /v1/stripe/webhook")
+else:
+    logger.warning("Stripe Webhooks router non monté (module non disponible)")
 
 # Résumé final
 total_routes = len(router.routes)

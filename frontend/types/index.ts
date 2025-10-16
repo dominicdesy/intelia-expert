@@ -1705,12 +1705,14 @@ export const SESSION_ENDPOINTS = {
 
 export const PLAN_CONFIGS = {
   essential: {
-    name: "Essentiel",
+    name: "Essential",
+    price: 0,
+    currency: "USD",
     color: "text-green-600",
     bgColor: "bg-green-50",
     borderColor: "border-green-200",
     features: [
-      "50 questions par mois",
+      "100 questions par mois",
       "Accès aux documents publics",
       "Support par email",
       "Interface web",
@@ -1718,6 +1720,8 @@ export const PLAN_CONFIGS = {
   },
   pro: {
     name: "Pro",
+    price: 18,
+    currency: "USD",
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     borderColor: "border-blue-200",
@@ -1727,6 +1731,22 @@ export const PLAN_CONFIGS = {
       "Support prioritaire",
       "Interface web + mobile",
       "Analytics avancées",
+    ],
+  },
+  elite: {
+    name: "Elite",
+    price: 28,
+    currency: "USD",
+    color: "text-purple-600",
+    bgColor: "bg-purple-50",
+    borderColor: "border-purple-200",
+    features: [
+      "Tout du plan Pro",
+      "Questions illimitées prioritaires",
+      "Accès API",
+      "Support dédié 24/7",
+      "Intégrations personnalisées",
+      "Formation équipe",
     ],
   },
 } as const;

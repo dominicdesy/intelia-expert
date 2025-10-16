@@ -35,3 +35,6 @@ defusedxml>=0.7.1  # Secure XML parsing
 
 # AWS S3 (pour upload images médicales)
 boto3>=1.28.0
+
+# Stripe (pour abonnements et paiements)
+stripe>=7.0.0

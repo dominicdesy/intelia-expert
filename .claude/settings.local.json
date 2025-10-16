@@ -45,7 +45,8 @@
       "Bash(docker-compose exec backend psql:*)",
       "Bash(git checkout:*)",
       "WebSearch",
-      "WebFetch(domain:www.letsbuildui.dev)"
+      "WebFetch(domain:www.letsbuildui.dev)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []
