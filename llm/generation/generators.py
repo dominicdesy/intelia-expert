@@ -1060,6 +1060,13 @@ Style professionnel et structuré avec recommandations actionnables.""",
 
         # ✅ NETTOYAGE AMÉLIORÉ DU FORMATAGE
 
+        # 0. NEW: Supprimer les citations de sources (Source: ..., Link: ...)
+        # Enlève "Source: Lean IJ et al. (2016)" et "Link: https://..." des réponses
+        response = re.sub(r"Source:\s*[^\n]+", "", response, flags=re.IGNORECASE)
+        response = re.sub(r"Link:\s*https?://[^\s\n]+", "", response, flags=re.IGNORECASE)
+        # Aussi supprimer les variations possibles
+        response = re.sub(r"\b(?:doi|pmid|pmcid):\s*[^\s\n]+", "", response, flags=re.IGNORECASE)
+
         # 1. Supprimer les headers markdown (##, ###, ####, etc.) - convertit "## Titre" en "Titre"
         response = re.sub(r"^#{1,6}\s+", "", response, flags=re.MULTILINE)
 
