@@ -7,7 +7,7 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { useTranslation, availableLanguages } from "@/lib/languages/i18n";
 import { secureLog } from "@/lib/utils/secureLogger";
 
-// ==================== VALIDATION MOT DE PASSE INTERNATIONALISÉE ====================
+// ==================== VALIDATION MOT DE PASSE SYNCHRONISÉE AVEC PAGE.TSX ====================
 const validatePassword = (
   password: string,
   t: (key: string) => string,
@@ -23,58 +23,20 @@ const validatePassword = (
     errors.push(t("validation.password.minLength"));
   }
 
-  if (password.length > 128) {
-    errors.push(t("resetPassword.validation.maxLength"));
+  if (!/[A-Z]/.test(password)) {
+    errors.push(t("validation.password.uppercase"));
   }
 
-  if (!/[a-zA-Z]/.test(password)) {
-    errors.push(t("resetPassword.validation.letterRequired"));
+  if (!/[a-z]/.test(password)) {
+    errors.push(t("validation.password.lowercase"));
   }
 
   if (!/\d/.test(password)) {
     errors.push(t("validation.password.number"));
   }
 
-  const commonPasswords = [
-    "password",
-    "12345678",
-    "qwerty123",
-    "abc123456",
-    "password1",
-    "password123",
-    "123456789",
-    "motdepasse",
-    "azerty123",
-    "11111111",
-    "00000000",
-  ];
-  if (
-    commonPasswords.some((common) =>
-      password.toLowerCase().includes(common.toLowerCase()),
-    )
-  ) {
-    errors.push(t("resetPassword.validation.tooCommon"));
-  }
-
-  if (/(.)\1{3,}/.test(password)) {
-    errors.push(t("resetPassword.validation.tooRepetitive"));
-  }
-
-  const sequentialPatterns = [
-    "12345678",
-    "87654321",
-    "abcdefgh",
-    "zyxwvuts",
-    "qwertyui",
-    "asdfghjk",
-    "zxcvbnm",
-  ];
-  if (
-    sequentialPatterns.some((pattern) =>
-      password.toLowerCase().includes(pattern),
-    )
-  ) {
-    errors.push(t("resetPassword.validation.avoidSequences"));
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    errors.push(t("validation.password.special"));
   }
 
   return errors;
@@ -134,17 +96,17 @@ const PasswordStrengthIndicator: React.FC<{
   const requirements = [
     { test: password.length >= 8, label: t("validation.password.minLength") },
     {
-      test: /[a-zA-Z]/.test(password),
-      label: t("resetPassword.requirements.hasLetter"),
+      test: /[A-Z]/.test(password),
+      label: t("validation.password.uppercase"),
+    },
+    {
+      test: /[a-z]/.test(password),
+      label: t("validation.password.lowercase"),
     },
     { test: /\d/.test(password), label: t("validation.password.number") },
     {
-      test: !/(.)\\1{3,}/.test(password),
-      label: t("resetPassword.requirements.noRepetition"),
-    },
-    {
-      test: password.length <= 128,
-      label: t("resetPassword.requirements.reasonableLength"),
+      test: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+      label: t("validation.password.special"),
     },
   ];
 

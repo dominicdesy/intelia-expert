@@ -338,7 +338,7 @@ const useCountries = () => {
   return { countries, loading, usingFallback };
 };
 
-// Nouvelle fonction de validation de mot de passe moderne (conservée)
+// Validation de mot de passe synchronisée avec page.tsx
 const validatePassword = (password: string): string[] => {
   const errors: string[] = [];
 
@@ -351,58 +351,20 @@ const validatePassword = (password: string): string[] => {
     errors.push("Au moins 8 caractères requis");
   }
 
-  if (password.length > 128) {
-    errors.push("Maximum 128 caractères autorisés");
+  if (!/[A-Z]/.test(password)) {
+    errors.push("Au moins une majuscule requise");
   }
 
-  if (!/[a-zA-Z]/.test(password)) {
-    errors.push("Au moins une lettre requise");
+  if (!/[a-z]/.test(password)) {
+    errors.push("Au moins une minuscule requise");
   }
 
   if (!/\d/.test(password)) {
     errors.push("Au moins un chiffre requis");
   }
 
-  const commonPasswords = [
-    "password",
-    "12345678",
-    "qwerty123",
-    "abc123456",
-    "password1",
-    "password123",
-    "123456789",
-    "motdepasse",
-    "azerty123",
-    "11111111",
-    "00000000",
-  ];
-  if (
-    commonPasswords.some((common) =>
-      password.toLowerCase().includes(common.toLowerCase()),
-    )
-  ) {
-    errors.push("Mot de passe trop commun");
-  }
-
-  if (/(.)\1{3,}/.test(password)) {
-    errors.push("Trop de caractères identiques consécutifs");
-  }
-
-  const sequentialPatterns = [
-    "12345678",
-    "87654321",
-    "abcdefgh",
-    "zyxwvuts",
-    "qwertyui",
-    "asdfghjk",
-    "zxcvbnm",
-  ];
-  if (
-    sequentialPatterns.some((pattern) =>
-      password.toLowerCase().includes(pattern),
-    )
-  ) {
-    errors.push("Évitez les séquences de caractères");
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    errors.push("Au moins un caractère spécial requis (!@#$%^&*(),.?\":{}|<>)");
   }
 
   return errors;
@@ -416,13 +378,13 @@ const PasswordStrengthIndicator: React.FC<{ password: string }> = ({
 
   const requirements = [
     { test: password.length >= 8, label: "Au moins 8 caractères" },
-    { test: /[a-zA-Z]/.test(password), label: "Au moins une lettre" },
+    { test: /[A-Z]/.test(password), label: "Au moins une majuscule" },
+    { test: /[a-z]/.test(password), label: "Au moins une minuscule" },
     { test: /\d/.test(password), label: "Au moins un chiffre" },
     {
-      test: !/(.)\\1{3,}/.test(password),
-      label: "Pas de répétitions excessives",
+      test: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+      label: "Au moins un caractère spécial (!@#$%...)",
     },
-    { test: password.length <= 128, label: "Longueur raisonnable" },
   ];
 
   const passedRequirements = requirements.filter((req) => req.test).length;
