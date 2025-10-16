@@ -547,8 +547,8 @@ function LoginPageContent() {
       <div className="relative z-10 flex flex-col justify-center items-center min-h-screen px-4 sm:px-6 lg:px-8">
         <div className="w-full max-w-md">
           {/* Header avec logo */}
-          <div className={isMobile ? 'text-left mb-8' : 'text-center mb-8'}>
-            <div className={`flex mb-6 ${isMobile ? 'justify-start' : 'justify-center'}`}>
+          <div className="text-left mb-8">
+            <div className="flex mb-6 justify-start">
               <InteliaLogo className="w-16 h-16" />
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">
