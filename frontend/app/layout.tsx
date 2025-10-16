@@ -161,6 +161,35 @@ const antiFlashScript = `
 
     console.log('[AntiFlash] Lang:', preferredLang, 'Dir:', direction);
 
+    // ✅ NOUVEAU: Écouter les changements de langue pour mettre à jour dir dynamiquement
+    window.addEventListener('languageChanged', function(event) {
+      const newLang = event.detail?.language;
+      if (newLang) {
+        const newDirection = isRTLLanguage(newLang) ? 'rtl' : 'ltr';
+        document.documentElement.setAttribute('lang', newLang);
+        document.documentElement.setAttribute('dir', newDirection);
+        console.log('[RTL] Language changed:', newLang, 'Dir:', newDirection);
+      }
+    });
+
+    // ✅ NOUVEAU: Écouter aussi les changements du localStorage (pour les autres onglets)
+    window.addEventListener('storage', function(e) {
+      if (e.key === 'intelia-language' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          const newLang = parsed?.state?.currentLanguage;
+          if (newLang) {
+            const newDirection = isRTLLanguage(newLang) ? 'rtl' : 'ltr';
+            document.documentElement.setAttribute('lang', newLang);
+            document.documentElement.setAttribute('dir', newDirection);
+            console.log('[RTL] Storage changed:', newLang, 'Dir:', newDirection);
+          }
+        } catch (error) {
+          console.warn('[RTL] Error parsing storage:', error);
+        }
+      }
+    });
+
     // ✅ Marquer comme prêt immédiatement - Le CSS gérera l'affichage progressif
     // Utiliser DOMContentLoaded avec { once: true } pour auto-cleanup
     if (document.readyState === 'loading') {
