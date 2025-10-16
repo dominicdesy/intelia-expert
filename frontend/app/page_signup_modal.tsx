@@ -258,26 +258,24 @@ const PasswordStrengthIndicator: React.FC<{ password: string }> = ({
         "Au moins 8 caractères",
     },
     {
-      test: /[a-zA-Z]/.test(password),
+      test: /[A-Z]/.test(password),
       label:
-        t("resetPassword.requirements.hasLetter" as any) ||
-        "Au moins une lettre",
+        t("validation.password.uppercase" as any) ||
+        "Au moins une majuscule",
+    },
+    {
+      test: /[a-z]/.test(password),
+      label:
+        t("validation.password.lowercase" as any) ||
+        "Au moins une minuscule",
     },
     {
       test: /\d/.test(password),
       label: t("validation.password.number" as any) || "Au moins un chiffre",
     },
     {
-      test: !/(.)\\1{3,}/.test(password),
-      label:
-        t("resetPassword.requirements.noRepetition" as any) ||
-        "Pas de répétitions excessives",
-    },
-    {
-      test: password.length <= 128,
-      label:
-        t("resetPassword.requirements.reasonableLength" as any) ||
-        "Longueur raisonnable",
+      test: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+      label: t("validation.password.special" as any) || "Au moins un caractère spécial (!@#$%...)",
     },
   ];
 
