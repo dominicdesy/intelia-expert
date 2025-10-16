@@ -30,10 +30,11 @@ from .core import GuardrailsOrchestrator
 from .cache import GuardrailCache
 from .evidence_checker import EvidenceChecker
 from .hallucination_detector import HallucinationDetector
+from .relevance_checker import RelevanceChecker  # NEW: Add relevance checker
 from .claims_extractor import ClaimsExtractor
 from .text_analyzer import TextAnalyzer
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"  # NEW: Bump version for relevance feature
 
 __all__ = [
     # Main API
@@ -44,6 +45,7 @@ __all__ = [
     "GuardrailCache",
     "EvidenceChecker",
     "HallucinationDetector",
+    "RelevanceChecker",  # NEW: Export relevance checker
     "ClaimsExtractor",
     "TextAnalyzer",
 ]
