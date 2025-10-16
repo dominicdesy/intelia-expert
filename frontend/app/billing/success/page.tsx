@@ -74,7 +74,7 @@ export default function BillingSuccessPage() {
 
         {/* Countdown */}
         <p className="text-sm text-gray-500 mb-6">
-          {t("stripe.success.redirecting", { seconds: countdown })}
+          {t("stripe.success.redirecting").replace("{seconds}", countdown.toString())}
         </p>
 
         {/* Boutons */}
