@@ -423,6 +423,7 @@ export interface TranslationKeys {
   "contact.sendMessage": string;
   "contact.messageSent": string;
   "contact.supportEmail": string;
+  "contact.corporatePlanSubject": string;
 
   // ===========================================
   // INVITATION MODAL & FRIEND INVITES
