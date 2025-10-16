@@ -38,7 +38,7 @@ else:
 # URLs frontend pour redirections après paiement
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 SUCCESS_URL = f"{FRONTEND_URL}/billing/success"
-CANCEL_URL = f"{FRONTEND_URL}/billing/cancel")
+CANCEL_URL = f"{FRONTEND_URL}/billing/cancel"
 
 # Database connection
 DATABASE_URL = os.getenv("DATABASE_URL")
