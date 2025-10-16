@@ -71,10 +71,20 @@ const versionLogScript = `
   console.log('\\n' + '='.repeat(60));
   console.log('Intelia Expert Frontend');
   console.log('='.repeat(60));
-  console.log('Version: 1.0.0.24');
+  console.log('Version: 1.0.0.25');
   console.log('Environment: ' + (window.location.hostname === 'localhost' ? 'development' : 'production'));
   console.log('Loaded at: ' + new Date().toISOString());
+  console.log('Build: ${Date.now()}');
   console.log('='.repeat(60) + '\\n');
+
+  // Force cache refresh
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+      for(let registration of registrations) {
+        registration.update();
+      }
+    });
+  }
 `;
 
 // Script pour masquer la barre d'adresse Safari/Edge sur iPhone
