@@ -65,6 +65,7 @@
   "chat.noMessages": "Keine Nachrichten anzuzeigen",
   "chat.notHelpfulResponse": "Nicht hilfreiche Antwort",
   "chat.placeholder": "Hallo! Wie kann ich Ihnen heute helfen?",
+  "chat.placeholderMobile": "Wie kann ich Ihnen helfen?",
   "chat.recentLogout": "Kürzliche Abmeldung erkannt, keine automatische Weiterleitung",
   "chat.redirectingInProgress": "Weiterleitung läuft...",
   "chat.redirectingLogin": "Weiterleitung zum Login:",

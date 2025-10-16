@@ -65,6 +65,7 @@
   "chat.noMessages": "Geen berichten om te tonen",
   "chat.notHelpfulResponse": "Niet nuttig antwoord",
   "chat.placeholder": "Hallo! Hoe kan ik u vandaag helpen?",
+  "chat.placeholderMobile": "Hoe kan ik u helpen?",
   "chat.recentLogout": "Recente uitlog gedetecteerd, geen automatische omleiding",
   "chat.redirectingInProgress": "Omleiding bezig...",
   "chat.redirectingLogin": "Omleiding naar login:",

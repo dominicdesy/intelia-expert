@@ -65,6 +65,7 @@
   "chat.noMessages": "Tidak ada pesan untuk ditampilkan",
   "chat.notHelpfulResponse": "Respons tidak bermanfaat",
   "chat.placeholder": "Halo! Bagaimana saya bisa membantu Anda hari ini?",
+  "chat.placeholderMobile": "Bagaimana saya bisa membantu?",
   "chat.recentLogout": "Logout baru terdeteksi, tidak ada pengalihan otomatis",
   "chat.redirectingInProgress": "Pengalihan sedang berlangsung...",
   "chat.redirectingLogin": "Mengarahkan ke login:",

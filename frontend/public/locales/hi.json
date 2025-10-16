@@ -65,6 +65,7 @@
   "chat.noMessages": "दिखाने के लिए कोई संदेश नहीं",
   "chat.notHelpfulResponse": "अनुपयोगी उत्तर",
   "chat.placeholder": "नमस्ते! मैं आज आपकी कैसे सहायता कर सकता हूँ?",
+  "chat.placeholderMobile": "मैं आपकी कैसे सहायता कर सकता हूँ?",
   "chat.recentLogout": "हाल का लॉगआउट पाया गया, कोई स्वचालित रीडायरेक्ट नहीं",
   "chat.redirectingInProgress": "रीडायरेक्ट चल रहा है...",
   "chat.redirectingLogin": "लॉगिन पर रीडायरेक्ट कर रहा है:",

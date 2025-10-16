@@ -65,6 +65,7 @@
   "chat.noMessages": "表示するメッセージがありません",
   "chat.notHelpfulResponse": "役に立たない回答",
   "chat.placeholder": "こんにちは!今日はどのようにお手伝いできますか?",
+  "chat.placeholderMobile": "どのようにお手伝いできますか?",
   "chat.recentLogout": "最近のログアウトが検出されました。自動リダイレクトはありません",
   "chat.redirectingInProgress": "リダイレクト中...",
   "chat.redirectingLogin": "ログインにリダイレクト中:",

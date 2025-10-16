@@ -65,6 +65,7 @@
   "chat.noMessages": "No hay mensajes para mostrar",
   "chat.notHelpfulResponse": "Respuesta no útil",
   "chat.placeholder": "¡Hola! ¿Cómo puedo ayudarte hoy?",
+  "chat.placeholderMobile": "¿Cómo puedo ayudarte?",
   "chat.recentLogout": "Desconexión reciente detectada, no redirección automática",
   "chat.redirectingInProgress": "Redirección en progreso...",
   "chat.redirectingLogin": "Redirigiendo a login:",

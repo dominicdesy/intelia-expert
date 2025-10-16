@@ -65,6 +65,7 @@
   "chat.noMessages": "Görüntülenecek mesaj yok",
   "chat.notHelpfulResponse": "Yararlı olmayan yanıt",
   "chat.placeholder": "Merhaba! Bugün size nasıl yardımcı olabilirim?",
+  "chat.placeholderMobile": "Size nasıl yardımcı olabilirim?",
   "chat.recentLogout": "Son çıkış algılandı, otomatik yönlendirme yok",
   "chat.redirectingInProgress": "Yönlendirme devam ediyor...",
   "chat.redirectingLogin": "Girişe yönlendiriliyor:",

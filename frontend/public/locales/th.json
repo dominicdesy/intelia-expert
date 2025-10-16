@@ -65,6 +65,7 @@
   "chat.noMessages": "ไม่มีข้อความให้แสดง",
   "chat.notHelpfulResponse": "คำตอบที่ไม่เป็นประโยชน์",
   "chat.placeholder": "สวัสดี! วันนี้ผมสามารถช่วยอะไรคุณได้บ้าง?",
+  "chat.placeholderMobile": "ผมสามารถช่วยอะไรคุณได้บ้าง?",
   "chat.recentLogout": "ตรวจพบการออกจากระบบล่าสุด ไม่มีการเปลี่ยนเส้นทางอัตโนมัติ",
   "chat.redirectingInProgress": "กำลังเปลี่ยนเส้นทาง...",
   "chat.redirectingLogin": "กำลังเปลี่ยนเส้นทางไปยัง login:",

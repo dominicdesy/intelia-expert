@@ -195,7 +195,9 @@ const ChatInput = React.memo(
                   ? t("chat.clarificationPlaceholder")
                   : selectedImages.length > 0
                     ? "Décrivez ce que vous voulez savoir..."
-                    : t("chat.placeholder")
+                    : isMobileDevice
+                      ? t("chat.placeholderMobile")
+                      : t("chat.placeholder")
               }
               className={`w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm flex items-center ${isMobileDevice ? "ios-input-fix" : ""}`}
               disabled={isLoadingChat}
@@ -1466,41 +1468,55 @@ function ChatInterface() {
         style={containerStyle}
       >
         <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
-          {/* SIMPLIFIÉ: Logo à gauche partout pour maîtriser le comportement sur web d'abord */}
           <div className="flex items-center justify-between">
+            {/* Left side - Adaptatif mobile/desktop */}
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleNewConversation}
-                className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200"
+                className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200 flex-shrink-0"
                 title={t("nav.newConversation")}
                 aria-label={t("nav.newConversation")}
               >
                 <PlusIcon className="w-5 h-5" />
               </button>
 
-              <div className="header-icon-container history-menu-container">
+              <div className="header-icon-container history-menu-container flex-shrink-0">
                 <HistoryMenu />
               </div>
 
-              {/* Logo toujours à gauche (après les boutons) */}
-              <div className="flex items-center space-x-3 ml-2">
-                <div className="w-10 h-10 grid place-items-center">
-                  <InteliaLogo className="h-8 w-auto" />
+              {/* Logo - caché sur très petit écran quand conversation active */}
+              <div className={`items-center space-x-2 ml-1 ${
+                isMobileDevice && currentConversation && currentConversation.id !== "welcome"
+                  ? 'hidden'
+                  : 'flex'
+              }`}>
+                <div className="w-8 h-8 sm:w-10 sm:h-10 grid place-items-center flex-shrink-0">
+                  <InteliaLogo className="h-6 sm:h-8 w-auto" />
                 </div>
-                <h1 className="text-lg font-medium text-gray-900 truncate">
+                <h1 className="text-base sm:text-lg font-medium text-gray-900 truncate hidden sm:block">
                   {t("common.appName")}
                 </h1>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            {/* Right side - Toujours visible sur mobile */}
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              {/* Share button - Visible uniquement desktop quand conversation active */}
               {currentConversation &&
                currentConversation.id !== "welcome" &&
                !currentConversation.id.startsWith("temp-") && (
-                <ShareConversationButton conversationId={currentConversation.id} />
+                <div className={isMobileDevice ? 'hidden' : 'block'}>
+                  <ShareConversationButton conversationId={currentConversation.id} />
+                </div>
               )}
-              <HelpButton onClick={() => setIsHelpOpen(true)} />
-              <div className="header-icon-container user-menu-container">
+
+              {/* Help button - Toujours visible */}
+              <div className="flex-shrink-0">
+                <HelpButton onClick={() => setIsHelpOpen(true)} />
+              </div>
+
+              {/* User menu - Toujours visible, priorité maximale */}
+              <div className="header-icon-container user-menu-container flex-shrink-0">
                 <UserMenuButton />
               </div>
             </div>

@@ -65,6 +65,7 @@
   "chat.noMessages": "没有消息显示",
   "chat.notHelpfulResponse": "无用的回答",
   "chat.placeholder": "您好！今天我可以为您做些什么？",
+  "chat.placeholderMobile": "我可以为您做些什么？",
   "chat.recentLogout": "检测到最近退出，无自动重定向",
   "chat.redirectingInProgress": "重定向进行中...",
   "chat.redirectingLogin": "重定向到登录:",

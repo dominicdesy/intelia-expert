@@ -65,6 +65,7 @@
   "chat.noMessages": "لا توجد رسائل للعرض",
   "chat.notHelpfulResponse": "إجابة غير مفيدة",
   "chat.placeholder": "مرحباً! كيف يمكنني مساعدتك اليوم؟",
+  "chat.placeholderMobile": "كيف يمكنني مساعدتك؟",
   "chat.recentLogout": "تم اكتشاف تسجيل خروج حديث، لا توجد إعادة توجيه تلقائية",
   "chat.redirectingInProgress": "جاري إعادة التوجيه...",
   "chat.redirectingLogin": "إعادة التوجيه إلى تسجيل الدخول:",

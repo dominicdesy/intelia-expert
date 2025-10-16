@@ -65,6 +65,7 @@
   "chat.noMessages": "Không có tin nhắn để hiển thị",
   "chat.notHelpfulResponse": "Phản hồi không hữu ích",
   "chat.placeholder": "Xin chào! Tôi có thể giúp gì cho bạn hôm nay?",
+  "chat.placeholderMobile": "Tôi có thể giúp gì cho bạn?",
   "chat.recentLogout": "Phát hiện đăng xuất gần đây, không tự động chuyển hướng",
   "chat.redirectingInProgress": "Đang chuyển hướng...",
   "chat.redirectingLogin": "Đang chuyển hướng đến đăng nhập:",
