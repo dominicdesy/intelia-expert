@@ -803,6 +803,7 @@ export interface TranslationKeys {
   "about.downloadDescription": string;
   "about.versionInfo": string;
   "about.version": string;
+  "about.versionDate": string;
   "about.lastUpdated": string;
   "about.license": string;
   "about.backToHome": string;

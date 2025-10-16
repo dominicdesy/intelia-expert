@@ -23,7 +23,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isManaging, setIsManaging] = useState(false);
 
-  const currentPlan = user?.plan || "essential";
+  // Map "free" to "essential" for backwards compatibility
+  const currentPlan = user?.plan === "free" ? "essential" : (user?.plan || "essential");
   const userPlan = PLAN_CONFIGS[currentPlan as keyof typeof PLAN_CONFIGS] || PLAN_CONFIGS.essential;
 
   const handleManageSubscription = async () => {
@@ -207,7 +208,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         onClick={() => setShowUpgradeModal(true)}
                         className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
                       >
-                        {t("stripe.account.upgradeButton")}
+                        {t("stripe.account.upgradePlan")}
                       </button>
                     )}
                   </div>

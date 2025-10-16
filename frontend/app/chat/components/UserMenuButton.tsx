@@ -75,7 +75,8 @@ export const UserMenuButton = () => {
 
   // Mémorisation des variables de plan
   const { currentPlan, plan, isSuperAdmin } = useMemo(() => {
-    const currentPlan = user?.plan || "essential";
+    // Map "free" to "essential" for backwards compatibility
+    const currentPlan = user?.plan === "free" ? "essential" : (user?.plan || "essential");
     const plan = PLAN_CONFIGS[currentPlan as keyof typeof PLAN_CONFIGS] || PLAN_CONFIGS.essential;
     const isSuperAdmin = user?.user_type === "super_admin";
     return { currentPlan, plan, isSuperAdmin };

@@ -49,7 +49,15 @@
       "Bash(npm install:*)",
       "Bash(node merge-stripe-translations.js)",
       "WebFetch(domain:claude.com)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(xargs:*)",
+      "Bash(for lang in de es it pt nl pl ar zh ja hi id th tr vi en fr)",
+      "Bash(do)",
+      "Bash(if grep -q '\"\"about.versionDate\"\"' \"frontend/public/locales/$lang.json\")",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(else)",
+      "Bash(fi)"
     ],
     "deny": [],
     "ask": []
