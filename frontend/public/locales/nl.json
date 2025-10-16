@@ -668,5 +668,13 @@
   "stripe.features.elite.unlimitedPriority": "Unlimited priority questions",
   "stripe.features.elite.api": "API access",
   "stripe.features.elite.dedicated": "Dedicated support",
-  "stripe.features.elite.customization": "Advanced customization"
+  "stripe.features.elite.customization": "Advanced customization",
+  "chat.voiceInput": "Spraakinvoer",
+  "chat.voiceListening": "Luisteren...",
+  "chat.voiceStart": "Spraakinvoer starten",
+  "chat.voiceStop": "Opname stoppen",
+  "chat.voiceNotSupported": "Spraakinvoer niet ondersteund in deze browser",
+  "chat.voicePermissionDenied": "Microfoontoestemming geweigerd",
+  "chat.voiceError": "Spraakinvoerfout",
+  "chat.voiceNoSpeech": "Geen spraak gedetecteerd. Probeer het opnieuw."
 }

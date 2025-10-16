@@ -668,5 +668,13 @@
   "stripe.features.elite.unlimitedPriority": "Unlimited priority questions",
   "stripe.features.elite.api": "API access",
   "stripe.features.elite.dedicated": "Dedicated support",
-  "stripe.features.elite.customization": "Advanced customization"
+  "stripe.features.elite.customization": "Advanced customization",
+  "chat.voiceInput": "Wprowadzanie głosowe",
+  "chat.voiceListening": "Słuchanie...",
+  "chat.voiceStart": "Rozpocznij wprowadzanie głosowe",
+  "chat.voiceStop": "Zatrzymaj nagrywanie",
+  "chat.voiceNotSupported": "Wprowadzanie głosowe nie jest obsługiwane w tej przeglądarce",
+  "chat.voicePermissionDenied": "Odmowa dostępu do mikrofonu",
+  "chat.voiceError": "Błąd wprowadzania głosowego",
+  "chat.voiceNoSpeech": "Nie wykryto mowy. Spróbuj ponownie."
 }

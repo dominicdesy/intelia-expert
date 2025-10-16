@@ -668,5 +668,13 @@
   "stripe.features.elite.unlimitedPriority": "Unlimited priority questions",
   "stripe.features.elite.api": "API access",
   "stripe.features.elite.dedicated": "Dedicated support",
-  "stripe.features.elite.customization": "Advanced customization"
+  "stripe.features.elite.customization": "Advanced customization",
+  "chat.voiceInput": "Nhập bằng giọng nói",
+  "chat.voiceListening": "Đang nghe...",
+  "chat.voiceStart": "Bắt đầu nhập giọng nói",
+  "chat.voiceStop": "Dừng ghi âm",
+  "chat.voiceNotSupported": "Nhập giọng nói không được hỗ trợ trên trình duyệt này",
+  "chat.voicePermissionDenied": "Quyền truy cập micrô bị từ chối",
+  "chat.voiceError": "Lỗi nhập giọng nói",
+  "chat.voiceNoSpeech": "Không phát hiện giọng nói. Vui lòng thử lại."
 }

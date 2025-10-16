@@ -669,5 +669,13 @@
   "stripe.features.elite.unlimitedPriority": "Unlimited priority questions",
   "stripe.features.elite.api": "API access",
   "stripe.features.elite.dedicated": "Dedicated support",
-  "stripe.features.elite.customization": "Advanced customization"
+  "stripe.features.elite.customization": "Advanced customization",
+  "chat.voiceInput": "Input suara",
+  "chat.voiceListening": "Mendengarkan...",
+  "chat.voiceStart": "Mulai input suara",
+  "chat.voiceStop": "Hentikan perekaman",
+  "chat.voiceNotSupported": "Input suara tidak didukung di browser ini",
+  "chat.voicePermissionDenied": "Izin mikrofon ditolak",
+  "chat.voiceError": "Kesalahan input suara",
+  "chat.voiceNoSpeech": "Tidak ada ucapan terdeteksi. Silakan coba lagi."
 }

@@ -667,5 +667,13 @@
   "stripe.features.elite.unlimitedPriority": "Unlimited priority questions",
   "stripe.features.elite.api": "API access",
   "stripe.features.elite.dedicated": "Dedicated support",
-  "stripe.features.elite.customization": "Advanced customization"
+  "stripe.features.elite.customization": "Advanced customization",
+  "chat.voiceInput": "Entrada de voz",
+  "chat.voiceListening": "Ouvindo...",
+  "chat.voiceStart": "Iniciar entrada de voz",
+  "chat.voiceStop": "Parar gravação",
+  "chat.voiceNotSupported": "Entrada de voz não suportada neste navegador",
+  "chat.voicePermissionDenied": "Permissão de microfone negada",
+  "chat.voiceError": "Erro de entrada de voz",
+  "chat.voiceNoSpeech": "Nenhuma fala detectada. Por favor, tente novamente."
 }

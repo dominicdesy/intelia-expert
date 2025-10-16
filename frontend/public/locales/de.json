@@ -668,5 +668,13 @@
   "stripe.features.elite.unlimitedPriority": "Unlimited priority questions",
   "stripe.features.elite.api": "API access",
   "stripe.features.elite.dedicated": "Dedicated support",
-  "stripe.features.elite.customization": "Advanced customization"
+  "stripe.features.elite.customization": "Advanced customization",
+  "chat.voiceInput": "Spracheingabe",
+  "chat.voiceListening": "Hört zu...",
+  "chat.voiceStart": "Spracheingabe starten",
+  "chat.voiceStop": "Aufnahme stoppen",
+  "chat.voiceNotSupported": "Spracheingabe wird in diesem Browser nicht unterstützt",
+  "chat.voicePermissionDenied": "Mikrofonberechtigung verweigert",
+  "chat.voiceError": "Spracheingabefehler",
+  "chat.voiceNoSpeech": "Keine Sprache erkannt. Bitte versuchen Sie es erneut."
 }

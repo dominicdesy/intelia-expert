@@ -40,6 +40,7 @@ import { LoadingMessage } from "./components/LoadingMessage";
 import ShareConversationButton from "./components/ShareConversationButton";
 import { HelpButton, HelpTour } from "./components/HelpTour";
 import { secureLog } from "@/lib/utils/secureLogger";
+import { VoiceInput } from "./components/VoiceInput";
 
 // Composant ChatInput optimisé avec React.memo
 const ChatInput = React.memo(
@@ -137,6 +138,21 @@ const ChatInput = React.memo(
         e.target.value = "";
       },
       [onImagesSelect, selectedImages],
+    );
+
+    const handleVoiceTranscript = useCallback(
+      (transcript: string) => {
+        // Append voice transcript to existing input message
+        const currentText = inputMessage.trim();
+        const newText = currentText
+          ? `${currentText} ${transcript}`
+          : transcript;
+        setInputMessage(newText);
+
+        // Focus input field after voice input
+        inputRef.current?.focus();
+      },
+      [inputMessage, setInputMessage, inputRef],
     );
 
     return (
@@ -257,6 +273,12 @@ const ChatInput = React.memo(
               </span>
             )}
           </button>
+
+          {/* Voice Input Button */}
+          <VoiceInput
+            onTranscript={handleVoiceTranscript}
+            disabled={isLoadingChat}
+          />
         </div>
       </div>
     );

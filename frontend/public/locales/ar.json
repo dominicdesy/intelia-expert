@@ -668,5 +668,13 @@
   "stripe.features.elite.unlimitedPriority": "Unlimited priority questions",
   "stripe.features.elite.api": "API access",
   "stripe.features.elite.dedicated": "Dedicated support",
-  "stripe.features.elite.customization": "Advanced customization"
+  "stripe.features.elite.customization": "Advanced customization",
+  "chat.voiceInput": "إدخال صوتي",
+  "chat.voiceListening": "جاري الاستماع...",
+  "chat.voiceStart": "بدء الإدخال الصوتي",
+  "chat.voiceStop": "إيقاف التسجيل",
+  "chat.voiceNotSupported": "الإدخال الصوتي غير مدعوم في هذا المتصفح",
+  "chat.voicePermissionDenied": "تم رفض إذن الميكروفون",
+  "chat.voiceError": "خطأ في الإدخال الصوتي",
+  "chat.voiceNoSpeech": "لم يتم اكتشاف كلام. يرجى المحاولة مرة أخرى."
 }

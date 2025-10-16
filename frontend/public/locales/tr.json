@@ -668,5 +668,13 @@
   "stripe.features.elite.unlimitedPriority": "Unlimited priority questions",
   "stripe.features.elite.api": "API access",
   "stripe.features.elite.dedicated": "Dedicated support",
-  "stripe.features.elite.customization": "Advanced customization"
+  "stripe.features.elite.customization": "Advanced customization",
+  "chat.voiceInput": "Sesli giriş",
+  "chat.voiceListening": "Dinliyor...",
+  "chat.voiceStart": "Sesli girişi başlat",
+  "chat.voiceStop": "Kaydı durdur",
+  "chat.voiceNotSupported": "Bu tarayıcıda sesli giriş desteklenmiyor",
+  "chat.voicePermissionDenied": "Mikrofon izni reddedildi",
+  "chat.voiceError": "Sesli giriş hatası",
+  "chat.voiceNoSpeech": "Konuşma tespit edilemedi. Lütfen tekrar deneyin."
 }

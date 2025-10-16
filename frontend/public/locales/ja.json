@@ -668,5 +668,13 @@
   "stripe.features.elite.unlimitedPriority": "Unlimited priority questions",
   "stripe.features.elite.api": "API access",
   "stripe.features.elite.dedicated": "Dedicated support",
-  "stripe.features.elite.customization": "Advanced customization"
+  "stripe.features.elite.customization": "Advanced customization",
+  "chat.voiceInput": "音声入力",
+  "chat.voiceListening": "聞いています...",
+  "chat.voiceStart": "音声入力を開始",
+  "chat.voiceStop": "録音を停止",
+  "chat.voiceNotSupported": "このブラウザでは音声入力がサポートされていません",
+  "chat.voicePermissionDenied": "マイクの許可が拒否されました",
+  "chat.voiceError": "音声入力エラー",
+  "chat.voiceNoSpeech": "音声が検出されませんでした。もう一度お試しください。"
 }
