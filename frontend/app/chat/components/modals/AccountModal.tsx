@@ -61,18 +61,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     <>
       <BaseDialog isOpen={isOpen} onClose={onClose} title={t("subscription.title")}>
         <div className="space-y-8">
-          {/* Current Plan Badge */}
-          <div className="text-center">
-            <p className="text-sm text-gray-600 mb-2">{t("plan.currentPlan")}</p>
-            <div
-              className={`inline-flex items-center px-4 py-2 rounded-full ${userPlan.bgColor} ${userPlan.borderColor} border`}
-            >
-              <span className={`font-semibold ${userPlan.color}`}>
-                {t(`plan.${currentPlan}` as any)}
-              </span>
-            </div>
-          </div>
-
           {/* Pricing Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {plans.map((plan) => {
