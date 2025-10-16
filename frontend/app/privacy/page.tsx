@@ -10,7 +10,7 @@ const InteliaLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -25,10 +25,10 @@ export default function PrivacyPage() {
               </span>
             </Link>
             <Link
-              href="/"
+              href="/chat"
               className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
             >
-              Back to Home
+              Back to Chat
             </Link>
           </div>
         </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/auth";
+import { useTranslation } from "react-i18next";
 import Link from "next/link";
 import {
   getSafeName,
@@ -103,6 +104,7 @@ const getSecureInitials = (name: string): string => {
 function ProfilePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const { user, isLoading } = useAuthStore();
   const { updateProfile, exportUserData, deleteUserData } = useAuthStore();
 
@@ -158,12 +160,12 @@ function ProfilePageContent() {
     // Validation côté client AVANT d'envoyer
     const trimmedName = formData.fullName.trim();
     if (!trimmedName || trimmedName.length < 2) {
-      setError("Le nom complet doit contenir au moins 2 caractères");
+      setError(t("profile.error.nameMinLength"));
       return;
     }
 
     if (!["producer", "professional"].includes(formData.userType)) {
-      setError("Type de compte invalide");
+      setError(t("profile.error.invalidAccountType"));
       return;
     }
 
@@ -175,12 +177,12 @@ function ProfilePageContent() {
       };
 
       await updateProfile(dataToUpdate);
-      setSuccess("Profil mis à jour avec succès");
+      setSuccess(t("profile.success.profileUpdated"));
 
       // Laisser le temps à l'UI de se stabiliser
       // Pas de redirection immédiate
     } catch (error: any) {
-      setError(error.message || "Erreur lors de la mise à jour");
+      setError(error.message || t("profile.error.updateFailed"));
     }
   };
 
@@ -198,9 +200,9 @@ function ProfilePageContent() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setSuccess("Données exportées avec succès");
+      setSuccess(t("profile.success.dataExported"));
     } catch (error: any) {
-      setError(error.message || "Erreur lors de l'export");
+      setError(error.message || t("profile.error.exportFailed"));
     }
   };
 
@@ -214,7 +216,7 @@ function ProfilePageContent() {
       await deleteUserData();
       router.push("/");
     } catch (error: any) {
-      setError(error.message || "Erreur lors de la suppression");
+      setError(error.message || t("profile.error.deleteFailed"));
       setShowDeleteConfirm(false);
     }
   };
@@ -235,13 +237,13 @@ function ProfilePageContent() {
   const userInitials = getSecureInitials(userName);
 
   const tabs = [
-    { id: "profile", label: "Profil", icon: UserIcon },
-    { id: "settings", label: "Paramètres", icon: CogIcon },
-    { id: "privacy", label: "Confidentialité", icon: ShieldCheckIcon },
+    { id: "profile", label: t("profile.tabs.personalInfo"), icon: UserIcon },
+    { id: "settings", label: t("account.settings"), icon: CogIcon },
+    { id: "privacy", label: t("account.privacy"), icon: ShieldCheckIcon },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -252,11 +254,11 @@ function ProfilePageContent() {
                 className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
               >
                 <ArrowLeftIcon className="w-5 h-5 mr-2" />
-                Retour au chat
+                {t("profile.backToChat")}
               </Link>
               <div className="h-6 w-px bg-gray-300"></div>
               <h1 className="text-xl font-semibold text-gray-900">
-                Mon profil
+                {t("profile.title")}
               </h1>
             </div>
           </div>
@@ -325,7 +327,7 @@ function ProfilePageContent() {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
-                    Informations personnelles
+                    {t("profile.personalInfo")}
                   </h3>
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
@@ -333,7 +335,7 @@ function ProfilePageContent() {
                         htmlFor="fullName"
                         className="block text-sm font-medium text-gray-700 mb-2"
                       >
-                        Nom complet
+                        {t("profile.fullName")}
                       </label>
                       <input
                         type="text"
@@ -351,7 +353,7 @@ function ProfilePageContent() {
                         htmlFor="email"
                         className="block text-sm font-medium text-gray-700 mb-2"
                       >
-                        Email
+                        {t("profile.email")}
                       </label>
                       <input
                         type="email"
@@ -362,8 +364,7 @@ function ProfilePageContent() {
                         disabled
                       />
                       <p className="text-sm text-gray-500 mt-1">
-                        L'email ne peut pas être modifié pour des raisons de
-                        sécurité
+                        {t("profile.emailNotEditable")}
                       </p>
                     </div>
 
@@ -372,7 +373,7 @@ function ProfilePageContent() {
                         htmlFor="userType"
                         className="block text-sm font-medium text-gray-700 mb-2"
                       >
-                        Type de compte
+                        {t("profile.accountType")}
                       </label>
                       <select
                         id="userType"
@@ -381,9 +382,9 @@ function ProfilePageContent() {
                         onChange={handleInputChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
-                        <option value="producer">Producteur agricole</option>
+                        <option value="producer">{t("profile.accountType.producer")}</option>
                         <option value="professional">
-                          Professionnel santé animale
+                          {t("profile.accountType.professional")}
                         </option>
                       </select>
                     </div>
@@ -394,8 +395,8 @@ function ProfilePageContent() {
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
                       {isLoading
-                        ? "Enregistrement..."
-                        : "Enregistrer les modifications"}
+                        ? t("profile.saving")
+                        : t("profile.saveChanges")}
                     </button>
                   </form>
                 </div>
@@ -407,16 +408,16 @@ function ProfilePageContent() {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
-                    Paramètres du compte
+                    {t("account.settings")}
                   </h3>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                       <div>
                         <h4 className="font-medium text-gray-900">
-                          Langue de l'interface
+                          {t("profile.settings.interfaceLanguage")}
                         </h4>
                         <p className="text-sm text-gray-500">
-                          Choisissez votre langue préférée
+                          {t("profile.settings.chooseLanguage")}
                         </p>
                       </div>
                       <select className="px-3 py-2 border border-gray-300 rounded-lg">
@@ -429,10 +430,10 @@ function ProfilePageContent() {
                     <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                       <div>
                         <h4 className="font-medium text-gray-900">
-                          Notifications
+                          {t("profile.settings.notifications")}
                         </h4>
                         <p className="text-sm text-gray-500">
-                          Recevoir des notifications par email
+                          {t("profile.settings.receiveEmails")}
                         </p>
                       </div>
                       <input
@@ -450,52 +451,49 @@ function ProfilePageContent() {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
-                    Gestion des données
+                    {t("profile.privacy.dataManagement")}
                   </h3>
                   <div className="space-y-4">
                     <div className="p-4 border border-gray-200 rounded-lg">
                       <h4 className="font-medium text-gray-900 mb-2">
-                        Exporter mes données
+                        {t("profile.privacy.exportData")}
                       </h4>
                       <p className="text-sm text-gray-600 mb-4">
-                        Téléchargez toutes vos données personnelles au format
-                        JSON.
+                        {t("profile.privacy.exportDescription")}
                       </p>
                       <button
                         onClick={handleExportData}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                       >
-                        Télécharger mes données
+                        {t("profile.privacy.downloadData")}
                       </button>
                     </div>
 
                     <div className="p-4 border border-red-200 rounded-lg bg-red-50">
                       <h4 className="font-medium text-red-900 mb-2">
-                        Supprimer mon compte
+                        {t("profile.privacy.deleteAccount")}
                       </h4>
                       <p className="text-sm text-red-700 mb-4">
-                        Cette action est irréversible. Toutes vos données seront
-                        définitivement supprimées.
+                        {t("profile.privacy.deleteWarning")}
                       </p>
                       {!showDeleteConfirm ? (
                         <button
                           onClick={() => setShowDeleteConfirm(true)}
                           className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
                         >
-                          Supprimer mon compte
+                          {t("profile.privacy.deleteAccount")}
                         </button>
                       ) : (
                         <div className="space-y-3">
                           <p className="text-sm font-medium text-red-800">
-                            Êtes-vous vraiment sûr ? Cette action ne peut pas
-                            être annulée.
+                            {t("profile.privacy.confirmDelete")}
                           </p>
                           <div className="flex space-x-3">
                             <button
                               onClick={() => setShowDeleteConfirm(false)}
                               className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
                             >
-                              Annuler
+                              {t("profile.privacy.cancel")}
                             </button>
                             <button
                               onClick={handleDeleteAccount}
@@ -503,8 +501,8 @@ function ProfilePageContent() {
                               className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
                             >
                               {isLoading
-                                ? "Suppression..."
-                                : "Oui, supprimer définitivement"}
+                                ? t("profile.privacy.deleting")
+                                : t("profile.privacy.yesDelete")}
                             </button>
                           </div>
                         </div>
@@ -513,13 +511,12 @@ function ProfilePageContent() {
 
                     <div className="p-4 border border-gray-200 rounded-lg">
                       <h4 className="font-medium text-gray-900 mb-2">
-                        Politique de conservation
+                        {t("profile.privacy.retentionPolicy")}
                       </h4>
                       <p className="text-sm text-gray-600">
-                        Vos données de conversation sont automatiquement
-                        supprimées après 30 jours. Membre depuis :{" "}
+                        {t("profile.privacy.retentionDescription")}{" "}
                         {createdDate
-                          ? createdDate.toLocaleDateString("fr-FR")
+                          ? createdDate.toLocaleDateString()
                           : "N/A"}
                       </p>
                     </div>
@@ -539,10 +536,10 @@ export default function ProfilePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-50 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Chargement du profil...</p>
+            <p className="text-gray-600">Loading...</p>
           </div>
         </div>
       }
