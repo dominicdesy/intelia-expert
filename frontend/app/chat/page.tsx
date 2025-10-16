@@ -338,113 +338,116 @@ const MessageList = React.memo(
                   )}
                 </div>
               ) : (
-                <ReactMarkdown
-                  className="prose prose-sm max-w-none break-words prose-p:my-3 prose-li:my-1 prose-ul:my-4 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900"
-                  components={{
-                    h2: ({ node, ...props }) => (
-                      <h2
-                        className="text-xl font-bold text-blue-900 mt-8 mb-6 border-b-2 border-blue-200 pb-3 bg-blue-50 px-4 py-2 rounded-t-lg"
-                        {...props}
-                      />
-                    ),
-                    h3: ({ node, ...props }) => (
-                      <h3
-                        className="text-lg font-semibold text-gray-800 mt-6 mb-4 border-l-4 border-blue-400 pl-4 bg-gray-50 py-2"
-                        {...props}
-                      />
-                    ),
-                    p: ({ node, ...props }) => (
-                      <p
-                        className="leading-relaxed text-gray-800 my-4 text-justify"
-                        {...props}
-                      />
-                    ),
-                    ul: ({ node, ...props }) => (
-                      <ul
-                        className="list-disc list-outside space-y-3 text-gray-800 my-6 ml-6 pl-2"
-                        {...props}
-                      />
-                    ),
-                    li: ({ node, ...props }) => (
-                      <li className="leading-relaxed pl-2 my-2" {...props} />
-                    ),
-                    strong: ({ node, ...props }) => (
-                      <strong
-                        className="font-bold text-blue-800 bg-blue-50 px-1 rounded"
-                        {...props}
-                      />
-                    ),
-                    table: ({ node, ...props }) => (
-                      <div className="overflow-x-auto my-6 -mx-1 sm:mx-0">
-                        <table
-                          className="min-w-full border border-gray-300 rounded-lg shadow-sm"
+                <>
+                  <ReactMarkdown
+                    className="prose prose-sm max-w-none break-words prose-p:my-3 prose-li:my-1 prose-ul:my-4 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900"
+                    components={{
+                      h2: ({ node, ...props }) => (
+                        <h2
+                          className="text-xl font-bold text-blue-900 mt-8 mb-6 border-b-2 border-blue-200 pb-3 bg-blue-50 px-4 py-2 rounded-t-lg"
                           {...props}
                         />
-                      </div>
-                    ),
-                    th: ({ node, ...props }) => (
-                      <th
-                        className="border border-gray-300 px-4 py-3 bg-blue-100 font-bold text-left text-blue-900"
-                        {...props}
-                      />
-                    ),
-                    td: ({ node, ...props }) => (
-                      <td
-                        className="border border-gray-300 px-4 py-3 hover:bg-gray-50"
-                        {...props}
-                      />
-                    ),
-                  }}
-                >
-                  {message.processedContent}
-                </ReactMarkdown>
+                      ),
+                      h3: ({ node, ...props }) => (
+                        <h3
+                          className="text-lg font-semibold text-gray-800 mt-6 mb-4 border-l-4 border-blue-400 pl-4 bg-gray-50 py-2"
+                          {...props}
+                        />
+                      ),
+                      p: ({ node, ...props }) => (
+                        <p
+                          className="leading-relaxed text-gray-800 my-4 text-justify"
+                          {...props}
+                        />
+                      ),
+                      ul: ({ node, ...props }) => (
+                        <ul
+                          className="list-disc list-outside space-y-3 text-gray-800 my-6 ml-6 pl-2"
+                          {...props}
+                        />
+                      ),
+                      li: ({ node, ...props }) => (
+                        <li className="leading-relaxed pl-2 my-2" {...props} />
+                      ),
+                      strong: ({ node, ...props }) => (
+                        <strong
+                          className="font-bold text-blue-800 bg-blue-50 px-1 rounded"
+                          {...props}
+                        />
+                      ),
+                      table: ({ node, ...props }) => (
+                        <div className="overflow-x-auto my-6 -mx-1 sm:mx-0">
+                          <table
+                            className="min-w-full border border-gray-300 rounded-lg shadow-sm"
+                            {...props}
+                          />
+                        </div>
+                      ),
+                      th: ({ node, ...props }) => (
+                        <th
+                          className="border border-gray-300 px-4 py-3 bg-blue-100 font-bold text-left text-blue-900"
+                          {...props}
+                        />
+                      ),
+                      td: ({ node, ...props }) => (
+                        <td
+                          className="border border-gray-300 px-4 py-3 hover:bg-gray-50"
+                          {...props}
+                        />
+                      ),
+                    }}
+                  >
+                    {message.processedContent}
+                  </ReactMarkdown>
+
+                  {/* Feedback buttons inside the message bubble at the bottom */}
+                  {!message.isUser && index > 0 && message.conversation_id && (
+                    <div className="flex items-center space-x-2 mt-3 pt-2 border-t border-gray-100">
+                      <button
+                        onClick={() => handleFeedbackClick(message.id, "positive")}
+                        className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
+                          message.feedback === "positive"
+                            ? "text-green-600 bg-green-50"
+                            : "text-gray-400"
+                        }`}
+                        title={t("chat.helpfulResponse")}
+                        aria-label={t("chat.helpfulResponse")}
+                      >
+                        <ThumbUpIcon />
+                      </button>
+                      <button
+                        onClick={() => handleFeedbackClick(message.id, "negative")}
+                        className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
+                          message.feedback === "negative"
+                            ? "text-red-600 bg-red-50"
+                            : "text-gray-400"
+                        }`}
+                        title={t("chat.notHelpfulResponse")}
+                        aria-label={t("chat.notHelpfulResponse")}
+                      >
+                        <ThumbDownIcon />
+                      </button>
+
+                      {message.feedback && (
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500">
+                            {t("chat.feedbackThanks")}
+                          </span>
+                          {message.feedbackComment && (
+                            <span
+                              className="text-xs text-blue-600"
+                              title={`${t("chat.feedbackComment")}: ${message.feedbackComment}`}
+                            >
+                              💬
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
-
-            {!message.isUser && index > 0 && message.conversation_id && (
-              <div className="flex items-center space-x-2 mt-2 ml-2">
-                <button
-                  onClick={() => handleFeedbackClick(message.id, "positive")}
-                  className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
-                    message.feedback === "positive"
-                      ? "text-green-600 bg-green-50"
-                      : "text-gray-400"
-                  }`}
-                  title={t("chat.helpfulResponse")}
-                  aria-label={t("chat.helpfulResponse")}
-                >
-                  <ThumbUpIcon />
-                </button>
-                <button
-                  onClick={() => handleFeedbackClick(message.id, "negative")}
-                  className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${
-                    message.feedback === "negative"
-                      ? "text-red-600 bg-red-50"
-                      : "text-gray-400"
-                  }`}
-                  title={t("chat.notHelpfulResponse")}
-                  aria-label={t("chat.notHelpfulResponse")}
-                >
-                  <ThumbDownIcon />
-                </button>
-
-                {message.feedback && (
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">
-                      {t("chat.feedbackThanks")}
-                    </span>
-                    {message.feedbackComment && (
-                      <span
-                        className="text-xs text-blue-600"
-                        title={`${t("chat.feedbackComment")}: ${message.feedbackComment}`}
-                      >
-                        💬
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
 
             {message.isUser && (
               <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
