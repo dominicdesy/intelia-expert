@@ -11,7 +11,6 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 // Import des modales
 import { UserInfoModal } from "./modals/UserInfoModal";
 import { AccountModal } from "./modals/AccountModal";
-import { ContactModal } from "./modals/ContactModal";
 import { LanguageModal } from "./modals/LanguageModal";
 import { InviteFriendModal } from "./modals/InviteFriendModal";
 import { secureLog } from "@/lib/utils/secureLogger";
@@ -24,7 +23,6 @@ export const UserMenuButton = () => {
   // États des modales
   const [showUserInfoModal, setShowUserInfoModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
-  const [showContactModal, setShowContactModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showInviteFriendModal, setShowInviteFriendModal] = useState(false);
 
@@ -143,13 +141,6 @@ export const UserMenuButton = () => {
     }
   }, [t, user]);
 
-  const handleContactClick = useCallback(() => {
-    if (!isMountedRef.current) return;
-    setTimeout(() => {
-      if (isMountedRef.current) setShowContactModal(true);
-    }, 50);
-  }, []);
-
   const handleUserInfoClick = useCallback(() => {
     if (!isMountedRef.current) return;
     setTimeout(() => {
@@ -186,10 +177,6 @@ export const UserMenuButton = () => {
   const handleSubscriptionsClick = useCallback(() => {
     if (!isMountedRef.current) return;
     window.open("/admin/subscriptions", "_blank");
-  }, []);
-
-  const openPrivacyPolicy = useCallback(() => {
-    window.open("https://intelia.com/privacy-policy/", "_blank");
   }, []);
 
   const handleAboutClick = useCallback((e?: Event) => {
@@ -313,32 +300,12 @@ export const UserMenuButton = () => {
 
               <DropdownMenu.Item
                 className="flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer outline-none"
-                onSelect={handleContactClick}
-              >
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                </svg>
-                <span>{t("nav.contact")}</span>
-              </DropdownMenu.Item>
-
-              <DropdownMenu.Item
-                className="flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer outline-none"
                 onSelect={handleAboutClick}
               >
                 <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                 </svg>
                 <span>{t("nav.about")}</span>
-              </DropdownMenu.Item>
-
-              <DropdownMenu.Item
-                className="flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer outline-none"
-                onSelect={openPrivacyPolicy}
-              >
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875v12.75c0 .621.504 1.125 1.125 1.125h2.25" />
-                </svg>
-                <span>{t("nav.legal")}</span>
               </DropdownMenu.Item>
             </div>
 
@@ -361,7 +328,6 @@ export const UserMenuButton = () => {
       {!isSuperAdmin && <AccountModal isOpen={showAccountModal} user={user} onClose={() => setShowAccountModal(false)} />}
       <UserInfoModal isOpen={showUserInfoModal} user={stableUser} onClose={() => setShowUserInfoModal(false)} />
       <LanguageModal isOpen={showLanguageModal} onClose={() => setShowLanguageModal(false)} />
-      <ContactModal isOpen={showContactModal} onClose={() => setShowContactModal(false)} />
       <InviteFriendModal isOpen={showInviteFriendModal} onClose={() => setShowInviteFriendModal(false)} />
     </>
   );
