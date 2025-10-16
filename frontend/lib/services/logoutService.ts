@@ -3,9 +3,40 @@ import { secureLog } from "@/lib/utils/secureLogger";
 // lib/services/logoutService.ts
 // Service de logout independant pour eviter les problemes React #300
 
+// Fonction pour sortir du mode PWA/fullscreen
+function exitPWAMode(): void {
+  try {
+    // Vérifier si on est en mode PWA
+    const isPWA = window.matchMedia('(display-mode: fullscreen)').matches ||
+                  window.matchMedia('(display-mode: standalone)').matches ||
+                  window.navigator['standalone'] === true; // iOS Safari
+
+    if (isPWA) {
+      secureLog.log("[LogoutService] Mode PWA détecté, tentative de sortie...");
+
+      // Pour iOS Safari PWA, on doit rediriger vers le navigateur
+      // On ajoute un paramètre pour forcer l'ouverture dans le navigateur
+      const currentUrl = window.location.origin + '/?exit_pwa=true';
+
+      // Tenter d'ouvrir dans le navigateur
+      window.open(currentUrl, '_blank');
+
+      // Message utilisateur
+      secureLog.log("[LogoutService] Ouverture dans le navigateur demandée");
+    } else {
+      secureLog.log("[LogoutService] Pas en mode PWA, pas besoin de sortir");
+    }
+  } catch (error) {
+    secureLog.warn("[LogoutService] Erreur lors de la sortie du mode PWA:", error);
+  }
+}
+
 export const logoutService = {
   async performLogout(user?: any): Promise<void> {
     secureLog.log("[LogoutService] Debut deconnexion via service independant");
+
+    // Sortir du mode PWA avant la déconnexion
+    exitPWAMode();
 
     // Timeout global pour forcer la redirection en cas de blocage
     const forceRedirect = setTimeout(() => {
