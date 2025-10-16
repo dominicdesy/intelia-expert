@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/lib/languages/i18n";
 
 export default function BillingSuccessPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [countdown, setCountdown] = useState(5);
 
@@ -47,13 +49,12 @@ export default function BillingSuccessPage() {
 
         {/* Titre */}
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          🎉 Paiement réussi !
+          {t("stripe.success.title")}
         </h1>
 
         {/* Message */}
         <p className="text-gray-600 mb-6">
-          Votre abonnement a été activé avec succès. Vous pouvez maintenant
-          profiter de toutes les fonctionnalités de votre nouveau plan !
+          {t("stripe.success.message")}
         </p>
 
         {/* Informations */}
@@ -61,11 +62,11 @@ export default function BillingSuccessPage() {
           <div className="flex items-start">
             <span className="text-green-600 text-xl mr-3">✓</span>
             <div className="text-sm text-left text-green-900">
-              <p className="font-medium mb-1">Abonnement activé</p>
+              <p className="font-medium mb-1">{t("stripe.success.activated")}</p>
               <ul className="list-disc list-inside space-y-1 text-green-800">
-                <li>Accès immédiat à toutes les fonctionnalités</li>
-                <li>Facturation mensuelle automatique</li>
-                <li>Email de confirmation envoyé</li>
+                <li>{t("stripe.success.immediateAccess")}</li>
+                <li>{t("stripe.success.monthlyBilling")}</li>
+                <li>{t("stripe.success.confirmationEmail")}</li>
               </ul>
             </div>
           </div>
@@ -73,8 +74,7 @@ export default function BillingSuccessPage() {
 
         {/* Countdown */}
         <p className="text-sm text-gray-500 mb-6">
-          Redirection automatique dans {countdown} seconde
-          {countdown > 1 ? "s" : ""}...
+          {t("stripe.success.redirecting", { seconds: countdown })}
         </p>
 
         {/* Boutons */}
@@ -83,13 +83,13 @@ export default function BillingSuccessPage() {
             onClick={() => router.push("/chat")}
             className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
           >
-            Commencer maintenant
+            {t("stripe.success.startNow")}
           </button>
           <button
             onClick={() => router.push("/profile")}
             className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
           >
-            Voir mon profil
+            {t("stripe.success.viewProfile")}
           </button>
         </div>
       </div>

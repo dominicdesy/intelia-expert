@@ -2,8 +2,10 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/lib/languages/i18n";
 
 export default function BillingCancelPage() {
+  const { t } = useTranslation();
   const router = useRouter();
 
   return (
@@ -30,13 +32,12 @@ export default function BillingCancelPage() {
 
         {/* Titre */}
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          Paiement annulé
+          {t("stripe.cancel.title")}
         </h1>
 
         {/* Message */}
         <p className="text-gray-600 mb-6">
-          Vous avez annulé le processus de paiement. Aucun montant n'a été
-          débité de votre compte.
+          {t("stripe.cancel.message")}
         </p>
 
         {/* Informations */}
@@ -44,11 +45,11 @@ export default function BillingCancelPage() {
           <div className="flex items-start">
             <span className="text-blue-600 text-xl mr-3">ℹ️</span>
             <div className="text-sm text-left text-blue-900">
-              <p className="font-medium mb-1">Vous pouvez toujours :</p>
+              <p className="font-medium mb-1">{t("stripe.cancel.youCanStill")}</p>
               <ul className="list-disc list-inside space-y-1 text-blue-800">
-                <li>Continuer avec le plan Essential gratuit</li>
-                <li>Réessayer le paiement plus tard</li>
-                <li>Nous contacter pour toute question</li>
+                <li>{t("stripe.cancel.continueEssential")}</li>
+                <li>{t("stripe.cancel.retryLater")}</li>
+                <li>{t("stripe.cancel.contactUs")}</li>
               </ul>
             </div>
           </div>
@@ -60,25 +61,25 @@ export default function BillingCancelPage() {
             onClick={() => router.push("/chat")}
             className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
           >
-            Retour à l'accueil
+            {t("stripe.cancel.backToHome")}
           </button>
           <button
             onClick={() => router.back()}
             className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
           >
-            Réessayer
+            {t("stripe.cancel.retry")}
           </button>
         </div>
 
         {/* Aide */}
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-sm text-gray-500">
-            Besoin d'aide ?{" "}
+            {t("stripe.cancel.needHelp")}{" "}
             <a
               href="mailto:support@intelia.com"
               className="text-blue-600 hover:text-blue-700 underline"
             >
-              Contactez notre support
+              {t("stripe.cancel.contactSupport")}
             </a>
           </p>
         </div>

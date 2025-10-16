@@ -31,7 +31,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     try {
       const token = localStorage.getItem("access_token");
       if (!token) {
-        toast.error("Session expirée. Veuillez vous reconnecter.");
+        toast.error(t("chat.sessionExpired"));
         return;
       }
 
@@ -41,7 +41,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       toast.error(
         error instanceof Error
           ? error.message
-          : "Erreur lors de l'accès au portail client"
+          : t("stripe.portal.error")
       );
       setIsManaging(false);
     }
@@ -65,7 +65,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <span className={`font-bold ${userPlan.color}`}>
                 {currentPlan === "essential"
                   ? t("subscription.free")
-                  : `$${userPlan.price}/mois`}
+                  : `$${userPlan.price}${t("stripe.upgrade.perMonth")}`}
               </span>
             </div>
           </div>
@@ -96,7 +96,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 onClick={() => setShowUpgradeModal(true)}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
               >
-                ⬆️ Passer à un plan supérieur
+                {t("stripe.account.upgradeButton")}
               </button>
             )}
 
@@ -124,10 +124,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    Chargement...
+                    {t("ui.loading")}
                   </span>
                 ) : (
-                  "⚙️ Gérer mon abonnement"
+                  t("stripe.account.manageButton")
                 )}
               </button>
             )}
