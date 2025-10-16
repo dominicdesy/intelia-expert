@@ -1,7 +1,7 @@
 // app/about/page.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/languages/i18n";
 
@@ -11,6 +11,16 @@ const InteliaLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
 
 export default function AboutPage() {
   const { t } = useTranslation();
+
+  // Fix: Ensure scroll is enabled (Radix Dialog may disable it)
+  useEffect(() => {
+    document.body.style.overflow = "auto";
+    document.body.style.paddingRight = "0px";
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.paddingRight = "";
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
