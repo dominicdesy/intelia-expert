@@ -308,7 +308,7 @@ export default function SubscriptionsAdminPage() {
               Actualiser les données
             </button>
             <button
-              onClick={() => toast.info("Export à venir...")}
+              onClick={() => toast("Export à venir...")}
               className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             >
               <span className="mr-2">📥</span>
