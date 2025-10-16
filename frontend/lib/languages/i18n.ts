@@ -778,6 +778,58 @@ export interface TranslationKeys {
   "help.profileDesc": string;
   "help.cameraTitle": string;
   "help.cameraDesc": string;
+
+  // ===========================================
+  // STRIPE PAYMENTS & BILLING
+  // ===========================================
+  // Upgrade Modal
+  "stripe.upgrade.title": string;
+  "stripe.upgrade.choosePlan": string;
+  "stripe.upgrade.currentPlanBadge": string;
+  "stripe.upgrade.perMonth": string;
+  "stripe.upgrade.selectPlan": string;
+  "stripe.upgrade.redirecting": string;
+  "stripe.upgrade.paymentSecure": string;
+  "stripe.upgrade.stripeLink": string;
+  "stripe.upgrade.cancelAnytime": string;
+  "stripe.upgrade.monthlyBilling": string;
+  "stripe.upgrade.noCommitment": string;
+  "stripe.upgrade.error": string;
+
+  // Account Modal
+  "stripe.account.title": string;
+  "stripe.account.currentPlan": string;
+  "stripe.account.badge": string;
+  "stripe.account.free": string;
+  "stripe.account.upgradeButton": string;
+  "stripe.account.manageButton": string;
+  "stripe.account.managingSubscription": string;
+
+  // Customer Portal
+  "stripe.portal.error": string;
+
+  // Success Page
+  "stripe.success.title": string;
+  "stripe.success.message": string;
+  "stripe.success.redirecting": string;
+  "stripe.success.activated": string;
+  "stripe.success.enjoy": string;
+  "stripe.success.thanksForTrust": string;
+  "stripe.success.backToChat": string;
+  "stripe.success.needHelp": string;
+  "stripe.success.contactSupport": string;
+
+  // Cancel Page
+  "stripe.cancel.title": string;
+  "stripe.cancel.message": string;
+  "stripe.cancel.youCanStill": string;
+  "stripe.cancel.continueEssential": string;
+  "stripe.cancel.retryLater": string;
+  "stripe.cancel.contactUs": string;
+  "stripe.cancel.backToHome": string;
+  "stripe.cancel.retry": string;
+  "stripe.cancel.needHelp": string;
+  "stripe.cancel.contactSupport": string;
 }
 
 // ✅ SOLUTION D: NotificationManager supprimé - Système redondant avec useState/useEffect
