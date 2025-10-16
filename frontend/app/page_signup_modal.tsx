@@ -145,7 +145,7 @@ const CountrySelect: React.FC<CountrySelectProps> = ({
   );
 };
 
-// Nouvelle fonction de validation de mot de passe
+// Validation de mot de passe synchronisée avec page.tsx
 const validatePassword = (password: string, t: (key: string) => string) => {
   const errors = [];
 
@@ -164,19 +164,17 @@ const validatePassword = (password: string, t: (key: string) => string) => {
     );
   }
 
-  // Maximum 128 caractères (sécurité contre les attaques DoS)
-  if (password.length > 128) {
+  // Au moins une majuscule
+  if (!/[A-Z]/.test(password)) {
     errors.push(
-      t("resetPassword.validation.maxLength") ||
-        "Maximum 128 caractères autorisés",
+      t("validation.password.uppercase") || "Au moins une majuscule requise",
     );
   }
 
-  // Au moins une lettre (majuscule ou minuscule)
-  if (!/[a-zA-Z]/.test(password)) {
+  // Au moins une minuscule
+  if (!/[a-z]/.test(password)) {
     errors.push(
-      t("resetPassword.validation.letterRequired") ||
-        "Au moins une lettre requise",
+      t("validation.password.lowercase") || "Au moins une minuscule requise",
     );
   }
 
@@ -187,56 +185,10 @@ const validatePassword = (password: string, t: (key: string) => string) => {
     );
   }
 
-  // Vérifier les mots de passe faibles courants
-  const commonPasswords = [
-    "password",
-    "12345678",
-    "qwerty123",
-    "abc123456",
-    "password1",
-    "password123",
-    "123456789",
-    "motdepasse",
-    "azerty123",
-    "11111111",
-    "00000000",
-  ];
-  if (
-    commonPasswords.some((common) =>
-      password.toLowerCase().includes(common.toLowerCase()),
-    )
-  ) {
+  // Au moins un caractère spécial
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
     errors.push(
-      t("resetPassword.validation.tooCommon") || "Mot de passe trop commun",
-    );
-  }
-
-  // Vérifier la répétition excessive (plus de 3 caractères identiques consécutifs)
-  if (/(.)\1{3,}/.test(password)) {
-    errors.push(
-      t("resetPassword.validation.tooRepetitive") ||
-        "Trop de caractères identiques consécutifs",
-    );
-  }
-
-  // Bonus: Vérifier que ce n'est pas que des caractères séquentiels
-  const sequentialPatterns = [
-    "12345678",
-    "87654321",
-    "abcdefgh",
-    "zyxwvuts",
-    "qwertyui",
-    "asdfghjk",
-    "zxcvbnm",
-  ];
-  if (
-    sequentialPatterns.some((pattern) =>
-      password.toLowerCase().includes(pattern),
-    )
-  ) {
-    errors.push(
-      t("resetPassword.validation.avoidSequences") ||
-        "Évitez les séquences de caractères",
+      t("validation.password.special") || "Au moins un caractère spécial requis (!@#$%^&*(),.?\":{}|<>)",
     );
   }
 
@@ -254,7 +206,7 @@ const PasswordStrengthIndicator: React.FC<{ password: string }> = ({
     {
       test: password.length >= 8,
       label:
-        t("resetPassword.requirements.minLength" as any) ||
+        t("validation.password.minLength" as any) ||
         "Au moins 8 caractères",
     },
     {
