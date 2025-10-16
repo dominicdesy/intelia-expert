@@ -50,6 +50,7 @@ class CreateCheckoutSessionRequest(BaseModel):
     plan_name: str  # "pro" ou "elite" (essential est gratuit)
     success_url: Optional[str] = None
     cancel_url: Optional[str] = None
+    locale: Optional[str] = None  # Code langue pour Stripe (ex: "fr", "en", "es")
 
 
 class CreateCheckoutSessionResponse(BaseModel):
@@ -341,6 +342,15 @@ async def create_checkout_session(
                 "quantity": 1,
             }]
 
+        # Mapper le code langue de l'app vers les locales Stripe supportées
+        stripe_locale = request.locale if request.locale else "auto"
+        # Stripe supporte: auto, da, de, en, es, fi, fr, it, ja, nb, nl, pl, pt, sv, zh
+        # Si la locale n'est pas supportée par Stripe, utiliser "auto"
+        supported_locales = ["da", "de", "en", "es", "fi", "fr", "it", "ja", "nb", "nl", "pl", "pt", "sv", "zh"]
+        if stripe_locale not in supported_locales and stripe_locale != "auto":
+            logger.warning(f"Locale {stripe_locale} non supportée par Stripe, utilisation de 'auto'")
+            stripe_locale = "auto"
+
         # Créer la Checkout Session avec Stripe Link activé
         checkout_session = stripe.checkout.Session.create(
             customer=stripe_customer_id,
@@ -352,6 +362,9 @@ async def create_checkout_session(
 
             # Sauvegarder automatiquement les infos de paiement
             payment_method_collection="always",
+
+            # 🌍 LOCALISATION STRIPE
+            locale=stripe_locale,
 
             # URLs de redirection
             success_url=request.success_url or SUCCESS_URL,

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { BaseDialog } from "../BaseDialog";
 import { PLAN_CONFIGS } from "@/types";
 import { redirectToCheckout } from "@/lib/api/stripe";
+import { useTranslation } from "@/lib/languages/i18n";
 import toast from "react-hot-toast";
 
 interface UpgradePlanModalProps {
@@ -17,6 +18,7 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
   onClose,
   currentPlan = "essential",
 }) => {
+  const { t, currentLanguage } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
@@ -28,18 +30,18 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
       // Récupérer le token JWT
       const token = localStorage.getItem("access_token");
       if (!token) {
-        toast.error("Session expirée. Veuillez vous reconnecter.");
+        toast.error(t("chat.sessionExpired"));
         return;
       }
 
-      // Rediriger vers Stripe Checkout
-      await redirectToCheckout(planName, token);
+      // Rediriger vers Stripe Checkout avec la langue utilisateur
+      await redirectToCheckout(planName, token, currentLanguage);
     } catch (error) {
       console.error("[UpgradePlan] Erreur:", error);
       toast.error(
         error instanceof Error
           ? error.message
-          : "Erreur lors de l'ouverture du paiement"
+          : t("stripe.upgrade.error")
       );
       setIsLoading(false);
       setSelectedPlan(null);
@@ -54,13 +56,12 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
     <BaseDialog
       isOpen={isOpen}
       onClose={onClose}
-      title="Choisissez votre plan"
+      title={t("stripe.upgrade.title")}
     >
       <div className="space-y-6">
         {/* Description */}
         <div className="text-center text-sm text-gray-600">
-          Passez à un plan supérieur pour débloquer toutes les fonctionnalités
-          avancées
+          {t("stripe.upgrade.choosePlan")}
         </div>
 
         {/* Plans Grid */}
@@ -85,7 +86,7 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
                 {isCurrentPlan && (
                   <div className="mb-3">
                     <span className="inline-block px-3 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full">
-                      Plan actuel
+                      {t("stripe.upgrade.currentPlanBadge")}
                     </span>
                   </div>
                 )}
@@ -100,7 +101,7 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
                   <span className="text-3xl font-bold text-gray-900">
                     ${planConfig.price}
                   </span>
-                  <span className="text-gray-600">/mois</span>
+                  <span className="text-gray-600">{t("stripe.upgrade.perMonth")}</span>
                 </div>
 
                 {/* Features */}
@@ -151,10 +152,10 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                           />
                         </svg>
-                        Redirection...
+                        {t("stripe.upgrade.redirecting")}
                       </span>
                     ) : (
-                      `Passer à ${planConfig.name}`
+                      t("stripe.upgrade.selectPlan")
                     )}
                   </button>
                 )}
@@ -168,12 +169,12 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
           <div className="flex items-start">
             <span className="text-blue-600 text-xl mr-3">ℹ️</span>
             <div className="text-sm text-blue-900">
-              <p className="font-medium mb-1">Paiement sécurisé avec Stripe</p>
+              <p className="font-medium mb-1">{t("stripe.upgrade.paymentSecure")}</p>
               <ul className="list-disc list-inside space-y-1 text-blue-800">
-                <li>Paiement 1-click avec Stripe Link</li>
-                <li>Annulation à tout moment</li>
-                <li>Facturation mensuelle automatique</li>
-                <li>Aucun engagement à long terme</li>
+                <li>{t("stripe.upgrade.stripeLink")}</li>
+                <li>{t("stripe.upgrade.cancelAnytime")}</li>
+                <li>{t("stripe.upgrade.monthlyBilling")}</li>
+                <li>{t("stripe.upgrade.noCommitment")}</li>
               </ul>
             </div>
           </div>
@@ -186,7 +187,7 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
             disabled={isLoading}
             className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
           >
-            Fermer
+            {t("ui.close")}
           </button>
         </div>
       </div>

@@ -38,11 +38,13 @@ export interface CustomerPortalResponse {
  * Crée une session Stripe Checkout pour upgrade de plan
  * @param planName - "pro" ou "elite"
  * @param token - JWT token d'authentification
+ * @param locale - Code de langue optionnel (ex: "fr", "en", "es")
  * @returns URL de redirection vers Stripe Checkout
  */
 export async function createCheckoutSession(
   planName: string,
-  token: string
+  token: string,
+  locale?: string
 ): Promise<CheckoutSessionResponse> {
   try {
     const response = await fetch(
@@ -57,6 +59,7 @@ export async function createCheckoutSession(
           plan_name: planName,
           success_url: `${window.location.origin}/billing/success`,
           cancel_url: `${window.location.origin}/billing/cancel`,
+          locale: locale, // Passer la langue de l'utilisateur
         }),
       }
     );
@@ -155,12 +158,14 @@ export async function getCustomerPortalUrl(
  * Helper: Redirige l'utilisateur vers Stripe Checkout
  * @param planName - "pro" ou "elite"
  * @param token - JWT token
+ * @param locale - Code de langue optionnel (ex: "fr", "en", "es")
  */
 export async function redirectToCheckout(
   planName: string,
-  token: string
+  token: string,
+  locale?: string
 ): Promise<void> {
-  const result = await createCheckoutSession(planName, token);
+  const result = await createCheckoutSession(planName, token, locale);
 
   if (result.success && result.checkout_url) {
     // Redirection vers Stripe Checkout
