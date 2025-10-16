@@ -691,7 +691,49 @@ export interface TranslationKeys {
   // ===========================================
   "plan.essential": string;
   "plan.pro": string;
-  "plan.max": string;
+  "plan.elite": string;
+  "plan.corporate": string;
+
+  // Plan descriptions
+  "plan.essential.description": string;
+  "plan.pro.description": string;
+  "plan.elite.description": string;
+  "plan.corporate.description": string;
+
+  // Essential features
+  "plan.essential.feature1": string; // 50 questions par mois
+  "plan.essential.feature2": string; // Accès aux documents publics
+  "plan.essential.feature3": string; // Support par email
+  "plan.essential.feature4": string; // Interface web
+
+  // Pro features
+  "plan.pro.feature1": string; // Questions illimitées
+  "plan.pro.feature2": string; // Accès documents confidentiels
+  "plan.pro.feature3": string; // Support prioritaire
+  "plan.pro.feature4": string; // Interface web + mobile
+  "plan.pro.feature5": string; // Analytics avancées
+
+  // Elite features
+  "plan.elite.feature1": string; // Tout du plan Pro
+  "plan.elite.feature2": string; // Questions illimitées prioritaires
+  "plan.elite.feature3": string; // Analyse de photos
+  "plan.elite.feature4": string; // Support dédié 24/7
+  "plan.elite.feature5": string; // Intégrations personnalisées
+
+  // Corporate features
+  "plan.corporate.feature1": string; // Tout du plan Elite
+  "plan.corporate.feature2": string; // Knowledge base personnalisée
+  "plan.corporate.feature3": string; // Intégration documents privés
+  "plan.corporate.feature4": string; // Formation équipe dédiée
+  "plan.corporate.feature5": string; // SLA garanti
+  "plan.corporate.feature6": string; // Support dédié 24/7
+
+  // Pricing labels
+  "plan.popular": string;
+  "plan.currentPlan": string;
+  "plan.contactUs": string;
+  "plan.perMonth": string;
+  "plan.free": string;
 
   // ===========================================
   // GDPR & LEGAL - NOUVELLES CLÉS AJOUTÉES

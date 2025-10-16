@@ -1711,11 +1711,12 @@ export const PLAN_CONFIGS = {
     color: "text-green-600",
     bgColor: "bg-green-50",
     borderColor: "border-green-200",
+    popular: false,
     features: [
-      "100 questions par mois",
-      "Accès aux documents publics",
-      "Support par email",
-      "Interface web",
+      "plan.essential.feature1", // 50 questions par mois
+      "plan.essential.feature2", // Accès aux documents publics
+      "plan.essential.feature3", // Support par email
+      "plan.essential.feature4", // Interface web
     ],
   },
   pro: {
@@ -1725,12 +1726,13 @@ export const PLAN_CONFIGS = {
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     borderColor: "border-blue-200",
+    popular: true,
     features: [
-      "Questions illimitées",
-      "Accès documents confidentiels",
-      "Support prioritaire",
-      "Interface web + mobile",
-      "Analytics avancées",
+      "plan.pro.feature1", // Questions illimitées
+      "plan.pro.feature2", // Accès documents confidentiels
+      "plan.pro.feature3", // Support prioritaire
+      "plan.pro.feature4", // Interface web + mobile
+      "plan.pro.feature5", // Analytics avancées
     ],
   },
   elite: {
@@ -1740,13 +1742,30 @@ export const PLAN_CONFIGS = {
     color: "text-purple-600",
     bgColor: "bg-purple-50",
     borderColor: "border-purple-200",
+    popular: false,
     features: [
-      "Tout du plan Pro",
-      "Questions illimitées prioritaires",
-      "Accès API",
-      "Support dédié 24/7",
-      "Intégrations personnalisées",
-      "Formation équipe",
+      "plan.elite.feature1", // Tout du plan Pro
+      "plan.elite.feature2", // Questions illimitées prioritaires
+      "plan.elite.feature3", // Analyse de photos
+      "plan.elite.feature4", // Support dédié 24/7
+      "plan.elite.feature5", // Intégrations personnalisées
+    ],
+  },
+  corporate: {
+    name: "Corporate",
+    price: null, // Prix sur demande
+    currency: "USD",
+    color: "text-orange-600",
+    bgColor: "bg-orange-50",
+    borderColor: "border-orange-200",
+    popular: false,
+    features: [
+      "plan.corporate.feature1", // Tout du plan Elite
+      "plan.corporate.feature2", // Knowledge base personnalisée
+      "plan.corporate.feature3", // Intégration documents privés
+      "plan.corporate.feature4", // Formation équipe dédiée
+      "plan.corporate.feature5", // SLA garanti
+      "plan.corporate.feature6", // Support dédié 24/7
     ],
   },
 } as const;
