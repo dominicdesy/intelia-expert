@@ -442,16 +442,6 @@ const PasswordStrengthIndicator: React.FC<{ password: string }> = ({
             <span>{req.label}</span>
           </div>
         ))}
-
-        {validation.errors.map((error, index) => (
-          <div
-            key={`error-${index}`}
-            className="flex items-center text-red-600"
-          >
-            <span className="mr-2 text-sm">❌</span>
-            <span>{error}</span>
-          </div>
-        ))}
       </div>
 
       {strength < 1 && (
