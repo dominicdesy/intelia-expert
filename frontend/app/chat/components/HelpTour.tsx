@@ -147,8 +147,8 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
           break;
       }
     } else {
-      // Desktop : logique originale
-      const topPadding = currentStep === 2 ? 40 : padding;
+      // Desktop : logique originale avec espacement augmenté pour le bouton caméra
+      const topPadding = currentStep === 2 ? 80 : padding; // Augmenté de 40 à 80 pour caméra
 
       switch (step.position) {
         case "top":
