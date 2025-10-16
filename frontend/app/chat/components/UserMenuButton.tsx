@@ -338,10 +338,10 @@ export const UserMenuButton = () => {
       </DropdownMenu.Root>
 
       {/* MODALES */}
-      {!isSuperAdmin && showAccountModal && <AccountModal user={user} onClose={() => setShowAccountModal(false)} />}
+      {!isSuperAdmin && <AccountModal isOpen={showAccountModal} user={user} onClose={() => setShowAccountModal(false)} />}
       {showUserInfoModal && <UserInfoModal user={stableUser} onClose={() => setShowUserInfoModal(false)} />}
       {showLanguageModal && <LanguageModal onClose={() => setShowLanguageModal(false)} />}
-      {showContactModal && <ContactModal onClose={() => setShowContactModal(false)} />}
+      <ContactModal isOpen={showContactModal} onClose={() => setShowContactModal(false)} />
       {showInviteFriendModal && <InviteFriendModal onClose={() => setShowInviteFriendModal(false)} />}
     </>
   );
