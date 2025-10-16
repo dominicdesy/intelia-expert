@@ -54,8 +54,13 @@ class EuropePMCFetcher(BaseFetcher):
         """
         url = f"{self.base_url}/search"
 
-        # Build search query with year and poultry filter
-        search_query = f"({query}) AND (poultry) AND (PUB_YEAR:[{min_year} TO 3000])"
+        # Build search query with year and strict poultry filter
+        # NEW: Stricter filtering to avoid off-topic documents (cattle, pigs, etc.)
+        # Require explicit poultry terms AND exclude non-poultry topics
+        poultry_terms = "(poultry OR chicken OR broiler OR layer OR hen OR rooster OR avian OR turkey OR duck)"
+        exclude_terms = "NOT (cattle OR bovine OR cow OR dairy OR pig OR swine OR sheep OR goat OR horse OR fish OR aquaculture)"
+
+        search_query = f"({query}) AND {poultry_terms} {exclude_terms} AND (PUB_YEAR:[{min_year} TO 3000])"
 
         params = {
             "query": search_query,

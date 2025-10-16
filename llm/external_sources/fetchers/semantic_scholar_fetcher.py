@@ -54,8 +54,12 @@ class SemanticScholarFetcher(BaseFetcher):
         """
         url = f"{self.base_url}/paper/search"
 
-        # Build search query with year filter
-        search_query = f"{query} poultry production"
+        # Build search query with strict poultry filtering
+        # NEW: Explicit poultry terms with exclusions to prevent off-topic results
+        poultry_terms = "(poultry OR chicken OR broiler OR layer OR avian)"
+        exclude_terms = "-cattle -bovine -cow -dairy -pig -swine -sheep -goat"
+
+        search_query = f"{query} {poultry_terms} {exclude_terms}"
 
         params = {
             "query": search_query,

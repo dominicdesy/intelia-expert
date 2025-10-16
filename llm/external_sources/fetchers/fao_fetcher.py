@@ -61,8 +61,12 @@ class FAOFetcher(BaseFetcher):
         # FAO search URL
         search_url = "http://www.fao.org/faolex/results/en/"
 
-        # Build query
-        search_query = f"{query} poultry production"
+        # Build query with strict poultry focus
+        # NEW: Specific poultry terms, exclude non-poultry livestock
+        poultry_terms = "poultry OR chicken OR broiler OR layer OR avian"
+        exclude_terms = "-cattle -bovine -cow -dairy -pig -swine"
+
+        search_query = f"{query} ({poultry_terms}) {exclude_terms}"
 
         params = {
             "q": search_query,

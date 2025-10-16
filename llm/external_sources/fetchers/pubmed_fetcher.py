@@ -58,8 +58,12 @@ class PubMedFetcher(BaseFetcher):
         Returns:
             Combined results dict with PMIDs and metadata
         """
-        # Step 1: ESearch - Get PMIDs
-        search_query = f"{query} AND poultry[Title/Abstract] AND {min_year}:3000[DP]"
+        # Step 1: ESearch - Get PMIDs with strict poultry filtering
+        # NEW: More specific poultry terms AND exclude non-poultry animals
+        poultry_terms = "(poultry[Title/Abstract] OR chicken[Title/Abstract] OR broiler[Title/Abstract] OR layer[Title/Abstract] OR avian[Title/Abstract])"
+        exclude_terms = "NOT (cattle[Title/Abstract] OR bovine[Title/Abstract] OR cow[Title/Abstract] OR dairy[Title/Abstract] OR pig[Title/Abstract] OR swine[Title/Abstract])"
+
+        search_query = f"{query} AND {poultry_terms} {exclude_terms} AND {min_year}:3000[DP]"
 
         search_url = f"{self.base_url}/esearch.fcgi"
         search_params = {
