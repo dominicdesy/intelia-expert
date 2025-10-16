@@ -220,22 +220,51 @@ Health check du service
 
 Les compteurs doivent être réinitialisés le **1er de chaque mois à 00:00 UTC**.
 
-### Configuration CRON
+### Configuration CRON (cron-job.org)
 
-**Option 1: Cron système**
+**Étape 1: Générer une clé secrète**
 ```bash
-# Crontab
-0 0 1 * * curl -X POST https://api.expert.intelia.com/v1/usage/admin/reset-monthly \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
+openssl rand -hex 32
+# Exemple: e1ca01ab5234c3188c5a72abcdbb184d11e95e7743828783c9754fc81ab36dc7
 ```
 
-**Option 2: Service externe (cron-job.org)**
-- URL: `https://api.expert.intelia.com/v1/usage/admin/reset-monthly`
-- Méthode: POST
-- Schedule: `0 0 1 * *` (1er jour de chaque mois à minuit UTC)
-- Headers: `Authorization: Bearer <ADMIN_TOKEN>`
+**Étape 2: Ajouter la clé dans `.env`**
+```bash
+# backend/.env
+CRON_SECRET_KEY=e1ca01ab5234c3188c5a72abcdbb184d11e95e7743828783c9754fc81ab36dc7
+```
 
-**Option 3: Fonction Python**
+**Étape 3: Configurer sur cron-job.org**
+
+1. Créer un compte sur https://cron-job.org (gratuit)
+2. Créer un nouveau cronjob avec:
+   - **URL**: `https://expert.intelia.com/api/v1/usage/cron/reset-monthly?secret=e1ca01ab5234c3188c5a72abcdbb184d11e95e7743828783c9754fc81ab36dc7`
+   - **Méthode**: POST
+   - **Schedule**: `0 0 1 * *` (1er du mois à 00:00 UTC)
+   - **Titre**: "Reset Quotas Mensuels Intelia"
+   - **Notifications**: ✅ Email si échec
+
+**Étape 4: Tester manuellement**
+```bash
+curl -X POST "https://expert.intelia.com/api/v1/usage/cron/reset-monthly?secret=VOTRE_CLE"
+```
+
+**Réponse attendue:**
+```json
+{
+  "status": "success",
+  "message": "Reset mensuel effectué avec succès",
+  "result": {
+    "status": "success",
+    "month_year": "2025-02",
+    "users_reset": 150,
+    "timestamp": "2025-02-01T00:00:00.000000"
+  },
+  "timestamp": "2025-02-01T00:00:05.123456"
+}
+```
+
+### Alternative: Fonction Python directe
 ```python
 from app.services.usage_limiter import reset_monthly_usage_for_all_users
 

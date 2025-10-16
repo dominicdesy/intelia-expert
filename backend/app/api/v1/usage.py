@@ -9,7 +9,8 @@ Permet au frontend d'afficher:
 - Statut du quota
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+import os
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Dict, Any
 from datetime import datetime
 
@@ -20,6 +21,7 @@ from app.services.usage_limiter import (
     get_user_usage_stats,
     check_user_quota,
     increment_question_count,
+    reset_monthly_usage_for_all_users,
     QuotaExceededException
 )
 
@@ -299,3 +301,82 @@ async def usage_service_health() -> Dict[str, Any]:
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat()
         }
+
+
+@router.post("/cron/reset-monthly")
+async def cron_reset_monthly(
+    secret: str = Query(None, description="Clé secrète CRON pour authentification")
+) -> Dict[str, Any]:
+    """
+    Reset mensuel des quotas - Endpoint pour service CRON externe (cron-job.org).
+
+    À appeler le 1er de chaque mois à 00:00 UTC.
+    Protégé par clé secrète passée en query parameter.
+
+    Usage: POST /v1/usage/cron/reset-monthly?secret=YOUR_SECRET_KEY
+
+    Cette fonction:
+    - Crée de nouveaux enregistrements monthly_usage_tracking pour le mois en cours
+    - Réinitialise questions_used à 0 pour tous les utilisateurs
+    - Préserve l'historique des mois précédents
+
+    Retourne:
+    - status: 'success' ou 'error'
+    - month_year: Mois créé (YYYY-MM)
+    - users_reset: Nombre d'utilisateurs réinitialisés
+    """
+    try:
+        # Vérification clé secrète
+        expected_secret = os.getenv("CRON_SECRET_KEY")
+
+        if not expected_secret:
+            logger.error("CRON_SECRET_KEY non configurée dans .env")
+            raise HTTPException(
+                status_code=500,
+                detail="Configuration serveur manquante: CRON_SECRET_KEY"
+            )
+
+        if not secret:
+            logger.warning("Tentative reset mensuel sans clé secrète")
+            raise HTTPException(
+                status_code=401,
+                detail="Clé secrète manquante. Usage: ?secret=YOUR_KEY"
+            )
+
+        if secret != expected_secret:
+            logger.warning(f"Tentative reset mensuel avec clé invalide: {secret[:8]}...")
+            raise HTTPException(
+                status_code=401,
+                detail="Clé secrète invalide"
+            )
+
+        # Exécuter le reset
+        logger.info("Démarrage reset mensuel des quotas (déclenché par CRON)")
+        result = reset_monthly_usage_for_all_users()
+
+        if result.get("status") == "success":
+            logger.info(
+                f"✅ Reset mensuel réussi: {result.get('users_reset')} utilisateurs "
+                f"réinitialisés pour {result.get('month_year')}"
+            )
+            return {
+                "status": "success",
+                "message": "Reset mensuel effectué avec succès",
+                "result": result,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            logger.error(f"❌ Échec reset mensuel: {result}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erreur lors du reset: {result.get('error', 'Unknown')}"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Erreur critique lors du reset mensuel CRON")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur serveur lors du reset: {str(e)}"
+        )
