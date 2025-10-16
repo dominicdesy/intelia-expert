@@ -12,6 +12,7 @@ import { UserInfoModalProps } from "@/types";
 import { CountrySelect } from "../CountrySelect";
 import { apiClient } from "@/lib/api/client";
 import { secureLog } from "@/lib/utils/secureLogger";
+import { BaseDialog } from "../BaseDialog";
 
 // Debug utility - TEMPORAIREMENT DÉSACTIVÉ
 const debugLog = (category: string, message: string, data?: any) => {
@@ -635,6 +636,7 @@ const ErrorDisplay: React.FC<{ errors: string[]; title: string }> = ({
 
 // Main component
 export const UserInfoModal: React.FC<UserInfoModalProps> = ({
+  isOpen,
   user,
   onClose,
 }) => {
@@ -648,8 +650,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
   const { updateProfile } = useAuthStore();
   const isMountedRef = useRef(true);
   const { t, changeLanguage, getCurrentLanguage } = useTranslation();
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
   const {
     countries,
     loading: countriesLoading,
@@ -747,57 +747,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     };
   }, []);
 
-  // Forcer les styles au montage
-  useEffect(() => {
-    const overlay = overlayRef.current;
-
-    if (overlay) {
-      overlay.style.setProperty("width", "100vw", "important");
-      overlay.style.setProperty("height", "100vh", "important");
-      overlay.style.setProperty("top", "0", "important");
-      overlay.style.setProperty("left", "0", "important");
-      overlay.style.setProperty("right", "0", "important");
-      overlay.style.setProperty("bottom", "0", "important");
-      overlay.style.setProperty(
-        "background-color",
-        "rgba(0, 0, 0, 0.5)",
-        "important",
-      );
-      overlay.style.setProperty("backdrop-filter", "blur(2px)", "important");
-      overlay.style.setProperty("display", "flex", "important");
-      overlay.style.setProperty("align-items", "center", "important");
-      overlay.style.setProperty("justify-content", "center", "important");
-      overlay.style.setProperty("padding", "16px", "important");
-
-      const content = overlay.querySelector(
-        '[data-modal="user-info"]',
-      ) as HTMLElement;
-      if (content) {
-        content.style.setProperty("width", "95vw", "important");
-        content.style.setProperty("max-width", "700px", "important");
-        content.style.setProperty("max-height", "85vh", "important");
-        content.style.setProperty("min-width", "320px", "important");
-        content.style.setProperty("background-color", "white", "important");
-      }
-    }
-  }, []);
-
-  // Keyboard handling
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isLoading) {
-        debugLog("INTERACTION", "Escape key pressed");
-        handleClose();
-      }
-    };
-
-    debugLog("EVENTS", "Adding keyboard listener");
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      debugLog("EVENTS", "Removing keyboard listener");
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isLoading]);
 
   // Validation functions
   const validatePasswordField = useCallback((password: string): string[] => {
@@ -877,16 +826,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
     },
     [],
-  );
-
-  // Handle overlay click
-  const handleOverlayClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget && !isLoading) {
-        handleClose();
-      }
-    },
-    [handleClose, isLoading],
   );
 
   // Fonction handleProfileSave
@@ -1091,55 +1030,10 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
   }
 
   return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        backdropFilter: "blur(2px)",
-      }}
-      onClick={handleOverlayClick}
-      data-debug="modal-overlay"
-    >
-      {/* MODAL CONTAINER */}
-      <div
-        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-        data-modal="user-info"
-        data-debug="modal-content"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {t("profile.title")}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
-            aria-label={t("modal.close")}
-            title={t("modal.close")}
-            disabled={isLoading}
-            data-debug="close-button"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="flex px-6" data-debug="tabs-nav">
+    <BaseDialog isOpen={isOpen} onClose={onClose} title={t("profile.title")}>
+      {/* Tabs */}
+      <div className="border-b border-gray-200 -mx-6 -mt-6 mb-6">
+        <nav className="flex px-6" data-debug="tabs-nav">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -1161,9 +1055,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
           </nav>
         </div>
 
-        {/* Content */}
-        <div className="p-6" data-debug="modal-body">
-          <div className="space-y-6">
+      {/* Content */}
+      <div className="space-y-6">
             {/* Errors */}
             <ErrorDisplay
               errors={formErrors}
@@ -1419,9 +1312,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
                 {isLoading ? t("modal.loading") : t("modal.save")}
               </button>
             </div>
-          </div>
-        </div>
       </div>
-    </div>
+    </BaseDialog>
   );
 };

@@ -339,10 +339,10 @@ export const UserMenuButton = () => {
 
       {/* MODALES */}
       {!isSuperAdmin && <AccountModal isOpen={showAccountModal} user={user} onClose={() => setShowAccountModal(false)} />}
-      {showUserInfoModal && <UserInfoModal user={stableUser} onClose={() => setShowUserInfoModal(false)} />}
+      <UserInfoModal isOpen={showUserInfoModal} user={stableUser} onClose={() => setShowUserInfoModal(false)} />
       <LanguageModal isOpen={showLanguageModal} onClose={() => setShowLanguageModal(false)} />
       <ContactModal isOpen={showContactModal} onClose={() => setShowContactModal(false)} />
-      {showInviteFriendModal && <InviteFriendModal onClose={() => setShowInviteFriendModal(false)} />}
+      <InviteFriendModal isOpen={showInviteFriendModal} onClose={() => setShowInviteFriendModal(false)} />
     </>
   );
 };

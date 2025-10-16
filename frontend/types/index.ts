@@ -1431,6 +1431,7 @@ export interface ModalProps {
 }
 
 export interface UserInfoModalProps {
+  isOpen: boolean;
   user: User | null;
   onClose: () => void;
 }
