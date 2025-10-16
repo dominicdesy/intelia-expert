@@ -53,7 +53,7 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
       position: "top",
     },
     {
-      target: "button[title*='send'], button[aria-label*='Envoyer'], button[title*='Envoyer'], button[title*='Sending']",
+      target: ".mobile-send-button, button[title*='Envoyer'], button[aria-label*='Envoyer'], button.flex-shrink-0.h-12.w-12",
       title: t("help.sendTitle"),
       description: t("help.sendDesc"),
       position: "left",
@@ -125,9 +125,9 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
           top = rect.top - bubbleHeight - 80;
           left = (window.innerWidth - bubbleWidth) / 2;
           break;
-        case 1: // Send button - À gauche du bouton, plus bas
-          top = rect.bottom - bubbleHeight + 40;
-          left = Math.max(10, rect.left - bubbleWidth - padding);
+        case 1: // Send button - Au-dessus du bouton, bien espacé
+          top = rect.top - bubbleHeight - 120;
+          left = (window.innerWidth - bubbleWidth) / 2;
           break;
         case 2: // Camera button - Au-dessus, bien espacé
           top = rect.top - bubbleHeight - 100;
