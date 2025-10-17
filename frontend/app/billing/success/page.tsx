@@ -5,9 +5,18 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/languages/i18n";
 
 export default function BillingSuccessPage() {
-  const { t } = useTranslation();
+  const { t, currentLanguage } = useTranslation();
   const router = useRouter();
   const [countdown, setCountdown] = useState(5);
+
+  // Helper pour accéder aux traductions non-typées
+  const tUnsafe = (key: string): string => {
+    try {
+      return (t as any)(key) || key;
+    } catch {
+      return key;
+    }
+  };
 
   useEffect(() => {
     // Countdown avant redirection
@@ -49,12 +58,12 @@ export default function BillingSuccessPage() {
 
         {/* Titre */}
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          {t("stripe.success.title")}
+          {tUnsafe("stripe.billing.success.title")}
         </h1>
 
         {/* Message */}
         <p className="text-gray-600 mb-6">
-          {t("stripe.success.message")}
+          {tUnsafe("stripe.billing.success.message")}
         </p>
 
         {/* Informations */}
@@ -62,11 +71,11 @@ export default function BillingSuccessPage() {
           <div className="flex items-start">
             <span className="text-green-600 text-xl mr-3">✓</span>
             <div className="text-sm text-left text-green-900">
-              <p className="font-medium mb-1">{t("stripe.success.activated")}</p>
+              <p className="font-medium mb-1">{tUnsafe("stripe.billing.success.thankyou")}</p>
               <ul className="list-disc list-inside space-y-1 text-green-800">
-                <li>{t("stripe.success.immediateAccess")}</li>
-                <li>{t("stripe.success.monthlyBilling")}</li>
-                <li>{t("stripe.success.confirmationEmail")}</li>
+                <li>{tUnsafe("stripe.billing.success.unlimited")}</li>
+                <li>{tUnsafe("stripe.billing.success.priority")}</li>
+                <li>{tUnsafe("stripe.billing.success.advanced")}</li>
               </ul>
             </div>
           </div>
@@ -74,7 +83,7 @@ export default function BillingSuccessPage() {
 
         {/* Countdown */}
         <p className="text-sm text-gray-500 mb-6">
-          {t("stripe.success.redirecting").replace("{seconds}", countdown.toString())}
+          {tUnsafe("stripe.billing.success.redirecting").replace("{seconds}", countdown.toString())}
         </p>
 
         {/* Boutons */}
@@ -83,13 +92,13 @@ export default function BillingSuccessPage() {
             onClick={() => router.push("/chat")}
             className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
           >
-            {t("stripe.success.startNow")}
+            {tUnsafe("stripe.billing.success.goToDashboard")}
           </button>
           <button
             onClick={() => router.push("/profile")}
             className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
           >
-            {t("stripe.success.viewProfile")}
+            {tUnsafe("stripe.billing.success.manageSubscription")}
           </button>
         </div>
       </div>
