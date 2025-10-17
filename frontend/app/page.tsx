@@ -571,9 +571,17 @@ function LoginPageContent() {
           router.push("/chat");
         }, 1000);
       } else {
+        alert("No token received");
         setError("Authentication failed: No token received");
       }
     } catch (err: any) {
+      // Show alert with error details
+      if (err instanceof Error) {
+        alert(`Error: ${err.name}\nMessage: ${err.message}`);
+      } else {
+        alert(`Error type: ${typeof err}\nValue: ${JSON.stringify(err)}`);
+      }
+
       const errorMessage = err.message || t("auth.error") || "Authentication failed";
       setError(errorMessage);
     }
