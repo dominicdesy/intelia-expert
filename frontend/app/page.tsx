@@ -578,8 +578,25 @@ function LoginPageContent() {
       }
     } catch (err: any) {
       console.error("[Passkey] Error:", err);
-      // Ensure we always set a string, not an object
-      const errorMessage = typeof err === 'string' ? err : (err?.message || err?.toString() || t("auth.error") || "Authentication failed");
+
+      // DEBUG: Show detailed error information
+      let errorMessage = "Unknown error";
+
+      if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (err instanceof Error) {
+        errorMessage = `${err.name}: ${err.message}`;
+      } else if (err && typeof err === 'object') {
+        // Try to extract useful information from error object
+        errorMessage = `Error: ${JSON.stringify({
+          name: err.name,
+          message: err.message,
+          detail: err.detail,
+          code: err.code,
+          status: err.status
+        })}`;
+      }
+
       console.error("[Passkey] Error message:", errorMessage);
       setError(errorMessage);
     }
