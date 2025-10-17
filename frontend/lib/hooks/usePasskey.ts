@@ -2,10 +2,6 @@
 
 import { useState, useCallback } from "react";
 import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
-import type {
-  PublicKeyCredentialCreationOptionsJSON,
-  PublicKeyCredentialRequestOptionsJSON,
-} from "@simplewebauthn/types";
 import { useAuthStore } from "./useAuthStore";
 
 interface PasskeyDevice {
@@ -65,8 +61,7 @@ export function usePasskey() {
           throw new Error(errorData.detail || "Failed to start registration");
         }
 
-        const options: PublicKeyCredentialCreationOptionsJSON =
-          await optionsRes.json();
+        const options = await optionsRes.json();
 
         // Step 2: Prompt user for biometric authentication
         const credential = await startRegistration(options);
@@ -133,8 +128,7 @@ export function usePasskey() {
         );
       }
 
-      const options: PublicKeyCredentialRequestOptionsJSON =
-        await optionsRes.json();
+      const options = await optionsRes.json();
 
       // Step 2: Prompt user for biometric authentication
       const credential = await startAuthentication(options);
