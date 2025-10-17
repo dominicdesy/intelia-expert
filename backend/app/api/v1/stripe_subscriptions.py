@@ -313,6 +313,47 @@ async def create_checkout_session(
 
         logger.info(f"Création checkout session pour {user_email}: {plan_name} @ {price} {currency} (Tier {tier_level})")
 
+        # Traductions des noms et descriptions de plans
+        plan_translations = {
+            "fr": {
+                "pro": {
+                    "name": "Plan Pro",
+                    "description": "Abonnement mensuel Intelia Expert - PRO"
+                },
+                "elite": {
+                    "name": "Plan Elite",
+                    "description": "Abonnement mensuel Intelia Expert - ELITE"
+                }
+            },
+            "en": {
+                "pro": {
+                    "name": "Pro Plan",
+                    "description": "Intelia Expert Monthly Subscription - PRO"
+                },
+                "elite": {
+                    "name": "Elite Plan",
+                    "description": "Intelia Expert Monthly Subscription - ELITE"
+                }
+            },
+            "es": {
+                "pro": {
+                    "name": "Plan Pro",
+                    "description": "Suscripción mensual Intelia Expert - PRO"
+                },
+                "elite": {
+                    "name": "Plan Elite",
+                    "description": "Suscripción mensual Intelia Expert - ELITE"
+                }
+            }
+        }
+
+        # Récupérer la locale demandée (avant mapping Stripe)
+        user_locale = request.locale or "en"
+        plan_info = plan_translations.get(user_locale, plan_translations["en"]).get(plan_name, {
+            "name": f"Plan {plan_name.capitalize()}",
+            "description": f"Intelia Expert - {plan_name.upper()}"
+        })
+
         # Si stripe_price_id existe dans la DB, l'utiliser (produit Stripe configuré)
         # Sinon, créer un paiement dynamique
         if stripe_price_id:
@@ -327,8 +368,8 @@ async def create_checkout_session(
                 "price_data": {
                     "currency": currency.lower(),
                     "product_data": {
-                        "name": f"Plan {plan_name.capitalize()}",
-                        "description": f"Abonnement mensuel Intelia Expert - {plan_name.upper()}",
+                        "name": plan_info["name"],
+                        "description": plan_info["description"],
                         "metadata": {
                             "plan_name": plan_name,
                             "source": "intelia_expert"
@@ -343,13 +384,26 @@ async def create_checkout_session(
             }]
 
         # Mapper le code langue de l'app vers les locales Stripe supportées
-        stripe_locale = request.locale if request.locale else "auto"
         # Stripe supporte: auto, da, de, en, es, fi, fr, it, ja, nb, nl, pl, pt, sv, zh
-        # Si la locale n'est pas supportée par Stripe, utiliser "auto"
-        supported_locales = ["da", "de", "en", "es", "fi", "fr", "it", "ja", "nb", "nl", "pl", "pt", "sv", "zh"]
-        if stripe_locale not in supported_locales and stripe_locale != "auto":
-            logger.warning(f"Locale {stripe_locale} non supportée par Stripe, utilisation de 'auto'")
-            stripe_locale = "auto"
+        locale_mapping = {
+            "fr": "fr",
+            "en": "en",
+            "es": "es",
+            "de": "de",
+            "it": "it",
+            "pt": "pt",
+            "nl": "nl",
+            "pl": "pl",
+            "ja": "ja",
+            "zh": "zh",
+            "da": "da",
+            "fi": "fi",
+            "nb": "nb",
+            "sv": "sv"
+        }
+
+        stripe_locale = locale_mapping.get(request.locale, "auto") if request.locale else "auto"
+        logger.info(f"Stripe locale utilisée: {stripe_locale} (demandée: {request.locale})")
 
         # Créer la Checkout Session avec Stripe Link activé
         checkout_session = stripe.checkout.Session.create(
