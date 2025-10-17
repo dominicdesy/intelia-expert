@@ -3,7 +3,7 @@ export const API_CONFIG = {
   // Base URL peut être configurée via env ou détectée automatiquement
   BASE_URL:
     process.env.NEXT_PUBLIC_API_BASE ??
-    (process.env.NODE_ENV === "development" ? "/api/v1" : "/v1"), // En production, votre backend semble utiliser /v1 directement
+    "/api/v1", // Le backend est accessible via /api/v1 en dev et prod
 
   ENDPOINTS: {
     STATS_FAST: {
