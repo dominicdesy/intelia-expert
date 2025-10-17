@@ -28,29 +28,45 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
     setSelectedPlan(planName);
 
     try {
-      // Récupérer le token JWT depuis Supabase
-      console.log("[UpgradePlan] Tentative de récupération session...");
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // Récupérer le token JWT depuis localStorage (comme apiService.ts)
+      console.log("[UpgradePlan] Tentative de récupération token...");
 
-      console.log("[UpgradePlan] Session:", {
-        hasSession: !!session,
-        hasAccessToken: !!session?.access_token,
-        error: error?.message,
-        sessionUser: session?.user?.email
-      });
+      let accessToken: string | null = null;
 
-      if (error || !session?.access_token) {
-        console.error("[UpgradePlan] Pas de session valide:", error);
+      // Méthode 1: Récupérer depuis intelia-expert-auth (PRIORITÉ)
+      const authData = localStorage.getItem("intelia-expert-auth");
+      if (authData) {
+        try {
+          const parsed = JSON.parse(authData);
+          accessToken = parsed.access_token;
+          console.log("[UpgradePlan] Token trouvé dans intelia-expert-auth");
+        } catch (e) {
+          console.error("[UpgradePlan] Erreur parse intelia-expert-auth:", e);
+        }
+      }
+
+      // Méthode 2: Fallback vers Supabase session
+      if (!accessToken) {
+        console.log("[UpgradePlan] Fallback vers Supabase session...");
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (!error && session?.access_token) {
+          accessToken = session.access_token;
+          console.log("[UpgradePlan] Token trouvé dans Supabase session");
+        }
+      }
+
+      if (!accessToken) {
+        console.error("[UpgradePlan] Aucun token trouvé");
         toast.error(t("chat.sessionExpired"));
         setIsLoading(false);
         setSelectedPlan(null);
         return;
       }
 
-      console.log("[UpgradePlan] Token JWT récupéré, longueur:", session.access_token.length);
+      console.log("[UpgradePlan] Token JWT récupéré, longueur:", accessToken.length);
 
       // Rediriger vers Stripe Checkout avec la langue utilisateur
-      await redirectToCheckout(planName, session.access_token, currentLanguage);
+      await redirectToCheckout(planName, accessToken, currentLanguage);
     } catch (error) {
       console.error("[UpgradePlan] Erreur:", error);
       toast.error(
