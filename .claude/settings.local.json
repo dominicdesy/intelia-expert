@@ -57,7 +57,8 @@
       "Bash(then)",
       "Bash(echo:*)",
       "Bash(else)",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(for lang in es de it pt nl pl ar zh ja hi id th tr vi)"
     ],
     "deny": [],
     "ask": []

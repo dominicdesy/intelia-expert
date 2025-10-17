@@ -679,5 +679,7 @@
   "chat.voiceError": "Lỗi nhập giọng nói",
   "chat.voiceNoSpeech": "Không phát hiện giọng nói. Vui lòng thử lại.",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "Nhập giọng nói",
+  "help.voiceDesc": "Giữ nút micrô để đặt câu hỏi của bạn. Thả ra để gửi. Nhận dạng giọng nói điều chỉnh theo ngôn ngữ giao diện của bạn."
 }

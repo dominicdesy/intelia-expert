@@ -679,5 +679,7 @@
   "chat.voiceError": "Spraakinvoerfout",
   "chat.voiceNoSpeech": "Geen spraak gedetecteerd. Probeer het opnieuw.",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "Sprakinvoer",
+  "help.voiceDesc": "Houd de microfoonknop ingedrukt om uw vraag te stellen. Loslaten om te verzenden. Spraakherkenning past zich aan uw interfacetaal aan."
 }

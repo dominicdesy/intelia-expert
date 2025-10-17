@@ -831,6 +831,8 @@ export interface TranslationKeys {
   "help.profileDesc": string;
   "help.cameraTitle": string;
   "help.cameraDesc": string;
+  "help.voiceTitle": string;
+  "help.voiceDesc": string;
 
   // ===========================================
   // STRIPE PAYMENTS & BILLING

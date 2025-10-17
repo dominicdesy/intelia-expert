@@ -679,5 +679,7 @@
   "chat.voiceError": "خطأ في الإدخال الصوتي",
   "chat.voiceNoSpeech": "لم يتم اكتشاف كلام. يرجى المحاولة مرة أخرى.",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "إدخال صوتي",
+  "help.voiceDesc": "اضغط باستمرار على زر الميكروفون لطرح سؤالك. حرر للإرسال. يتكيف التعرف على الكلام مع لغة الواجهة."
 }

@@ -680,5 +680,7 @@
   "chat.voiceError": "Errore ingresso vocale",
   "chat.voiceNoSpeech": "Nessun parlato rilevato. Per favore riprova.",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "Input vocale",
+  "help.voiceDesc": "Tieni premuto il pulsante del microfono per fare la tua domanda. Rilascia per inviare. Il riconoscimento vocale si adatta alla lingua dell'interfaccia."
 }

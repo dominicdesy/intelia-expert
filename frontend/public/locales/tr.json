@@ -679,5 +679,7 @@
   "chat.voiceError": "Sesli giriş hatası",
   "chat.voiceNoSpeech": "Konuşma tespit edilemedi. Lütfen tekrar deneyin.",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "Sesli Giriş",
+  "help.voiceDesc": "Sorunuzu sormak için mikrofon düğmesini basılı tutun. Göndermek için bırakın. Ses tanıma, arayüz dilinize uyum sağlar."
 }

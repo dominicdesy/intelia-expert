@@ -679,5 +679,7 @@
   "chat.voiceError": "音声入力エラー",
   "chat.voiceNoSpeech": "音声が検出されませんでした。もう一度お試しください。",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "音声入力",
+  "help.voiceDesc": "マイクボタンを押し続けて質問してください。離すと送信されます。音声認識はインターフェース言語に適応します。"
 }

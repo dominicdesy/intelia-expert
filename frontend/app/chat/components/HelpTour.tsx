@@ -65,6 +65,12 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
       position: "top",
     },
     {
+      target: "button[title*='voice'], button[aria-label*='voice'], button[title*='vocale'], button[aria-label*='vocale'], .chat-input-fixed button:nth-child(2)",
+      title: t("help.voiceTitle"),
+      description: t("help.voiceDesc"),
+      position: "top",
+    },
+    {
       target: "button[title*='nouvelle conversation'], button[aria-label*='nouvelle conversation'], button[title*='Nouvelle conversation'], header button:first-child",
       title: t("help.newChatTitle"),
       description: t("help.newChatDesc"),
@@ -133,22 +139,26 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
           top = rect.top - bubbleHeight - 100;
           left = (window.innerWidth - bubbleWidth) / 2;
           break;
-        case 3: // New conversation - En-dessous
+        case 3: // Voice button - Au-dessus, bien espacé
+          top = rect.top - bubbleHeight - 100;
+          left = (window.innerWidth - bubbleWidth) / 2;
+          break;
+        case 4: // New conversation - En-dessous
           top = rect.bottom + padding + 10;
           left = Math.max(10, rect.left);
           break;
-        case 4: // History - En-dessous
+        case 5: // History - En-dessous
           top = rect.bottom + padding + 10;
           left = Math.max(10, rect.left);
           break;
-        case 5: // User menu - En-dessous, aligné à droite
+        case 6: // User menu - En-dessous, aligné à droite
           top = rect.bottom + padding + 10;
           left = Math.min(window.innerWidth - bubbleWidth - 10, rect.right - bubbleWidth);
           break;
       }
     } else {
-      // Desktop : logique originale avec espacement augmenté pour le bouton caméra
-      const topPadding = currentStep === 2 ? 150 : padding; // Augmenté significativement pour ne pas cacher le bouton
+      // Desktop : logique originale avec espacement augmenté pour les boutons caméra et micro
+      const topPadding = (currentStep === 2 || currentStep === 3) ? 150 : padding; // Augmenté significativement pour ne pas cacher les boutons
 
       switch (step.position) {
         case "top":

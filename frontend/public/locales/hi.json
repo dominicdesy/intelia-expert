@@ -679,5 +679,7 @@
   "chat.voiceError": "वॉयस इनपुट त्रुटि",
   "chat.voiceNoSpeech": "कोई भाषण नहीं मिला। कृपया पुनः प्रयास करें।",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "वॉइस इनपुट",
+  "help.voiceDesc": "अपना प्रश्न बोलने के लिए माइक्रोफ़ोन बटन को दबाए रखें। भेजने के लिए छोड़ें। वॉइस पहचान आपकी इंटरफ़ेस भाषा के अनुसार समायोजित होती है।"
 }

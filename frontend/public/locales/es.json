@@ -679,5 +679,7 @@
   "chat.voiceError": "Error de entrada de voz",
   "chat.voiceNoSpeech": "No se detectó habla. Por favor, inténtalo de nuevo.",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "Entrada de voz",
+  "help.voiceDesc": "Mantenga presionado el botón del micrófono para hacer su pregunta. Suelte para enviar. El reconocimiento de voz se adapta al idioma de la interfaz."
 }

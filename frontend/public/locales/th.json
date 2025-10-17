@@ -679,5 +679,7 @@
   "chat.voiceError": "ข้อผิดพลาดการป้อนเสียง",
   "chat.voiceNoSpeech": "ไม่พบการพูด โปรดลองอีกครั้ง",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "การป้อนเสียง",
+  "help.voiceDesc": "กดค้างปุ่มไมโครโฟนเพื่อถามคำถามของคุณ ปล่อยเพื่อส่ง การรู้จำเสียงจะปรับให้เข้ากับภาษาอินเทอร์เฟซของคุณ"
 }

@@ -746,5 +746,7 @@
   "stripe.features.elite.unlimitedPriority": "Questions illimitées prioritaires",
   "stripe.features.elite.api": "Accès API",
   "stripe.features.elite.dedicated": "Support dédié",
-  "stripe.features.elite.customization": "Personnalisation avancée"
+  "stripe.features.elite.customization": "Personnalisation avancée",
+  "help.voiceTitle": "Entrée vocale",
+  "help.voiceDesc": "Maintenez le bouton micro enfoncé pour poser votre question. Relâchez pour envoyer. La reconnaissance vocale s'adapte à la langue de l'interface."
 }

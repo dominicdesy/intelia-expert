@@ -679,5 +679,7 @@
   "chat.voiceError": "Spracheingabefehler",
   "chat.voiceNoSpeech": "Keine Sprache erkannt. Bitte versuchen Sie es erneut.",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "Spracheingabe",
+  "help.voiceDesc": "Halten Sie die Mikrofontaste gedrückt, um Ihre Frage zu stellen. Loslassen zum Senden. Die Spracherkennung passt sich an Ihre Schnittstellensprache an."
 }

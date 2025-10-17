@@ -679,5 +679,7 @@
   "chat.voiceError": "语音输入错误",
   "chat.voiceNoSpeech": "未检测到语音。请重试。",
   "subscription.description": "View and manage your subscription plan",
-  "profile.description": "Manage your personal information and account settings"
+  "profile.description": "Manage your personal information and account settings",
+  "help.voiceTitle": "语音输入",
+  "help.voiceDesc": "按住麦克风按钮说出您的问题。松开即可发送。语音识别会适应您的界面语言。"
 }

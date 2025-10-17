@@ -746,5 +746,7 @@
   "stripe.features.elite.unlimitedPriority": "Unlimited priority questions",
   "stripe.features.elite.api": "API access",
   "stripe.features.elite.dedicated": "Dedicated support",
-  "stripe.features.elite.customization": "Advanced customization"
+  "stripe.features.elite.customization": "Advanced customization",
+  "help.voiceTitle": "Voice Input",
+  "help.voiceDesc": "Hold the microphone button to speak your question. Release to send. Speech recognition adapts to your interface language."
 }
