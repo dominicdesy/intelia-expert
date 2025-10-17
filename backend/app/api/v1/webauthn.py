@@ -8,6 +8,7 @@ import os
 import logging
 import secrets
 import base64
+import uuid
 from typing import Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request
@@ -35,6 +36,7 @@ from webauthn.helpers.structs import (
 
 from app.core.database import get_supabase_client
 from app.middleware.auth_middleware import get_current_user
+from app.api.v1.auth import create_access_token, TokenResponse
 
 router = APIRouter(prefix="/webauthn", tags=["WebAuthn"])
 logger = logging.getLogger(__name__)
@@ -366,7 +368,7 @@ async def authentication_start(request: AuthenticationStartRequest):
         raise HTTPException(status_code=500, detail=f"Failed to start authentication: {str(e)}")
 
 
-@router.post("/authenticate/finish", response_model=AuthenticationVerifyResponse)
+@router.post("/authenticate/finish", response_model=TokenResponse)
 async def authentication_finish(request: AuthenticationVerifyRequest):
     """
     Étape 2: Vérifie la réponse et retourne un JWT token si valide
@@ -419,15 +421,50 @@ async def authentication_finish(request: AuthenticationVerifyRequest):
         # Nettoyer le challenge
         del authentication_challenges[challenge_id]
 
-        # TODO: Générer un JWT token pour l'utilisateur (à implémenter avec votre système existant)
-        # Pour l'instant, retourner juste success avec user_id
+        # Récupérer les informations utilisateur depuis Supabase
+        user_response = supabase.table("profiles").select("email, full_name").eq("profile_id", user_id).execute()
+
+        if not user_response.data or len(user_response.data) == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user_data = user_response.data[0]
+        user_email = user_data.get("email", "")
+
+        # Générer un session_id unique
+        session_id = str(uuid.uuid4())
+
+        # Générer le JWT token avec les mêmes claims que le login normal
+        expires = timedelta(minutes=60)  # Même expiration que ACCESS_TOKEN_EXPIRE_MINUTES
+        token_data = {
+            "sub": user_email,
+            "user_id": user_id,
+            "email": user_email,
+            "iss": "intelia-expert",
+            "aud": "authenticated",
+            "session_id": session_id,
+            "auth_method": "webauthn",  # Indiquer que c'est une auth via passkey
+        }
+
+        token = create_access_token(token_data, expires)
+        expires_at = datetime.utcnow() + expires
+
+        # Démarrer le tracking de session
+        try:
+            from .logging import get_analytics_manager
+
+            analytics = get_analytics_manager()
+            analytics.start_session(user_email=user_email, session_id=session_id)
+            logger.info(f"[WebAuthn] Session tracking démarré: {session_id}")
+        except Exception as e:
+            logger.warning(f"[WebAuthn] Erreur session tracking: {e}")
+            # Ne pas faire échouer l'authentification si le tracking échoue
 
         logger.info(f"✅ [WEBAUTHN] Authentication successful for user {user_id}")
 
-        return AuthenticationVerifyResponse(
-            success=True,
-            message="Authentication successful",
-            token="TODO_GENERATE_JWT_TOKEN"  # À implémenter
+        return TokenResponse(
+            access_token=token,
+            token_type="bearer",
+            expires_at=expires_at
         )
 
     except HTTPException:

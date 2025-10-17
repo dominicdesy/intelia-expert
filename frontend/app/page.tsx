@@ -171,7 +171,7 @@ function AuthCallbackHandler() {
 function LoginPageContent() {
   const router = useRouter();
   const { t, currentLanguage, loading: translationsLoading } = useTranslation();
-  const { login, register, loginWithOAuth, isOAuthLoading } = useAuthStore(); // Store unifié avec OAuth
+  const { login, register, loginWithOAuth, isOAuthLoading, checkAuth, isAuthenticated, startSessionTracking } = useAuthStore(); // Store unifié avec OAuth
   const isMountedRef = React.useRef(true); // Protection démontage
 
   // Cleanup au démontage
@@ -546,7 +546,25 @@ function LoginPageContent() {
     try {
       const result = await authenticateWithPasskey();
 
-      if (result.success) {
+      // Backend now returns TokenResponse: {access_token, token_type, expires_at}
+      if (result.access_token) {
+        // Store token in localStorage (same as regular login)
+        const authData = {
+          access_token: result.access_token,
+          token_type: result.token_type || "bearer",
+          expires_at: result.expires_at,
+          synced_at: Date.now(),
+        };
+        localStorage.setItem("intelia-expert-auth", JSON.stringify(authData));
+
+        // Check auth to load user data
+        await checkAuth();
+
+        // Start session tracking if authenticated
+        if (isAuthenticated) {
+          startSessionTracking();
+        }
+
         setSuccess(t("auth.success") || "Authenticated successfully!");
         setTimeout(() => {
           if (!isMountedRef.current) return;
