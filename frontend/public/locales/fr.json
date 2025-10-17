@@ -790,5 +790,7 @@
   "passkey.benefits.faster": "Connexion rapide avec Face ID, Touch ID ou empreinte digitale",
   "passkey.benefits.secure": "Plus sécurisé que les mots de passe",
   "passkey.benefits.noPassword": "Aucun mot de passe à retenir",
-  "passkey.devices.supported": "Compatible iPhone, iPad, téléphones Android et navigateurs modernes"
+  "passkey.devices.supported": "Compatible iPhone, iPad, téléphones Android et navigateurs modernes",
+  "passkey.setupTitle": "Configurer votre Passkey",
+  "passkey.setup.inProgress": "Configuration..."
 }

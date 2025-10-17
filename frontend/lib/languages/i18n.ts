@@ -891,6 +891,66 @@ export interface TranslationKeys {
   "stripe.cancel.retry": string;
   "stripe.cancel.needHelp": string;
   "stripe.cancel.contactSupport": string;
+
+  // ===========================================
+  // PASSKEY / WEBAUTHN - BIOMETRIC AUTHENTICATION
+  // ===========================================
+  "passkey.title": string;
+  "passkey.description": string;
+  "passkey.setupButton": string;
+  "passkey.registered": string;
+  "passkey.noPasskeys": string;
+
+  // Login
+  "passkey.login.title": string;
+  "passkey.login.button": string;
+  "passkey.login.description": string;
+  "passkey.login.inProgress": string;
+  "passkey.login.success": string;
+  "passkey.login.error": string;
+  "passkey.login.canceled": string;
+
+  // Setup
+  "passkey.setupTitle": string;
+  "passkey.setup.title": string;
+  "passkey.setup.description": string;
+  "passkey.setup.button": string;
+  "passkey.setup.deviceName": string;
+  "passkey.setup.devicePlaceholder": string;
+  "passkey.setup.inProgress": string;
+  "passkey.setup.success": string;
+  "passkey.setup.error": string;
+  "passkey.setup.notSupported": string;
+  "passkey.setup.alreadySetup": string;
+
+  // Manage
+  "passkey.manage.title": string;
+  "passkey.manage.description": string;
+  "passkey.manage.deviceName": string;
+  "passkey.manage.addedOn": string;
+  "passkey.manage.lastUsed": string;
+  "passkey.manage.never": string;
+  "passkey.manage.delete": string;
+  "passkey.manage.confirmDelete": string;
+  "passkey.manage.deleteSuccess": string;
+  "passkey.manage.deleteError": string;
+  "passkey.manage.noDevices": string;
+  "passkey.manage.synced": string;
+  "passkey.manage.local": string;
+
+  // Info
+  "passkey.info.whatIs": string;
+  "passkey.info.description": string;
+  "passkey.info.benefits": string;
+  "passkey.info.devices": string;
+
+  // Benefits
+  "passkey.benefits.faster": string;
+  "passkey.benefits.secure": string;
+  "passkey.benefits.noPassword": string;
+
+  // Devices
+  "passkey.devices.supported": string;
 }
 
 // ✅ SOLUTION D: NotificationManager supprimé - Système redondant avec useState/useEffect

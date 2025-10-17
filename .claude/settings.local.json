@@ -60,7 +60,9 @@
       "Bash(fi)",
       "Bash(for lang in es de it pt nl pl ar zh ja hi id th tr vi)",
       "WebFetch(domain:github.com)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(node -e:*)",
+      "Bash(node add-missing-passkey-keys.js:*)"
     ],
     "deny": [],
     "ask": []

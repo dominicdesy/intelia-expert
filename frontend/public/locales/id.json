@@ -790,5 +790,7 @@
   "passkey.benefits.faster": "Faster login with Face ID, Touch ID or fingerprint",
   "passkey.benefits.secure": "More secure than passwords",
   "passkey.benefits.noPassword": "No password to remember",
-  "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers"
+  "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers",
+  "passkey.setupTitle": "Konfigurasi Passkey Anda",
+  "passkey.setup.inProgress": "Mengkonfigurasi..."
 }
