@@ -99,7 +99,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
 
     // Handle end of speech
     recognition.onend = () => {
-      console.log("[VoiceInput] Speech recognition ended. isStoppingRef:", isStoppingRef.current);
+      console.log("[VoiceInput] Speech recognition ended. isStoppingRef:", isStoppingRef.current, "finalTranscript:", finalTranscriptRef.current);
 
       // Only process if we're intentionally stopping
       if (isStoppingRef.current) {
@@ -114,10 +114,11 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
         }
 
         // Reset state
+        setIsListening(false);
         finalTranscriptRef.current = "";
         isStoppingRef.current = false;
       } else {
-        // Unintentional stop - restart automatically
+        // Unintentional stop - browser auto-ended recognition (shouldn't happen in continuous mode)
         console.log("[VoiceInput] Unintentional stop detected - browser auto-ended recognition");
       }
     };
@@ -191,30 +192,16 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     console.log("[VoiceInput] Stopping speech recognition manually. Setting isStoppingRef to true.");
     isStoppingRef.current = true; // Mark as intentional stop BEFORE calling stop()
 
-    // Process transcript immediately before stopping
-    if (finalTranscriptRef.current.trim()) {
-      console.log("[VoiceInput] Processing transcript immediately:", finalTranscriptRef.current.trim());
-      onTranscript(finalTranscriptRef.current.trim());
-    } else {
-      console.log("[VoiceInput] No transcript to process");
-    }
-
-    // Reset state immediately
-    setIsListening(false);
-    finalTranscriptRef.current = "";
-
-    // Stop the recognition (this will trigger onend, but we already processed)
+    // Stop the recognition - onend will handle transcript processing
     try {
       recognitionRef.current.stop();
     } catch (err) {
       console.log("[VoiceInput] Error stopping recognition:", err);
-    }
-
-    // Reset flag after a short delay to ensure onend sees it as true
-    setTimeout(() => {
+      // If stop fails, reset state manually
+      setIsListening(false);
       isStoppingRef.current = false;
-    }, 100);
-  }, [isListening, onTranscript]);
+    }
+  }, [isListening]);
 
   if (!isSupported) {
     return (
