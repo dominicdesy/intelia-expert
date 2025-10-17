@@ -31,6 +31,22 @@ export function usePasskey() {
   }, []);
 
   /**
+   * Get auth token from localStorage
+   */
+  const getAuthToken = useCallback(() => {
+    try {
+      const authData = localStorage.getItem("intelia-expert-auth");
+      if (authData) {
+        const parsed = JSON.parse(authData);
+        return parsed?.state?.session?.access_token || null;
+      }
+    } catch (error) {
+      console.error("[Passkey] Failed to get auth token:", error);
+    }
+    return null;
+  }, []);
+
+  /**
    * Register a new passkey/credential
    */
   const registerPasskey = useCallback(
@@ -47,11 +63,18 @@ export function usePasskey() {
       setError(null);
 
       try {
+        // Get auth token
+        const token = getAuthToken();
+        if (!token) {
+          throw new Error("No authentication token found");
+        }
+
         // Step 1: Get registration options from backend
         const optionsRes = await fetch("/api/v1/webauthn/register/start", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
           },
           credentials: "include",
         });
@@ -71,6 +94,7 @@ export function usePasskey() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
           },
           credentials: "include",
           body: JSON.stringify({
@@ -97,7 +121,7 @@ export function usePasskey() {
         setIsLoading(false);
       }
     },
-    [user, isSupported]
+    [user, isSupported, getAuthToken]
   );
 
   /**
@@ -173,8 +197,17 @@ export function usePasskey() {
     }
 
     try {
+      const token = getAuthToken();
+      if (!token) {
+        console.error("[Passkey] No auth token for getPasskeys");
+        return [];
+      }
+
       const res = await fetch("/api/v1/webauthn/credentials", {
         method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
         credentials: "include",
       });
 
@@ -188,7 +221,7 @@ export function usePasskey() {
       setError(err.message || "Failed to fetch passkeys");
       return [];
     }
-  }, [user]);
+  }, [user, getAuthToken]);
 
   /**
    * Delete a passkey
@@ -203,10 +236,18 @@ export function usePasskey() {
       setError(null);
 
       try {
+        const token = getAuthToken();
+        if (!token) {
+          throw new Error("No authentication token found");
+        }
+
         const res = await fetch(
           `/api/v1/webauthn/credentials/${credentialId}`,
           {
             method: "DELETE",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            },
             credentials: "include",
           }
         );
@@ -224,7 +265,7 @@ export function usePasskey() {
         setIsLoading(false);
       }
     },
-    [user]
+    [user, getAuthToken]
   );
 
   return {
