@@ -677,5 +677,7 @@
   "chat.voiceNotSupported": "इस ब्राउज़र में वॉयस इनपुट समर्थित नहीं है",
   "chat.voicePermissionDenied": "माइक्रोफोन अनुमति अस्वीकृत",
   "chat.voiceError": "वॉयस इनपुट त्रुटि",
-  "chat.voiceNoSpeech": "कोई भाषण नहीं मिला। कृपया पुनः प्रयास करें।"
+  "chat.voiceNoSpeech": "कोई भाषण नहीं मिला। कृपया पुनः प्रयास करें।",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }

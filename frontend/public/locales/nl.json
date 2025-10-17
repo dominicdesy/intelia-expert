@@ -677,5 +677,7 @@
   "chat.voiceNotSupported": "Spraakinvoer niet ondersteund in deze browser",
   "chat.voicePermissionDenied": "Microfoontoestemming geweigerd",
   "chat.voiceError": "Spraakinvoerfout",
-  "chat.voiceNoSpeech": "Geen spraak gedetecteerd. Probeer het opnieuw."
+  "chat.voiceNoSpeech": "Geen spraak gedetecteerd. Probeer het opnieuw.",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }

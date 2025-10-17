@@ -677,5 +677,7 @@
   "chat.voiceNotSupported": "このブラウザでは音声入力がサポートされていません",
   "chat.voicePermissionDenied": "マイクの許可が拒否されました",
   "chat.voiceError": "音声入力エラー",
-  "chat.voiceNoSpeech": "音声が検出されませんでした。もう一度お試しください。"
+  "chat.voiceNoSpeech": "音声が検出されませんでした。もう一度お試しください。",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }

@@ -7,6 +7,7 @@ interface BaseDialogProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  description?: string;
   children: React.ReactNode;
   maxWidth?: string;
   showCloseButton?: boolean;
@@ -33,6 +34,7 @@ export const BaseDialog: React.FC<BaseDialogProps> = ({
   isOpen,
   onClose,
   title,
+  description,
   children,
   maxWidth = "700px",
   showCloseButton = true,
@@ -68,6 +70,11 @@ export const BaseDialog: React.FC<BaseDialogProps> = ({
               )}
             </div>
           )}
+
+          {/* Description (hidden but accessible for screen readers) */}
+          <Dialog.Description className="sr-only">
+            {description || title || "Dialog content"}
+          </Dialog.Description>
 
           {/* Content */}
           <div className="p-6">{children}</div>

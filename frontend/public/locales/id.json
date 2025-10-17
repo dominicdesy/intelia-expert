@@ -678,5 +678,7 @@
   "chat.voiceNotSupported": "Input suara tidak didukung di browser ini",
   "chat.voicePermissionDenied": "Izin mikrofon ditolak",
   "chat.voiceError": "Kesalahan input suara",
-  "chat.voiceNoSpeech": "Tidak ada ucapan terdeteksi. Silakan coba lagi."
+  "chat.voiceNoSpeech": "Tidak ada ucapan terdeteksi. Silakan coba lagi.",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }

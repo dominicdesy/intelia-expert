@@ -677,5 +677,7 @@
   "chat.voiceNotSupported": "الإدخال الصوتي غير مدعوم في هذا المتصفح",
   "chat.voicePermissionDenied": "تم رفض إذن الميكروفون",
   "chat.voiceError": "خطأ في الإدخال الصوتي",
-  "chat.voiceNoSpeech": "لم يتم اكتشاف كلام. يرجى المحاولة مرة أخرى."
+  "chat.voiceNoSpeech": "لم يتم اكتشاف كلام. يرجى المحاولة مرة أخرى.",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }

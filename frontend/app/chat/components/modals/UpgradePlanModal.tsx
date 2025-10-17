@@ -57,6 +57,7 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={t("stripe.upgrade.title")}
+      description={t("stripe.upgrade.choosePlan")}
     >
       <div className="space-y-6">
         {/* Description */}

@@ -677,5 +677,7 @@
   "chat.voiceNotSupported": "การป้อนเสียงไม่รองรับในเบราว์เซอร์นี้",
   "chat.voicePermissionDenied": "การอนุญาตไมโครโฟนถูกปฏิเสธ",
   "chat.voiceError": "ข้อผิดพลาดการป้อนเสียง",
-  "chat.voiceNoSpeech": "ไม่พบการพูด โปรดลองอีกครั้ง"
+  "chat.voiceNoSpeech": "ไม่พบการพูด โปรดลองอีกครั้ง",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }

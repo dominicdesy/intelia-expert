@@ -677,5 +677,7 @@
   "chat.voiceNotSupported": "Entrada de voz no soportada en este navegador",
   "chat.voicePermissionDenied": "Permiso de micrófono denegado",
   "chat.voiceError": "Error de entrada de voz",
-  "chat.voiceNoSpeech": "No se detectó habla. Por favor, inténtalo de nuevo."
+  "chat.voiceNoSpeech": "No se detectó habla. Por favor, inténtalo de nuevo.",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }

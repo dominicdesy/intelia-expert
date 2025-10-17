@@ -677,5 +677,7 @@
   "chat.voiceNotSupported": "Wprowadzanie głosowe nie jest obsługiwane w tej przeglądarce",
   "chat.voicePermissionDenied": "Odmowa dostępu do mikrofonu",
   "chat.voiceError": "Błąd wprowadzania głosowego",
-  "chat.voiceNoSpeech": "Nie wykryto mowy. Spróbuj ponownie."
+  "chat.voiceNoSpeech": "Nie wykryto mowy. Spróbuj ponownie.",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }

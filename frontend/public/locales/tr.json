@@ -677,5 +677,7 @@
   "chat.voiceNotSupported": "Bu tarayıcıda sesli giriş desteklenmiyor",
   "chat.voicePermissionDenied": "Mikrofon izni reddedildi",
   "chat.voiceError": "Sesli giriş hatası",
-  "chat.voiceNoSpeech": "Konuşma tespit edilemedi. Lütfen tekrar deneyin."
+  "chat.voiceNoSpeech": "Konuşma tespit edilemedi. Lütfen tekrar deneyin.",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }

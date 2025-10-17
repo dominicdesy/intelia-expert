@@ -982,7 +982,12 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
   }
 
   return (
-    <BaseDialog isOpen={isOpen} onClose={onClose} title={t("profile.title")}>
+    <BaseDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title={t("profile.title")}
+      description={t("profile.description")}
+    >
       {/* Tabs */}
       <div className="border-b border-gray-200 -mx-6 -mt-6 mb-6">
         <nav className="flex px-6" data-debug="tabs-nav">

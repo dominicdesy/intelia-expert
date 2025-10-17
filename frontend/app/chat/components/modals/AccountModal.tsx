@@ -59,7 +59,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
   return (
     <>
-      <BaseDialog isOpen={isOpen} onClose={onClose} title={t("subscription.title")}>
+      <BaseDialog
+        isOpen={isOpen}
+        onClose={onClose}
+        title={t("subscription.title")}
+        description={t("subscription.description")}
+      >
         <div className="space-y-8">
           {/* Pricing Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

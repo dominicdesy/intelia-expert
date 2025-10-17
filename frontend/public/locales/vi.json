@@ -677,5 +677,7 @@
   "chat.voiceNotSupported": "Nhập giọng nói không được hỗ trợ trên trình duyệt này",
   "chat.voicePermissionDenied": "Quyền truy cập micrô bị từ chối",
   "chat.voiceError": "Lỗi nhập giọng nói",
-  "chat.voiceNoSpeech": "Không phát hiện giọng nói. Vui lòng thử lại."
+  "chat.voiceNoSpeech": "Không phát hiện giọng nói. Vui lòng thử lại.",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }

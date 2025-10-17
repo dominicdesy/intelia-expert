@@ -677,5 +677,7 @@
   "chat.voiceNotSupported": "此浏览器不支持语音输入",
   "chat.voicePermissionDenied": "麦克风权限被拒绝",
   "chat.voiceError": "语音输入错误",
-  "chat.voiceNoSpeech": "未检测到语音。请重试。"
+  "chat.voiceNoSpeech": "未检测到语音。请重试。",
+  "subscription.description": "View and manage your subscription plan",
+  "profile.description": "Manage your personal information and account settings"
 }
