@@ -235,12 +235,14 @@ async def registration_start(
             "device_name": request.device_name,
         }
 
-        # Convertir en JSON pour le frontend
-        options_json = options_to_json(registration_options)
+        # Convertir en dict pour le frontend
+        import json
+        options_json_str = options_to_json(registration_options)
+        options_dict = json.loads(options_json_str)
 
         logger.info(f"✅ [WEBAUTHN] Registration options generated for user {user_id}")
 
-        return RegistrationStartResponse(options=options_json)
+        return RegistrationStartResponse(options=options_dict)
 
     except Exception as e:
         logger.error(f"❌ [WEBAUTHN] Registration start error: {e}")
@@ -347,15 +349,17 @@ async def authentication_start(request: AuthenticationStartRequest):
             timeout=60000,  # 60 secondes
         )
 
-        # Convertir en JSON
-        options_json = options_to_json(authentication_options)
+        # Convertir en dict
+        import json
+        options_json_str = options_to_json(authentication_options)
+        options_dict = json.loads(options_json_str)
 
         # Ajouter le challenge_id au response pour le retrouver lors de verify
-        options_json["challenge_id"] = challenge_id
+        options_dict["challenge_id"] = challenge_id
 
         logger.info(f"✅ [WEBAUTHN] Authentication options generated")
 
-        return AuthenticationStartResponse(options=options_json)
+        return AuthenticationStartResponse(options=options_dict)
 
     except Exception as e:
         logger.error(f"❌ [WEBAUTHN] Authentication start error: {e}")
