@@ -544,7 +544,9 @@ function LoginPageContent() {
     setSuccess("");
 
     try {
+      console.log("[Passkey] Starting authentication...");
       const result = await authenticateWithPasskey();
+      console.log("[Passkey] Result:", result);
 
       // Backend now returns TokenResponse: {access_token, token_type, expires_at}
       if (result.access_token) {
@@ -570,9 +572,15 @@ function LoginPageContent() {
           if (!isMountedRef.current) return;
           router.push("/chat");
         }, 1000);
+      } else {
+        console.error("[Passkey] No access_token in result:", result);
+        setError("Authentication failed: No token received");
       }
     } catch (err: any) {
-      const errorMessage = err.message || t("auth.error") || "Authentication failed";
+      console.error("[Passkey] Error:", err);
+      // Ensure we always set a string, not an object
+      const errorMessage = typeof err === 'string' ? err : (err?.message || err?.toString() || t("auth.error") || "Authentication failed");
+      console.error("[Passkey] Error message:", errorMessage);
       setError(errorMessage);
     }
   };
