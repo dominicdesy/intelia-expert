@@ -420,12 +420,12 @@ async def authentication_finish(request: AuthenticationVerifyRequest):
         del authentication_challenges[challenge_id]
 
         # Récupérer les informations utilisateur depuis Supabase
-        user_response = supabase.table("profiles").select("email, full_name").eq("profile_id", user_id).execute()
+        from app.core.database import get_user_from_supabase
 
-        if not user_response.data or len(user_response.data) == 0:
+        user_data = get_user_from_supabase(user_id)
+        if not user_data:
             raise HTTPException(status_code=404, detail="User not found")
 
-        user_data = user_response.data[0]
         user_email = user_data.get("email", "")
 
         # Générer un session_id unique
