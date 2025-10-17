@@ -40,6 +40,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const finalTranscriptRef = useRef("");
+  const isStoppingRef = useRef(false); // Track if we're intentionally stopping
 
   // Check browser support on mount
   useEffect(() => {
@@ -92,19 +93,28 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
 
     // Handle end of speech
     recognition.onend = () => {
-      console.log("[VoiceInput] Speech recognition ended. Final transcript:", finalTranscriptRef.current);
+      console.log("[VoiceInput] Speech recognition ended. isStoppingRef:", isStoppingRef.current);
 
-      // Send transcript if we have one
-      if (finalTranscriptRef.current.trim()) {
-        console.log("[VoiceInput] Sending transcript:", finalTranscriptRef.current.trim());
-        onTranscript(finalTranscriptRef.current.trim());
+      // Only process if we're intentionally stopping
+      if (isStoppingRef.current) {
+        console.log("[VoiceInput] Intentional stop. Final transcript:", finalTranscriptRef.current);
+
+        // Send transcript if we have one
+        if (finalTranscriptRef.current.trim()) {
+          console.log("[VoiceInput] Sending transcript:", finalTranscriptRef.current.trim());
+          onTranscript(finalTranscriptRef.current.trim());
+        } else {
+          console.log("[VoiceInput] No transcript captured");
+        }
+
+        // Reset state
+        setIsListening(false);
+        finalTranscriptRef.current = "";
+        isStoppingRef.current = false;
       } else {
-        console.log("[VoiceInput] No transcript captured - user may not have spoken or microphone issue");
+        // Unintentional stop - restart if still in listening state
+        console.log("[VoiceInput] Unintentional stop, ignoring");
       }
-
-      // Reset state
-      setIsListening(false);
-      finalTranscriptRef.current = "";
     };
 
     // Handle errors
@@ -160,8 +170,8 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
 
     // Stop listening
     console.log("[VoiceInput] Stopping speech recognition manually");
+    isStoppingRef.current = true; // Mark as intentional stop
     recognitionRef.current.stop();
-    setIsListening(false);
   }, [isListening]);
 
   if (!isSupported) {
