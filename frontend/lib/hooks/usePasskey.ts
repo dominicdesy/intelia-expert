@@ -145,6 +145,7 @@ export function usePasskey() {
           "Content-Type": "application/json",
         },
         credentials: "include",
+        body: JSON.stringify({}),
       });
 
       if (!optionsRes.ok) {
