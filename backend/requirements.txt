@@ -38,3 +38,6 @@ boto3>=1.28.0
 
 # Stripe (pour abonnements et paiements)
 stripe>=7.0.0
+
+# WebAuthn (pour authentification biométrique - Face ID, Touch ID, Fingerprint)
+webauthn>=2.0.0
