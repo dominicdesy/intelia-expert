@@ -587,14 +587,19 @@ function LoginPageContent() {
       } else if (err instanceof Error) {
         errorMessage = `${err.name}: ${err.message}`;
       } else if (err && typeof err === 'object') {
-        // Try to extract useful information from error object
-        errorMessage = `Error: ${JSON.stringify({
-          name: err.name,
-          message: err.message,
-          detail: err.detail,
-          code: err.code,
-          status: err.status
-        })}`;
+        // Try to extract ALL properties from error object
+        const errorProps = [];
+        try {
+          for (const key in err) {
+            errorProps.push(`${key}: ${err[key]}`);
+          }
+          errorMessage = `Error object: ${errorProps.join(', ')}`;
+        } catch {
+          // If that fails, try converting to string
+          errorMessage = `Error: ${String(err)}`;
+        }
+      } else {
+        errorMessage = `Error (type ${typeof err}): ${String(err)}`;
       }
 
       console.error("[Passkey] Error message:", errorMessage);
