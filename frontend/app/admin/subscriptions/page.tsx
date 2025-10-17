@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { API_CONFIG } from "@/types";
+import { buildApiUrl } from "@/lib/api/config";
 
 interface SubscriptionStats {
   total_subscriptions: number;
@@ -49,7 +49,7 @@ export default function SubscriptionsAdminPage() {
     setIsLoading(true);
     try {
       const response = await fetch(
-        `${API_CONFIG.BASE_URL}/billing/admin`,
+        buildApiUrl("/billing/admin"),
         {
           headers: {
             Authorization: `Bearer ${token}`,

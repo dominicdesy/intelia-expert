@@ -5,7 +5,7 @@
  * Version: 1.0
  */
 
-import { API_CONFIG } from "@/types";
+import { API_CONFIG } from "@/lib/api/config";
 
 // ==================== TYPES ====================
 
