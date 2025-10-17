@@ -614,6 +614,9 @@ function LoginPageContent() {
                   <input
                     id="email"
                     type="email"
+                    name="email"
+                    autoComplete="username"
+                    inputMode="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyPress={handleKeyPress}
@@ -651,6 +654,8 @@ function LoginPageContent() {
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
+                    name="password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyPress={handleKeyPress}

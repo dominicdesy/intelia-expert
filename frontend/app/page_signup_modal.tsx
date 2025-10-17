@@ -616,6 +616,8 @@ export function SignupModal({
                 </label>
                 <input
                   type="text"
+                  name="given-name"
+                  autoComplete="given-name"
                   required
                   value={signupData.firstName}
                   onChange={(e) =>
@@ -634,6 +636,8 @@ export function SignupModal({
                 </label>
                 <input
                   type="text"
+                  name="family-name"
+                  autoComplete="family-name"
                   required
                   value={signupData.lastName}
                   onChange={(e) =>
@@ -652,6 +656,9 @@ export function SignupModal({
                 </label>
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="email"
+                  inputMode="email"
                   required
                   value={signupData.email}
                   onChange={(e) => handleSignupChange("email", e.target.value)}
@@ -696,6 +703,8 @@ export function SignupModal({
                 <div className="mt-1 relative">
                   <input
                     type={showPassword ? "text" : "password"}
+                    name="new-password"
+                    autoComplete="new-password"
                     required
                     value={signupData.password}
                     onChange={(e) =>
@@ -749,6 +758,8 @@ export function SignupModal({
                 <div className="mt-1 relative">
                   <input
                     type={showConfirmPassword ? "text" : "password"}
+                    name="new-password-confirm"
+                    autoComplete="new-password"
                     required
                     value={signupData.confirmPassword}
                     onChange={(e) =>
