@@ -38,7 +38,7 @@ export function usePasskey() {
       const authData = localStorage.getItem("intelia-expert-auth");
       if (authData) {
         const parsed = JSON.parse(authData);
-        return parsed?.state?.session?.access_token || null;
+        return parsed?.access_token || null;
       }
     } catch (error) {
       console.error("[Passkey] Failed to get auth token:", error);
