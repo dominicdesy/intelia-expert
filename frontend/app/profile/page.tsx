@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/auth";
+import { usePasskey } from "@/lib/hooks/usePasskey";
 import { useTranslation } from "react-i18next";
 import Link from "next/link";
 import {
@@ -134,6 +135,18 @@ function ProfilePageContent() {
   const [success, setSuccess] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Passkey state
+  const {
+    isSupported: isPasskeySupported,
+    isLoading: isPasskeyLoading,
+    error: passkeyError,
+    registerPasskey,
+    getPasskeys,
+    deletePasskey: removePasskey,
+  } = usePasskey();
+  const [passkeys, setPasskeys] = useState<any[]>([]);
+  const [isLoadingPasskeys, setIsLoadingPasskeys] = useState(false);
+
   // Initialisation sécurisée avec les données utilisateur
   useEffect(() => {
     if (!user) {
@@ -153,7 +166,61 @@ function ProfilePageContent() {
     if (tab && ["profile", "settings", "passkey", "privacy"].includes(tab)) {
       setActiveTab(tab);
     }
-  }, [user, router, searchParams]);
+
+    // Load passkeys when passkey tab is active
+    if (activeTab === "passkey") {
+      loadPasskeys();
+    }
+  }, [user, router, searchParams, activeTab]);
+
+  const loadPasskeys = async () => {
+    setIsLoadingPasskeys(true);
+    try {
+      const credentials = await getPasskeys();
+      setPasskeys(credentials);
+    } catch (err: any) {
+      console.error("Failed to load passkeys:", err);
+    } finally {
+      setIsLoadingPasskeys(false);
+    }
+  };
+
+  const handleSetupPasskey = async () => {
+    setError("");
+    setSuccess("");
+
+    if (!isPasskeySupported()) {
+      setError(t("passkey.setup.notSupported"));
+      return;
+    }
+
+    try {
+      const deviceName =
+        window.navigator.userAgent.includes("iPhone")
+          ? "iPhone"
+          : window.navigator.userAgent.includes("iPad")
+            ? "iPad"
+            : window.navigator.userAgent.includes("Android")
+              ? "Android"
+              : "Browser";
+
+      await registerPasskey(deviceName);
+      setSuccess(t("passkey.setup.success"));
+      await loadPasskeys();
+    } catch (err: any) {
+      setError(err.message || t("passkey.setup.error"));
+    }
+  };
+
+  const handleDeletePasskey = async (credentialId: string) => {
+    try {
+      await removePasskey(credentialId);
+      setSuccess(t("passkey.manage.deleteSuccess"));
+      await loadPasskeys();
+    } catch (err: any) {
+      setError(err.message || t("passkey.manage.deleteError"));
+    }
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -516,22 +583,67 @@ function ProfilePageContent() {
                         </div>
 
                         <button
-                          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
+                          onClick={handleSetupPasskey}
+                          disabled={isPasskeyLoading || !isPasskeySupported()}
+                          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {t("passkey.setupButton")}
+                          {isPasskeyLoading
+                            ? t("passkey.setup.inProgress") || "Setting up..."
+                            : t("passkey.setupButton")}
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Registered Passkeys List (placeholder) */}
+                  {/* Registered Passkeys List */}
                   <div className="border border-gray-200 rounded-lg p-6">
-                    <h4 className="font-medium text-gray-900 mb-3">
+                    <h4 className="font-medium text-gray-900 mb-4">
                       {t("passkey.registered")}
                     </h4>
-                    <p className="text-sm text-gray-500">
-                      {t("passkey.noPasskeys")}
-                    </p>
+
+                    {isLoadingPasskeys ? (
+                      <div className="flex justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      </div>
+                    ) : passkeys.length === 0 ? (
+                      <p className="text-sm text-gray-500">
+                        {t("passkey.noPasskeys")}
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {passkeys.map((passkey) => (
+                          <div
+                            key={passkey.id}
+                            className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <FingerprintIcon className="w-5 h-5 text-gray-600" />
+                              <div>
+                                <p className="font-medium text-gray-900">
+                                  {passkey.device_name || t("passkey.manage.deviceName")}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {t("passkey.manage.addedOn")}:{" "}
+                                  {new Date(passkey.created_at).toLocaleDateString()}
+                                </p>
+                                {passkey.last_used_at && (
+                                  <p className="text-xs text-gray-400">
+                                    {t("passkey.manage.lastUsed")}:{" "}
+                                    {new Date(passkey.last_used_at).toLocaleDateString()}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleDeletePasskey(passkey.credential_id)}
+                              className="text-red-600 hover:text-red-700 text-sm font-medium"
+                            >
+                              {t("passkey.manage.delete")}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

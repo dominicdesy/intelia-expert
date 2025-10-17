@@ -247,8 +247,8 @@ async def registration_start(
         raise HTTPException(status_code=500, detail=f"Failed to start registration: {str(e)}")
 
 
-@router.post("/register/verify", response_model=RegistrationVerifyResponse)
-async def registration_verify(
+@router.post("/register/finish", response_model=RegistrationVerifyResponse)
+async def registration_finish(
     request: RegistrationVerifyRequest,
     current_user: dict = Depends(get_current_user)
 ):
@@ -362,8 +362,8 @@ async def authentication_start(request: AuthenticationStartRequest):
         raise HTTPException(status_code=500, detail=f"Failed to start authentication: {str(e)}")
 
 
-@router.post("/authenticate/verify", response_model=AuthenticationVerifyResponse)
-async def authentication_verify(request: AuthenticationVerifyRequest):
+@router.post("/authenticate/finish", response_model=AuthenticationVerifyResponse)
+async def authentication_finish(request: AuthenticationVerifyRequest):
     """
     Étape 2: Vérifie la réponse et retourne un JWT token si valide
     """
@@ -437,8 +437,8 @@ async def authentication_verify(request: AuthenticationVerifyRequest):
 # ENDPOINTS - MANAGEMENT (List, Delete)
 # ============================================================================
 
-@router.get("/passkeys", response_model=list[PasskeyInfo])
-async def list_passkeys(current_user: dict = Depends(get_current_user)):
+@router.get("/credentials", response_model=dict)
+async def list_credentials(current_user: dict = Depends(get_current_user)):
     """
     Liste tous les passkeys de l'utilisateur connecté
     """
@@ -461,15 +461,15 @@ async def list_passkeys(current_user: dict = Depends(get_current_user)):
         ]
 
         logger.info(f"✅ [WEBAUTHN] Listed {len(passkeys)} passkeys for user {user_id}")
-        return passkeys
+        return {"credentials": passkeys}
 
     except Exception as e:
         logger.error(f"❌ [WEBAUTHN] List passkeys error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list passkeys: {str(e)}")
 
 
-@router.delete("/passkeys/{credential_id}")
-async def delete_passkey(credential_id: str, current_user: dict = Depends(get_current_user)):
+@router.delete("/credentials/{credential_id}")
+async def delete_credential(credential_id: str, current_user: dict = Depends(get_current_user)):
     """
     Supprime un passkey spécifique
     """

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/languages/i18n";
 import { useAuthStore } from "@/lib/stores/auth"; // Store unifié
+import { usePasskey } from "@/lib/hooks/usePasskey";
 import { availableLanguages } from "../lib/languages/config";
 import { rememberMeUtils } from "./page_hooks";
 import { SignupModal } from "./page_signup_modal";
@@ -190,6 +191,13 @@ function LoginPageContent() {
   const [showSignup, setShowSignup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Passkey authentication
+  const {
+    isSupported: isPasskeySupported,
+    isLoading: isPasskeyLoading,
+    authenticateWithPasskey,
+  } = usePasskey();
 
   // Détection mobile
   useEffect(() => {
@@ -530,6 +538,27 @@ function LoginPageContent() {
     }
   };
 
+  // Handle passkey authentication
+  const handlePasskeyLogin = async () => {
+    setError("");
+    setSuccess("");
+
+    try {
+      const result = await authenticateWithPasskey();
+
+      if (result.success) {
+        setSuccess(t("passkey.login.success") || "Authenticated successfully!");
+        setTimeout(() => {
+          if (!isMountedRef.current) return;
+          router.push("/chat");
+        }, 1000);
+      }
+    } catch (err: any) {
+      const errorMessage = err.message || t("passkey.login.error") || "Authentication failed";
+      setError(errorMessage);
+    }
+  };
+
   return (
     <div
       className="min-h-screen relative bg-white overflow-y-auto overflow-x-hidden"
@@ -734,7 +763,7 @@ function LoginPageContent() {
               {/* Bouton de connexion */}
               <button
                 onClick={handleLogin}
-                disabled={isLoading || isOAuthLoading !== null}
+                disabled={isLoading || isOAuthLoading !== null || isPasskeyLoading}
                 className="w-full relative py-4 px-6 bg-blue-100 hover:bg-blue-200 border-2 border-blue-100 hover:border-blue-200 text-blue-700 font-semibold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 {isLoading ? (
@@ -761,6 +790,39 @@ function LoginPageContent() {
                   </span>
                 )}
               </button>
+
+              {/* Bouton de connexion biométrique (Passkey) */}
+              {isPasskeySupported() && (
+                <button
+                  onClick={handlePasskeyLogin}
+                  disabled={isPasskeyLoading || isLoading || isOAuthLoading !== null}
+                  className="w-full relative py-4 px-6 bg-gradient-to-r from-purple-100 to-blue-100 hover:from-purple-200 hover:to-blue-200 border-2 border-purple-100 hover:border-purple-200 text-purple-700 font-semibold rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  {isPasskeyLoading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-5 h-5 border-2 border-purple-700/30 border-t-purple-700 rounded-full animate-spin"></div>
+                      <span>{t("passkey.login.inProgress") || "Authenticating..."}</span>
+                    </div>
+                  ) : (
+                    <span className="flex items-center justify-center space-x-2">
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a7.464 7.464 0 01-1.15 3.993m1.989 3.559A11.209 11.209 0 008.25 10.5a3.75 3.75 0 117.5 0c0 .527-.021 1.049-.064 1.565M12 10.5a14.94 14.94 0 01-3.6 9.75m6.633-4.596a18.666 18.666 0 01-2.485 5.33"
+                        />
+                      </svg>
+                      <span>{t("passkey.login.button") || "Sign in with Face ID / Touch ID"}</span>
+                    </span>
+                  )}
+                </button>
+              )}
 
               {/* Séparateur pour les boutons sociaux */}
               <div className="relative">

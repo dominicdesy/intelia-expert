@@ -1,0 +1,245 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/types";
+import { useAuthStore } from "./useAuthStore";
+
+interface PasskeyDevice {
+  id: string;
+  device_name: string;
+  device_type: "platform" | "cross-platform";
+  created_at: string;
+  last_used_at: string | null;
+  backup_eligible: boolean;
+  backup_state: boolean;
+  transports: string[];
+}
+
+export function usePasskey() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuthStore();
+
+  /**
+   * Check if WebAuthn is supported in the current browser
+   */
+  const isSupported = useCallback(() => {
+    return (
+      window?.PublicKeyCredential !== undefined &&
+      typeof window.PublicKeyCredential === "function"
+    );
+  }, []);
+
+  /**
+   * Register a new passkey/credential
+   */
+  const registerPasskey = useCallback(
+    async (deviceName?: string) => {
+      if (!user) {
+        throw new Error("User must be authenticated to register a passkey");
+      }
+
+      if (!isSupported()) {
+        throw new Error("WebAuthn is not supported in this browser");
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Step 1: Get registration options from backend
+        const optionsRes = await fetch("/api/v1/webauthn/register/start", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        });
+
+        if (!optionsRes.ok) {
+          const errorData = await optionsRes.json();
+          throw new Error(errorData.detail || "Failed to start registration");
+        }
+
+        const options: PublicKeyCredentialCreationOptionsJSON =
+          await optionsRes.json();
+
+        // Step 2: Prompt user for biometric authentication
+        const credential = await startRegistration(options);
+
+        // Step 3: Send credential to backend for verification
+        const verifyRes = await fetch("/api/v1/webauthn/register/finish", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            credential,
+            device_name: deviceName || "Unknown Device",
+          }),
+        });
+
+        if (!verifyRes.ok) {
+          const errorData = await verifyRes.json();
+          throw new Error(errorData.detail || "Failed to verify registration");
+        }
+
+        const result = await verifyRes.json();
+        return result;
+      } catch (err: any) {
+        const errorMessage =
+          err.name === "NotAllowedError"
+            ? "Registration was cancelled"
+            : err.message || "Failed to register passkey";
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [user, isSupported]
+  );
+
+  /**
+   * Authenticate using a passkey
+   */
+  const authenticateWithPasskey = useCallback(async () => {
+    if (!isSupported()) {
+      throw new Error("WebAuthn is not supported in this browser");
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Step 1: Get authentication options from backend
+      const optionsRes = await fetch("/api/v1/webauthn/authenticate/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!optionsRes.ok) {
+        const errorData = await optionsRes.json();
+        throw new Error(
+          errorData.detail || "Failed to start authentication"
+        );
+      }
+
+      const options: PublicKeyCredentialRequestOptionsJSON =
+        await optionsRes.json();
+
+      // Step 2: Prompt user for biometric authentication
+      const credential = await startAuthentication(options);
+
+      // Step 3: Send credential to backend for verification
+      const verifyRes = await fetch("/api/v1/webauthn/authenticate/finish", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ credential }),
+      });
+
+      if (!verifyRes.ok) {
+        const errorData = await verifyRes.json();
+        throw new Error(
+          errorData.detail || "Failed to verify authentication"
+        );
+      }
+
+      const result = await verifyRes.json();
+      return result;
+    } catch (err: any) {
+      const errorMessage =
+        err.name === "NotAllowedError"
+          ? "Authentication was cancelled"
+          : err.message || "Failed to authenticate with passkey";
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isSupported]);
+
+  /**
+   * Get list of registered passkeys for current user
+   */
+  const getPasskeys = useCallback(async (): Promise<PasskeyDevice[]> => {
+    if (!user) {
+      return [];
+    }
+
+    try {
+      const res = await fetch("/api/v1/webauthn/credentials", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch passkeys");
+      }
+
+      const data = await res.json();
+      return data.credentials || [];
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch passkeys");
+      return [];
+    }
+  }, [user]);
+
+  /**
+   * Delete a passkey
+   */
+  const deletePasskey = useCallback(
+    async (credentialId: string) => {
+      if (!user) {
+        throw new Error("User must be authenticated");
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch(
+          `/api/v1/webauthn/credentials/${credentialId}`,
+          {
+            method: "DELETE",
+            credentials: "include",
+          }
+        );
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.detail || "Failed to delete passkey");
+        }
+
+        return await res.json();
+      } catch (err: any) {
+        setError(err.message || "Failed to delete passkey");
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [user]
+  );
+
+  return {
+    isSupported,
+    isLoading,
+    error,
+    registerPasskey,
+    authenticateWithPasskey,
+    getPasskeys,
+    deletePasskey,
+  };
+}
