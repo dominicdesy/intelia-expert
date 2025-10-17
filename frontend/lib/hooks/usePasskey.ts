@@ -165,17 +165,19 @@ export function usePasskey() {
       // Step 2: Prompt user for biometric authentication
       const credential = await startAuthentication(options);
 
-      // Add challenge_id to credential before sending to backend
-      credential.challenge_id = challenge_id;
-
-      // Step 3: Send credential to backend for verification
+      // Step 3: Send credential to backend for verification (with challenge_id)
       const verifyRes = await fetch("/api/v1/webauthn/authenticate/finish", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ credential }),
+        body: JSON.stringify({
+          credential: {
+            ...credential,
+            challenge_id
+          }
+        }),
       });
 
       if (!verifyRes.ok) {
