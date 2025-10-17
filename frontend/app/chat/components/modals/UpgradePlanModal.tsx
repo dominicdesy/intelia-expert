@@ -5,7 +5,7 @@ import { BaseDialog } from "../BaseDialog";
 import { PLAN_CONFIGS } from "@/types";
 import { redirectToCheckout } from "@/lib/api/stripe";
 import { useTranslation } from "@/lib/languages/i18n";
-import { createBrowserClient } from "@supabase/ssr";
+import { supabase } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 
 interface UpgradePlanModalProps {
@@ -29,11 +29,6 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
 
     try {
       // Récupérer le token JWT depuis Supabase
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-
       const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error || !session?.access_token) {
