@@ -388,11 +388,10 @@ async def authentication_finish(request: AuthenticationVerifyRequest):
         expected_challenge = challenge_data["challenge"]
 
         # Récupérer le credential_id de la réponse
-        raw_credential_id = request.credential.get("rawId") or request.credential.get("id")
-        if not raw_credential_id:
+        # Note: rawId et id sont déjà en base64url format (pas besoin de decoder/encoder)
+        credential_id_base64 = request.credential.get("rawId") or request.credential.get("id")
+        if not credential_id_base64:
             raise HTTPException(status_code=400, detail="Missing credential ID")
-
-        credential_id_base64 = bytes_to_base64url(base64.b64decode(raw_credential_id))
 
         # Trouver le credential dans la DB
         supabase = get_supabase_client()
