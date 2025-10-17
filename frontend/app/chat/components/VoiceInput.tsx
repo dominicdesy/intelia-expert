@@ -108,12 +108,11 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
         }
 
         // Reset state
-        setIsListening(false);
         finalTranscriptRef.current = "";
         isStoppingRef.current = false;
       } else {
-        // Unintentional stop - restart if still in listening state
-        console.log("[VoiceInput] Unintentional stop, ignoring");
+        // Unintentional stop - restart automatically
+        console.log("[VoiceInput] Unintentional stop detected - browser auto-ended recognition");
       }
     };
 
@@ -174,9 +173,32 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
 
     // Stop listening
     console.log("[VoiceInput] Stopping speech recognition manually. Setting isStoppingRef to true.");
-    isStoppingRef.current = true; // Mark as intentional stop
-    recognitionRef.current.stop();
-  }, [isListening]);
+    isStoppingRef.current = true; // Mark as intentional stop BEFORE calling stop()
+
+    // Process transcript immediately before stopping
+    if (finalTranscriptRef.current.trim()) {
+      console.log("[VoiceInput] Processing transcript immediately:", finalTranscriptRef.current.trim());
+      onTranscript(finalTranscriptRef.current.trim());
+    } else {
+      console.log("[VoiceInput] No transcript to process");
+    }
+
+    // Reset state immediately
+    setIsListening(false);
+    finalTranscriptRef.current = "";
+
+    // Stop the recognition (this will trigger onend, but we already processed)
+    try {
+      recognitionRef.current.stop();
+    } catch (err) {
+      console.log("[VoiceInput] Error stopping recognition:", err);
+    }
+
+    // Reset flag after a short delay to ensure onend sees it as true
+    setTimeout(() => {
+      isStoppingRef.current = false;
+    }, 100);
+  }, [isListening, onTranscript]);
 
   if (!isSupported) {
     return (
