@@ -195,9 +195,9 @@ async def registration_start(
     L'utilisateur doit être connecté (via email/password ou OAuth)
     """
     try:
-        user_id = current_user["id"]
+        user_id = current_user["user_id"]
         user_email = current_user.get("email", "")
-        user_name = current_user.get("name", user_email)
+        user_name = current_user.get("full_name") or current_user.get("name") or user_email
 
         logger.info(f"🔐 [WEBAUTHN] Registration start for user: {user_id}")
 
@@ -256,7 +256,7 @@ async def registration_finish(
     Étape 2: Vérifie la réponse du navigateur et sauvegarde le credential
     """
     try:
-        user_id = current_user["id"]
+        user_id = current_user["user_id"]
 
         logger.info(f"🔐 [WEBAUTHN] Registration verify for user: {user_id}")
 
@@ -443,7 +443,7 @@ async def list_credentials(current_user: dict = Depends(get_current_user)):
     Liste tous les passkeys de l'utilisateur connecté
     """
     try:
-        user_id = current_user["id"]
+        user_id = current_user["user_id"]
         credentials = get_user_credentials(user_id)
 
         passkeys = [
@@ -474,7 +474,7 @@ async def delete_credential(credential_id: str, current_user: dict = Depends(get
     Supprime un passkey spécifique
     """
     try:
-        user_id = current_user["id"]
+        user_id = current_user["user_id"]
 
         supabase = get_supabase_client()
 
