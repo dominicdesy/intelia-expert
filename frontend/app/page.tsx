@@ -575,12 +575,27 @@ function LoginPageContent() {
         setError("Authentication failed: No token received");
       }
     } catch (err: any) {
-      // Show alert with error details
+      // Show alert with ALL error details
+      let debugInfo = `Error caught!\n`;
+      debugInfo += `Type: ${typeof err}\n`;
+      debugInfo += `instanceof Error: ${err instanceof Error}\n`;
+
       if (err instanceof Error) {
-        alert(`Error: ${err.name}\nMessage: ${err.message}`);
-      } else {
-        alert(`Error type: ${typeof err}\nValue: ${JSON.stringify(err)}`);
+        debugInfo += `Name: ${err.name}\n`;
+        debugInfo += `Message type: ${typeof err.message}\n`;
+        debugInfo += `Message: ${err.message}\n`;
+
+        // Try to stringify the message if it's an object
+        if (typeof err.message === 'object') {
+          try {
+            debugInfo += `Message JSON: ${JSON.stringify(err.message)}\n`;
+          } catch {
+            debugInfo += `Message JSON: (cannot stringify)\n`;
+          }
+        }
       }
+
+      alert(debugInfo);
 
       const errorMessage = err.message || t("auth.error") || "Authentication failed";
       setError(errorMessage);
