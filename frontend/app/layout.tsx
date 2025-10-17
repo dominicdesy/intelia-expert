@@ -17,8 +17,6 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover", // Important pour fullscreen avec notch
-  maximumScale: 5, // Permet zoom mais évite l'auto-zoom sur focus
-  userScalable: true,
 };
 
 export const metadata: Metadata = {

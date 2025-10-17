@@ -8,6 +8,12 @@ export async function middleware(req: NextRequest) {
   const supabase = createMiddlewareClient({ req, res });
   // Rafraîchit la session si nécessaire — aucune redirection ici
   await supabase.auth.getSession();
+
+  // Add security headers
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
   return res;
 }
 
