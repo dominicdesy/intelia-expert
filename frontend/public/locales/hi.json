@@ -671,7 +671,7 @@
   "stripe.features.elite.dedicated": "Dedicated support",
   "stripe.features.elite.customization": "Advanced customization",
   "chat.voiceInput": "वॉयस इनपुट",
-  "chat.voiceListening": "सुन रहे हैं...",
+  "chat.voiceListening": "सुन रहा है...",
   "chat.voiceStart": "वॉयस इनपुट शुरू करें",
   "chat.voiceStop": "रिकॉर्डिंग बंद करें",
   "chat.voiceNotSupported": "इस ब्राउज़र में वॉयस इनपुट समर्थित नहीं है",

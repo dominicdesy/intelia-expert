@@ -671,7 +671,7 @@
   "stripe.features.elite.dedicated": "Dedicated support",
   "stripe.features.elite.customization": "Advanced customization",
   "chat.voiceInput": "语音输入",
-  "chat.voiceListening": "正在聆听...",
+  "chat.voiceListening": "听...",
   "chat.voiceStart": "开始语音输入",
   "chat.voiceStop": "停止录音",
   "chat.voiceNotSupported": "此浏览器不支持语音输入",

@@ -671,7 +671,7 @@
   "stripe.features.elite.dedicated": "Dedicated support",
   "stripe.features.elite.customization": "Advanced customization",
   "chat.voiceInput": "إدخال صوتي",
-  "chat.voiceListening": "جاري الاستماع...",
+  "chat.voiceListening": "الاستماع...",
   "chat.voiceStart": "بدء الإدخال الصوتي",
   "chat.voiceStop": "إيقاف التسجيل",
   "chat.voiceNotSupported": "الإدخال الصوتي غير مدعوم في هذا المتصفح",

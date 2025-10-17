@@ -268,6 +268,7 @@ export interface TranslationKeys {
   "chat.voiceNotSupported": string;
   "chat.voiceStop": string;
   "chat.voiceStart": string;
+  "chat.voiceListening": string;
   "chat.noConversations": string;
   "chat.loading": string;
   "chat.errorMessage": string;

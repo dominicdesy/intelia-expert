@@ -672,7 +672,7 @@
   "stripe.features.elite.dedicated": "Dedicated support",
   "stripe.features.elite.customization": "Advanced customization",
   "chat.voiceInput": "Ingresso vocale",
-  "chat.voiceListening": "In ascolto...",
+  "chat.voiceListening": "Ascolto...",
   "chat.voiceStart": "Avvia ingresso vocale",
   "chat.voiceStop": "Interrompi registrazione",
   "chat.voiceNotSupported": "Ingresso vocale non supportato in questo browser",
