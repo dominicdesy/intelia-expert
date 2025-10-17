@@ -341,6 +341,7 @@ export interface TranslationKeys {
   // USER PROFILE
   // ===========================================
   "profile.title": string;
+  "profile.description": string;
   "profile.personalInfo": string;
   "profile.professionalInfo": string;
   "profile.contact": string;
@@ -397,6 +398,7 @@ export interface TranslationKeys {
   // SUBSCRIPTION & BILLING
   // ===========================================
   "subscription.title": string;
+  "subscription.description": string;
   "subscription.currentPlan": string;
   "subscription.modify": string;
   "subscription.payment": string;
