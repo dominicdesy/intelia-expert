@@ -68,7 +68,7 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
       target: "button[title*='voice'], button[aria-label*='voice'], button[title*='vocale'], button[aria-label*='vocale'], .chat-input-fixed button:nth-child(2)",
       title: t("help.voiceTitle"),
       description: t("help.voiceDesc"),
-      position: "top",
+      position: "left",
     },
     {
       target: "button[title*='nouvelle conversation'], button[aria-label*='nouvelle conversation'], button[title*='Nouvelle conversation'], header button:first-child",
@@ -139,8 +139,8 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
           top = rect.top - bubbleHeight - 100;
           left = (window.innerWidth - bubbleWidth) / 2;
           break;
-        case 3: // Voice button - Au-dessus, bien espacé
-          top = rect.top - bubbleHeight - 100;
+        case 3: // Voice button - Au-dessus du bouton, bien espacé
+          top = rect.top - bubbleHeight - 120;
           left = (window.innerWidth - bubbleWidth) / 2;
           break;
         case 4: // New conversation - En-dessous
@@ -157,8 +157,8 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
           break;
       }
     } else {
-      // Desktop : logique originale avec espacement augmenté pour les boutons caméra et micro
-      const topPadding = (currentStep === 2 || currentStep === 3) ? 150 : padding; // Augmenté significativement pour ne pas cacher les boutons
+      // Desktop : logique originale avec espacement augmenté pour le bouton caméra
+      const topPadding = currentStep === 2 ? 150 : padding; // Augmenté significativement pour ne pas cacher le bouton caméra
 
       switch (step.position) {
         case "top":
