@@ -77,6 +77,7 @@ export function usePasskey() {
             "Authorization": `Bearer ${token}`,
           },
           credentials: "include",
+          body: JSON.stringify({ device_name: deviceName }),
         });
 
         if (!optionsRes.ok) {
