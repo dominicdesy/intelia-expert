@@ -54,7 +54,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
 
     // Initialize speech recognition
     const recognition = new SpeechRecognition();
-    recognition.continuous = false; // Stop after user stops speaking
+    recognition.continuous = true; // Keep listening until manually stopped
     recognition.interimResults = true; // Get interim results for better UX
     recognition.maxAlternatives = 1;
 
@@ -62,40 +62,49 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     const speechLang = LANGUAGE_MAP[currentLanguage] || "en-US";
     recognition.lang = speechLang;
 
+    console.log("[VoiceInput] Recognition initialized with continuous mode");
+
     recognitionRef.current = recognition;
 
     // Handle results
     recognition.onresult = (event: any) => {
       console.log("[VoiceInput] onresult fired, event:", event);
       let interimTranscript = "";
-      let finalTranscript = "";
+      let newFinalTranscript = "";
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         console.log(`[VoiceInput] Result ${i}: "${transcript}", isFinal: ${event.results[i].isFinal}`);
         if (event.results[i].isFinal) {
-          finalTranscript += transcript;
+          newFinalTranscript += transcript;
         } else {
           interimTranscript += transcript;
         }
       }
 
-      if (finalTranscript) {
-        console.log("[VoiceInput] Final transcript:", finalTranscript);
-        finalTranscriptRef.current = finalTranscript;
+      // Accumulate final transcripts (continuous mode)
+      if (newFinalTranscript) {
+        console.log("[VoiceInput] Accumulating final transcript:", newFinalTranscript);
+        finalTranscriptRef.current += newFinalTranscript + " ";
+        console.log("[VoiceInput] Total accumulated:", finalTranscriptRef.current);
       }
     };
 
     // Handle end of speech
     recognition.onend = () => {
       console.log("[VoiceInput] Speech recognition ended. Final transcript:", finalTranscriptRef.current);
-      setIsListening(false);
-      if (finalTranscriptRef.current) {
-        onTranscript(finalTranscriptRef.current);
-        finalTranscriptRef.current = "";
+
+      // Send transcript if we have one
+      if (finalTranscriptRef.current.trim()) {
+        console.log("[VoiceInput] Sending transcript:", finalTranscriptRef.current.trim());
+        onTranscript(finalTranscriptRef.current.trim());
       } else {
         console.log("[VoiceInput] No transcript captured - user may not have spoken or microphone issue");
       }
+
+      // Reset state
+      setIsListening(false);
+      finalTranscriptRef.current = "";
     };
 
     // Handle errors
@@ -129,28 +138,31 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     };
   }, [currentLanguage, onTranscript, t]);
 
-  const toggleListening = useCallback(() => {
-    if (!recognitionRef.current || disabled) return;
+  const startListening = useCallback(() => {
+    if (!recognitionRef.current || disabled || isListening) return;
 
-    if (isListening) {
-      // Stop listening
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      // Start listening
-      setError(null);
-      finalTranscriptRef.current = "";
-      try {
-        console.log("[VoiceInput] Starting speech recognition with language:", recognitionRef.current.lang);
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (err) {
-        console.error("Error starting speech recognition:", err);
-        setError(t("chat.voiceError"));
-        setTimeout(() => setError(null), 3000);
-      }
+    // Start listening
+    setError(null);
+    finalTranscriptRef.current = "";
+    try {
+      console.log("[VoiceInput] Starting speech recognition with language:", recognitionRef.current.lang);
+      recognitionRef.current.start();
+      setIsListening(true);
+    } catch (err) {
+      console.error("Error starting speech recognition:", err);
+      setError(t("chat.voiceError"));
+      setTimeout(() => setError(null), 3000);
     }
   }, [isListening, disabled, t]);
+
+  const stopListening = useCallback(() => {
+    if (!recognitionRef.current || !isListening) return;
+
+    // Stop listening
+    console.log("[VoiceInput] Stopping speech recognition manually");
+    recognitionRef.current.stop();
+    setIsListening(false);
+  }, [isListening]);
 
   if (!isSupported) {
     return (
@@ -173,23 +185,27 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   return (
     <div className="relative">
       <button
-        onClick={toggleListening}
+        onMouseDown={startListening}
+        onMouseUp={stopListening}
+        onMouseLeave={stopListening}
+        onTouchStart={startListening}
+        onTouchEnd={stopListening}
         disabled={disabled}
-        className={`flex-shrink-0 h-12 w-12 flex items-center justify-center transition-colors rounded-full ${
+        className={`flex-shrink-0 h-12 w-12 flex items-center justify-center transition-colors rounded-full select-none ${
           isListening
             ? "text-red-600 bg-red-50 hover:bg-red-100"
             : "text-blue-600 hover:text-blue-700 disabled:text-gray-300 hover:bg-blue-50"
         } ${className}`}
         title={
           isListening
-            ? t("chat.voiceStop")
+            ? t("chat.voiceListening")
             : error
               ? error
               : t("chat.voiceStart")
         }
         aria-label={
           isListening
-            ? t("chat.voiceStop")
+            ? t("chat.voiceListening")
             : error
               ? error
               : t("chat.voiceStart")
