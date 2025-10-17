@@ -410,6 +410,24 @@ except Exception as e:
     usage_router = None
     logger.error("ERREUR import usage router: %s", e)
 
+# WebAuthn router (authentification biométrique - Face ID, Touch ID, Fingerprint)
+WEBAUTHN_AVAILABLE = False
+try:
+    from .webauthn import router as webauthn_router
+
+    WEBAUTHN_AVAILABLE = True
+    logger.info(
+        "WebAuthn router importé avec %d routes", len(webauthn_router.routes)
+    )
+except ImportError:
+    WEBAUTHN_AVAILABLE = False
+    webauthn_router = None
+    logger.warning("WebAuthn router non disponible (normal si pas encore créé)")
+except Exception as e:
+    WEBAUTHN_AVAILABLE = False
+    webauthn_router = None
+    logger.error("ERREUR import webauthn router: %s", e)
+
 # Création du router principal
 logger.info("Création du router principal v1...")
 router = APIRouter(prefix="/v1")
@@ -607,6 +625,15 @@ if USAGE_AVAILABLE and usage_router:
     logger.info("Système de quotas mensuels activé (Essential: 50 questions/mois)")
 else:
     logger.warning("Usage router non monté (module non disponible)")
+
+# WebAuthn (authentification biométrique)
+if WEBAUTHN_AVAILABLE and webauthn_router:
+    router.include_router(webauthn_router, tags=["WebAuthn"])
+    logger.info("WebAuthn router monté")
+    logger.info("WebAuthn router maintenant disponible sur /v1/webauthn/*")
+    logger.info("Authentification biométrique activée (Face ID, Touch ID, Fingerprint)!")
+else:
+    logger.warning("WebAuthn router non monté (module non disponible)")
 
 # Résumé final
 total_routes = len(router.routes)
