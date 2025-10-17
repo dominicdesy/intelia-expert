@@ -85,7 +85,8 @@ export function usePasskey() {
           throw new Error(errorData.detail || "Failed to start registration");
         }
 
-        const options = await optionsRes.json();
+        const response = await optionsRes.json();
+        const options = response.options; // Extract options from response wrapper
 
         // Step 2: Prompt user for biometric authentication
         const credential = await startRegistration(options);
@@ -153,7 +154,8 @@ export function usePasskey() {
         );
       }
 
-      const options = await optionsRes.json();
+      const response = await optionsRes.json();
+      const options = response.options; // Extract options from response wrapper
 
       // Step 2: Prompt user for biometric authentication
       const credential = await startAuthentication(options);
