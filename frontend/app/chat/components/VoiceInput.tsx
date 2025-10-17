@@ -42,7 +42,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   const finalTranscriptRef = useRef("");
   const isStoppingRef = useRef(false); // Track if we're intentionally stopping
 
-  // Check browser support on mount
+  // Check browser support and initialize recognition ONCE on mount
   useEffect(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition ||
@@ -50,6 +50,12 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
 
     if (!SpeechRecognition) {
       setIsSupported(false);
+      return;
+    }
+
+    // Initialize speech recognition ONLY if not already initialized
+    if (recognitionRef.current) {
+      console.log("[VoiceInput] Recognition already initialized, skipping");
       return;
     }
 
@@ -63,7 +69,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     const speechLang = LANGUAGE_MAP[currentLanguage] || "en-US";
     recognition.lang = speechLang;
 
-    console.log("[VoiceInput] Recognition initialized with continuous mode");
+    console.log("[VoiceInput] Recognition initialized with continuous mode, lang:", speechLang);
 
     recognitionRef.current = recognition;
 
@@ -145,7 +151,17 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
         recognitionRef.current.abort();
       }
     };
-  }, [currentLanguage, onTranscript, t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only initialize once on mount
+
+  // Update recognition language when currentLanguage changes (without reinitializing)
+  useEffect(() => {
+    if (recognitionRef.current) {
+      const speechLang = LANGUAGE_MAP[currentLanguage] || "en-US";
+      recognitionRef.current.lang = speechLang;
+      console.log("[VoiceInput] Updated recognition language to:", speechLang);
+    }
+  }, [currentLanguage]);
 
   const startListening = useCallback(() => {
     if (!recognitionRef.current || disabled || isListening) return;
