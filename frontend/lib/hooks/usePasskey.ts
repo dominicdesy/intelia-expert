@@ -130,21 +130,14 @@ export function usePasskey() {
    * Authenticate using a passkey
    */
   const authenticateWithPasskey = useCallback(async () => {
-    console.log("[Passkey] authenticateWithPasskey called");
-    console.log("[Passkey] isSupported:", isSupported());
-    console.log("[Passkey] window.PublicKeyCredential:", window?.PublicKeyCredential);
-
     if (!isSupported()) {
-      const errorMsg = "WebAuthn is not supported in this browser";
-      console.error("[Passkey] Not supported:", errorMsg);
-      throw new Error(errorMsg);
+      throw new Error("WebAuthn is not supported in this browser");
     }
 
     setIsLoading(true);
     setError(null);
 
     try {
-      console.log("[Passkey] Fetching authentication options from backend...");
       // Step 1: Get authentication options from backend
       const optionsRes = await fetch("/api/v1/webauthn/authenticate/start", {
         method: "POST",
@@ -162,10 +155,18 @@ export function usePasskey() {
       }
 
       const response = await optionsRes.json();
-      const options = response.options; // Extract options from response wrapper
+      const options = response.options;
+      const challenge_id = response.challenge_id;
+
+      if (!options || !challenge_id) {
+        throw new Error("Invalid response from backend");
+      }
 
       // Step 2: Prompt user for biometric authentication
       const credential = await startAuthentication(options);
+
+      // Add challenge_id to credential before sending to backend
+      credential.challenge_id = challenge_id;
 
       // Step 3: Send credential to backend for verification
       const verifyRes = await fetch("/api/v1/webauthn/authenticate/finish", {
@@ -185,20 +186,12 @@ export function usePasskey() {
       }
 
       const result = await verifyRes.json();
-      console.log("[Passkey] Authentication successful, result:", result);
       return result;
     } catch (err: any) {
-      console.error("[Passkey] Catch block - error:", err);
-      console.error("[Passkey] Error type:", typeof err);
-      console.error("[Passkey] Error name:", err?.name);
-      console.error("[Passkey] Error message:", err?.message);
-
       const errorMessage =
         err.name === "NotAllowedError"
           ? "Authentication was cancelled"
           : err.message || "Failed to authenticate with passkey";
-
-      console.error("[Passkey] Final error message:", errorMessage);
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {

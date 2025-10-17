@@ -544,9 +544,7 @@ function LoginPageContent() {
     setSuccess("");
 
     try {
-      console.log("[Passkey] Starting authentication...");
       const result = await authenticateWithPasskey();
-      console.log("[Passkey] Result:", result);
 
       // Backend now returns TokenResponse: {access_token, token_type, expires_at}
       if (result.access_token) {
@@ -573,36 +571,10 @@ function LoginPageContent() {
           router.push("/chat");
         }, 1000);
       } else {
-        console.error("[Passkey] No access_token in result:", result);
         setError("Authentication failed: No token received");
       }
     } catch (err: any) {
-      console.error("[Passkey] Error:", err);
-
-      // DEBUG: Show detailed error information
-      let errorMessage = "Unknown error";
-
-      if (typeof err === 'string') {
-        errorMessage = err;
-      } else if (err instanceof Error) {
-        errorMessage = `${err.name}: ${err.message}`;
-      } else if (err && typeof err === 'object') {
-        // Try to extract ALL properties from error object
-        const errorProps = [];
-        try {
-          for (const key in err) {
-            errorProps.push(`${key}: ${err[key]}`);
-          }
-          errorMessage = `Error object: ${errorProps.join(', ')}`;
-        } catch {
-          // If that fails, try converting to string
-          errorMessage = `Error: ${String(err)}`;
-        }
-      } else {
-        errorMessage = `Error (type ${typeof err}): ${String(err)}`;
-      }
-
-      console.error("[Passkey] Error message:", errorMessage);
+      const errorMessage = err.message || t("auth.error") || "Authentication failed";
       setError(errorMessage);
     }
   };

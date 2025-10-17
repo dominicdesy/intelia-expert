@@ -80,6 +80,7 @@ class AuthenticationStartRequest(BaseModel):
 
 class AuthenticationStartResponse(BaseModel):
     options: dict  # PublicKeyCredentialRequestOptions en JSON
+    challenge_id: str  # ID pour retrouver le challenge lors de verify
 
 
 class AuthenticationVerifyRequest(BaseModel):
@@ -356,12 +357,10 @@ async def authentication_start(request: AuthenticationStartRequest):
         options_json_str = options_to_json(authentication_options)
         options_dict = json.loads(options_json_str)
 
-        # Ajouter le challenge_id au response pour le retrouver lors de verify
-        options_dict["challenge_id"] = challenge_id
-
         logger.info(f"✅ [WEBAUTHN] Authentication options generated")
 
-        return AuthenticationStartResponse(options=options_dict)
+        # Retourner options ET challenge_id séparément
+        return AuthenticationStartResponse(options=options_dict, challenge_id=challenge_id)
 
     except Exception as e:
         logger.error(f"❌ [WEBAUTHN] Authentication start error: {e}")
