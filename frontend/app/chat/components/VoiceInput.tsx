@@ -154,6 +154,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     // Start listening
     setError(null);
     finalTranscriptRef.current = "";
+    isStoppingRef.current = false; // Reset stopping flag when starting
     try {
       console.log("[VoiceInput] Starting speech recognition with language:", recognitionRef.current.lang);
       recognitionRef.current.start();
@@ -166,10 +167,13 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   }, [isListening, disabled, t]);
 
   const stopListening = useCallback(() => {
-    if (!recognitionRef.current || !isListening) return;
+    if (!recognitionRef.current || !isListening) {
+      console.log("[VoiceInput] stopListening called but conditions not met. recognitionRef:", !!recognitionRef.current, "isListening:", isListening);
+      return;
+    }
 
     // Stop listening
-    console.log("[VoiceInput] Stopping speech recognition manually");
+    console.log("[VoiceInput] Stopping speech recognition manually. Setting isStoppingRef to true.");
     isStoppingRef.current = true; // Mark as intentional stop
     recognitionRef.current.stop();
   }, [isListening]);
