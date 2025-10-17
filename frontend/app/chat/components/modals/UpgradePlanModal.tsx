@@ -5,6 +5,7 @@ import { BaseDialog } from "../BaseDialog";
 import { PLAN_CONFIGS } from "@/types";
 import { redirectToCheckout } from "@/lib/api/stripe";
 import { useTranslation } from "@/lib/languages/i18n";
+import { createBrowserClient } from "@supabase/ssr";
 import toast from "react-hot-toast";
 
 interface UpgradePlanModalProps {
@@ -27,15 +28,23 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
     setSelectedPlan(planName);
 
     try {
-      // Récupérer le token JWT
-      const token = localStorage.getItem("access_token");
-      if (!token) {
+      // Récupérer le token JWT depuis Supabase
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (error || !session?.access_token) {
         toast.error(t("chat.sessionExpired"));
+        setIsLoading(false);
+        setSelectedPlan(null);
         return;
       }
 
       // Rediriger vers Stripe Checkout avec la langue utilisateur
-      await redirectToCheckout(planName, token, currentLanguage);
+      await redirectToCheckout(planName, session.access_token, currentLanguage);
     } catch (error) {
       console.error("[UpgradePlan] Erreur:", error);
       toast.error(
