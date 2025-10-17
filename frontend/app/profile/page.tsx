@@ -84,6 +84,22 @@ const ArrowLeftIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const FingerprintIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a7.464 7.464 0 01-1.15 3.993m1.989 3.559A11.209 11.209 0 008.25 10.5a3.75 3.75 0 117.5 0c0 .527-.021 1.049-.064 1.565M12 10.5a14.94 14.94 0 01-3.6 9.75m6.633-4.596a18.666 18.666 0 01-2.485 5.33"
+    />
+  </svg>
+);
+
 // Fonction sécurisée pour les initiales
 const getSecureInitials = (name: string): string => {
   if (!name || typeof name !== "string") return "U";
@@ -134,7 +150,7 @@ function ProfilePageContent() {
 
     // Gestion de l'onglet depuis l'URL
     const tab = searchParams.get("tab");
-    if (tab && ["profile", "settings", "privacy"].includes(tab)) {
+    if (tab && ["profile", "settings", "passkey", "privacy"].includes(tab)) {
       setActiveTab(tab);
     }
   }, [user, router, searchParams]);
@@ -239,6 +255,7 @@ function ProfilePageContent() {
   const tabs = [
     { id: "profile", label: t("profile.tabs.personalInfo"), icon: UserIcon },
     { id: "settings", label: t("account.settings"), icon: CogIcon },
+    { id: "passkey", label: t("passkey.title"), icon: FingerprintIcon },
     { id: "privacy", label: t("account.privacy"), icon: ShieldCheckIcon },
   ];
 
@@ -441,6 +458,80 @@ function ProfilePageContent() {
                         className="w-4 h-4 text-blue-600 rounded"
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Onglet Passkey */}
+            {activeTab === "passkey" && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    {t("passkey.title")}
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    {t("passkey.info.whatIs")}
+                  </p>
+
+                  {/* Setup Section */}
+                  <div className="p-6 border border-blue-200 rounded-lg bg-blue-50 mb-6">
+                    <div className="flex items-start space-x-4">
+                      <FingerprintIcon className="w-8 h-8 text-blue-600 flex-shrink-0 mt-1" />
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-blue-900 mb-2 text-lg">
+                          {t("passkey.setupTitle")}
+                        </h4>
+                        <p className="text-sm text-blue-700 mb-4">
+                          {t("passkey.description")}
+                        </p>
+
+                        <div className="bg-white bg-opacity-50 rounded-lg p-4 mb-4">
+                          <h5 className="font-medium text-blue-900 mb-2">
+                            {t("passkey.info.benefits")}
+                          </h5>
+                          <ul className="text-sm text-blue-700 space-y-2">
+                            <li className="flex items-start">
+                              <span className="mr-2">✓</span>
+                              <span>{t("passkey.benefits.faster")}</span>
+                            </li>
+                            <li className="flex items-start">
+                              <span className="mr-2">✓</span>
+                              <span>{t("passkey.benefits.secure")}</span>
+                            </li>
+                            <li className="flex items-start">
+                              <span className="mr-2">✓</span>
+                              <span>{t("passkey.benefits.noPassword")}</span>
+                            </li>
+                          </ul>
+                        </div>
+
+                        <div className="bg-white bg-opacity-50 rounded-lg p-4 mb-4">
+                          <h5 className="font-medium text-blue-900 mb-2">
+                            {t("passkey.info.devices")}
+                          </h5>
+                          <p className="text-sm text-blue-700">
+                            {t("passkey.devices.supported")}
+                          </p>
+                        </div>
+
+                        <button
+                          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
+                        >
+                          {t("passkey.setupButton")}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Registered Passkeys List (placeholder) */}
+                  <div className="border border-gray-200 rounded-lg p-6">
+                    <h4 className="font-medium text-gray-900 mb-3">
+                      {t("passkey.registered")}
+                    </h4>
+                    <p className="text-sm text-gray-500">
+                      {t("passkey.noPasskeys")}
+                    </p>
                   </div>
                 </div>
               </div>
