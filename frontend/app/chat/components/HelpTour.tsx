@@ -170,7 +170,9 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
           left = rect.left + rect.width / 2 - bubbleWidth / 2;
           break;
         case "left":
-          top = rect.top + rect.height / 2 - bubbleHeight / 2;
+          // For voice input button (at bottom), position higher to avoid being cut off
+          const verticalOffset = currentStep === 3 ? -bubbleHeight + 30 : 0;
+          top = rect.top + rect.height / 2 - bubbleHeight / 2 + verticalOffset;
           left = rect.left - bubbleWidth - padding;
           break;
         case "right":
