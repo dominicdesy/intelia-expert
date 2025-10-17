@@ -29,14 +29,25 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
 
     try {
       // Récupérer le token JWT depuis Supabase
+      console.log("[UpgradePlan] Tentative de récupération session...");
       const { data: { session }, error } = await supabase.auth.getSession();
 
+      console.log("[UpgradePlan] Session:", {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+        error: error?.message,
+        sessionUser: session?.user?.email
+      });
+
       if (error || !session?.access_token) {
+        console.error("[UpgradePlan] Pas de session valide:", error);
         toast.error(t("chat.sessionExpired"));
         setIsLoading(false);
         setSelectedPlan(null);
         return;
       }
+
+      console.log("[UpgradePlan] Token JWT récupéré, longueur:", session.access_token.length);
 
       // Rediriger vers Stripe Checkout avec la langue utilisateur
       await redirectToCheckout(planName, session.access_token, currentLanguage);

@@ -47,9 +47,15 @@ export async function createCheckoutSession(
   locale?: string
 ): Promise<CheckoutSessionResponse> {
   try {
-    const response = await fetch(
-      `${API_CONFIG.BASE_URL}/stripe/create-checkout-session`,
-      {
+    const url = `${API_CONFIG.BASE_URL}/stripe/create-checkout-session`;
+    console.log("[Stripe] Creating checkout session:", {
+      url,
+      planName,
+      locale,
+      tokenLength: token.length
+    });
+
+    const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -64,12 +70,16 @@ export async function createCheckoutSession(
       }
     );
 
+    console.log("[Stripe] Response status:", response.status);
+
     if (!response.ok) {
       const error = await response.json();
+      console.error("[Stripe] Error response:", error);
       throw new Error(error.detail || "Erreur création session checkout");
     }
 
     const data = await response.json();
+    console.log("[Stripe] Checkout session created:", data);
     return data;
   } catch (error) {
     console.error("[Stripe] Erreur création checkout:", error);
