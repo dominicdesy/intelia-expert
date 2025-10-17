@@ -26,8 +26,29 @@ export default function SubscriptionsAdminPage() {
     // Vérifier que l'utilisateur est super admin
     const checkAuth = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
+        // Récupérer le token JWT depuis localStorage (comme UpgradePlanModal)
+        let accessToken: string | null = null;
+
+        // Méthode 1: Récupérer depuis intelia-expert-auth (PRIORITÉ)
+        const authData = localStorage.getItem("intelia-expert-auth");
+        if (authData) {
+          try {
+            const parsed = JSON.parse(authData);
+            accessToken = parsed.access_token;
+            console.log("[SubscriptionsAdmin] Token trouvé dans intelia-expert-auth");
+          } catch (e) {
+            console.error("[SubscriptionsAdmin] Erreur parse intelia-expert-auth:", e);
+          }
+        }
+
+        // Méthode 2: Fallback vers ancien format
+        if (!accessToken) {
+          accessToken = localStorage.getItem("access_token");
+          console.log("[SubscriptionsAdmin] Fallback vers access_token");
+        }
+
+        if (!accessToken) {
+          console.error("[SubscriptionsAdmin] Aucun token trouvé");
           router.push("/");
           return;
         }
@@ -35,7 +56,7 @@ export default function SubscriptionsAdminPage() {
         // TODO: Récupérer infos utilisateur et vérifier is_admin/user_type
         // Pour l'instant, on suppose que l'accès est autorisé si token existe
 
-        await fetchStats(token);
+        await fetchStats(accessToken);
       } catch (error) {
         console.error("[SubscriptionsAdmin] Erreur auth:", error);
         router.push("/");
@@ -299,8 +320,21 @@ export default function SubscriptionsAdminPage() {
             </a>
             <button
               onClick={() => {
-                const token = localStorage.getItem("access_token");
-                if (token) fetchStats(token);
+                // Récupérer le token depuis intelia-expert-auth (comme checkAuth)
+                let accessToken: string | null = null;
+                const authData = localStorage.getItem("intelia-expert-auth");
+                if (authData) {
+                  try {
+                    const parsed = JSON.parse(authData);
+                    accessToken = parsed.access_token;
+                  } catch (e) {
+                    console.error("Erreur parse token:", e);
+                  }
+                }
+                if (!accessToken) {
+                  accessToken = localStorage.getItem("access_token");
+                }
+                if (accessToken) fetchStats(accessToken);
               }}
               className="flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
