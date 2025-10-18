@@ -610,9 +610,15 @@ export const generateAIResponse = async (
         user.id,
         agentMetadata,
       );
-    } catch (saveError) {
+    } catch (saveError: any) {
       secureLog.warn("[apiService] Erreur sauvegarde conversation:", saveError);
-      // Ne pas faire échouer la réponse pour une erreur de sauvegarde
+
+      // Propager l'erreur de quota dépassé pour que l'UI puisse l'afficher
+      if (saveError.message === "QUOTA_EXCEEDED") {
+        throw saveError;
+      }
+
+      // Pour les autres erreurs, ne pas faire échouer la réponse
     }
 
     // FIX: Stockage du session ID pour l'historique
@@ -717,6 +723,17 @@ async function saveConversationToBackend(
     });
 
     if (!response_save.ok) {
+      // Gérer spécifiquement les quotas dépassés
+      if (response_save.status === 429) {
+        const errorData = await response_save.json();
+        const quotaInfo = errorData.detail?.quota_info || {};
+        secureLog.warn("[apiService] Quota dépassé:", quotaInfo);
+
+        const error = new Error("QUOTA_EXCEEDED");
+        (error as any).quotaInfo = quotaInfo;
+        throw error;
+      }
+
       const errorText = await response_save.text();
       secureLog.error("[apiService] Erreur sauvegarde conversation:", errorText);
       throw new Error(`Erreur sauvegarde: ${response_save.status}`);

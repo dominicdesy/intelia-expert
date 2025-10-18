@@ -1254,8 +1254,28 @@ function ChatInterface() {
 		}
 		// ✅ FIN DE L'AJOUT
 
-	  } catch (error) {
+	  } catch (error: any) {
 		secureLog.error(t("chat.sendError"), error);
+
+		// Gérer spécifiquement l'erreur de quota dépassé
+		if (error.message === "QUOTA_EXCEEDED") {
+		  const quotaInfo = error.quotaInfo || {};
+		  const quotaMessage = `${t("chat.quotaExceeded")}\n\n` +
+			`${t("chat.questionsUsed")}: ${quotaInfo.questions_used || 0}/${quotaInfo.monthly_quota || 0}\n` +
+			`${t("chat.planName")}: ${quotaInfo.plan_name || "free"}\n\n` +
+			`${t("chat.upgradePrompt")}`;
+
+		  if (isMountedRef.current) {
+			addMessage({
+			  id: `quota-error-${Date.now()}`,
+			  content: quotaMessage,
+			  isUser: false,
+			  timestamp: new Date(),
+			});
+		  }
+		  return; // Ne pas appeler handleAuthError pour les quotas
+		}
+
 		handleAuthError(error);
 
 		if (isMountedRef.current) {
