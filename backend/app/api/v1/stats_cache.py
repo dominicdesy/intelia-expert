@@ -26,9 +26,9 @@ class StatisticsCache:
         self._timestamps = {}
         self.max_entries = 100
 
-        logger.info("🚀 StatisticsCache VERSION SIMPLE V1.0 initialisé")
-        logger.info("✅ Cache en mémoire activé (max 100 entrées)")
-        logger.info("🔧 Cette version évite les problèmes SQL du cache")
+        logger.info("StatisticsCache VERSION SIMPLE V1.0 initialisé")
+        logger.info("Cache en mémoire activé (max 100 entrées)")
+        logger.info("Cette version évite les problèmes SQL du cache")
 
     def set_cache(
         self, key: str, data: Any, ttl_hours: int = 12, source: str = "computed"

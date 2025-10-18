@@ -30,10 +30,10 @@ STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 
 if not STRIPE_SECRET_KEY:
-    logger.warning("⚠️ STRIPE_SECRET_KEY non configurée - mode développement")
+    logger.warning("STRIPE_SECRET_KEY non configurée - mode développement")
 else:
     stripe.api_key = STRIPE_SECRET_KEY
-    logger.info("✅ Stripe API configurée")
+    logger.info("Stripe API configurée")
 
 # URLs frontend pour redirections après paiement
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
@@ -134,14 +134,14 @@ def get_or_create_stripe_customer(user_email: str, user_name: Optional[str] = No
                 )
                 conn.commit()
 
-                logger.info(f"✅ Customer Stripe créé: {stripe_customer.id}")
+                logger.info(f"Customer Stripe créé: {stripe_customer.id}")
                 return stripe_customer.id
 
     except stripe.error.StripeError as e:
-        logger.error(f"❌ Erreur Stripe lors de la création du customer: {e}")
+        logger.error(f"Erreur Stripe lors de la création du customer: {e}")
         raise HTTPException(status_code=500, detail=f"Erreur Stripe: {str(e)}")
     except Exception as e:
-        logger.error(f"❌ Erreur base de données: {e}")
+        logger.error(f"Erreur base de données: {e}")
         raise HTTPException(status_code=500, detail="Erreur création customer")
 
 
@@ -191,7 +191,7 @@ def get_regional_price(plan_name: str, country_code: str = "US") -> Tuple[float,
                 raise Exception("No pricing found in database")
 
     except Exception as e:
-        logger.error(f"❌ Erreur récupération prix: {e}")
+        logger.error(f"Erreur récupération prix: {e}")
         # Fallback hardcodé (Tier 4 USA)
         default_prices = {
             "essential": (0.0, "USD", None, 4),
@@ -249,7 +249,7 @@ def save_subscription_to_db(subscription_data: Dict[str, Any], user_email: str) 
                     )
                 )
                 conn.commit()
-                logger.info(f"✅ Abonnement sauvegardé pour {user_email}")
+                logger.info(f"Abonnement sauvegardé pour {user_email}")
 
                 # Mettre à jour aussi user_billing_info pour compatibilité
                 cur.execute(
@@ -263,7 +263,7 @@ def save_subscription_to_db(subscription_data: Dict[str, Any], user_email: str) 
                 conn.commit()
 
     except Exception as e:
-        logger.error(f"❌ Erreur sauvegarde abonnement: {e}")
+        logger.error(f"Erreur sauvegarde abonnement: {e}")
         raise
 
 
@@ -442,7 +442,7 @@ async def create_checkout_session(
             billing_address_collection="auto",
         )
 
-        logger.info(f"✅ Checkout session créée: {checkout_session.id}")
+        logger.info(f"Checkout session créée: {checkout_session.id}")
 
         return CreateCheckoutSessionResponse(
             success=True,
@@ -453,13 +453,13 @@ async def create_checkout_session(
     except HTTPException:
         raise
     except stripe.error.StripeError as e:
-        logger.error(f"❌ Erreur Stripe: {e}")
+        logger.error(f"Erreur Stripe: {e}")
         return CreateCheckoutSessionResponse(
             success=False,
             error=f"Erreur Stripe: {str(e)}"
         )
     except Exception as e:
-        logger.error(f"❌ Erreur création checkout: {e}")
+        logger.error(f"Erreur création checkout: {e}")
         return CreateCheckoutSessionResponse(
             success=False,
             error="Erreur lors de la création de la session de paiement"
@@ -516,7 +516,7 @@ async def get_subscription_status(
                 )
 
     except Exception as e:
-        logger.error(f"❌ Erreur récupération statut: {e}")
+        logger.error(f"Erreur récupération statut: {e}")
         return SubscriptionStatusResponse(has_subscription=False)
 
 
@@ -554,7 +554,7 @@ async def create_customer_portal_session(
             return_url=f"{FRONTEND_URL}/chat",  # Retour vers l'app après modifications
         )
 
-        logger.info(f"✅ Portail client créé pour {user_email}")
+        logger.info(f"Portail client créé pour {user_email}")
 
         return CustomerPortalResponse(
             success=True,
@@ -564,13 +564,13 @@ async def create_customer_portal_session(
     except HTTPException:
         raise
     except stripe.error.StripeError as e:
-        logger.error(f"❌ Erreur Stripe portal: {e}")
+        logger.error(f"Erreur Stripe portal: {e}")
         return CustomerPortalResponse(
             success=False,
             error=f"Erreur Stripe: {str(e)}"
         )
     except Exception as e:
-        logger.error(f"❌ Erreur création portal: {e}")
+        logger.error(f"Erreur création portal: {e}")
         return CustomerPortalResponse(
             success=False,
             error="Erreur lors de la création du portail client"

@@ -48,9 +48,9 @@ print(
 )
 print("=" * 80)
 
-logger.info("🚀 STATS_ADMIN VERSION SIMPLE V1.0 chargé")
+logger.info("STATS_ADMIN VERSION SIMPLE V1.0 chargé")
 logger.info(
-    f"✅ Imports: AUTH={AUTH_AVAILABLE}, CACHE={CACHE_AVAILABLE}, UPDATER={UPDATER_AVAILABLE}"
+    f"Imports: AUTH={AUTH_AVAILABLE}, CACHE={CACHE_AVAILABLE}, UPDATER={UPDATER_AVAILABLE}"
 )
 
 

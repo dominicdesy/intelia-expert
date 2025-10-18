@@ -194,7 +194,7 @@ async def get_problematic_qa(
                 }
 
     except Exception as e:
-        logger.error(f"❌ [QA_QUALITY] Error fetching problematic Q&A: {e}", exc_info=True)
+        logger.error(f"[QA_QUALITY] Error fetching problematic Q&A: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -267,7 +267,7 @@ async def analyze_batch(
                 cur.execute(query, (limit,))
                 qa_to_analyze = cur.fetchall()
 
-                logger.info(f"📊 [QA_QUALITY] Batch analysis: {len(qa_to_analyze)} Q&A to analyze")
+                logger.info(f"[QA_QUALITY] Batch analysis: {len(qa_to_analyze)} Q&A to analyze")
 
                 # Analyser chaque Q&A
                 for qa in qa_to_analyze:
@@ -345,7 +345,7 @@ async def analyze_batch(
                         continue
 
         logger.info(
-            f"✅ [QA_QUALITY] Batch analysis complete: "
+            f"[QA_QUALITY] Batch analysis complete: "
             f"{analyzed_count} analyzed, {problematic_found} problematic, {errors} errors"
         )
 
@@ -358,7 +358,7 @@ async def analyze_batch(
         }
 
     except Exception as e:
-        logger.error(f"❌ [QA_QUALITY] Batch analysis error: {e}", exc_info=True)
+        logger.error(f"[QA_QUALITY] Batch analysis error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -421,7 +421,7 @@ async def review_qa(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [QA_QUALITY] Review error: {e}", exc_info=True)
+        logger.error(f"[QA_QUALITY] Review error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -528,7 +528,7 @@ async def get_qa_quality_stats(
                 }
 
     except Exception as e:
-        logger.error(f"❌ [QA_QUALITY] Stats error: {e}", exc_info=True)
+        logger.error(f"[QA_QUALITY] Stats error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -558,14 +558,14 @@ async def cron_analyze_batch(
     # Vérifier le secret du cron
     expected_secret = os.getenv("CRON_SECRET_KEY")
     if not expected_secret:
-        logger.error("❌ [QA_QUALITY_CRON] CRON_SECRET_KEY non configuré dans l'environnement")
+        logger.error("[QA_QUALITY_CRON] CRON_SECRET_KEY non configuré dans l'environnement")
         raise HTTPException(
             status_code=500,
             detail="CRON_SECRET_KEY not configured on server"
         )
 
     if cron_secret != expected_secret:
-        logger.warning(f"❌ [QA_QUALITY_CRON] Tentative d'accès avec secret invalide")
+        logger.warning(f"[QA_QUALITY_CRON] Tentative d'accès avec secret invalide")
         raise HTTPException(
             status_code=403,
             detail="Invalid cron secret"
@@ -612,7 +612,7 @@ async def cron_analyze_batch(
                 cur.execute(query)
                 qa_to_analyze = cur.fetchall()
 
-                logger.info(f"📊 [QA_QUALITY_CRON] {len(qa_to_analyze)} Q&A sélectionnées pour analyse")
+                logger.info(f"[QA_QUALITY_CRON] {len(qa_to_analyze)} Q&A sélectionnées pour analyse")
 
                 # Analyser chaque Q&A
                 for qa in qa_to_analyze:
@@ -682,15 +682,15 @@ async def cron_analyze_batch(
                                 problematic_found += 1
                         else:
                             errors += 1
-                            logger.error(f"❌ [QA_QUALITY_CRON] Analysis error for {qa['conversation_id']}")
+                            logger.error(f"[QA_QUALITY_CRON] Analysis error for {qa['conversation_id']}")
 
                     except Exception as e:
                         errors += 1
-                        logger.error(f"❌ [QA_QUALITY_CRON] Error analyzing {qa.get('conversation_id')}: {e}")
+                        logger.error(f"[QA_QUALITY_CRON] Error analyzing {qa.get('conversation_id')}: {e}")
                         continue
 
         logger.info(
-            f"✅ [QA_QUALITY_CRON] Analyse automatique terminée: "
+            f"[QA_QUALITY_CRON] Analyse automatique terminée: "
             f"{analyzed_count} analysées, {problematic_found} anomalies détectées, {errors} erreurs"
         )
 
@@ -704,8 +704,8 @@ async def cron_analyze_batch(
         }
 
     except Exception as e:
-        logger.error(f"❌ [QA_QUALITY_CRON] Erreur critique: {e}", exc_info=True)
+        logger.error(f"[QA_QUALITY_CRON] Erreur critique: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-logger.info("✅ qa_quality.py loaded")
+logger.info("qa_quality.py loaded")

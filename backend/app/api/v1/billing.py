@@ -199,10 +199,10 @@ class BillingManager:
                         cur.execute(index_sql)
 
                     conn.commit()
-                    logger.info("✅ Tables de facturation et quotas créées")
+                    logger.info("Tables de facturation et quotas créées")
 
         except Exception as e:
-            logger.error(f"❌ Erreur création tables facturation: {e}")
+            logger.error(f"Erreur création tables facturation: {e}")
             raise
 
     def _load_plan_configurations(self):
@@ -212,9 +212,9 @@ class BillingManager:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("SELECT * FROM billing_plans WHERE active = true")
                     self.plans = {row["plan_name"]: dict(row) for row in cur.fetchall()}
-                    logger.info(f"✅ {len(self.plans)} plans de facturation chargés")
+                    logger.info(f"{len(self.plans)} plans de facturation chargés")
         except Exception as e:
-            logger.error(f"❌ Erreur chargement plans: {e}")
+            logger.error(f"Erreur chargement plans: {e}")
             self.plans = {}
 
     def check_quota_before_question(
@@ -317,7 +317,7 @@ class BillingManager:
                     }
 
         except Exception as e:
-            logger.error(f"❌ Erreur vérification quota pour {user_email}: {e}")
+            logger.error(f"Erreur vérification quota pour {user_email}: {e}")
             # En cas d'erreur, autoriser la question (fail-safe)
             return True, {"status": "error", "message": "Erreur de vérification quota"}
 
@@ -393,7 +393,7 @@ class BillingManager:
                     )
 
         except Exception as e:
-            logger.error(f"❌ Erreur incrémentation usage pour {user_email}: {e}")
+            logger.error(f"Erreur incrémentation usage pour {user_email}: {e}")
 
     def _update_quota_status(self, cur, user_email: str, month_year: str) -> None:
         """Met à jour le statut du quota après usage"""
@@ -444,7 +444,7 @@ class BillingManager:
             )
 
         except Exception as e:
-            logger.error(f"❌ Erreur update quota status: {e}")
+            logger.error(f"Erreur update quota status: {e}")
 
     def _initialize_new_user(self, user_email: str, plan_name: str = "free") -> None:
         """Initialise un nouvel utilisateur avec un plan par défaut"""
@@ -461,10 +461,10 @@ class BillingManager:
                     )
                     conn.commit()
                     logger.info(
-                        f"✅ Nouvel utilisateur initialisé: {user_email} - Plan: {plan_name}"
+                        f"Nouvel utilisateur initialisé: {user_email} - Plan: {plan_name}"
                     )
         except Exception as e:
-            logger.error(f"❌ Erreur initialisation utilisateur {user_email}: {e}")
+            logger.error(f"Erreur initialisation utilisateur {user_email}: {e}")
 
     def _log_quota_action(
         self, user_email: str, action: str, details: Dict[str, Any]
@@ -482,7 +482,7 @@ class BillingManager:
                     )
                     conn.commit()
         except Exception as e:
-            logger.error(f"❌ Erreur log quota action: {e}")
+            logger.error(f"Erreur log quota action: {e}")
 
     def generate_monthly_invoice(
         self, user_email: str, year: int, month: int
@@ -584,7 +584,7 @@ class BillingManager:
                     }
 
         except Exception as e:
-            logger.error(f"❌ Erreur génération facture pour {user_email}: {e}")
+            logger.error(f"Erreur génération facture pour {user_email}: {e}")
             return {"error": str(e)}
 
     def change_user_plan(
@@ -639,7 +639,7 @@ class BillingManager:
                     }
 
         except Exception as e:
-            logger.error(f"❌ Erreur changement plan pour {user_email}: {e}")
+            logger.error(f"Erreur changement plan pour {user_email}: {e}")
             return {"error": str(e)}
 
     def get_user_billing_summary(self, user_email: str) -> Dict[str, Any]:
@@ -711,7 +711,7 @@ class BillingManager:
                     }
 
         except Exception as e:
-            logger.error(f"❌ Erreur billing summary pour {user_email}: {e}")
+            logger.error(f"Erreur billing summary pour {user_email}: {e}")
             return {"error": str(e)}
 
 
@@ -792,7 +792,7 @@ def generate_invoice(
 @router.get("/plans")
 def available_plans() -> Dict[str, Any]:
     """Liste des plans disponibles - ENDPOINT PUBLIC"""
-    # ✅ CORRECTION: Suppression de get_current_user = Depends(...)
+    # CORRECTION: Suppression de get_current_user = Depends(...)
     # Cet endpoint doit être accessible sans authentification
 
     billing = get_billing_manager()
@@ -1018,7 +1018,7 @@ def check_quota_middleware(user_email: str) -> Tuple[bool, Dict[str, Any]]:
         billing = get_billing_manager()
         return billing.check_quota_before_question(user_email)
     except Exception as e:
-        logger.error(f"❌ Erreur quota middleware: {e}")
+        logger.error(f"Erreur quota middleware: {e}")
         # En cas d'erreur, autoriser (fail-safe)
         return True, {"status": "error", "message": "Erreur système"}
 
@@ -1033,4 +1033,4 @@ def increment_quota_usage(
         billing = get_billing_manager()
         billing.increment_usage_after_question(user_email, success, cost_usd)
     except Exception as e:
-        logger.error(f"❌ Erreur increment quota: {e}")
+        logger.error(f"Erreur increment quota: {e}")

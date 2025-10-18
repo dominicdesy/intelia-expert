@@ -1,6 +1,6 @@
 """
 Service de gestion des conversations et messages
-================================================
+
 Architecture: conversations + messages séparés
 """
 
@@ -65,7 +65,7 @@ class ConversationService:
                     conversation_id = result["conversation_id"]
 
                     logger.info(
-                        f"✅ Conversation créée: {conversation_id} "
+                        f"Conversation créée: {conversation_id} "
                         f"(session: {session_id}, user: {user_id})"
                     )
 
@@ -76,7 +76,7 @@ class ConversationService:
                     }
 
         except Exception as e:
-            logger.error(f"❌ Erreur création conversation: {e}")
+            logger.error(f"Erreur création conversation: {e}")
             raise
 
     @staticmethod
@@ -138,7 +138,7 @@ class ConversationService:
                     sequence = cur.fetchone()["sequence_number"]
 
                     logger.info(
-                        f"✅ Message ajouté: {message_id} "
+                        f"Message ajouté: {message_id} "
                         f"(conversation: {conversation_id}, sequence: {sequence})"
                     )
 
@@ -148,7 +148,7 @@ class ConversationService:
                     }
 
         except Exception as e:
-            logger.error(f"❌ Erreur ajout message: {e}")
+            logger.error(f"Erreur ajout message: {e}")
             raise
 
     @staticmethod
@@ -184,14 +184,14 @@ class ConversationService:
                         })
 
                     logger.info(
-                        f"✅ Messages récupérés: {len(messages)} "
+                        f"Messages récupérés: {len(messages)} "
                         f"(conversation: {conversation_id})"
                     )
 
                     return messages
 
         except Exception as e:
-            logger.error(f"❌ Erreur récupération messages: {e}")
+            logger.error(f"Erreur récupération messages: {e}")
             raise
 
     @staticmethod
@@ -261,7 +261,7 @@ class ConversationService:
                             "language": row["language"],
                             "message_count": row["message_count"],
                             "first_message_preview": row["first_message_preview"],
-                            "preview": row["first_message_preview"],  # ✅ Alias pour compatibilité frontend
+                            "preview": row["first_message_preview"],  # Alias pour compatibilité frontend
                             "last_message_preview": row["last_message_preview"],
                             "status": row["status"],
                             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
@@ -270,7 +270,7 @@ class ConversationService:
                         })
 
                     logger.info(
-                        f"✅ Conversations récupérées: {len(conversations)}/{total} "
+                        f"Conversations récupérées: {len(conversations)}/{total} "
                         f"(user: {user_id})"
                     )
 
@@ -282,7 +282,7 @@ class ConversationService:
                     }
 
         except Exception as e:
-            logger.error(f"❌ Erreur récupération conversations: {e}")
+            logger.error(f"Erreur récupération conversations: {e}")
             raise
 
     @staticmethod
@@ -332,7 +332,7 @@ class ConversationService:
                     return None
 
         except Exception as e:
-            logger.error(f"❌ Erreur récupération conversation: {e}")
+            logger.error(f"Erreur récupération conversation: {e}")
             raise
 
     @staticmethod
@@ -355,11 +355,11 @@ class ConversationService:
                         (conversation_id,)
                     )
 
-                    logger.info(f"✅ Conversation supprimée: {conversation_id}")
+                    logger.info(f"Conversation supprimée: {conversation_id}")
                     return True
 
         except Exception as e:
-            logger.error(f"❌ Erreur suppression conversation: {e}")
+            logger.error(f"Erreur suppression conversation: {e}")
             raise
 
 

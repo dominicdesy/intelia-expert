@@ -1,6 +1,6 @@
 """
 API Stats Fast - CORRIGÉ pour nouvelle architecture
-====================================================
+
 PostgreSQL: conversations, feedback, invitations
 Supabase: users (via helper function)
 """
@@ -75,7 +75,7 @@ def enrich_users_data(user_ids: list[str]) -> Dict[str, Dict]:
         user = get_user_from_supabase(user_id)
 
         if user:
-            logger.info(f"✅ [ENRICHMENT] User found: {user}")
+            logger.info(f"[ENRICHMENT] User found: {user}")
             users_data[user_id] = {
                 "email": user.get("email", ""),
                 "first_name": user.get("first_name", ""),
@@ -83,9 +83,9 @@ def enrich_users_data(user_ids: list[str]) -> Dict[str, Dict]:
                 "plan": user.get("plan", "free"),
                 "user_type": user.get("user_type", "user")
             }
-            logger.info(f"✅ [ENRICHMENT] Enriched data for {user_id}: {users_data[user_id]}")
+            logger.info(f"[ENRICHMENT] Enriched data for {user_id}: {users_data[user_id]}")
         else:
-            logger.warning(f"❌ [ENRICHMENT] User NOT found in Supabase for user_id: {user_id}")
+            logger.warning(f"[ENRICHMENT] User NOT found in Supabase for user_id: {user_id}")
             users_data[user_id] = {
                 "email": user_id,  # Fallback: utiliser l'ID
                 "first_name": "",
@@ -93,7 +93,7 @@ def enrich_users_data(user_ids: list[str]) -> Dict[str, Dict]:
                 "plan": "free",
                 "user_type": "user"
             }
-            logger.warning(f"⚠️ [ENRICHMENT] Using fallback data for {user_id}: {users_data[user_id]}")
+            logger.warning(f"[ENRICHMENT] Using fallback data for {user_id}: {users_data[user_id]}")
 
     logger.info(f"🔍 [ENRICHMENT] Enrichment complete. Returning {len(users_data)} users")
     return users_data
@@ -442,7 +442,7 @@ async def get_questions(
         current_user.get("id")
     )
     if not user_id:
-        logger.error(f"❌ [QUESTIONS] User ID manquant")
+        logger.error(f"[QUESTIONS] User ID manquant")
         raise HTTPException(status_code=400, detail="User ID manquant")
 
     logger.info(f"🔍 [QUESTIONS] Fetching conversations for user_id: {user_id}")
@@ -463,7 +463,7 @@ async def get_questions(
                 )
                 total = cur.fetchone()["total"]
 
-                logger.info(f"✅ [QUESTIONS] Found {total} conversations")
+                logger.info(f"[QUESTIONS] Found {total} conversations")
 
                 # Récupérer les conversations paginées
                 cur.execute(
@@ -541,7 +541,7 @@ async def get_questions(
                         "last_activity_at": conv_row["last_activity_at"].isoformat() if conv_row["last_activity_at"] else None
                     })
 
-                logger.info(f"✅ [QUESTIONS] Returning {len(conversations)}/{total} conversations")
+                logger.info(f"[QUESTIONS] Returning {len(conversations)}/{total} conversations")
 
                 # Transformer conversations en format QuestionLog pour le frontend
                 questions = []
@@ -593,7 +593,7 @@ async def get_questions(
                 }
 
     except Exception as e:
-        logger.error(f"❌ [QUESTIONS] Error: {e}")
+        logger.error(f"[QUESTIONS] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -623,4 +623,4 @@ async def stats_health() -> Dict[str, Any]:
         }
 
 
-logger.info("✅ stats_fast.py chargé - Architecture PostgreSQL + Supabase")
+logger.info("stats_fast.py chargé - Architecture PostgreSQL + Supabase")
