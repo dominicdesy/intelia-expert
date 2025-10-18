@@ -64,16 +64,10 @@ export const metadata: Metadata = {
   },
 };
 
-// Script de log de version (sans emojis pour éviter les problèmes de compilation)
-const versionLogScript = `
-  console.log('\\n' + '='.repeat(60));
-  console.log('Intelia Expert Frontend');
-  console.log('='.repeat(60));
-  console.log('Version: 1.0.0.25');
-  console.log('Environment: ' + (window.location.hostname === 'localhost' ? 'development' : 'production'));
-  console.log('Loaded at: ' + new Date().toISOString());
-  console.log('Build: ${Date.now()}');
-  console.log('='.repeat(60) + '\\n');
+// Script de log de version - uniquement en développement
+const versionLogScript = process.env.NODE_ENV === 'development' ? `
+  console.log('Intelia Expert Frontend v1.0.0.25');
+  console.log('Environment:', window.location.hostname === 'localhost' ? 'development' : 'production');
 
   // Force cache refresh
   if ('serviceWorker' in navigator) {
@@ -83,7 +77,7 @@ const versionLogScript = `
       }
     });
   }
-`;
+` : '';
 
 // Script pour masquer la barre d'adresse Safari/Edge sur iPhone
 const hideAddressBarScript = `
@@ -121,11 +115,9 @@ const hideAddressBarScript = `
   })();
 `;
 
-// ✅ Script anti-flash SIMPLIFIÉ - CSS pur avec minimal JavaScript
-// Plus robuste pour Android/iOS, pas d'event listeners complexes
+// Script anti-flash - Initialisation langue et direction
 const antiFlashScript = `
   (function() {
-    console.log('[AntiFlash] Initialisation simplifiée...');
 
     // Fonction pour obtenir la langue préférée
     function getPreferredLanguage() {
@@ -167,20 +159,17 @@ const antiFlashScript = `
     const direction = isRTLLanguage(preferredLang) ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('dir', direction);
 
-    console.log('[AntiFlash] Lang:', preferredLang, 'Dir:', direction);
-
-    // ✅ NOUVEAU: Écouter les changements de langue pour mettre à jour dir dynamiquement
+    // Écouter les changements de langue pour mettre à jour dir dynamiquement
     window.addEventListener('languageChanged', function(event) {
       const newLang = event.detail?.language;
       if (newLang) {
         const newDirection = isRTLLanguage(newLang) ? 'rtl' : 'ltr';
         document.documentElement.setAttribute('lang', newLang);
         document.documentElement.setAttribute('dir', newDirection);
-        console.log('[RTL] Language changed:', newLang, 'Dir:', newDirection);
       }
     });
 
-    // ✅ NOUVEAU: Écouter aussi les changements du localStorage (pour les autres onglets)
+    // Écouter les changements du localStorage (pour les autres onglets)
     window.addEventListener('storage', function(e) {
       if (e.key === 'intelia-language' && e.newValue) {
         try {
@@ -190,25 +179,20 @@ const antiFlashScript = `
             const newDirection = isRTLLanguage(newLang) ? 'rtl' : 'ltr';
             document.documentElement.setAttribute('lang', newLang);
             document.documentElement.setAttribute('dir', newDirection);
-            console.log('[RTL] Storage changed:', newLang, 'Dir:', newDirection);
           }
         } catch (error) {
-          console.warn('[RTL] Error parsing storage:', error);
+          // Silent fail
         }
       }
     });
 
-    // ✅ Marquer comme prêt immédiatement - Le CSS gérera l'affichage progressif
-    // Utiliser DOMContentLoaded avec { once: true } pour auto-cleanup
+    // Marquer comme prêt
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', function() {
         document.documentElement.classList.add('language-ready');
-        console.log('[AntiFlash] ✅ Ready on DOMContentLoaded');
       }, { once: true });
     } else {
-      // Document déjà prêt
       document.documentElement.classList.add('language-ready');
-      console.log('[AntiFlash] ✅ Ready immediately');
     }
   })();
 `;
