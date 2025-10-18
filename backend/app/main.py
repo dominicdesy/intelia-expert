@@ -37,6 +37,24 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
+# Filtrer les logs d'accès uvicorn pour les endpoints répétitifs
+class SuppressHealthCheckFilter(logging.Filter):
+    """Filtre pour supprimer les logs d'accès des endpoints de santé répétitifs"""
+    def filter(self, record):
+        # Supprimer les logs pour /auth/me (appelé chaque seconde par le frontend)
+        if hasattr(record, 'getMessage'):
+            message = record.getMessage()
+            if '/auth/me' in message or '/v1/auth/me' in message:
+                return False
+            # Également supprimer les health checks si nécessaire
+            if '/health' in message and 'GET' in message:
+                return False
+        return True
+
+# Appliquer le filtre au logger uvicorn.access
+uvicorn_access_logger = logging.getLogger("uvicorn.access")
+uvicorn_access_logger.addFilter(SuppressHealthCheckFilter())
+
 # === CONFIG CORS ===
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",

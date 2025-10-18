@@ -2268,7 +2268,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
 
                     if response.data:
                         profile_data = response.data
-                        logger.info(f"[/auth/me] Profil complet récupéré pour {current_user.get('email')}")
+                        logger.debug(f"[/auth/me] Profil complet récupéré pour {current_user.get('email')}")
 
                         # Retourner les données complètes incluant first_name, last_name, country
                         return {

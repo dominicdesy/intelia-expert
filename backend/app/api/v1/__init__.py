@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Import avec debug détaillé pour chaque router
-logger.info("Début import des routers...")
+logger.debug("Début import des routers...")
 
 # System router
 try:
@@ -101,7 +101,7 @@ try:
     try:
         import aiohttp
 
-        logger.info(" aiohttp disponible (version: %s)", aiohttp.__version__)
+        logger.debug(" aiohttp disponible (version: %s)", aiohttp.__version__)
     except ImportError as aiohttp_error:
         logger.error(" aiohttp MANQUANT: %s", aiohttp_error)
 
@@ -111,7 +111,7 @@ try:
 
         auth_spec = importlib.util.find_spec(".auth", package=__name__)
         if auth_spec is not None:
-            logger.info(" auth module disponible")
+            logger.debug(" auth module disponible")
         else:
             logger.error(" auth module MANQUANT")
     except Exception as auth_error:
@@ -121,7 +121,7 @@ try:
     try:
         stats_cache_spec = importlib.util.find_spec(".stats_cache", package=__name__)
         if stats_cache_spec is not None:
-            logger.info(" stats_cache module disponible")
+            logger.debug(" stats_cache module disponible")
         else:
             logger.error(" stats_cache module MANQUANT")
     except Exception as cache_error:
@@ -131,10 +131,9 @@ try:
     from .stats_fast import router as stats_fast_router
 
     STATS_FAST_AVAILABLE = True
-    logger.info(" Stats Fast router importé avec succès!")
+    logger.debug(" Stats Fast router importé avec succès!")
     logger.debug("Stats Fast router a %d routes", len(stats_fast_router.routes))
-    logger.info(
-        "Stats Fast router prefix: %s", getattr(stats_fast_router, "prefix", "None")
+    logger.debug("Stats Fast router prefix: %s", getattr(stats_fast_router, "prefix", "None")
     )
     stats_fast_routes = [
         f"{route.path} ({', '.join(route.methods)})"
@@ -173,10 +172,9 @@ try:
     from .stats_admin import router as stats_admin_router
 
     STATS_ADMIN_AVAILABLE = True
-    logger.info("Stats Admin router importé avec succès!")
+    logger.debug("Stats Admin router importé avec succès!")
     logger.debug("Stats Admin router a %d routes", len(stats_admin_router.routes))
-    logger.info(
-        "Stats Admin router prefix: %s", getattr(stats_admin_router, "prefix", "None")
+    logger.debug("Stats Admin router prefix: %s", getattr(stats_admin_router, "prefix", "None")
     )
     stats_admin_routes = [
         f"{route.path} ({', '.join(route.methods)})"
@@ -220,10 +218,9 @@ except Exception as e:
 try:
     from .invitations import router as invitations_router
 
-    logger.info(
-        "Invitations router importé avec %d routes", len(invitations_router.routes)
+    logger.debug("Invitations router importé avec %d routes", len(invitations_router.routes)
     )
-    logger.info("Invitations router inclut maintenant les fonctions d'auth invitations")
+    logger.debug("Invitations router inclut maintenant les fonctions d'auth invitations")
 except Exception as e:
     logger.error("ERREUR import invitations router: %s", e)
     invitations_router = None
@@ -272,8 +269,7 @@ try:
     from .conversations import router as conversations_router
 
     CONVERSATIONS_AVAILABLE = True
-    logger.info(
-        "Conversations router importé avec %d routes", len(conversations_router.routes)
+    logger.debug("Conversations router importé avec %d routes", len(conversations_router.routes)
     )
 except ImportError:
     CONVERSATIONS_AVAILABLE = False
@@ -290,8 +286,7 @@ try:
     from .shared import router as shared_router
 
     SHARED_AVAILABLE = True
-    logger.info(
-        "Shared router importé avec %d routes", len(shared_router.routes)
+    logger.debug("Shared router importé avec %d routes", len(shared_router.routes)
     )
 except ImportError:
     SHARED_AVAILABLE = False
@@ -308,8 +303,7 @@ try:
     from .webhooks import router as webhooks_router
 
     WEBHOOKS_AVAILABLE = True
-    logger.info(
-        "Webhooks router importé avec %d routes", len(webhooks_router.routes)
+    logger.debug("Webhooks router importé avec %d routes", len(webhooks_router.routes)
     )
 except ImportError:
     WEBHOOKS_AVAILABLE = False
@@ -326,8 +320,7 @@ try:
     from .qa_quality import router as qa_quality_router
 
     QA_QUALITY_AVAILABLE = True
-    logger.info(
-        "QA Quality router importé avec %d routes", len(qa_quality_router.routes)
+    logger.debug("QA Quality router importé avec %d routes", len(qa_quality_router.routes)
     )
 except ImportError:
     QA_QUALITY_AVAILABLE = False
@@ -344,8 +337,7 @@ try:
     from .images import router as images_router
 
     IMAGES_AVAILABLE = True
-    logger.info(
-        "Images router importé avec %d routes", len(images_router.routes)
+    logger.debug("Images router importé avec %d routes", len(images_router.routes)
     )
 except ImportError:
     IMAGES_AVAILABLE = False
@@ -362,8 +354,7 @@ try:
     from .stripe_subscriptions import router as stripe_subscriptions_router
 
     STRIPE_SUBSCRIPTIONS_AVAILABLE = True
-    logger.info(
-        "Stripe Subscriptions router importé avec %d routes", len(stripe_subscriptions_router.routes)
+    logger.debug("Stripe Subscriptions router importé avec %d routes", len(stripe_subscriptions_router.routes)
     )
 except ImportError:
     STRIPE_SUBSCRIPTIONS_AVAILABLE = False
@@ -380,8 +371,7 @@ try:
     from .stripe_webhooks import router as stripe_webhooks_router
 
     STRIPE_WEBHOOKS_AVAILABLE = True
-    logger.info(
-        "Stripe Webhooks router importé avec %d routes", len(stripe_webhooks_router.routes)
+    logger.debug("Stripe Webhooks router importé avec %d routes", len(stripe_webhooks_router.routes)
     )
 except ImportError:
     STRIPE_WEBHOOKS_AVAILABLE = False
@@ -398,8 +388,7 @@ try:
     from .usage import router as usage_router
 
     USAGE_AVAILABLE = True
-    logger.info(
-        "Usage router importé avec %d routes", len(usage_router.routes)
+    logger.debug("Usage router importé avec %d routes", len(usage_router.routes)
     )
 except ImportError:
     USAGE_AVAILABLE = False
@@ -416,8 +405,7 @@ try:
     from .webauthn import router as webauthn_router
 
     WEBAUTHN_AVAILABLE = True
-    logger.info(
-        "WebAuthn router importé avec %d routes", len(webauthn_router.routes)
+    logger.debug("WebAuthn router importé avec %d routes", len(webauthn_router.routes)
     )
 except ImportError:
     WEBAUTHN_AVAILABLE = False
@@ -447,7 +435,7 @@ if auth_router:
     try:
         router.include_router(auth_router, tags=["Auth"])
         logger.debug("Auth router monté avec succès!")
-        logger.info("Auth router maintenant disponible sur /v1/auth/*")
+        logger.debug("Auth router maintenant disponible sur /v1/auth/*")
     except Exception as e:
         logger.error("ERREUR montage auth router: %s", e)
         import traceback
@@ -461,7 +449,7 @@ if USERS_AVAILABLE and users_router:
     try:
         router.include_router(users_router, tags=["Users"])
         logger.debug("Users router monté avec succès!")
-        logger.info("Users router maintenant disponible sur /v1/users/*")
+        logger.debug("Users router maintenant disponible sur /v1/users/*")
         logger.info("Gestion profils utilisateur ACTIVE!")
     except Exception as e:
         logger.error("ERREUR montage users router: %s", e)
@@ -479,7 +467,7 @@ if STATS_FAST_AVAILABLE and stats_fast_router:
     try:
         router.include_router(stats_fast_router, tags=["Stats-Fast"])
         logger.debug("Stats Fast router monté avec succès!")
-        logger.info("Stats Fast router maintenant disponible sur /v1/stats-fast/*")
+        logger.debug("Stats Fast router maintenant disponible sur /v1/stats-fast/*")
         logger.info("Endpoints ultra-rapides activés (<100ms vs 10-30s)")
     except Exception as e:
         logger.error("ERREUR montage stats_fast router: %s", e)
@@ -499,7 +487,7 @@ if STATS_ADMIN_AVAILABLE and stats_admin_router:
             stats_admin_router, prefix="/stats-admin", tags=["Stats-Admin"]
         )
         logger.debug("Stats Admin router monté avec succès!")
-        logger.info("Stats Admin router maintenant disponible sur /v1/stats-admin/*")
+        logger.debug("Stats Admin router maintenant disponible sur /v1/stats-admin/*")
         logger.info("Administration cache activée (super admin uniquement)")
     except Exception as e:
         logger.error("ERREUR montage stats_admin router: %s", e)
@@ -526,7 +514,7 @@ if health_router:
 if invitations_router:
     router.include_router(invitations_router, tags=["Invitations"])
     logger.debug("Invitations router monté (inclut auth invitations)")
-    logger.info("Invitations router disponible sur /v1/invitations/*")
+    logger.debug("Invitations router disponible sur /v1/invitations/*")
 else:
     logger.error("Invitations router NON MONTÉ - import a échoué")
 
@@ -549,7 +537,7 @@ if billing_openai_router:
         billing_openai_router, prefix="/billing", tags=["Billing-OpenAI"]
     )
     logger.debug("Billing OpenAI router monté avec succès!")
-    logger.info("Billing OpenAI router maintenant disponible sur /v1/billing/openai-*")
+    logger.debug("Billing OpenAI router maintenant disponible sur /v1/billing/openai-*")
 else:
     logger.error("Billing OpenAI router NON MONTÉ - échec import")
 """
@@ -570,7 +558,7 @@ if SHARED_AVAILABLE and shared_router:
         shared_router, prefix="/shared", tags=["Shared"]
     )
     logger.debug("Shared router monté")
-    logger.info("Shared router maintenant disponible sur /v1/shared/*")
+    logger.debug("Shared router maintenant disponible sur /v1/shared/*")
 else:
     logger.warning("Shared router non monté (module non disponible)")
 
@@ -580,7 +568,7 @@ if WEBHOOKS_AVAILABLE and webhooks_router:
         webhooks_router, prefix="/webhooks", tags=["Webhooks"]
     )
     logger.debug("Webhooks router monté")
-    logger.info("Webhooks router maintenant disponible sur /v1/webhooks/*")
+    logger.debug("Webhooks router maintenant disponible sur /v1/webhooks/*")
 else:
     logger.warning("Webhooks router non monté (module non disponible)")
 
@@ -588,7 +576,7 @@ else:
 if QA_QUALITY_AVAILABLE and qa_quality_router:
     router.include_router(qa_quality_router, tags=["QA-Quality"])
     logger.debug("QA Quality router monté")
-    logger.info("QA Quality router maintenant disponible sur /v1/qa-quality/*")
+    logger.debug("QA Quality router maintenant disponible sur /v1/qa-quality/*")
 else:
     logger.warning("QA Quality router non monté (module non disponible)")
 
@@ -596,7 +584,7 @@ else:
 if IMAGES_AVAILABLE and images_router:
     router.include_router(images_router, tags=["Images"])
     logger.debug("Images router monté")
-    logger.info("Images router maintenant disponible sur /v1/images/*")
+    logger.debug("Images router maintenant disponible sur /v1/images/*")
 else:
     logger.warning("Images router non monté (module non disponible)")
 
@@ -604,7 +592,7 @@ else:
 if STRIPE_SUBSCRIPTIONS_AVAILABLE and stripe_subscriptions_router:
     router.include_router(stripe_subscriptions_router, tags=["Stripe-Subscriptions"])
     logger.debug("Stripe Subscriptions router monté")
-    logger.info("Stripe Subscriptions router maintenant disponible sur /v1/stripe/*")
+    logger.debug("Stripe Subscriptions router maintenant disponible sur /v1/stripe/*")
     logger.info("Support Stripe Link activé pour paiements 1-click!")
 else:
     logger.warning("Stripe Subscriptions router non monté (module non disponible)")
@@ -613,7 +601,7 @@ else:
 if STRIPE_WEBHOOKS_AVAILABLE and stripe_webhooks_router:
     router.include_router(stripe_webhooks_router, prefix="/stripe", tags=["Stripe-Webhooks"])
     logger.debug("Stripe Webhooks router monté")
-    logger.info("Stripe Webhooks router maintenant disponible sur /v1/stripe/webhook")
+    logger.debug("Stripe Webhooks router maintenant disponible sur /v1/stripe/webhook")
 else:
     logger.warning("Stripe Webhooks router non monté (module non disponible)")
 
@@ -621,7 +609,7 @@ else:
 if USAGE_AVAILABLE and usage_router:
     router.include_router(usage_router, prefix="/usage", tags=["Usage"])
     logger.debug("Usage router monté")
-    logger.info("Usage router maintenant disponible sur /v1/usage/*")
+    logger.debug("Usage router maintenant disponible sur /v1/usage/*")
     logger.info("Système de quotas mensuels activé (Essential: 50 questions/mois)")
 else:
     logger.warning("Usage router non monté (module non disponible)")
@@ -630,7 +618,7 @@ else:
 if WEBAUTHN_AVAILABLE and webauthn_router:
     router.include_router(webauthn_router, tags=["WebAuthn"])
     logger.debug("WebAuthn router monté")
-    logger.info("WebAuthn router maintenant disponible sur /v1/webauthn/*")
+    logger.debug("WebAuthn router maintenant disponible sur /v1/webauthn/*")
     logger.info("Authentification biométrique activée (Face ID, Touch ID, Fingerprint)!")
 else:
     logger.warning("WebAuthn router non monté (module non disponible)")
@@ -641,7 +629,7 @@ logger.info("Router v1 créé avec %d routes au total", total_routes)
 
 # Debug des routes auth spécifiquement
 auth_route_count = len([r for r in router.routes if "/auth" in r.path])
-logger.info("Routes auth détectées: %d", auth_route_count)
+logger.debug("Routes auth détectées: %d", auth_route_count)
 
 if auth_route_count > 0:
     auth_routes_debug = [
@@ -653,7 +641,7 @@ else:
 
 # Debug des routes users spécifiquement
 users_route_count = len([r for r in router.routes if "/users" in r.path])
-logger.info("Routes users détectées: %d", users_route_count)
+logger.debug("Routes users détectées: %d", users_route_count)
 
 if users_route_count > 0:
     users_routes_debug = [
@@ -668,7 +656,7 @@ else:
 
 # Debug des routes invitations spécifiquement (MAINTENANT UNIFIÉ)
 invitations_route_count = len([r for r in router.routes if "/invitations" in r.path])
-logger.info("Routes invitations détectées: %d", invitations_route_count)
+logger.debug("Routes invitations détectées: %d", invitations_route_count)
 
 if invitations_route_count > 0:
     invitations_routes_debug = [
@@ -683,7 +671,7 @@ else:
 
 # Debug des routes stats cache spécifiquement
 stats_route_count = len([r for r in router.routes if "/stats-" in r.path])
-logger.info("Routes stats cache détectées: %d", stats_route_count)
+logger.debug("Routes stats cache détectées: %d", stats_route_count)
 
 if stats_route_count > 0:
     stats_routes_debug = [
@@ -700,7 +688,7 @@ else:
 billing_openai_route_count = len(
     [r for r in router.routes if "/billing/openai" in r.path]
 )
-logger.info("Routes billing OpenAI détectées: %d", billing_openai_route_count)
+logger.debug("Routes billing OpenAI détectées: %d", billing_openai_route_count)
 
 if billing_openai_route_count > 0:
     billing_openai_routes_debug = [

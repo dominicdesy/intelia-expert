@@ -13,22 +13,14 @@ logger = logging.getLogger(__name__)
 
 class StatisticsCache:
     def __init__(self, dsn: str = None):
-        # LOG DE DÉPLOIEMENT - VERSION SIMPLE V1.0
-        print("=" * 80)
-        print("STATS_CACHE.PY - VERSION SIMPLE V1.0 - DÉPLOYÉE")
-        print("Date: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        print("CORRECTION: Cache en mémoire simple, sans complexité SQL")
-        print("Évite tous les problèmes de connexion DB du cache")
-        print("=" * 80)
-
         # Cache en mémoire simple
         self._cache = {}
         self._timestamps = {}
         self.max_entries = 100
 
-        logger.info("StatisticsCache VERSION SIMPLE V1.0 initialisé")
-        logger.info("Cache en mémoire activé (max 100 entrées)")
-        logger.info("Cette version évite les problèmes SQL du cache")
+        logger.debug("StatisticsCache VERSION SIMPLE V1.0 initialisé")
+        logger.debug("Cache en mémoire activé (max 100 entrées)")
+        logger.debug("Cette version évite les problèmes SQL du cache")
 
     def set_cache(
         self, key: str, data: Any, ttl_hours: int = 12, source: str = "computed"

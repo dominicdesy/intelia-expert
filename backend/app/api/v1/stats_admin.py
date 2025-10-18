@@ -38,18 +38,8 @@ except ImportError:
 
 router = APIRouter(tags=["statistics-admin"])
 
-# LOG DE DÉPLOIEMENT AU CHARGEMENT DU MODULE
-print("=" * 80)
-print("STATS_ADMIN.PY - VERSION SIMPLE V1.0 - DÉPLOYÉE")
-print("Date: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-print("CORRECTION: Administration simplifiée sans complexité")
-print(
-    f"Composants disponibles: AUTH={AUTH_AVAILABLE}, CACHE={CACHE_AVAILABLE}, UPDATER={UPDATER_AVAILABLE}"
-)
-print("=" * 80)
-
-logger.info("STATS_ADMIN VERSION SIMPLE V1.0 chargé")
-logger.info(
+logger.debug("STATS_ADMIN VERSION SIMPLE V1.0 chargé")
+logger.debug(
     f"Imports: AUTH={AUTH_AVAILABLE}, CACHE={CACHE_AVAILABLE}, UPDATER={UPDATER_AVAILABLE}"
 )
 
