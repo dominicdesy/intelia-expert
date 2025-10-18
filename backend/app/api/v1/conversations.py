@@ -106,12 +106,36 @@ async def save_conversation(
     """
     Sauvegarde une conversation dans la nouvelle architecture.
     Crée une conversation avec le premier échange Q&R ou ajoute des messages.
+
+    ⚠️ QUOTA: Vérifie et incrémente automatiquement le quota utilisateur
     """
+    from app.services.usage_limiter import check_usage_limit, increment_question_count, QuotaExceededException
+
+    user_email = current_user.get('email')
+
     try:
         logger.info(
-            f"save_conversation: user={current_user.get('email', 'unknown')}, "
+            f"save_conversation: user={user_email}, "
             f"session_id={conversation_data.conversation_id[:8]}..."
         )
+
+        # 🔒 ÉTAPE 1: Vérifier le quota AVANT de sauvegarder
+        try:
+            quota_info = check_usage_limit(user_email)
+            logger.info(
+                f"[Quota] {user_email}: {quota_info['questions_used']}/{quota_info['monthly_quota']} "
+                f"({quota_info['questions_remaining']} restantes)"
+            )
+        except QuotaExceededException as qe:
+            logger.warning(f"[Quota] Dépassé pour {user_email}: {qe.usage_info}")
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "quota_exceeded",
+                    "message": str(qe),
+                    "quota_info": qe.usage_info
+                }
+            )
 
         # Vérification sécurité - Comparer les UUID
         requester_id = current_user.get("user_id", "")
@@ -155,6 +179,15 @@ async def save_conversation(
                 f"assistant={assistant_msg['sequence_number']}"
             )
 
+            # 📊 ÉTAPE 2: Incrémenter le compteur de questions
+            try:
+                increment_result = increment_question_count(user_email, success=True)
+                logger.info(
+                    f"[Quota] Question comptée: {increment_result.get('questions_used')}/{increment_result.get('monthly_quota')}"
+                )
+            except Exception as inc_error:
+                logger.error(f"[Quota] Erreur incrémentation (non bloquant): {inc_error}")
+
             return {
                 "status": "updated",
                 "conversation_id": existing_conv["id"],
@@ -181,6 +214,15 @@ async def save_conversation(
             )
 
             logger.info(f"Nouvelle conversation créée: {result['conversation_id']}")
+
+            # 📊 ÉTAPE 2: Incrémenter le compteur de questions
+            try:
+                increment_result = increment_question_count(user_email, success=True)
+                logger.info(
+                    f"[Quota] Question comptée: {increment_result.get('questions_used')}/{increment_result.get('monthly_quota')}"
+                )
+            except Exception as inc_error:
+                logger.error(f"[Quota] Erreur incrémentation (non bloquant): {inc_error}")
 
             return {
                 "status": "created",

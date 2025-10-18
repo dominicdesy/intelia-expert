@@ -90,7 +90,7 @@ def get_user_plan_and_quota(user_email: str) -> Tuple[str, int, bool]:
 
             # Par défaut: plan gratuit avec quota limité
             logger.warning(f"Aucun plan trouvé pour {user_email}, utilisation du plan par défaut")
-            return ('essential', 50, True)
+            return ('essential', 3, True)  # TEMPORAIRE: 3 pour tests (normalement 50)
 
 
 def get_or_create_monthly_usage(user_email: str, month_year: str, monthly_quota: int) -> Dict[str, Any]:
