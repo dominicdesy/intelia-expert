@@ -1264,10 +1264,16 @@ function ChatInterface() {
 		// Gérer spécifiquement l'erreur de quota dépassé
 		if (error.message === "QUOTA_EXCEEDED") {
 		  const quotaInfo = error.quotaInfo || {};
-		  const quotaMessage = `${t("chat.quotaExceeded")}\n\n` +
-			`${t("chat.questionsUsed")}: ${quotaInfo.questions_used || 0}/${quotaInfo.monthly_quota || 0}\n` +
-			`${t("chat.planName")}: ${quotaInfo.plan_name || "free"}\n\n` +
-			`${t("chat.upgradePrompt")}`;
+
+		  // Message structuré avec les clés de traduction
+		  const quotaMessage = [
+			`**${t("chat.quotaExceeded")}**`,
+			"",
+			`**${t("chat.questionsUsed")}:** ${quotaInfo.questions_used || 0}/${quotaInfo.monthly_quota || 0}`,
+			`**${t("chat.planName")}:** ${quotaInfo.plan_name || "free"}`,
+			"",
+			t("chat.upgradePrompt")
+		  ].join("\n");
 
 		  if (isMountedRef.current) {
 			addMessage({
