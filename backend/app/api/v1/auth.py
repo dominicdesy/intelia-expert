@@ -101,6 +101,9 @@ MAIN_JWT_SECRET = JWT_SECRETS[0][1]
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
+logger.info("JWT signing secret: %s", JWT_SECRETS[0][0])
+logger.info("Token validity duration: %s minutes", ACCESS_TOKEN_EXPIRE_MINUTES)
+
 security = HTTPBearer()
 
 
@@ -341,26 +344,6 @@ async def get_current_user(
     """
     token = credentials.credentials
 
-    # === AJOUTEZ CES LIGNES ICI ===
-    logger.critical("=" * 80)
-    logger.critical("[AUTH_DEBUG] ANALYSE DU TOKEN")
-    logger.critical(f"Longueur du token: {len(token)}")
-    logger.critical(f"Premiers 30 caractères: {token[:30]}...")
-
-    try:
-        import jwt as pyjwt
-
-        payload = pyjwt.decode(token, options={"verify_signature": False})
-        logger.critical(f"Token ISS (émetteur): {payload.get('iss')}")
-        logger.critical(f"Token AUD (audience): {payload.get('aud')}")
-        logger.critical(f"Token EMAIL: {payload.get('email')}")
-        logger.critical(f"Token SUB: {payload.get('sub')}")
-        logger.critical("=" * 80)
-    except Exception as e:
-        logger.critical(f"Impossible de décoder le token: {e}")
-        logger.critical("=" * 80)
-    # === FIN DES LIGNES À AJOUTER ===
-
     if not token or not isinstance(token, str):
         logger.warning("Token vide ou invalide")
         raise HTTPException(
@@ -483,8 +466,8 @@ async def get_current_user(
             continue
 
     # Si aucun secret n'a fonctionné
-    logger.error("Impossible de décoder le token avec tous les secrets disponibles")
-    logger.error(f"Secrets essayés: {[s[0] for s in JWT_SECRETS]}")
+    logger.debug("Impossible de décoder le token avec tous les secrets disponibles")
+    logger.debug(f"Secrets essayés: {[s[0] for s in JWT_SECRETS]}")
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
