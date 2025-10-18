@@ -109,7 +109,7 @@ async def save_conversation(
 
     ⚠️ QUOTA: Vérifie et incrémente automatiquement le quota utilisateur
     """
-    from app.services.usage_limiter import check_usage_limit, increment_question_count, QuotaExceededException
+    from app.services.usage_limiter import check_user_quota, increment_question_count, QuotaExceededException
 
     user_email = current_user.get('email')
 
@@ -121,7 +121,7 @@ async def save_conversation(
 
         # 🔒 ÉTAPE 1: Vérifier le quota AVANT de sauvegarder
         try:
-            quota_info = check_usage_limit(user_email)
+            quota_info = check_user_quota(user_email)
             logger.info(
                 f"[Quota] {user_email}: {quota_info['questions_used']}/{quota_info['monthly_quota']} "
                 f"({quota_info['questions_remaining']} restantes)"

@@ -6,7 +6,7 @@ from typing import Dict, Any
 import logging
 
 from app.api.v1.auth import get_current_user
-from app.services.usage_limiter import check_usage_limit, QuotaExceededException
+from app.services.usage_limiter import check_user_quota, QuotaExceededException
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ async def check_user_quota_dependency(
 
     try:
         # Vérifier le quota AVANT de permettre la requête
-        quota_info = check_usage_limit(user_email)
+        quota_info = check_user_quota(user_email)
 
         logger.info(
             f"[QuotaCheck] {user_email}: {quota_info['questions_used']}/{quota_info['monthly_quota']} questions"
