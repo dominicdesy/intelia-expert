@@ -128,12 +128,17 @@ async def save_conversation(
             )
         except QuotaExceededException as qe:
             logger.warning(f"[Quota] Dépassé pour {user_email}: {qe.usage_info}")
+            # Convertir datetime en string pour sérialisation JSON
+            quota_info_serializable = {**qe.usage_info}
+            if 'quota_exceeded_at' in quota_info_serializable and quota_info_serializable['quota_exceeded_at']:
+                quota_info_serializable['quota_exceeded_at'] = quota_info_serializable['quota_exceeded_at'].isoformat()
+
             raise HTTPException(
                 status_code=429,
                 detail={
                     "error": "quota_exceeded",
                     "message": str(qe),
-                    "quota_info": qe.usage_info
+                    "quota_info": quota_info_serializable
                 }
             )
 
