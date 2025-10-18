@@ -272,6 +272,10 @@ export interface TranslationKeys {
   "chat.noConversations": string;
   "chat.loading": string;
   "chat.errorMessage": string;
+  "chat.planName": string;
+  "chat.questionsUsed": string;
+  "chat.quotaExceeded": string;
+  "chat.upgradePrompt": string;
   "chat.newConversation": string;
   "chat.disclaimer": string;
   "chat.send": string;
