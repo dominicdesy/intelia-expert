@@ -56,6 +56,7 @@ const ChatInput = React.memo(
     selectedImages,
     onImagesSelect,
     onImageRemove,
+    fileInputRef,
     t,
   }: {
     inputMessage: string;
@@ -68,9 +69,9 @@ const ChatInput = React.memo(
     selectedImages: File[];
     onImagesSelect: (files: File[]) => void;
     onImageRemove: (index: number) => void;
+    fileInputRef: React.RefObject<HTMLInputElement>;
     t: (key: string) => string;
   }) => {
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const [previewUrls, setPreviewUrls] = React.useState<string[]>([]);
     const [imageErrors, setImageErrors] = React.useState<boolean[]>([]);
 
@@ -119,26 +120,6 @@ const ChatInput = React.memo(
         onSendMessage();
       },
       [onSendMessage],
-    );
-
-    const handleCameraClick = useCallback(() => {
-      fileInputRef.current?.click();
-    }, []);
-
-    const handleFileChange = useCallback(
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (files && files.length > 0) {
-          const imageFiles = Array.from(files).filter(file => file.type.startsWith("image/"));
-          if (imageFiles.length > 0) {
-            // Ajouter les nouvelles images aux images existantes
-            onImagesSelect([...selectedImages, ...imageFiles]);
-          }
-        }
-        // Reset input pour permettre de sélectionner les mêmes images à nouveau
-        e.target.value = "";
-      },
-      [onImagesSelect, selectedImages],
     );
 
     const handleVoiceTranscript = useCallback(
@@ -227,17 +208,6 @@ const ChatInput = React.memo(
             />
           </div>
 
-          {/* Hidden File Input - Multiple */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={handleFileChange}
-            className="hidden"
-            multiple
-            aria-label={t("chat.uploadImages")}
-          />
-
           {/* Send Button */}
           <button
             onClick={handleButtonClick}
@@ -254,26 +224,28 @@ const ChatInput = React.memo(
             <PaperAirplaneIcon />
           </button>
 
-          {/* Camera Button */}
-          <button
-            onClick={handleCameraClick}
-            disabled={isLoadingChat}
-            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
-            title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
-            aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
-            style={{
-              minWidth: "48px",
-              width: "48px",
-              height: "48px",
-            }}
-          >
-            <CameraIcon />
-            {selectedImages.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                {selectedImages.length}
-              </span>
-            )}
-          </button>
+          {/* Camera Button - Visible uniquement sur desktop */}
+          {!isMobileDevice && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoadingChat}
+              className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
+              title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+              aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+              style={{
+                minWidth: "48px",
+                width: "48px",
+                height: "48px",
+              }}
+            >
+              <CameraIcon />
+              {selectedImages.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  {selectedImages.length}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Voice Input Button */}
           <VoiceInput
@@ -723,6 +695,13 @@ function ChatInterface() {
 
   const handleImageRemove = useCallback((index: number) => {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // Ref pour le file input (partagé entre header et input bar)
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCameraClick = useCallback(() => {
+    fileInputRef.current?.click();
   }, []);
 
   const processedMessages = useMemo(() => {
@@ -1525,7 +1504,7 @@ function ChatInterface() {
         <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             {/* Left side - Adaptatif mobile/desktop */}
-            <div className="flex items-center space-x-2">
+            <div className={`flex items-center ${isMobileDevice ? 'space-x-1' : 'space-x-2'}`}>
               <button
                 onClick={handleNewConversation}
                 className="w-10 h-10 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center border border-gray-200 flex-shrink-0"
@@ -1539,19 +1518,35 @@ function ChatInterface() {
                 <HistoryMenu />
               </div>
 
-              {/* Logo - caché sur très petit écran quand conversation active */}
-              <div className={`items-center space-x-2 ml-1 ${
-                isMobileDevice && currentConversation && currentConversation.id !== "welcome"
-                  ? 'hidden'
-                  : 'flex'
-              }`}>
-                <div className="w-8 h-8 sm:w-10 sm:h-10 grid place-items-center flex-shrink-0">
-                  <InteliaLogo className="h-6 sm:h-8 w-auto" />
+              {/* Camera Button - Visible uniquement sur iPhone */}
+              {isMobileDevice && (
+                <button
+                  onClick={handleCameraClick}
+                  disabled={isLoadingChat}
+                  className={`flex-shrink-0 w-10 h-10 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-lg hover:bg-blue-50 border border-gray-200 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
+                  title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : t("chat.uploadImages")}
+                  aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : t("chat.uploadImages")}
+                >
+                  <CameraIcon className="w-5 h-5" />
+                  {selectedImages.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                      {selectedImages.length}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              {/* Logo - masqué sur iPhone, visible sur desktop */}
+              {!isMobileDevice && (
+                <div className="flex items-center space-x-2 ml-1">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 grid place-items-center flex-shrink-0">
+                    <InteliaLogo className="h-6 sm:h-8 w-auto" />
+                  </div>
+                  <h1 className="text-base sm:text-lg font-medium text-gray-900 truncate hidden sm:block">
+                    {t("common.appName")}
+                  </h1>
                 </div>
-                <h1 className="text-base sm:text-lg font-medium text-gray-900 truncate hidden sm:block">
-                  {t("common.appName")}
-                </h1>
-              </div>
+              )}
             </div>
 
             {/* Right side - Toujours visible sur mobile */}
@@ -1647,6 +1642,26 @@ function ChatInterface() {
                 </div>
               )}
 
+              {/* Hidden File Input - Partagé entre header et input bar */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => {
+                  const files = e.target.files;
+                  if (files && files.length > 0) {
+                    const imageFiles = Array.from(files).filter(file => file.type.startsWith("image/"));
+                    if (imageFiles.length > 0) {
+                      handleImagesSelect([...selectedImages, ...imageFiles]);
+                    }
+                  }
+                  e.target.value = ""; // Reset pour permettre la re-sélection
+                }}
+                className="hidden"
+                multiple
+                aria-label={t("chat.uploadImages")}
+              />
+
               <ChatInput
                 inputMessage={inputMessage}
                 setInputMessage={setInputMessage}
@@ -1658,6 +1673,7 @@ function ChatInterface() {
                 selectedImages={selectedImages}
                 onImagesSelect={handleImagesSelect}
                 onImageRemove={handleImageRemove}
+                fileInputRef={fileInputRef}
                 t={t}
               />
 
