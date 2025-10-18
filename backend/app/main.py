@@ -247,10 +247,7 @@ async def lifespan(app: FastAPI):
     BUILD = "20251012-001"  # Pydantic warning fix + Conversation sharing feature
     COMMIT = os.getenv("COMMIT_SHA", "unknown")[:8]
 
-    logger.info("=" * 80)
-    logger.info(f"🚀 Demarrage backend Expert API - Architecture simplifiee")
-    logger.info(f"📦 VERSION: {VERSION} | BUILD: {BUILD} | COMMIT: {COMMIT}")
-    logger.info("=" * 80)
+    logger.info("Starting Expert API backend - v%s (build %s, commit %s)", VERSION, BUILD, COMMIT)
 
     # ========== INITIALISATION DES BASES DE DONNÉES ==========
     try:
@@ -261,9 +258,9 @@ async def lifespan(app: FastAPI):
         db_init_success = init_all_databases()
 
         if db_init_success:
-            logger.info("✅ Bases de données PostgreSQL et Supabase initialisées")
+            logger.info("Database connections initialized (PostgreSQL + Supabase)")
         else:
-            logger.warning("⚠️ Erreur initialisation des bases de données")
+            logger.warning("Database initialization error")
 
         # ========== INITIALISATION DES SERVICES ==========
         database_url = os.getenv("DATABASE_URL")
@@ -357,7 +354,7 @@ async def lifespan(app: FastAPI):
     try:
         from app.core.database import close_all_databases
         close_all_databases()
-        logger.info("✅ Connexions bases de données fermées")
+        logger.info("Database connections closed")
     except Exception as e:
         logger.error(f"Erreur fermeture DB: {e}")
 

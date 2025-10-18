@@ -40,10 +40,10 @@ def init_postgresql_pool():
             maxconn=20,
             dsn=database_url
         )
-        logger.info("✅ PostgreSQL connection pool initialized (2-20 connections)")
+        logger.info("PostgreSQL connection pool initialized (2-20 connections)")
         return _pg_pool
     except Exception as e:
-        logger.error(f"❌ Failed to initialize PostgreSQL pool: {e}")
+        logger.error(f"Failed to initialize PostgreSQL pool: {e}")
         raise
 
 
@@ -118,10 +118,10 @@ def init_supabase_client() -> Client:
 
     try:
         _supabase_client = create_client(supabase_url, supabase_key)
-        logger.info("✅ Supabase client initialized")
+        logger.info("Supabase client initialized")
         return _supabase_client
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Supabase client: {e}")
+        logger.error(f"Failed to initialize Supabase client: {e}")
         raise
 
 
@@ -148,31 +148,26 @@ def get_user_from_supabase(user_id: str) -> Optional[dict]:
         dict avec email, first_name, last_name, user_type, plan ou None
     """
     try:
-        logger.info(f"🔍 [SUPABASE] Fetching user from Supabase for user_id: {user_id}")
+        logger.debug("Fetching user from Supabase for user_id: %s", user_id)
         supabase = get_supabase_client()
-        logger.info(f"🔍 [SUPABASE] Supabase client URL: {supabase.supabase_url}")
 
         # Essayer d'abord par auth_user_id (cas le plus probable)
         response = supabase.table("users").select("*").eq("auth_user_id", user_id).execute()
-        logger.info(f"🔍 [SUPABASE] Query by auth_user_id response: {response}")
 
         # Si aucun résultat, essayer par id (fallback)
         if not response.data or len(response.data) == 0:
-            logger.info(f"🔍 [SUPABASE] No user found by auth_user_id, trying by id")
+            logger.debug("No user found by auth_user_id, trying by id")
             response = supabase.table("users").select("*").eq("id", user_id).execute()
-            logger.info(f"🔍 [SUPABASE] Query by id response: {response}")
 
         if response.data and len(response.data) > 0:
             user_data = response.data[0]
-            logger.info(f"✅ [SUPABASE] User data found: {user_data}")
+            logger.debug("User data found for user_id: %s", user_id)
             return user_data
         else:
-            logger.warning(f"❌ [SUPABASE] No data found for user_id: {user_id}")
+            logger.warning("No data found for user_id: %s", user_id)
             return None
     except Exception as e:
-        logger.error(f"❌ [SUPABASE] Error fetching user from Supabase for {user_id}: {e}")
-        logger.error(f"❌ [SUPABASE] Error type: {type(e).__name__}")
-        logger.error(f"❌ [SUPABASE] Error details: {str(e)}")
+        logger.error("Error fetching user from Supabase for %s: %s", user_id, e)
         return None
 
 
@@ -246,33 +241,33 @@ def check_databases_health() -> dict:
 
 def init_all_databases():
     """Initialise toutes les connexions aux bases de données"""
-    logger.info("🚀 Initializing database connections...")
+    logger.info("Initializing database connections...")
 
     try:
         # Initialiser PostgreSQL
         pg_pool = init_postgresql_pool()
-        logger.info(f"✅ PostgreSQL pool: {pg_pool.minconn}-{pg_pool.maxconn} connections")
+        logger.info("PostgreSQL pool: %s-%s connections", pg_pool.minconn, pg_pool.maxconn)
 
         # Initialiser Supabase
         supabase = init_supabase_client()
-        logger.info(f"✅ Supabase client: {supabase.supabase_url}")
+        logger.info("Supabase client: %s", supabase.supabase_url)
 
         # Health check
         health = check_databases_health()
-        logger.info(f"📊 Database health: {health}")
+        logger.info("Database health: %s", health)
 
         return True
     except Exception as e:
-        logger.error(f"❌ Failed to initialize databases: {e}")
+        logger.error("Failed to initialize databases: %s", e)
         return False
 
 
 def close_all_databases():
     """Ferme toutes les connexions aux bases de données"""
-    logger.info("🔒 Closing database connections...")
+    logger.info("Closing database connections...")
     close_postgresql_pool()
     # Supabase n'a pas besoin de fermeture explicite
-    logger.info("✅ All database connections closed")
+    logger.info("All database connections closed")
 
 
 # ============================================================================
