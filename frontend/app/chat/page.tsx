@@ -18,6 +18,7 @@ import { useChatStore } from "./hooks/useChatStore";
 import {
   generateAIResponse,
   generateVisionResponse,
+  checkUserQuota,
 } from "./services/apiService";
 import { conversationService } from "./services/conversationService";
 
@@ -1070,6 +1071,9 @@ function ChatInterface() {
 	  let messageCreated = false;
 
 	  try {
+		// 🔒 VÉRIFICATION QUOTA AVANT D'APPELER LE LLM
+		await checkUserQuota();
+
 		let response;
 
 		// IMAGE ANALYSIS PATH

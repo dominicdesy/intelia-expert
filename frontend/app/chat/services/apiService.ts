@@ -476,6 +476,50 @@ async function streamAIResponseInternal(
 }
 
 /**
+ * Vérifie le quota de l'utilisateur AVANT d'appeler le LLM
+ *
+ * @throws Error avec message "QUOTA_EXCEEDED" si le quota est dépassé
+ * @returns quota info si OK
+ */
+export const checkUserQuota = async (): Promise<any> => {
+  const headers = await getAuthHeaders();
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/usage/check`, {
+      method: "GET",
+      headers,
+    });
+
+    if (!response.ok) {
+      // Si erreur serveur, on laisse passer (fail-open) pour ne pas bloquer le service
+      secureLog.warn("[apiService] Erreur vérification quota, on laisse passer");
+      return { can_ask: true };
+    }
+
+    const data = await response.json();
+
+    // Si quota dépassé
+    if (data.status === "quota_exceeded") {
+      const quotaInfo = data.quota || {};
+      const error = new Error("QUOTA_EXCEEDED");
+      (error as any).quotaInfo = quotaInfo;
+      throw error;
+    }
+
+    return data.quota;
+  } catch (error: any) {
+    // Si c'est notre erreur QUOTA_EXCEEDED, on la re-lance
+    if (error.message === "QUOTA_EXCEEDED") {
+      throw error;
+    }
+
+    // Pour les autres erreurs (réseau, etc.), on laisse passer
+    secureLog.warn("[apiService] Erreur vérification quota:", error);
+    return { can_ask: true };
+  }
+};
+
+/**
  * NOUVELLE FONCTION generateAIResponse avec support Agent complet
  * Interface compatible avec l'ancien système + nouvelles capacités Agent
  */
