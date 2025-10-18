@@ -400,7 +400,7 @@ async def get_current_user(
             if not payload:
                 continue  # Essayer le secret suivant
 
-            logger.info(f"Token décodé avec succès avec {secret_name}")
+            logger.debug("Token décodé avec succès avec %s", secret_name)
 
             # EXTRACTION FLEXIBLE DES INFORMATIONS UTILISATEUR
             # Support auth-temp ET Supabase
@@ -442,8 +442,8 @@ async def get_current_user(
                 "is_admin": profile.get("user_type") in ["admin", "super_admin"],
             }
 
-            logger.info(
-                f"Utilisateur authentifié: {email} (rôle: {user_data['user_type']}, secret: {secret_name})"
+            logger.debug(
+                "User authenticated: %s (role: %s)", email, user_data['user_type']
             )
             return user_data
 

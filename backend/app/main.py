@@ -33,6 +33,10 @@ except ImportError:
 logger = logging.getLogger("app.main")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
+# Désactiver les logs verbeux de bibliothèques externes
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 # === CONFIG CORS ===
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",

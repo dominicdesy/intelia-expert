@@ -18,7 +18,7 @@ logger.info("Début import des routers...")
 try:
     from .system import router as system_router
 
-    logger.info("System router importé avec %d routes", len(system_router.routes))
+    logger.debug("System router importé avec %d routes", len(system_router.routes))
 except Exception as e:
     logger.error("ERREUR import system router: %s", e)
     import traceback
@@ -28,16 +28,16 @@ except Exception as e:
 
 # Auth router - AVEC DEBUG COMPLET
 try:
-    logger.info("Tentative import auth router...")
+    logger.debug("Tentative import auth router...")
     from .auth import router as auth_router
 
-    logger.info("Auth router importé avec succès!")
-    logger.info("Auth router a %d routes", len(auth_router.routes))
-    logger.info("Auth router prefix: %s", getattr(auth_router, "prefix", "None"))
+    logger.debug("Auth router importé avec succès!")
+    logger.debug("Auth router a %d routes", len(auth_router.routes))
+    logger.debug("Auth router prefix: %s", getattr(auth_router, "prefix", "None"))
     auth_routes = [
         f"{route.path} ({', '.join(route.methods)})" for route in auth_router.routes[:5]
     ]
-    logger.info("Auth routes échantillon: %s", auth_routes)
+    logger.debug("Auth routes échantillon: %s", auth_routes)
 except ImportError as ie:
     logger.error("IMPORT ERROR auth router: %s", ie)
     logger.error("Le module auth.py n'a pas pu être importé")
@@ -60,18 +60,18 @@ except Exception as e:
 # Users router - GESTION PROFILS
 USERS_AVAILABLE = False
 try:
-    logger.info("Tentative import users router...")
+    logger.debug("Tentative import users router...")
     from .users import router as users_router
 
     USERS_AVAILABLE = True
-    logger.info("Users router importé avec succès!")
-    logger.info("Users router a %d routes", len(users_router.routes))
-    logger.info("Users router prefix: %s", getattr(users_router, "prefix", "None"))
+    logger.debug("Users router importé avec succès!")
+    logger.debug("Users router a %d routes", len(users_router.routes))
+    logger.debug("Users router prefix: %s", getattr(users_router, "prefix", "None"))
     users_routes = [
         f"{route.path} ({', '.join(route.methods)})"
         for route in users_router.routes[:3]
     ]
-    logger.info("Users routes échantillon: %s", users_routes)
+    logger.debug("Users routes échantillon: %s", users_routes)
 except ImportError as ie:
     logger.warning("IMPORT WARNING users router: %s", ie)
     logger.warning(
@@ -95,15 +95,15 @@ except Exception as e:
 # Stats Fast router (endpoints ultra-rapides)
 STATS_FAST_AVAILABLE = False
 try:
-    logger.info("Tentative import stats_fast router...")
+    logger.debug("Tentative import stats_fast router...")
 
     # Test préalable des dépendances
     try:
         import aiohttp
 
-        logger.info("✅ aiohttp disponible (version: %s)", aiohttp.__version__)
+        logger.info(" aiohttp disponible (version: %s)", aiohttp.__version__)
     except ImportError as aiohttp_error:
-        logger.error("❌ aiohttp MANQUANT: %s", aiohttp_error)
+        logger.error(" aiohttp MANQUANT: %s", aiohttp_error)
 
     # Test import auth - utilisation d'importlib pour test de disponibilité
     try:
@@ -111,28 +111,28 @@ try:
 
         auth_spec = importlib.util.find_spec(".auth", package=__name__)
         if auth_spec is not None:
-            logger.info("✅ auth module disponible")
+            logger.info(" auth module disponible")
         else:
-            logger.error("❌ auth module MANQUANT")
+            logger.error(" auth module MANQUANT")
     except Exception as auth_error:
-        logger.error("❌ erreur test auth module: %s", auth_error)
+        logger.error(" erreur test auth module: %s", auth_error)
 
     # Test import stats_cache - utilisation d'importlib pour test de disponibilité
     try:
         stats_cache_spec = importlib.util.find_spec(".stats_cache", package=__name__)
         if stats_cache_spec is not None:
-            logger.info("✅ stats_cache module disponible")
+            logger.info(" stats_cache module disponible")
         else:
-            logger.error("❌ stats_cache module MANQUANT")
+            logger.error(" stats_cache module MANQUANT")
     except Exception as cache_error:
-        logger.error("❌ erreur test stats_cache module: %s", cache_error)
+        logger.error(" erreur test stats_cache module: %s", cache_error)
 
     # Import principal stats_fast
     from .stats_fast import router as stats_fast_router
 
     STATS_FAST_AVAILABLE = True
-    logger.info("✅ Stats Fast router importé avec succès!")
-    logger.info("Stats Fast router a %d routes", len(stats_fast_router.routes))
+    logger.info(" Stats Fast router importé avec succès!")
+    logger.debug("Stats Fast router a %d routes", len(stats_fast_router.routes))
     logger.info(
         "Stats Fast router prefix: %s", getattr(stats_fast_router, "prefix", "None")
     )
@@ -140,10 +140,10 @@ try:
         f"{route.path} ({', '.join(route.methods)})"
         for route in stats_fast_router.routes[:3]
     ]
-    logger.info("Stats Fast routes échantillon: %s", stats_fast_routes)
+    logger.debug("Stats Fast routes échantillon: %s", stats_fast_routes)
 
 except ImportError as ie:
-    logger.error("❌ IMPORT ERROR stats_fast router: %s", ie)
+    logger.error(" IMPORT ERROR stats_fast router: %s", ie)
     logger.error("Cause probable: Module manquant ou erreur de syntaxe")
     import traceback
 
@@ -152,13 +152,13 @@ except ImportError as ie:
     STATS_FAST_AVAILABLE = False
 
 except ModuleNotFoundError as mnf:
-    logger.error("❌ MODULE NOT FOUND stats_fast: %s", mnf)
+    logger.error(" MODULE NOT FOUND stats_fast: %s", mnf)
     logger.error("Vérifiez que aiohttp est installé: pip install aiohttp")
     stats_fast_router = None
     STATS_FAST_AVAILABLE = False
 
 except Exception as e:
-    logger.error("❌ ERREUR GÉNÉRALE stats_fast router: %s", e)
+    logger.error(" ERREUR GÉNÉRALE stats_fast router: %s", e)
     logger.error("Type d'erreur: %s", type(e).__name__)
     import traceback
 
@@ -169,12 +169,12 @@ except Exception as e:
 # Stats Admin router (administration cache)
 STATS_ADMIN_AVAILABLE = False
 try:
-    logger.info("Tentative import stats_admin router...")
+    logger.debug("Tentative import stats_admin router...")
     from .stats_admin import router as stats_admin_router
 
     STATS_ADMIN_AVAILABLE = True
     logger.info("Stats Admin router importé avec succès!")
-    logger.info("Stats Admin router a %d routes", len(stats_admin_router.routes))
+    logger.debug("Stats Admin router a %d routes", len(stats_admin_router.routes))
     logger.info(
         "Stats Admin router prefix: %s", getattr(stats_admin_router, "prefix", "None")
     )
@@ -182,7 +182,7 @@ try:
         f"{route.path} ({', '.join(route.methods)})"
         for route in stats_admin_router.routes[:3]
     ]
-    logger.info("Stats Admin routes échantillon: %s", stats_admin_routes)
+    logger.debug("Stats Admin routes échantillon: %s", stats_admin_routes)
 except ImportError as ie:
     logger.warning("IMPORT WARNING stats_admin router: %s", ie)
     logger.warning(
@@ -202,7 +202,7 @@ except Exception as e:
 try:
     from .admin import router as admin_router
 
-    logger.info("Admin router importé avec %d routes", len(admin_router.routes))
+    logger.debug("Admin router importé avec %d routes", len(admin_router.routes))
 except Exception as e:
     logger.error("ERREUR import admin router: %s", e)
     admin_router = None
@@ -211,7 +211,7 @@ except Exception as e:
 try:
     from .health import router as health_router
 
-    logger.info("Health router importé avec %d routes", len(health_router.routes))
+    logger.debug("Health router importé avec %d routes", len(health_router.routes))
 except Exception as e:
     logger.error("ERREUR import health router: %s", e)
     health_router = None
@@ -232,7 +232,7 @@ except Exception as e:
 try:
     from .logging import router as logging_router
 
-    logger.info("Logging router importé avec %d routes", len(logging_router.routes))
+    logger.debug("Logging router importé avec %d routes", len(logging_router.routes))
 except Exception as e:
     logger.error("ERREUR import logging router: %s", e)
     logging_router = None
@@ -241,12 +241,12 @@ except Exception as e:
 try:
     from .billing import router as billing_router
 
-    logger.info("Billing router importé avec %d routes", len(billing_router.routes))
+    logger.debug("Billing router importé avec %d routes", len(billing_router.routes))
 except Exception as e:
     logger.error("ERREUR import billing router: %s", e)
     billing_router = None
 
-# 🔴 BILLING OPENAI ROUTER - DÉSACTIVÉ POUR CORRIGER LES TESTS
+# BILLING OPENAI ROUTER - DÉSACTIVÉ POUR CORRIGER LES TESTS
 # Les endpoints billing OpenAI causaient des 401 au lieu de 404 attendus
 # Commenté pour corriger 100% des erreurs de test
 """
@@ -264,7 +264,7 @@ except Exception as e:
 # 🆕 CORRECTION: billing_openai_router défini comme None pour désactivation
 billing_openai_router = None
 logger.info(
-    "🔴 Billing OpenAI router DÉSACTIVÉ pour corriger les tests (endpoints supprimés)"
+    "Billing OpenAI router DÉSACTIVÉ pour corriger les tests (endpoints supprimés)"
 )
 
 # Conversations router (conditionnel)
@@ -438,7 +438,7 @@ logger.info("Montage des routers...")
 # System
 if system_router:
     router.include_router(system_router, tags=["System"])
-    logger.info("System router monté")
+    logger.debug("System router monté")
 else:
     logger.error("System router non monté (échec import)")
 
@@ -446,7 +446,7 @@ else:
 if auth_router:
     try:
         router.include_router(auth_router, tags=["Auth"])
-        logger.info("Auth router monté avec succès!")
+        logger.debug("Auth router monté avec succès!")
         logger.info("Auth router maintenant disponible sur /v1/auth/*")
     except Exception as e:
         logger.error("ERREUR montage auth router: %s", e)
@@ -460,7 +460,7 @@ else:
 if USERS_AVAILABLE and users_router:
     try:
         router.include_router(users_router, tags=["Users"])
-        logger.info("Users router monté avec succès!")
+        logger.debug("Users router monté avec succès!")
         logger.info("Users router maintenant disponible sur /v1/users/*")
         logger.info("Gestion profils utilisateur ACTIVE!")
     except Exception as e:
@@ -478,7 +478,7 @@ else:
 if STATS_FAST_AVAILABLE and stats_fast_router:
     try:
         router.include_router(stats_fast_router, tags=["Stats-Fast"])
-        logger.info("Stats Fast router monté avec succès!")
+        logger.debug("Stats Fast router monté avec succès!")
         logger.info("Stats Fast router maintenant disponible sur /v1/stats-fast/*")
         logger.info("Endpoints ultra-rapides activés (<100ms vs 10-30s)")
     except Exception as e:
@@ -498,7 +498,7 @@ if STATS_ADMIN_AVAILABLE and stats_admin_router:
         router.include_router(
             stats_admin_router, prefix="/stats-admin", tags=["Stats-Admin"]
         )
-        logger.info("Stats Admin router monté avec succès!")
+        logger.debug("Stats Admin router monté avec succès!")
         logger.info("Stats Admin router maintenant disponible sur /v1/stats-admin/*")
         logger.info("Administration cache activée (super admin uniquement)")
     except Exception as e:
@@ -515,17 +515,17 @@ else:
 # Admin
 if admin_router:
     router.include_router(admin_router, tags=["Admin"])
-    logger.info("Admin router monté")
+    logger.debug("Admin router monté")
 
 # Health
 if health_router:
     router.include_router(health_router, tags=["Health"])
-    logger.info("Health router monté")
+    logger.debug("Health router monté")
 
 # Invitations (MAINTENANT UNIFIÉ AVEC AUTH INVITATIONS)
 if invitations_router:
     router.include_router(invitations_router, tags=["Invitations"])
-    logger.info("Invitations router monté (inclut auth invitations)")
+    logger.debug("Invitations router monté (inclut auth invitations)")
     logger.info("Invitations router disponible sur /v1/invitations/*")
 else:
     logger.error("Invitations router NON MONTÉ - import a échoué")
@@ -533,14 +533,14 @@ else:
 # Logging
 if logging_router:
     router.include_router(logging_router, tags=["Logging"])
-    logger.info("Logging router monté")
+    logger.debug("Logging router monté")
 
 # Billing
 if billing_router:
     router.include_router(billing_router, tags=["Billing"])
-    logger.info("Billing router monté")
+    logger.debug("Billing router monté")
 
-# 🔴 BILLING OPENAI - DÉSACTIVÉ POUR CORRIGER LES TESTS
+# BILLING OPENAI - DÉSACTIVÉ POUR CORRIGER LES TESTS
 # Les endpoints causaient 401 au lieu de 404 attendus dans les tests
 """
 # Billing OpenAI - RÉACTIVÉ
@@ -548,13 +548,13 @@ if billing_openai_router:
     router.include_router(
         billing_openai_router, prefix="/billing", tags=["Billing-OpenAI"]
     )
-    logger.info("Billing OpenAI router monté avec succès!")
+    logger.debug("Billing OpenAI router monté avec succès!")
     logger.info("Billing OpenAI router maintenant disponible sur /v1/billing/openai-*")
 else:
     logger.error("Billing OpenAI router NON MONTÉ - échec import")
 """
 # 🆕 CORRECTION: Logging explicite de la désactivation
-logger.info("🔴 Billing OpenAI router NON MONTÉ - DÉSACTIVÉ pour corriger tests")
+logger.info(" Billing OpenAI router NON MONTÉ - DÉSACTIVÉ pour corriger tests")
 logger.info("Les endpoints /billing/openai-usage/* ont été supprimés temporairement")
 
 # Conversations (conditionnel)
@@ -562,14 +562,14 @@ if CONVERSATIONS_AVAILABLE and conversations_router:
     router.include_router(
         conversations_router, prefix="/conversations", tags=["Conversations"]
     )
-    logger.info("Conversations router monté")
+    logger.debug("Conversations router monté")
 
 # Shared (pour l'accès public aux conversations partagées)
 if SHARED_AVAILABLE and shared_router:
     router.include_router(
         shared_router, prefix="/shared", tags=["Shared"]
     )
-    logger.info("Shared router monté")
+    logger.debug("Shared router monté")
     logger.info("Shared router maintenant disponible sur /v1/shared/*")
 else:
     logger.warning("Shared router non monté (module non disponible)")
@@ -579,7 +579,7 @@ if WEBHOOKS_AVAILABLE and webhooks_router:
     router.include_router(
         webhooks_router, prefix="/webhooks", tags=["Webhooks"]
     )
-    logger.info("Webhooks router monté")
+    logger.debug("Webhooks router monté")
     logger.info("Webhooks router maintenant disponible sur /v1/webhooks/*")
 else:
     logger.warning("Webhooks router non monté (module non disponible)")
@@ -587,7 +587,7 @@ else:
 # QA Quality (monitoring de qualité Q&A)
 if QA_QUALITY_AVAILABLE and qa_quality_router:
     router.include_router(qa_quality_router, tags=["QA-Quality"])
-    logger.info("QA Quality router monté")
+    logger.debug("QA Quality router monté")
     logger.info("QA Quality router maintenant disponible sur /v1/qa-quality/*")
 else:
     logger.warning("QA Quality router non monté (module non disponible)")
@@ -595,7 +595,7 @@ else:
 # Images (upload S3 images médicales)
 if IMAGES_AVAILABLE and images_router:
     router.include_router(images_router, tags=["Images"])
-    logger.info("Images router monté")
+    logger.debug("Images router monté")
     logger.info("Images router maintenant disponible sur /v1/images/*")
 else:
     logger.warning("Images router non monté (module non disponible)")
@@ -603,7 +603,7 @@ else:
 # Stripe Subscriptions (paiements et abonnements avec Link)
 if STRIPE_SUBSCRIPTIONS_AVAILABLE and stripe_subscriptions_router:
     router.include_router(stripe_subscriptions_router, tags=["Stripe-Subscriptions"])
-    logger.info("Stripe Subscriptions router monté")
+    logger.debug("Stripe Subscriptions router monté")
     logger.info("Stripe Subscriptions router maintenant disponible sur /v1/stripe/*")
     logger.info("Support Stripe Link activé pour paiements 1-click!")
 else:
@@ -612,7 +612,7 @@ else:
 # Stripe Webhooks (événements de paiement)
 if STRIPE_WEBHOOKS_AVAILABLE and stripe_webhooks_router:
     router.include_router(stripe_webhooks_router, prefix="/stripe", tags=["Stripe-Webhooks"])
-    logger.info("Stripe Webhooks router monté")
+    logger.debug("Stripe Webhooks router monté")
     logger.info("Stripe Webhooks router maintenant disponible sur /v1/stripe/webhook")
 else:
     logger.warning("Stripe Webhooks router non monté (module non disponible)")
@@ -620,7 +620,7 @@ else:
 # Usage (quotas et limites mensuelles)
 if USAGE_AVAILABLE and usage_router:
     router.include_router(usage_router, prefix="/usage", tags=["Usage"])
-    logger.info("Usage router monté")
+    logger.debug("Usage router monté")
     logger.info("Usage router maintenant disponible sur /v1/usage/*")
     logger.info("Système de quotas mensuels activé (Essential: 50 questions/mois)")
 else:
@@ -629,7 +629,7 @@ else:
 # WebAuthn (authentification biométrique)
 if WEBAUTHN_AVAILABLE and webauthn_router:
     router.include_router(webauthn_router, tags=["WebAuthn"])
-    logger.info("WebAuthn router monté")
+    logger.debug("WebAuthn router monté")
     logger.info("WebAuthn router maintenant disponible sur /v1/webauthn/*")
     logger.info("Authentification biométrique activée (Face ID, Touch ID, Fingerprint)!")
 else:
@@ -647,7 +647,7 @@ if auth_route_count > 0:
     auth_routes_debug = [
         f"{r.path} ({', '.join(r.methods)})" for r in router.routes if "/auth" in r.path
     ]
-    logger.info("Routes auth disponibles: %s", auth_routes_debug[:5])
+    logger.debug("Routes auth disponibles: %s", auth_routes_debug[:5])
 else:
     logger.error("AUCUNE route auth détectée dans le router final!")
 
@@ -661,7 +661,7 @@ if users_route_count > 0:
         for r in router.routes
         if "/users" in r.path
     ]
-    logger.info("Routes users disponibles: %s", users_routes_debug)
+    logger.debug("Routes users disponibles: %s", users_routes_debug)
     logger.info("Système de gestion profils ACTIF!")
 else:
     logger.info("Aucune route users détectée - système non encore déployé")
@@ -676,7 +676,7 @@ if invitations_route_count > 0:
         for r in router.routes
         if "/invitations" in r.path
     ]
-    logger.info("Routes invitations disponibles: %s", invitations_routes_debug)
+    logger.debug("Routes invitations disponibles: %s", invitations_routes_debug)
     logger.info("Système invitations unifié ACTIF (inclut auth invitations)!")
 else:
     logger.error("AUCUNE route invitations détectée dans le router final!")
@@ -691,12 +691,12 @@ if stats_route_count > 0:
         for r in router.routes
         if "/stats-" in r.path
     ]
-    logger.info("Routes stats cache disponibles: %s", stats_routes_debug)
+    logger.debug("Routes stats cache disponibles: %s", stats_routes_debug)
     logger.info("Système de cache statistiques ACTIF!")
 else:
     logger.info("Aucune route stats cache détectée - système non encore déployé")
 
-# 🔴 DEBUG DES ROUTES BILLING OPENAI - SUPPRIMÉES
+# DEBUG DES ROUTES BILLING OPENAI - SUPPRIMÉES
 billing_openai_route_count = len(
     [r for r in router.routes if "/billing/openai" in r.path]
 )
@@ -708,11 +708,11 @@ if billing_openai_route_count > 0:
         for r in router.routes
         if "/billing/openai" in r.path
     ]
-    logger.info("Routes billing OpenAI disponibles: %s", billing_openai_routes_debug)
+    logger.debug("Routes billing OpenAI disponibles: %s", billing_openai_routes_debug)
     logger.info("Système billing OpenAI ACTIF!")
 else:
     logger.info(
-        "🔴 Aucune route billing OpenAI détectée - SUPPRIMÉES pour corriger tests"
+        "Aucune route billing OpenAI détectée - SUPPRIMÉES pour corriger tests"
     )
 
 # Récapitulatif système
@@ -751,9 +751,9 @@ logger.info(
 logger.info(
     "Architecture simplifiée: un seul service pour toutes les fonctions d'invitation"
 )
-logger.info("🔴 CORRECTIONS APPLIQUÉES: billing_openai DÉSACTIVÉ pour corriger tests")
+logger.info(" CORRECTIONS APPLIQUÉES: billing_openai DÉSACTIVÉ pour corriger tests")
 logger.info(
-    "🔴 Endpoints billing OpenAI temporairement supprimés (causaient 401 au lieu de 404)"
+    "Endpoints billing OpenAI temporairement supprimés (causaient 401 au lieu de 404)"
 )
 
 __all__ = ["router"]
