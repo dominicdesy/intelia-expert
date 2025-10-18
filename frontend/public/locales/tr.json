@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "E-posta adresi",
   "forgotPassword.emailNotFound": "Bu e-posta adresi bir hesapla ilişkili değil",
   "forgotPassword.emailPlaceholder": "e-postanız@mail.com",
-  "forgotPassword.emailSent": "Sıfırlama e-postası şu adrese gönderildi: ",
+  "forgotPassword.emailSent": "Bu e-posta adresi sistemimizde mevcutsa, kısa süre içinde bir sıfırlama bağlantısı alacaksınız.",
   "forgotPassword.enterEmail": "Lütfen e-posta adresinizi girin",
   "forgotPassword.genericError": "Sıfırlama e-postası gönderilirken hata",
   "forgotPassword.invalidEmail": "Lütfen geçerli bir e-posta adresi girin",

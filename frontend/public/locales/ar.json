@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "عنوان البريد الإلكتروني",
   "forgotPassword.emailNotFound": "عنوان البريد الإلكتروني هذا غير مرتبط بأي حساب",
   "forgotPassword.emailPlaceholder": "your@email.com",
-  "forgotPassword.emailSent": "تم إرسال بريد إلكتروني لإعادة التعيين إلى ",
+  "forgotPassword.emailSent": "إذا كان عنوان البريد الإلكتروني هذا موجوداً في نظامنا، فستتلقى رابط إعادة التعيين قريباً.",
   "forgotPassword.enterEmail": "يرجى إدخال عنوان بريدك الإلكتروني",
   "forgotPassword.genericError": "خطأ في إرسال بريد إعادة التعيين",
   "forgotPassword.invalidEmail": "يرجى إدخال عنوان بريد إلكتروني صالح",

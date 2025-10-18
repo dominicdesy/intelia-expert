@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "Email address",
   "forgotPassword.emailNotFound": "This email address is not associated with an account",
   "forgotPassword.emailPlaceholder": "your@email.com",
-  "forgotPassword.emailSent": "A reset email has been sent to ",
+  "forgotPassword.emailSent": "If this email address exists in our system, you will receive a reset link shortly.",
   "forgotPassword.enterEmail": "Please enter your email address",
   "forgotPassword.genericError": "Error sending reset email",
   "forgotPassword.invalidEmail": "Please enter a valid email address",

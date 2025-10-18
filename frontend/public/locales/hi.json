@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "ईमेल पता",
   "forgotPassword.emailNotFound": "यह ईमेल पता किसी खाते से जुड़ा नहीं है",
   "forgotPassword.emailPlaceholder": "आपका@email.com",
-  "forgotPassword.emailSent": "रीसेट ईमेल भेजा गया है ",
+  "forgotPassword.emailSent": "यदि यह ईमेल पता हमारे सिस्टम में मौजूद है, तो आपको शीघ्र ही एक रीसेट लिंक प्राप्त होगा।",
   "forgotPassword.enterEmail": "कृपया अपना ईमेल पता दर्ज करें",
   "forgotPassword.genericError": "रीसेट ईमेल भेजने में त्रुटि",
   "forgotPassword.invalidEmail": "कृपया एक मान्य ईमेल पता दर्ज करें",

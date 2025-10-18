@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "メールアドレス",
   "forgotPassword.emailNotFound": "このメールアドレスはアカウントに関連付けられていません",
   "forgotPassword.emailPlaceholder": "your@email.com",
-  "forgotPassword.emailSent": "リセットメールが送信されました ",
+  "forgotPassword.emailSent": "このメールアドレスがシステムに存在する場合、まもなくリセットリンクが届きます。",
   "forgotPassword.enterEmail": "メールアドレスを入力してください",
   "forgotPassword.genericError": "リセットメールの送信エラー",
   "forgotPassword.invalidEmail": "有効なメールアドレスを入力してください",

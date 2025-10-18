@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "E-mailadres",
   "forgotPassword.emailNotFound": "Dit e-mailadres is niet gekoppeld aan een account",
   "forgotPassword.emailPlaceholder": "uw@email.com",
-  "forgotPassword.emailSent": "Een reset e-mail is verzonden naar ",
+  "forgotPassword.emailSent": "Als dit e-mailadres in ons systeem bestaat, ontvangt u binnenkort een reset link.",
   "forgotPassword.enterEmail": "Voer uw e-mailadres in",
   "forgotPassword.genericError": "Fout bij verzenden reset e-mail",
   "forgotPassword.invalidEmail": "Voer een geldig e-mailadres in",

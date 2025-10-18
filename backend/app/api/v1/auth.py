@@ -1532,7 +1532,7 @@ async def request_password_reset(request: ForgotPasswordRequest):
     Demande de réinitialisation de mot de passe
     Envoie un email avec un lien de réinitialisation
     """
-    logger.info(f"[ResetPassword] Demande pour: {request.email}")
+    logger.info("[ResetPassword] Demande de réinitialisation reçue")
 
     if not SUPABASE_AVAILABLE:
         logger.error("Supabase client non disponible")
@@ -1570,9 +1570,7 @@ async def request_password_reset(request: ForgotPasswordRequest):
             )
 
         # Supabase ne retourne pas d'erreur même si l'email n'existe pas (pour des raisons de sécurité)
-        logger.info(
-            f"[ResetPassword] Email de réinitialisation envoyé pour: {request.email}"
-        )
+        logger.info("[ResetPassword] Demande traitée avec succès")
 
         return ForgotPasswordResponse(
             success=True,

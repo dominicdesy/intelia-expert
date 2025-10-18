@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "ที่อยู่อีเมล",
   "forgotPassword.emailNotFound": "ที่อยู่อีเมลนี้ไม่ได้เชื่อมโยงกับบัญชีใด ๆ",
   "forgotPassword.emailPlaceholder": "คุณ@email.com",
-  "forgotPassword.emailSent": "อีเมลรีเซ็ตได้ถูกส่งไปยัง ",
+  "forgotPassword.emailSent": "หากที่อยู่อีเมลนี้มีอยู่ในระบบของเรา คุณจะได้รับลิงก์รีเซ็ตในไม่ช้า",
   "forgotPassword.enterEmail": "กรุณาใส่ที่อยู่อีเมลของคุณ",
   "forgotPassword.genericError": "ข้อผิดพลาดในการส่งอีเมลรีเซ็ต",
   "forgotPassword.invalidEmail": "กรุณาใส่ที่อยู่อีเมลที่ถูกต้อง",

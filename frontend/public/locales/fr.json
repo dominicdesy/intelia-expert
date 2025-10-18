@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "Adresse courriel",
   "forgotPassword.emailNotFound": "Cette adresse courriel n'est pas associée à un compte",
   "forgotPassword.emailPlaceholder": "votre@courriel.com",
-  "forgotPassword.emailSent": "Un courriel de réinitialisation a été envoyé à ",
+  "forgotPassword.emailSent": "Si cette adresse courriel existe dans notre système, vous recevrez un lien de réinitialisation sous peu.",
   "forgotPassword.enterEmail": "Veuillez entrer votre adresse courriel",
   "forgotPassword.genericError": "Erreur lors de l'envoi du courriel de réinitialisation",
   "forgotPassword.invalidEmail": "Veuillez entrer une adresse courriel valide",

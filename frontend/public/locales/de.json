@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "E-Mail-Adresse",
   "forgotPassword.emailNotFound": "Diese E-Mail-Adresse ist mit keinem Konto verknüpft",
   "forgotPassword.emailPlaceholder": "ihre@email.com",
-  "forgotPassword.emailSent": "Eine Zurücksetzungs-E-Mail wurde gesendet an ",
+  "forgotPassword.emailSent": "Wenn diese E-Mail-Adresse in unserem System existiert, erhalten Sie in Kürze einen Zurücksetzungs-Link.",
   "forgotPassword.enterEmail": "Bitte geben Sie Ihre E-Mail-Adresse ein",
   "forgotPassword.genericError": "Fehler beim Senden der Zurücksetzungs-E-Mail",
   "forgotPassword.invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein",

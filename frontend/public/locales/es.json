@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "Dirección de email",
   "forgotPassword.emailNotFound": "Esta dirección de email no está asociada con una cuenta",
   "forgotPassword.emailPlaceholder": "su@email.com",
-  "forgotPassword.emailSent": "Un email de restablecimiento ha sido enviado a ",
+  "forgotPassword.emailSent": "Si esta dirección de email existe en nuestro sistema, recibirá un enlace de restablecimiento en breve.",
   "forgotPassword.enterEmail": "Por favor ingrese su dirección de email",
   "forgotPassword.genericError": "Error al enviar el email de restablecimiento",
   "forgotPassword.invalidEmail": "Por favor ingrese una dirección de email válida",

@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "邮箱地址",
   "forgotPassword.emailNotFound": "此邮箱地址未与任何账户关联",
   "forgotPassword.emailPlaceholder": "您的@email.com",
-  "forgotPassword.emailSent": "重置邮件已发送至 ",
+  "forgotPassword.emailSent": "如果此邮箱地址在我们的系统中存在，您将很快收到重置链接。",
   "forgotPassword.enterEmail": "请输入您的邮箱地址",
   "forgotPassword.genericError": "发送重置邮件时出错",
   "forgotPassword.invalidEmail": "请输入有效的邮箱地址",

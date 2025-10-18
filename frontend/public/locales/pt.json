@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "Endereço de email",
   "forgotPassword.emailNotFound": "Este endereço de email não está associado a uma conta",
   "forgotPassword.emailPlaceholder": "seu@email.com",
-  "forgotPassword.emailSent": "Um email de redefinição foi enviado para ",
+  "forgotPassword.emailSent": "Se este endereço de email existir em nosso sistema, você receberá um link de redefinição em breve.",
   "forgotPassword.enterEmail": "Por favor digite seu endereço de email",
   "forgotPassword.genericError": "Erro ao enviar email de redefinição",
   "forgotPassword.invalidEmail": "Por favor digite um endereço de email válido",

@@ -78,12 +78,10 @@ export default function ForgotPasswordPage() {
         throw new Error(errorData.detail || `Erreur ${response.status}`);
       }
 
-      setSuccess(`${t("forgotPassword.emailSent")} ${email.trim()}`);
+      setSuccess(t("forgotPassword.emailSent"));
       setEmail("");
     } catch (error: any) {
-      if (error.message.includes("404")) {
-        setError(t("forgotPassword.emailNotFound"));
-      } else if (error.message.includes("429")) {
+      if (error.message.includes("429")) {
         setError(t("forgotPassword.tooManyAttempts"));
       } else if (error.message.includes("Failed to fetch")) {
         setError(t("forgotPassword.connectionError"));

@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "Địa chỉ email",
   "forgotPassword.emailNotFound": "Địa chỉ email này không được liên kết với tài khoản nào",
   "forgotPassword.emailPlaceholder": "email@cua-ban.com",
-  "forgotPassword.emailSent": "Một email đặt lại đã được gửi đến ",
+  "forgotPassword.emailSent": "Nếu địa chỉ email này tồn tại trong hệ thống của chúng tôi, bạn sẽ nhận được liên kết đặt lại sớm.",
   "forgotPassword.enterEmail": "Vui lòng nhập địa chỉ email của bạn",
   "forgotPassword.genericError": "Lỗi gửi email đặt lại",
   "forgotPassword.invalidEmail": "Vui lòng nhập địa chỉ email hợp lệ",

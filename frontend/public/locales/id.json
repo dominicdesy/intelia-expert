@@ -190,7 +190,7 @@
   "forgotPassword.emailLabel": "Alamat email",
   "forgotPassword.emailNotFound": "Alamat email ini tidak terkait dengan akun",
   "forgotPassword.emailPlaceholder": "anda@email.com",
-  "forgotPassword.emailSent": "Email reset telah dikirim ke ",
+  "forgotPassword.emailSent": "Jika alamat email ini ada di sistem kami, Anda akan menerima tautan reset sebentar lagi.",
   "forgotPassword.enterEmail": "Harap masukkan alamat email Anda",
   "forgotPassword.genericError": "Kesalahan saat mengirim email reset",
   "forgotPassword.invalidEmail": "Harap masukkan alamat email yang valid",
