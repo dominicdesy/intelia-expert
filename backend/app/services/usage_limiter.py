@@ -414,8 +414,29 @@ def reset_monthly_usage_for_all_users() -> Dict[str, Any]:
 
         with get_pg_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Créer de nouveaux enregistrements pour le nouveau mois
-                # pour tous les utilisateurs actifs
+                # ÉTAPE 1: Réinitialiser les enregistrements existants pour le mois actuel
+                cur.execute(
+                    """
+                    UPDATE monthly_usage_tracking
+                    SET
+                        questions_used = 0,
+                        questions_successful = 0,
+                        questions_failed = 0,
+                        total_cost_usd = 0.00,
+                        openai_cost_usd = 0.00,
+                        current_status = 'active',
+                        warning_sent = FALSE,
+                        limit_notifications_sent = 0,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE month_year = %s
+                    """,
+                    (month_year,)
+                )
+
+                updated_count = cur.rowcount
+
+                # ÉTAPE 2: Créer de nouveaux enregistrements pour les utilisateurs
+                # qui n'ont pas encore d'enregistrement pour ce mois
                 cur.execute(
                     """
                     INSERT INTO monthly_usage_tracking (
@@ -459,12 +480,14 @@ def reset_monthly_usage_for_all_users() -> Dict[str, Any]:
 
                 created_count = cur.rowcount
 
-                logger.info(f"Reset mensuel: {created_count} nouveaux enregistrements créés pour {month_year}")
+                logger.info(f"Reset mensuel: {updated_count} enregistrements réinitialisés, {created_count} nouveaux créés pour {month_year}")
 
                 return {
                     'status': 'success',
                     'month_year': month_year,
-                    'users_reset': created_count,
+                    'users_updated': updated_count,
+                    'users_created': created_count,
+                    'users_reset': updated_count + created_count,
                     'timestamp': datetime.utcnow().isoformat()
                 }
 
