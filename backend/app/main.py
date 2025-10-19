@@ -487,6 +487,75 @@ app.add_middleware(
 )
 
 
+# === MIDDLEWARE SECURITY HEADERS ===
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """
+    Add security headers to all responses
+
+    Headers implemented:
+    - HSTS: Force HTTPS for 1 year
+    - X-Frame-Options: Prevent clickjacking
+    - X-Content-Type-Options: Prevent MIME sniffing
+    - X-XSS-Protection: Legacy XSS protection
+    - Referrer-Policy: Control referrer information
+    - Content-Security-Policy: Restrict resource loading
+    - Permissions-Policy: Disable unnecessary browser features
+
+    Configuration is permissive to support:
+    - Next.js inline scripts (antiFlashScript, hideAddressBarScript)
+    - Tailwind CSS inline styles
+    - Supabase API connections
+    """
+    response = await call_next(request)
+
+    # HSTS - Force HTTPS for 1 year with subdomains
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
+
+    # X-Frame-Options - Prevent clickjacking attacks
+    response.headers["X-Frame-Options"] = "DENY"
+
+    # X-Content-Type-Options - Prevent MIME type sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+
+    # X-XSS-Protection - Legacy XSS protection (for older browsers)
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+
+    # Referrer-Policy - Control referrer information leakage
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    # Content-Security-Policy - Restrict resource loading
+    # NOTE: Permissive configuration to support Next.js + inline scripts + Tailwind
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        # Scripts: allow self + unsafe-inline (Next.js inline scripts) + unsafe-eval (dev mode)
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        # Styles: allow self + unsafe-inline (Tailwind CSS inline styles)
+        "style-src 'self' 'unsafe-inline'; "
+        # Images: allow self + data URIs + HTTPS (for external images)
+        "img-src 'self' data: https:; "
+        # Fonts: allow self + data URIs
+        "font-src 'self' data:; "
+        # Connect: API calls to backend + Supabase (HTTP + WebSocket)
+        "connect-src 'self' https://expert.intelia.com https://*.supabase.co wss://*.supabase.co; "
+        # Frames: DENY all iframes
+        "frame-ancestors 'none'; "
+        # Base URI: restrict to self
+        "base-uri 'self'; "
+        # Forms: restrict to self
+        "form-action 'self'"
+    )
+
+    # Permissions-Policy - Disable unnecessary browser features
+    response.headers["Permissions-Policy"] = (
+        "geolocation=(), microphone=(), camera=()"
+    )
+
+    return response
+
+
 # === MIDDLEWARE DE MONITORING DES REQUETES ===
 @app.middleware("http")
 async def monitoring_middleware(request: Request, call_next):
