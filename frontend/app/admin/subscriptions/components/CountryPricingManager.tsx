@@ -13,6 +13,7 @@ interface CountryPricing {
   display_currency_symbol: string;
   tier_level: number;
   stripe_price_id: string;
+  price_type: string; // 'auto_marketing' or 'custom'
 }
 
 interface CountryPricingManagerProps {
@@ -30,6 +31,8 @@ export default function CountryPricingManager({
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [priceValue, setPriceValue] = useState<number>(0);
   const [currencyValue, setCurrencyValue] = useState<string>("USD");
+  const [editingTier, setEditingTier] = useState<string | null>(null);
+  const [tierValue, setTierValue] = useState<number>(1);
 
   const availableCurrencies = ["CAD", "USD", "EUR"];
   const availablePlans = ["essential", "pro", "elite"];
@@ -94,6 +97,69 @@ export default function CountryPricingManager({
     } catch (error: any) {
       console.error("[CountryPricingManager] Erreur update price:", error);
       toast.error(error.message || "Erreur lors de la mise à jour du prix");
+    }
+  };
+
+  const handleDeleteCountry = async (countryCode: string, countryName: string) => {
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer ${countryName} (${countryCode}) ?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        buildApiUrl(`/billing/admin/countries/${countryCode}`),
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Erreur lors de la suppression");
+      }
+
+      toast.success(`${countryName} supprimé avec succès`);
+      await fetchCountries();
+    } catch (error: any) {
+      console.error("[CountryPricingManager] Erreur delete country:", error);
+      toast.error(error.message || "Erreur lors de la suppression");
+    }
+  };
+
+  const handleUpdateTier = async (countryCode: string) => {
+    try {
+      const response = await fetch(
+        buildApiUrl(`/billing/admin/countries/${countryCode}/tier`),
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            tier_level: tierValue,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Erreur lors de la mise à jour");
+      }
+
+      const data = await response.json();
+      toast.success(
+        `Tier modifié pour ${countryCode}: Tier ${data.old_tier} → Tier ${data.new_tier}`
+      );
+
+      setEditingTier(null);
+      await fetchCountries();
+    } catch (error: any) {
+      console.error("[CountryPricingManager] Erreur update tier:", error);
+      toast.error(error.message || "Erreur lors de la mise à jour du tier");
     }
   };
 
@@ -223,19 +289,51 @@ export default function CountryPricingManager({
                 </td>
 
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      country.tier_level === 1
-                        ? "bg-green-100 text-green-800"
-                        : country.tier_level === 2
-                        ? "bg-blue-100 text-blue-800"
-                        : country.tier_level === 3
-                        ? "bg-purple-100 text-purple-800"
-                        : "bg-orange-100 text-orange-800"
-                    }`}
-                  >
-                    Tier {country.tier_level}
-                  </span>
+                  {editingTier === country.country_code ? (
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={tierValue}
+                        onChange={(e) => setTierValue(parseInt(e.target.value))}
+                        className="px-2 py-1 border border-gray-300 rounded text-sm"
+                        autoFocus
+                      >
+                        <option value={1}>Tier 1</option>
+                        <option value={2}>Tier 2</option>
+                        <option value={3}>Tier 3</option>
+                        <option value={4}>Tier 4</option>
+                      </select>
+                      <button
+                        onClick={() => handleUpdateTier(country.country_code)}
+                        className="px-1.5 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => setEditingTier(null)}
+                        className="px-1.5 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      onClick={() => {
+                        setEditingTier(country.country_code);
+                        setTierValue(country.tier_level);
+                      }}
+                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:opacity-75 transition-opacity ${
+                        country.tier_level === 1
+                          ? "bg-green-100 text-green-800"
+                          : country.tier_level === 2
+                          ? "bg-blue-100 text-blue-800"
+                          : country.tier_level === 3
+                          ? "bg-purple-100 text-purple-800"
+                          : "bg-orange-100 text-orange-800"
+                      }`}
+                    >
+                      Tier {country.tier_level}
+                    </span>
+                  )}
                 </td>
 
                 {availablePlans.map((planName) => {
@@ -284,45 +382,74 @@ export default function CountryPricingManager({
                           </button>
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-900">
-                          {pricing
-                            ? `${pricing.display_currency_symbol}${pricing.display_price.toFixed(
-                                2
-                              )} ${pricing.display_currency}`
-                            : "Non configuré"}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm text-gray-900">
+                            {pricing
+                              ? `${pricing.display_currency_symbol}${pricing.display_price.toFixed(
+                                  2
+                                )} ${pricing.display_currency}`
+                              : "Non configuré"}
+                          </span>
+                          {pricing && pricing.price_type === "auto_marketing" && (
+                            <span
+                              className="text-xs px-1 py-0.5 bg-blue-100 text-blue-700 rounded"
+                              title="Prix marketing calculé automatiquement depuis le tier"
+                            >
+                              Auto
+                            </span>
+                          )}
+                          {pricing && pricing.price_type === "custom" && (
+                            <span
+                              className="text-xs px-1 py-0.5 bg-purple-100 text-purple-700 rounded"
+                              title="Prix personnalisé défini manuellement"
+                            >
+                              Custom
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
                   );
                 })}
 
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                  {editingPrice?.startsWith(country.country_code) ? null : (
-                    <select
-                      onChange={(e) => {
-                        const planName = e.target.value;
-                        if (planName) {
-                          const pricing = country.plans[planName];
-                          const editKey = `${country.country_code}-${planName}`;
-                          setEditingPrice(editKey);
-                          setPriceValue(
-                            pricing?.display_price || 0
-                          );
-                          setCurrencyValue(
-                            pricing?.display_currency || "USD"
-                          );
+                  {editingPrice?.startsWith(country.country_code) ||
+                  editingTier === country.country_code ? null : (
+                    <div className="flex items-center justify-end gap-2">
+                      <select
+                        onChange={(e) => {
+                          const planName = e.target.value;
+                          if (planName) {
+                            const pricing = country.plans[planName];
+                            const editKey = `${country.country_code}-${planName}`;
+                            setEditingPrice(editKey);
+                            setPriceValue(pricing?.display_price || 0);
+                            setCurrencyValue(pricing?.display_currency || "USD");
+                          }
+                        }}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:border-blue-500 focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                        defaultValue=""
+                      >
+                        <option value="">✏️  Modifier...</option>
+                        {availablePlans.map((plan) => (
+                          <option key={plan} value={plan}>
+                            {plan.charAt(0).toUpperCase() + plan.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() =>
+                          handleDeleteCountry(
+                            country.country_code,
+                            country.country_name
+                          )
                         }
-                      }}
-                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:border-blue-500 focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
-                      defaultValue=""
-                    >
-                      <option value="">✏️  Modifier...</option>
-                      {availablePlans.map((plan) => (
-                        <option key={plan} value={plan}>
-                          {plan.charAt(0).toUpperCase() + plan.slice(1)}
-                        </option>
-                      ))}
-                    </select>
+                        className="px-2 py-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                        title="Supprimer ce pays"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -341,23 +468,40 @@ export default function CountryPricingManager({
 
       {/* Legend */}
       <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
-        <div className="flex items-center gap-4 text-xs text-gray-600">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-green-100 border border-green-300"></span>
-            Tier 1 (Marchés émergents)
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-4 text-xs text-gray-600">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-3 h-3 rounded-full bg-green-100 border border-green-300"></span>
+              Tier 1 (Marchés émergents)
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-3 h-3 rounded-full bg-blue-100 border border-blue-300"></span>
+              Tier 2 (Intermédiaire)
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-3 h-3 rounded-full bg-purple-100 border border-purple-300"></span>
+              Tier 3 (Développés)
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-3 h-3 rounded-full bg-orange-100 border border-orange-300"></span>
+              Tier 4 (Premium)
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-blue-100 border border-blue-300"></span>
-            Tier 2 (Intermédiaire)
+          <div className="flex items-center gap-3 text-xs text-gray-600">
+            <div className="flex items-center gap-1">
+              <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded">Auto</span>
+              <span>Prix marketing automatique</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="px-1 py-0.5 bg-purple-100 text-purple-700 rounded">Custom</span>
+              <span>Prix personnalisé</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-purple-100 border border-purple-300"></span>
-            Tier 3 (Développés)
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-orange-100 border border-orange-300"></span>
-            Tier 4 (Premium)
-          </div>
+        </div>
+        <div className="text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded p-2">
+          <strong>Calcul automatique:</strong> Les prix "Auto" sont calculés depuis les prix tier (Gestion des plans)
+          + conversion devise + ajustement marketing (ex: 20.34 → 19.99).
+          Vous pouvez personnaliser n'importe quel prix en cliquant sur "Modifier" (devient "Custom").
         </div>
       </div>
     </div>
