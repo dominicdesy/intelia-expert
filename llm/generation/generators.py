@@ -102,12 +102,29 @@ class EnhancedResponseGenerator:
         """
         query_lower = query.lower()
 
-        # Mots-clés pour les poules pondeuses (layer)
+        # Mots-clés pour les poules pondeuses (layer) - 33 keywords
         layer_keywords = [
-            'pondeuse', 'layer', 'ponte', 'œuf', 'egg', 'laying',
+            # Basic terms (FR/EN)
+            'pondeuse', 'poule', 'poules pondeuses', 'layer', 'hen', 'hens',
+
+            # Egg-related (FR/EN/Multi-language)
+            'œuf', 'egg', 'ponte', 'laying', 'production d\'œufs', 'egg production',
+            'coquille', 'shell', 'jaune', 'yolk', 'blanc d\'œuf', 'egg white',
+            'albumine', 'albumen',
             'poedeira', 'gallina ponedora', 'eierlegen', 'uovo',
-            'production d\'œufs', 'egg production', 'isa brown',
-            'lohmann', 'hy-line', 'bovans'
+
+            # Housing/equipment (FR/EN)
+            'poulailler', 'hen house', 'pondoir', 'nid', 'nest', 'perchoir', 'perch',
+
+            # Nutrition/health (FR/EN)
+            'calcaire', 'calcium', 'picage', 'pecking', 'plumage', 'feathering',
+
+            # Reproductive system (FR/EN)
+            'ovulation', 'oviducte', 'oviduct', 'clutch',
+
+            # Management & breeds (FR/EN)
+            'photopériode', 'photoperiod', 'lumière', 'lighting',
+            'isa brown', 'lohmann', 'hy-line', 'bovans'
         ]
 
         # Mots-clés pour poulets de chair (broiler)

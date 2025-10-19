@@ -56,6 +56,39 @@ class StandardQueryHandler(BaseQueryHandler):
                 self.semantic_reranker = False  # Flag to avoid retry
         return self.semantic_reranker if self.semantic_reranker is not False else None
 
+    def _detect_poultry_type(self, query: str) -> str:
+        """
+        Detect poultry type (broiler vs layer) from query for RAG filtering.
+
+        Args:
+            query: User query
+
+        Returns:
+            'layers' or 'broilers' (Weaviate species field values)
+        """
+        query_lower = query.lower()
+
+        # Layer keywords (same as generators.py)
+        layer_keywords = [
+            'pondeuse', 'poule', 'poules pondeuses', 'layer', 'hen', 'hens',
+            'œuf', 'egg', 'ponte', 'laying', 'production d\'œufs', 'egg production',
+            'coquille', 'shell', 'jaune', 'yolk', 'blanc d\'œuf', 'egg white',
+            'albumine', 'albumen', 'poulailler', 'hen house', 'pondoir', 'nid',
+            'nest', 'perchoir', 'perch', 'calcaire', 'calcium', 'picage', 'pecking',
+            'plumage', 'feathering', 'ovulation', 'oviducte', 'oviduct', 'clutch',
+            'photopériode', 'photoperiod', 'lumière', 'lighting',
+            'isa brown', 'lohmann', 'hy-line', 'bovans'
+        ]
+
+        # Detect layer (priority)
+        if any(keyword in query_lower for keyword in layer_keywords):
+            logger.info("🐔 Poultry type detected: LAYER (filtering Weaviate by species=layers)")
+            return 'layers'
+
+        # Default: broiler
+        logger.info("🐔 Poultry type detected: BROILER (filtering Weaviate by species=broilers)")
+        return 'broilers'
+
     def configure(
         self,
         postgresql_system=None,
@@ -413,12 +446,16 @@ class StandardQueryHandler(BaseQueryHandler):
             preprocessed_data = {}
 
         try:
+            # 🐔 OPTION 3: Detect poultry type and filter Weaviate by species
+            poultry_species = self._detect_poultry_type(query)
+            filters['species'] = poultry_species
+
             # Use top_k directly (no reduction for optimization)
             # The 10x multiplier + re-ranker will handle filtering
             weaviate_top_k = top_k
 
             logger.info(
-                f"Weaviate search (top_k={weaviate_top_k}, language={language}, filters={filters})"
+                f"Weaviate search (top_k={weaviate_top_k}, language={language}, species={poultry_species}, filters={filters})"
             )
 
             conversation_context_list = parse_contextual_history(preprocessed_data)
