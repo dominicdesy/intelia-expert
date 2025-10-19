@@ -13,6 +13,11 @@ interface BillingPlan {
   active: boolean;
 }
 
+interface TierPrice {
+  tier_level: number;
+  price_usd: number;
+}
+
 interface SubscriptionPlansManagerProps {
   accessToken: string;
 }
@@ -26,6 +31,10 @@ export default function SubscriptionPlansManager({
   const [editingName, setEditingName] = useState<string | null>(null);
   const [quotaValue, setQuotaValue] = useState<number>(0);
   const [nameValue, setNameValue] = useState<string>("");
+  const [tierPrices, setTierPrices] = useState<Record<string, TierPrice[]>>({});
+  const [editingTierPrice, setEditingTierPrice] = useState<string | null>(null);
+  const [tierPriceValue, setTierPriceValue] = useState<number>(0);
+  const [showTierPrices, setShowTierPrices] = useState(false);
 
   useEffect(() => {
     fetchPlans();
@@ -45,12 +54,108 @@ export default function SubscriptionPlansManager({
       }
 
       const data = await response.json();
-      setPlans(data.plans || []);
+      const loadedPlans = data.plans || [];
+      setPlans(loadedPlans);
+
+      // Fetch tier prices for each plan
+      await fetchAllTierPrices(loadedPlans);
     } catch (error) {
       console.error("[PlansManager] Erreur fetch plans:", error);
       toast.error("Erreur lors du chargement des plans");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchAllTierPrices = async (plansList: BillingPlan[]) => {
+    try {
+      const tierPricesMap: Record<string, TierPrice[]> = {};
+
+      for (const plan of plansList) {
+        const response = await fetch(
+          buildApiUrl(`/billing/admin/plans/${plan.plan_name}/tier-prices`),
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          tierPricesMap[plan.plan_name] = data.tier_prices || [];
+        }
+      }
+
+      setTierPrices(tierPricesMap);
+    } catch (error) {
+      console.error("[PlansManager] Erreur fetch tier prices:", error);
+    }
+  };
+
+  const handleUpdateTierPrice = async (planName: string, tierLevel: number) => {
+    try {
+      const response = await fetch(
+        buildApiUrl(`/billing/admin/plans/${planName}/tier-prices/${tierLevel}`),
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            price_usd: tierPriceValue,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Erreur lors de la mise à jour");
+      }
+
+      const data = await response.json();
+      toast.success(
+        `Prix Tier ${tierLevel} modifié: $${data.old_price_usd} → $${data.new_price_usd}`
+      );
+
+      setEditingTierPrice(null);
+      await fetchPlans();
+
+      // Demander si on veut recalculer tous les prix des pays
+      if (confirm("Voulez-vous recalculer automatiquement les prix marketing de tous les pays avec ce nouveau prix tier ?")) {
+        await handleRecalculatePrices();
+      }
+    } catch (error: any) {
+      console.error("[PlansManager] Erreur update tier price:", error);
+      toast.error(error.message || "Erreur lors de la mise à jour du prix");
+    }
+  };
+
+  const handleRecalculatePrices = async () => {
+    try {
+      const response = await fetch(
+        buildApiUrl("/billing/admin/recalculate-prices"),
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Erreur lors du recalcul");
+      }
+
+      const data = await response.json();
+      toast.success(
+        `Prix marketing recalculés! ${data.auto_prices_count} prix automatiques mis à jour`
+      );
+    } catch (error: any) {
+      console.error("[PlansManager] Erreur recalculate prices:", error);
+      toast.error(error.message || "Erreur lors du recalcul des prix");
     }
   };
 
@@ -314,6 +419,156 @@ export default function SubscriptionPlansManager({
       {plans.length === 0 && (
         <div className="px-6 py-12 text-center text-gray-500">
           Aucun plan trouvé
+        </div>
+      )}
+
+      {/* Tier Prices Section */}
+      {plans.length > 0 && (
+        <div className="border-t border-gray-200">
+          <button
+            onClick={() => setShowTierPrices(!showTierPrices)}
+            className="w-full px-6 py-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-900">
+                Prix par Tier (Tier 1-4)
+              </span>
+              <span className="text-xs text-gray-500">
+                Définir les prix USD pour chaque niveau de marché
+              </span>
+            </div>
+            <svg
+              className={`w-5 h-5 text-gray-500 transition-transform ${
+                showTierPrices ? "transform rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+
+          {showTierPrices && (
+            <div className="px-6 py-4 bg-white">
+              <div className="grid grid-cols-1 gap-6">
+                {plans.map((plan) => {
+                  const planTierPrices = tierPrices[plan.plan_name] || [];
+
+                  return (
+                    <div
+                      key={plan.plan_name}
+                      className="border border-gray-200 rounded-lg overflow-hidden"
+                    >
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                        <h4 className="text-sm font-semibold text-gray-900">
+                          {plan.display_name} ({plan.plan_name})
+                        </h4>
+                      </div>
+                      <div className="p-4">
+                        <div className="grid grid-cols-4 gap-4">
+                          {[1, 2, 3, 4].map((tierLevel) => {
+                            const tierPrice = planTierPrices.find(
+                              (tp) => tp.tier_level === tierLevel
+                            );
+                            const editKey = `${plan.plan_name}-tier${tierLevel}`;
+                            const isEditing = editingTierPrice === editKey;
+
+                            return (
+                              <div
+                                key={tierLevel}
+                                className="border border-gray-200 rounded-md p-3"
+                              >
+                                <div className="text-xs font-medium text-gray-500 mb-2">
+                                  Tier {tierLevel}
+                                  <span className="ml-1 text-gray-400">
+                                    {tierLevel === 1
+                                      ? "(Émergent)"
+                                      : tierLevel === 2
+                                      ? "(Intermédiaire)"
+                                      : tierLevel === 3
+                                      ? "(Développé)"
+                                      : "(Premium)"}
+                                  </span>
+                                </div>
+
+                                {isEditing ? (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-sm text-gray-600">$</span>
+                                    <input
+                                      type="number"
+                                      value={tierPriceValue}
+                                      onChange={(e) =>
+                                        setTierPriceValue(
+                                          parseFloat(e.target.value) || 0
+                                        )
+                                      }
+                                      className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                      step="0.01"
+                                      min="0"
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() =>
+                                        handleUpdateTierPrice(
+                                          plan.plan_name,
+                                          tierLevel
+                                        )
+                                      }
+                                      className="px-1.5 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingTierPrice(null)}
+                                      className="px-1.5 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div
+                                    onClick={() => {
+                                      setEditingTierPrice(editKey);
+                                      setTierPriceValue(
+                                        tierPrice?.price_usd || 0
+                                      );
+                                    }}
+                                    className="cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors"
+                                  >
+                                    <div className="text-lg font-semibold text-gray-900">
+                                      ${tierPrice?.price_usd.toFixed(2) || "0.00"}
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      Cliquer pour modifier
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-xs text-blue-800">
+                  <strong>Note:</strong> Ces prix USD sont utilisés comme base pour calculer
+                  automatiquement les prix dans toutes les devises (CAD, EUR, etc.) pour
+                  chaque pays selon leur tier. Vous pouvez ensuite personnaliser
+                  individuellement chaque pays dans l'onglet "Prix par pays".
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
