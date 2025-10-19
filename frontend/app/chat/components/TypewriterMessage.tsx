@@ -20,16 +20,32 @@ interface TypewriterMessageProps {
 export const TypewriterMessage: React.FC<TypewriterMessageProps> = ({
   content,
   isStreaming = false,
-  speed = 15,  // Ralenti: 15ms par caractère au lieu de 3ms
+  speed,  // Speed can be overridden, but we calculate adaptive by default
   onTypingComplete
 }) => {
   // Parse CoT sections to extract answer only (thinking/analysis saved backend-side)
   const cotSections = useMemo(() => parseCotResponse(content || ''), [content]);
 
+  // Adaptive speed: slower for short answers, faster for long ones
+  const adaptiveSpeed = useMemo(() => {
+    if (speed !== undefined) return speed; // Use override if provided
+
+    const textLength = cotSections.answer.length;
+
+    // Short answers (< 150 chars): Very slow (30ms per char) - ~4.5s for 150 chars
+    if (textLength < 150) return 30;
+
+    // Medium answers (150-500 chars): Moderate (20ms per char) - ~10s for 500 chars
+    if (textLength < 500) return 20;
+
+    // Long answers (500+ chars): Normal speed (15ms per char)
+    return 15;
+  }, [cotSections.answer.length, speed]);
+
   // Apply typewriter effect only to final answer
   const { displayedText, isTyping } = useTypewriter({
     text: cotSections.answer,
-    speed,
+    speed: adaptiveSpeed,
     enabled: !isStreaming && cotSections.answer.length > 0,
     onComplete: onTypingComplete
   });

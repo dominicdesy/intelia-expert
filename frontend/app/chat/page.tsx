@@ -337,10 +337,9 @@ const MessageList = React.memo(
                 </div>
               ) : (
                 <>
-                  {/* AI response with typewriter effect */}
+                  {/* AI response with adaptive typewriter effect */}
                   <TypewriterMessage
                     content={message.processedContent || ''}
-                    speed={15}
                     onTypingComplete={() => handleTypingComplete(message.id)}
                   />
 
