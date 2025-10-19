@@ -313,7 +313,7 @@ export default function CountryPricingManager({
                           );
                         }
                       }}
-                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:border-blue-500 focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
                       defaultValue=""
                     >
                       <option value="">✏️  Modifier...</option>
