@@ -79,7 +79,7 @@ const nextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://expert.intelia.com https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri https://expert.intelia.com/api/v1/csp-report",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://expert.intelia.com https://*.supabase.co wss://*.supabase.co https://restcountries.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri https://expert.intelia.com/api/v1/csp-report",
           },
           {
             key: "Permissions-Policy",
@@ -153,6 +153,11 @@ const nextConfig = {
       {
         source: "/api/expert/:path*",
         destination: "https://expert.intelia.com/api/expert/:path*",
+      },
+      // ✅ NOUVEAU: Rewrite pour CSP report endpoint
+      {
+        source: "/api/v1/csp-report",
+        destination: "https://expert.intelia.com/api/v1/csp-report",
       },
       // ❌ SUPPRIMÉ: Le rewrite problématique qui interceptait TOUTES les routes /api/*
       // {

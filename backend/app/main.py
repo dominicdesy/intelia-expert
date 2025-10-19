@@ -538,8 +538,8 @@ async def add_security_headers(request: Request, call_next):
         "img-src 'self' data: https:; "
         # Fonts: allow self + data URIs
         "font-src 'self' data:; "
-        # Connect: API calls to backend + Supabase (HTTP + WebSocket)
-        "connect-src 'self' https://expert.intelia.com https://*.supabase.co wss://*.supabase.co; "
+        # Connect: API calls to backend + Supabase (HTTP + WebSocket) + REST Countries API
+        "connect-src 'self' https://expert.intelia.com https://*.supabase.co wss://*.supabase.co https://restcountries.com; "
         # Frames: DENY all iframes
         "frame-ancestors 'none'; "
         # Base URI: restrict to self
