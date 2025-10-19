@@ -17,7 +17,7 @@ const InteliaLogo = ({ className = "w-20 h-20" }: { className?: string }) => (
     className={`${className} bg-white border-2 border-blue-100 rounded-2xl shadow-lg flex items-center justify-center p-3`}
   >
     <img
-      src="/images/favicon.png"
+      src="/images/logo.png"
       alt="Intelia Logo"
       className="w-full h-full object-contain"
     />
