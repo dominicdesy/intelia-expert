@@ -2,14 +2,13 @@
  * TypewriterMessage.tsx - Message component with typewriter effect
  *
  * Displays LLM response with smooth typing animation
- * CoT reasoning and answer are displayed in separate bubbles
+ * CoT reasoning is parsed backend-side and saved to DB (not displayed to user)
  */
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useTypewriter } from '../hooks/useTypewriter';
 import { parseCotResponse } from '@/lib/utils/cotParser';
-import { CotReasoning } from '@/components/CotReasoning';
 
 interface TypewriterMessageProps {
   content: string;
@@ -22,45 +21,20 @@ export const TypewriterMessage: React.FC<TypewriterMessageProps> = ({
   isStreaming = false,
   speed = 3
 }) => {
-  // Parse CoT sections
+  // Parse CoT sections to extract answer only (thinking/analysis saved backend-side)
   const cotSections = useMemo(() => parseCotResponse(content || ''), [content]);
-
-  // State to control when answer bubble appears (1.5 second delay after reasoning)
-  const [showAnswerBubble, setShowAnswerBubble] = useState(false);
 
   // Apply typewriter effect only to final answer
   const { displayedText, isTyping } = useTypewriter({
     text: cotSections.answer,
     speed,
-    enabled: showAnswerBubble && !isStreaming && cotSections.answer.length > 0
+    enabled: !isStreaming && cotSections.answer.length > 0
   });
-
-  // Show answer bubble 1.5 seconds after reasoning is displayed
-  useEffect(() => {
-    if (cotSections.hasStructure && !isStreaming) {
-      const timer = setTimeout(() => {
-        setShowAnswerBubble(true);
-      }, 1500); // 1.5 second delay
-
-      return () => clearTimeout(timer);
-    } else if (!cotSections.hasStructure) {
-      // If no CoT structure, show answer immediately
-      setShowAnswerBubble(true);
-    }
-  }, [cotSections.hasStructure, isStreaming]);
 
   return (
     <>
-      {/* Display CoT reasoning in first bubble (collapsible) */}
-      {cotSections.hasStructure && (
-        <div className="mb-4">
-          <CotReasoning sections={cotSections} />
-        </div>
-      )}
-
-      {/* Display main answer in second bubble with typewriter effect */}
-      {showAnswerBubble && (
-        <ReactMarkdown
+      {/* Display only the final answer with typewriter effect */}
+      <ReactMarkdown
         className="prose prose-sm max-w-none break-words prose-p:my-3 prose-li:my-1 prose-ul:my-4 prose-strong:text-gray-900 prose-headings:font-bold prose-headings:text-gray-900"
         components={{
           h2: ({ node, ...props }) => (
@@ -120,10 +94,9 @@ export const TypewriterMessage: React.FC<TypewriterMessageProps> = ({
       >
         {displayedText}
       </ReactMarkdown>
-      )}
 
       {/* Typing cursor */}
-      {showAnswerBubble && isTyping && (
+      {isTyping && (
         <span className="inline-block w-0.5 h-4 bg-blue-600 ml-0.5 animate-pulse"></span>
       )}
     </>
