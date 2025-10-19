@@ -22,10 +22,9 @@ logger = logging.getLogger(__name__)
 
 
 class PlanType(str, Enum):
-    FREE = "free"
-    BASIC = "basic"
-    PREMIUM = "premium"
-    ENTERPRISE = "enterprise"
+    ESSENTIAL = "essential"
+    PRO = "pro"
+    ELITE = "elite"
 
 
 class QuotaStatus(str, Enum):
@@ -43,167 +42,11 @@ class BillingManager:
 
     def __init__(self, dsn=None):
         self.dsn = dsn or os.getenv("DATABASE_URL")
-        self._ensure_billing_tables()
         self._load_plan_configurations()
 
-    def _ensure_billing_tables(self):
-        """Crée UNIQUEMENT les tables de facturation et quotas (pas analytics)"""
-        try:
-            with psycopg2.connect(self.dsn) as conn:
-                with conn.cursor() as cur:
-                    # Table des plans de facturation
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS billing_plans (
-                            plan_name VARCHAR(50) PRIMARY KEY,
-                            display_name VARCHAR(100),
-                            monthly_quota INTEGER NOT NULL,
-                            price_per_month DECIMAL(10,2) DEFAULT 0.00,
-                            price_per_question DECIMAL(6,4) DEFAULT 0.0000,
-                            overage_rate DECIMAL(6,4) DEFAULT 0.0100,
-                            features JSONB DEFAULT '{}',
-                            active BOOLEAN DEFAULT TRUE,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        );
-                    """
-                    )
-
-                    # Insérer les plans par défaut
-                    cur.execute(
-                        """
-                        INSERT INTO billing_plans (plan_name, display_name, monthly_quota, price_per_month, overage_rate, features)
-                        VALUES 
-                            ('free', 'Plan Gratuit', 100, 0.00, 0.02, '{"support": "community", "priority": "low"}'),
-                            ('basic', 'Plan Basic', 1000, 29.99, 0.015, '{"support": "email", "priority": "normal"}'),
-                            ('premium', 'Plan Premium', 5000, 99.99, 0.01, '{"support": "priority", "priority": "high", "advanced_features": true}'),
-                            ('enterprise', 'Plan Enterprise', 50000, 499.99, 0.005, '{"support": "dedicated", "priority": "highest", "custom_features": true}')
-                        ON CONFLICT (plan_name) DO NOTHING;
-                    """
-                    )
-
-                    # Table des utilisateurs avec plans et quotas
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS user_billing_info (
-                            user_email VARCHAR(255) PRIMARY KEY,
-                            plan_name VARCHAR(50) DEFAULT 'free' REFERENCES billing_plans(plan_name),
-                            custom_monthly_quota INTEGER, -- Override du quota si nécessaire
-                            billing_enabled BOOLEAN DEFAULT TRUE,
-                            quota_enforcement BOOLEAN DEFAULT TRUE, -- Peut désactiver la limitation
-                            
-                            -- Informations de facturation
-                            billing_address JSONB,
-                            payment_method JSONB,
-                            billing_contact_email VARCHAR(255),
-                            
-                            -- Métadonnées
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            notes TEXT
-                        );
-                    """
-                    )
-
-                    # Table de tracking d'usage mensuel en temps réel
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS monthly_usage_tracking (
-                            id SERIAL PRIMARY KEY,
-                            user_email VARCHAR(255) NOT NULL,
-                            month_year VARCHAR(7) NOT NULL, -- YYYY-MM
-                            
-                            -- Compteurs en temps réel
-                            questions_used INTEGER DEFAULT 0,
-                            questions_successful INTEGER DEFAULT 0,
-                            questions_failed INTEGER DEFAULT 0,
-                            
-                            -- Coûts calculés
-                            total_cost_usd DECIMAL(10,6) DEFAULT 0,
-                            openai_cost_usd DECIMAL(10,6) DEFAULT 0,
-                            
-                            -- Quotas et limites
-                            monthly_quota INTEGER NOT NULL,
-                            quota_exceeded_at TIMESTAMP,
-                            
-                            -- Status et flags
-                            current_status VARCHAR(20) DEFAULT 'available',
-                            warning_sent BOOLEAN DEFAULT FALSE,
-                            limit_notifications_sent INTEGER DEFAULT 0,
-                            
-                            -- Timestamps
-                            first_question_at TIMESTAMP,
-                            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            
-                            UNIQUE(user_email, month_year)
-                        );
-                    """
-                    )
-
-                    # Table de factures mensuelles
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS monthly_invoices (
-                            id SERIAL PRIMARY KEY,
-                            user_email VARCHAR(255) NOT NULL,
-                            month_year VARCHAR(7) NOT NULL,
-                            
-                            -- Détails facturation
-                            plan_name VARCHAR(50),
-                            questions_included INTEGER,
-                            questions_used INTEGER,
-                            overage_questions INTEGER DEFAULT 0,
-                            
-                            -- Montants
-                            base_amount DECIMAL(10,2),
-                            overage_amount DECIMAL(10,2) DEFAULT 0,
-                            total_amount DECIMAL(10,2),
-                            currency VARCHAR(3) DEFAULT 'EUR',
-                            
-                            -- Status facture
-                            status VARCHAR(20) DEFAULT 'draft', -- draft, issued, paid, overdue
-                            issued_at TIMESTAMP,
-                            due_at TIMESTAMP,
-                            paid_at TIMESTAMP,
-                            
-                            -- Détails techniques
-                            breakdown JSONB DEFAULT '{}',
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            
-                            UNIQUE(user_email, month_year)
-                        );
-                    """
-                    )
-
-                    # Table d'audit des actions de quota (simplifié)
-                    cur.execute(
-                        """
-                        CREATE TABLE IF NOT EXISTS quota_audit_log (
-                            id SERIAL PRIMARY KEY,
-                            user_email VARCHAR(255) NOT NULL,
-                            action VARCHAR(50) NOT NULL, -- question_allowed, question_blocked, quota_exceeded, quota_reset
-                            details JSONB DEFAULT '{}',
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        );
-                    """
-                    )
-
-                    # Indexes pour performance (uniquement billing)
-                    indexes = [
-                        "CREATE INDEX IF NOT EXISTS idx_billing_usage_user_month ON monthly_usage_tracking(user_email, month_year);",
-                        "CREATE INDEX IF NOT EXISTS idx_billing_usage_status ON monthly_usage_tracking(current_status, last_updated);",
-                        "CREATE INDEX IF NOT EXISTS idx_billing_invoices_status ON monthly_invoices(status, due_at);",
-                        "CREATE INDEX IF NOT EXISTS idx_billing_audit_user ON quota_audit_log(user_email, created_at);",
-                    ]
-
-                    for index_sql in indexes:
-                        cur.execute(index_sql)
-
-                    conn.commit()
-                    logger.info("Tables de facturation et quotas créées")
-
-        except Exception as e:
-            logger.error(f"Erreur création tables facturation: {e}")
-            raise
+    # NOTE: Les tables de facturation sont gérées via migrations SQL
+    # et l'interface admin (/admin/subscriptions).
+    # Plus de création automatique de tables ou d'insertion de données par défaut.
 
     def _load_plan_configurations(self):
         """Charge les configurations des plans en cache"""
