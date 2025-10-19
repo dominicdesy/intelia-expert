@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Share2, Copy, Check, X, Clock, Eye, Trash2 } from "lucide-react";
+import { Share2, Copy, Check, X, Clock, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/languages/i18n";
 import { secureLog } from "@/lib/utils/secureLogger";
 
@@ -31,7 +31,6 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Options du formulaire
-  const [anonymize, setAnonymize] = useState(true);
   const [expiresInDays, setExpiresInDays] = useState<number>(30);
 
   const getAuthToken = async (): Promise<string | null> => {
@@ -68,7 +67,7 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
           },
           body: JSON.stringify({
             share_type: "public",
-            anonymize: anonymize,
+            anonymize: false,
             expires_in_days: expiresInDays,
           }),
         }
@@ -112,7 +111,6 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
     setError(null);
     setCopied(false);
     // Reset des options
-    setAnonymize(true);
     setExpiresInDays(30);
   };
 
@@ -157,24 +155,6 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
                 // Formulaire de configuration
                 <div className="space-y-4">
                   <div className="space-y-3">
-                    {/* Option anonymisation */}
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={anonymize}
-                        onChange={(e) => setAnonymize(e.target.checked)}
-                        className="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {t("share.anonymize")}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {t("share.anonymizeHelp")}
-                        </div>
-                      </div>
-                    </label>
-
                     {/* Option expiration */}
                     <div>
                       <label className="block font-medium text-gray-900 mb-2">
@@ -251,12 +231,6 @@ const ShareConversationButton: React.FC<ShareConversationButtonProps> = ({
                           Expire le{" "}
                           {new Date(shareData.expires_at).toLocaleDateString("fr-FR")}
                         </span>
-                      </div>
-                    )}
-                    {shareData.anonymize && (
-                      <div className="flex items-center gap-2">
-                        <Eye size={14} />
-                        <span>Données personnelles anonymisées</span>
                       </div>
                     )}
                   </div>
