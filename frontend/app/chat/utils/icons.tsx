@@ -96,7 +96,7 @@ export const TrashIcon = ({ className = "w-5 h-5" }: IconProps) => (
 );
 
 export const InteliaLogo = ({ className = "w-8 h-8" }: IconProps) => (
-  <img src="/images/favicon.png" alt="Intelia Logo" className={className} />
+  <img src="/images/logo.png" alt="Intelia Logo" className={className} />
 );
 
 export const RefreshIcon = ({ className = "w-4 h-4" }: IconProps) => (

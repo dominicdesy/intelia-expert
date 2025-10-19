@@ -15,7 +15,7 @@ export const InteliaLogo = ({
 }: {
   className?: string;
 }) => (
-  <img src="/images/favicon.png" alt="Intelia Logo" className={className} />
+  <img src="/images/logo.png" alt="Intelia Logo" className={className} />
 );
 
 // Sélecteur de langue intégré avec le système i18n
