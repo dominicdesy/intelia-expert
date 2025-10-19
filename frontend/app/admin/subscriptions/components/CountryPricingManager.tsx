@@ -316,7 +316,7 @@ export default function CountryPricingManager({
                       className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:border-blue-500 focus:ring-2 focus:ring-blue-500"
                       defaultValue=""
                     >
-                      <option value="">✏️ Modifier...</option>
+                      <option value="">✏️  Modifier...</option>
                       {availablePlans.map((plan) => (
                         <option key={plan} value={plan}>
                           {plan.charAt(0).toUpperCase() + plan.slice(1)}
