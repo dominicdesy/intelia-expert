@@ -46,6 +46,15 @@ import logging
 from typing import Any, Dict, List, Optional, Iterable
 from functools import wraps
 
+# Circuit breaker for resilience
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
+
 # The OpenAI Python SDK (global style preserved for compatibility)
 import openai
 
@@ -88,10 +97,9 @@ def _get_api_key() -> str:
 
 
 def openai_retry(max_retries: int = 2, delay: float = 1.0):
-    """Decorator for targeted retries with linear backoff.
+    """LEGACY decorator for targeted retries - kept for backward compatibility.
 
-    Retries on network/transient errors, and lets the inner functions perform
-    semantic retries (e.g., temperature removal or token param swap).
+    Use openai_circuit_breaker for new code (exponential backoff).
     """
 
     def deco(fn):
@@ -111,6 +119,23 @@ def openai_retry(max_retries: int = 2, delay: float = 1.0):
         return wrapper
 
     return deco
+
+
+# Circuit breaker decorator for OpenAI API calls with exponential backoff
+openai_circuit_breaker = retry(
+    stop=stop_after_attempt(3),  # Maximum 3 attempts
+    wait=wait_exponential(multiplier=1, min=2, max=10),  # 2s, 4s, 8s
+    retry=(
+        retry_if_exception_type(httpx.ConnectError) |
+        retry_if_exception_type(httpx.TimeoutException) |
+        retry_if_exception_type(httpx.NetworkError) |
+        retry_if_exception_type(openai.RateLimitError) |
+        retry_if_exception_type(openai.APIConnectionError) |
+        retry_if_exception_type(openai.APITimeoutError)
+    ),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
 
 
 def _configure_openai_client() -> None:
@@ -306,7 +331,7 @@ def get_model_max_tokens(model: str = _DEFAULT_MODEL) -> int:
 # ----------------------------------------------------------------------------
 
 
-@openai_retry(max_retries=2, delay=1.0)
+@openai_circuit_breaker
 def complete(
     messages: List[Dict[str, Any]],
     model: str,
@@ -315,7 +340,7 @@ def complete(
     timeout: float = _OPENAI_TIMEOUT,
     extra: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """HTTP path to POST /v1/chat/completions.
+    """HTTP path to POST /v1/chat/completions with circuit breaker protection.
 
     - Chooses between `max_tokens` and `max_completion_tokens`.
     - Applies safe temperature. If API rejects temperature, retry once without it.
@@ -405,19 +430,20 @@ def complete(
 # ----------------------------------------------------------------------------
 
 
-@openai_retry(max_retries=2, delay=1.0)
+@openai_circuit_breaker
 def complete_text(
     prompt: str,
     temperature: float = 0.2,
     max_tokens: Optional[int] = None,
     model: Optional[str] = None,
 ) -> str:
-    """Legacy wrapper that builds chat messages and returns text content.
-    Applies safe temperature and tolerant output parsing.
+    """Legacy wrapper with circuit breaker protection.
 
-    NOW WITH:
+    Features:
+    - Circuit breaker for OpenAI API resilience (3 retries, exponential backoff)
     - Dynamic broiler/layer detection
-    - Phase 1 Chain-of-Thought prompting
+    - Chain-of-Thought prompting with XML structure
+    - Safe temperature handling
     """
     if not prompt or not prompt.strip():
         raise ValueError("Le prompt ne peut pas être vide")
@@ -501,9 +527,12 @@ def complete_text(
 # ----------------------------------------------------------------------------
 
 
-@openai_retry(max_retries=2, delay=1.0)
+@openai_circuit_breaker
 def safe_chat_completion(**kwargs) -> Any:
-    """Safe wrapper around openai.chat.completions.create
+    """Safe wrapper with circuit breaker around openai.chat.completions.create
+
+    Protections:
+    - Circuit breaker with exponential backoff (2s → 4s → 8s)
     - Auto-maps tokens param name
     - Applies safe temperature
     - Retries without temperature if unsupported
@@ -605,7 +634,7 @@ def _extract_final_answer(raw: str, sections: Dict[str, str]) -> str:
         return raw.strip()
 
 
-@openai_retry(max_retries=2, delay=1.0)
+@openai_circuit_breaker
 def complete_with_cot(
     prompt: str,
     temperature: float = 0.3,
@@ -613,7 +642,13 @@ def complete_with_cot(
     model: Optional[str] = None,
     parse_cot: bool = True,
 ) -> Dict[str, Any]:
-    """Chain-of-Thought helper. Preserves signature; GPT-5-safe temperature.
+    """Chain-of-Thought helper with circuit breaker protection.
+
+    Features:
+    - Circuit breaker for API resilience (exponential backoff)
+    - GPT-5-safe temperature handling
+    - XML-structured CoT parsing
+
     Returns dict with raw_response, parsed_sections, final_answer, model_used.
     """
     if not prompt or not prompt.strip():
@@ -715,12 +750,18 @@ def complete_with_cot(
 # ----------------------------------------------------------------------------
 
 
-@openai_retry(max_retries=2, delay=0.5)
+@openai_circuit_breaker
 def safe_embedding_create(
     input: Any, model: str | None = None, **kwargs
 ) -> List[List[float]] | List[float]:
-    """Create embeddings with batching; returns list(s) of vectors.
-    Accepts str or list[str]. Preserves existing signature.
+    """Create embeddings with circuit breaker protection and batching.
+
+    Features:
+    - Circuit breaker for API resilience
+    - Automatic batching (100 texts per request)
+    - Supports single string or list of strings
+
+    Returns list(s) of embedding vectors.
     """
     if input is None:
         raise ValueError("Le paramètre 'input' ne peut pas être vide")

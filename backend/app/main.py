@@ -545,7 +545,9 @@ async def add_security_headers(request: Request, call_next):
         # Base URI: restrict to self
         "base-uri 'self'; "
         # Forms: restrict to self
-        "form-action 'self'"
+        "form-action 'self'; "
+        # Report violations to monitoring endpoint
+        "report-uri https://expert.intelia.com/api/v1/csp-report"
     )
 
     # Permissions-Policy - Disable unnecessary browser features
@@ -617,6 +619,39 @@ async def readiness_check():
 async def liveness_check():
     """Liveness check ultra leger"""
     return {"alive": True}
+
+
+# === CSP VIOLATION REPORTING ===
+@app.post("/api/v1/csp-report", tags=["Security"])
+async def csp_violation_report(request: Request):
+    """
+    Endpoint for Content-Security-Policy violation reports.
+
+    Browsers automatically POST to this endpoint when CSP violations occur.
+    Logs violations for security monitoring and debugging.
+    """
+    try:
+        body = await request.json()
+
+        # Extract CSP violation details
+        csp_report = body.get("csp-report", {})
+
+        # Log the violation with relevant details
+        logger.warning(
+            f"CSP Violation: "
+            f"blocked-uri={csp_report.get('blocked-uri', 'unknown')}, "
+            f"violated-directive={csp_report.get('violated-directive', 'unknown')}, "
+            f"document-uri={csp_report.get('document-uri', 'unknown')}, "
+            f"source-file={csp_report.get('source-file', 'unknown')}, "
+            f"line-number={csp_report.get('line-number', 'unknown')}"
+        )
+
+        # Return 204 No Content (standard for CSP reports)
+        return JSONResponse(status_code=204, content={})
+
+    except Exception as e:
+        logger.error(f"Error processing CSP report: {e}")
+        return JSONResponse(status_code=204, content={})  # Always return 204
 
 
 # === MONTAGE DES ROUTERS ===
