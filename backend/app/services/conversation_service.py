@@ -44,33 +44,71 @@ class ConversationService:
             }
         """
         try:
+            # Parse CoT structure from assistant response BEFORE saving
+            parsed = parse_cot_response(assistant_response)
+            cot_thinking = parsed['thinking']
+            cot_analysis = parsed['analysis']
+            has_cot_structure = parsed['has_structure']
+            final_answer = parsed['answer']  # Only save answer in content field
+
+            if has_cot_structure:
+                logger.info(
+                    f"🧠 CoT detected in new conversation - "
+                    f"thinking: {len(cot_thinking or '')} chars, "
+                    f"analysis: {len(cot_analysis or '')} chars"
+                )
+
             with get_pg_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Utiliser la fonction SQL helper
+                    # Create conversation with user message first
                     cur.execute(
                         """
-                        SELECT create_conversation_with_messages(
-                            %s::uuid, %s, %s, %s, %s, %s, %s, %s
-                        ) as conversation_id
+                        INSERT INTO conversations (session_id, user_id, language)
+                        VALUES (%s::uuid, %s, %s)
+                        RETURNING id
+                        """,
+                        (session_id, user_id, language)
+                    )
+
+                    conversation_id = cur.fetchone()["id"]
+
+                    # Add user message (sequence 1)
+                    cur.execute(
+                        """
+                        INSERT INTO messages (conversation_id, role, content, sequence_number)
+                        VALUES (%s, 'user', %s, 1)
+                        """,
+                        (conversation_id, user_message)
+                    )
+
+                    # Add assistant message with CoT parsing (sequence 2)
+                    cur.execute(
+                        """
+                        INSERT INTO messages (
+                            conversation_id, role, content, sequence_number,
+                            response_source, response_confidence, processing_time_ms,
+                            cot_thinking, cot_analysis, has_cot_structure
+                        ) VALUES (
+                            %s, 'assistant', %s, 2,
+                            %s, %s, %s,
+                            %s, %s, %s
+                        )
                         """,
                         (
-                            session_id,
-                            user_id,
-                            user_message,
-                            assistant_response,
-                            language,
+                            conversation_id,
+                            final_answer,  # Only save final answer
                             response_source,
                             response_confidence,
-                            processing_time_ms
+                            processing_time_ms,
+                            cot_thinking,
+                            cot_analysis,
+                            has_cot_structure
                         )
                     )
 
-                    result = cur.fetchone()
-                    conversation_id = result["conversation_id"]
-
                     logger.info(
                         f"Conversation créée: {conversation_id} "
-                        f"(session: {session_id}, user: {user_id})"
+                        f"(session: {session_id}, user: {user_id}, CoT: {has_cot_structure})"
                     )
 
                     return {

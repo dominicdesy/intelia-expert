@@ -267,6 +267,7 @@ const MessageList = React.memo(
     processedMessages,
     isLoadingChat,
     handleFeedbackClick,
+    handleTypingComplete,
     getUserInitials,
     user,
     t,
@@ -278,6 +279,7 @@ const MessageList = React.memo(
       messageId: string,
       feedback: "positive" | "negative",
     ) => void;
+    handleTypingComplete: (messageId: string) => void;
     getUserInitials: (user: any) => string;
     user: any;
     t: (key: string) => string;
@@ -338,7 +340,8 @@ const MessageList = React.memo(
                   {/* AI response with typewriter effect */}
                   <TypewriterMessage
                     content={message.processedContent || ''}
-                    speed={3}
+                    speed={15}
+                    onTypingComplete={() => handleTypingComplete(message.id)}
                   />
 
                   {/* Feedback buttons inside the message bubble at the bottom */}
@@ -400,7 +403,7 @@ const MessageList = React.memo(
           </div>
         </div>
       ));
-    }, [processedMessages, handleFeedbackClick, getUserInitials, user, t]);
+    }, [processedMessages, handleFeedbackClick, handleTypingComplete, getUserInitials, user, t]);
 
     return (
       <>
@@ -475,6 +478,12 @@ function ChatInterface() {
     messageId: string;
     originalQuestion: string;
     clarificationQuestions: string[];
+  } | null>(null);
+
+  // État pour le follow-up proactif en attente (affiché après le typewriter)
+  const [pendingFollowup, setPendingFollowup] = useState<{
+    messageId: string;
+    content: string;
   } | null>(null);
 
   const [feedbackModal, setFeedbackModal] = useState<{
@@ -1088,12 +1097,13 @@ function ChatInterface() {
 				}
 			  },
 			  onFollowup: (followupMessage: string) => {
-				addMessage({
-				  id: `followup-${Date.now()}`,
-				  content: followupMessage,
-				  isUser: false,
-				  timestamp: new Date(),
-				});
+				// Stocker le follow-up en attente (sera affiché après le typewriter)
+				if (assistantId) {
+				  setPendingFollowup({
+					messageId: assistantId,
+					content: followupMessage,
+				  });
+				}
 			  },
 			},
 		  );
@@ -1262,6 +1272,25 @@ function ChatInterface() {
       });
     },
     [],
+  );
+
+  // Callback quand le typewriter termine - afficher le follow-up proactif
+  const handleTypingComplete = useCallback(
+    (messageId: string) => {
+      if (!isMountedRef.current) return;
+
+      // Si un follow-up est en attente pour ce message, l'afficher maintenant
+      if (pendingFollowup && pendingFollowup.messageId === messageId) {
+        addMessage({
+          id: `followup-${Date.now()}`,
+          content: pendingFollowup.content,
+          isUser: false,
+          timestamp: new Date(),
+        });
+        setPendingFollowup(null); // Réinitialiser
+      }
+    },
+    [pendingFollowup, addMessage],
   );
 
   const handleFeedbackSubmit = useCallback(
@@ -1530,6 +1559,7 @@ function ChatInterface() {
                 processedMessages={processedMessages}
                 isLoadingChat={isLoadingChat}
                 handleFeedbackClick={handleFeedbackClick}
+                handleTypingComplete={handleTypingComplete}
                 getUserInitials={getUserInitials}
                 user={user}
                 t={t}

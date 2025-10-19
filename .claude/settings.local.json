@@ -66,7 +66,8 @@
       "Bash(for file in frontend/public/locales/es.json frontend/public/locales/de.json frontend/public/locales/it.json frontend/public/locales/pt.json frontend/public/locales/nl.json frontend/public/locales/pl.json)",
       "Bash(for file in frontend/public/locales/ar.json frontend/public/locales/zh.json frontend/public/locales/ja.json frontend/public/locales/hi.json frontend/public/locales/id.json frontend/public/locales/th.json frontend/public/locales/tr.json frontend/public/locales/vi.json)",
       "Bash(do if [ -f \"$file\" ])",
-      "Bash(then echo \"=== $file ===\")"
+      "Bash(then echo \"=== $file ===\")",
+      "Bash(node add-cot-translations.js)"
     ],
     "deny": [],
     "ask": []

@@ -14,12 +14,14 @@ interface TypewriterMessageProps {
   content: string;
   isStreaming?: boolean; // True while receiving from API
   speed?: number;
+  onTypingComplete?: () => void; // Callback when typewriter finishes
 }
 
 export const TypewriterMessage: React.FC<TypewriterMessageProps> = ({
   content,
   isStreaming = false,
-  speed = 3
+  speed = 15,  // Ralenti: 15ms par caractère au lieu de 3ms
+  onTypingComplete
 }) => {
   // Parse CoT sections to extract answer only (thinking/analysis saved backend-side)
   const cotSections = useMemo(() => parseCotResponse(content || ''), [content]);
@@ -28,7 +30,8 @@ export const TypewriterMessage: React.FC<TypewriterMessageProps> = ({
   const { displayedText, isTyping } = useTypewriter({
     text: cotSections.answer,
     speed,
-    enabled: !isStreaming && cotSections.answer.length > 0
+    enabled: !isStreaming && cotSections.answer.length > 0,
+    onComplete: onTypingComplete
   });
 
   return (
