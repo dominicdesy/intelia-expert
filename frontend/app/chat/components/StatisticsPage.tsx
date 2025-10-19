@@ -874,7 +874,7 @@ export const StatisticsPage: React.FC = () => {
                       : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
-                  Quality Issues
+                  Anomalies
                 </button>
                 <button
                   onClick={() => handleTabChange("invitations")}
