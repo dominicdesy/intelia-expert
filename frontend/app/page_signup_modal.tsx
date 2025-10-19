@@ -402,6 +402,9 @@ export function SignupModal({
     "idle" | "loading" | "success" | "error"
   >("idle");
 
+  // État pour le consentement GDPR (Article 7 - Consentement explicite)
+  const [acceptTerms, setAcceptTerms] = React.useState(false);
+
   // Gestion locale simplifiée de l'auto-remplissage country
   const handleCountryChange = React.useCallback(
     (value: string) => {
@@ -848,29 +851,38 @@ export function SignupModal({
             </div>
           </div>
 
-          {/* Texte légal */}
-          <div className="mb-10 mt-0 text-center">
-            <p className="text-xs text-gray-500 leading-relaxed">
-              {safeT("gdpr.signupNotice")}{" "}
-              <a
-                href="/terms"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline transition-colors"
-              >
-                {safeT("legal.terms")}
-              </a>{" "}
-              {safeT("legal.and")}{" "}
-              <a
-                href="/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline transition-colors"
-              >
-                {safeT("legal.privacy")}
-              </a>
-              .
-            </p>
+          {/* GDPR Consent Checkbox - Article 7 RGPD */}
+          <div className="mb-6 mt-0">
+            <label className="flex items-start space-x-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={acceptTerms}
+                onChange={(e) => setAcceptTerms(e.target.checked)}
+                required
+                className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+              />
+              <span className="text-xs text-gray-700 leading-relaxed select-none">
+                {safeT("gdpr.signupNotice")}{" "}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 underline transition-colors font-medium"
+                >
+                  {safeT("legal.terms")}
+                </a>{" "}
+                {safeT("legal.and")}{" "}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 underline transition-colors font-medium"
+                >
+                  {safeT("legal.privacy")}
+                </a>
+                .
+              </span>
+            </label>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -883,7 +895,7 @@ export function SignupModal({
             </button>
             <button
               onClick={onSubmit}
-              disabled={isLoading || buttonState !== "idle"}
+              disabled={isLoading || buttonState !== "idle" || !acceptTerms}
               className={getButtonClasses()}
             >
               {getButtonContent()}
