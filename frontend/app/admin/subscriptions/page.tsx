@@ -108,8 +108,8 @@ export default function SubscriptionsAdminPage() {
 
   const tabs = [
     { id: "overview", label: "Vue d'ensemble", icon: "📊" },
-    { id: "plans", label: "Gestion Plans", icon: "📋" },
-    { id: "pricing", label: "Prix par Pays", icon: "🌍" },
+    { id: "plans", label: "Gestion des plans", icon: "📋" },
+    { id: "pricing", label: "Prix par pays", icon: "🌍" },
     { id: "history", label: "Historique", icon: "📜" },
   ];
 
