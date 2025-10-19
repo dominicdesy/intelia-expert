@@ -51,15 +51,15 @@ const nextConfig = {
     ignoreDuringBuilds: true, // ✅ CHANGÉ: Ignorer ESLint pendant le build
   },
 
-  // Headers de sécurité - version simplifiée qui fonctionne
+  // Headers de sécurité - 7 headers pour score A/A+ sur SecurityHeaders.com
   async headers() {
     return [
       {
-        source: "/(.*)",
+        source: "/:path*",
         headers: [
           {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
           },
           {
             key: "X-Frame-Options",
@@ -69,14 +69,21 @@ const nextConfig = {
             key: "X-Content-Type-Options",
             value: "nosniff",
           },
-        ],
-      },
-      {
-        source: "/api/(.*)",
-        headers: [
           {
-            key: "Cache-Control",
-            value: "no-cache, no-store, must-revalidate",
+            key: "X-XSS-Protection",
+            value: "1; mode=block",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://expert.intelia.com https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "geolocation=(), microphone=(), camera=()",
           },
         ],
       },

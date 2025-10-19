@@ -579,6 +579,8 @@ export interface TranslationKeys {
   "error.unexpectedResponse": string;
   "error.checkConnection": string;
   "error.serviceUnavailable": string;
+  "error.invalidShareToken": string;
+  "error.noTokenReceived": string;
 
   // ===========================================
   // AUTH ERROR MESSAGES - NOUVELLES CLÉS

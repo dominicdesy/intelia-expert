@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MessageCircle, Clock, Eye, AlertCircle, Loader2 } from "lucide-react";
 import { secureLog } from "@/lib/utils/secureLogger";
+import { useTranslation } from "@/lib/languages/i18n";
 
 interface Message {
   id: string;
@@ -37,6 +38,7 @@ export default function SharedConversationPage() {
   const params = useParams();
   const router = useRouter();
   const token = params?.token as string;
+  const { t } = useTranslation();
 
   const [data, setData] = useState<SharedConversationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
