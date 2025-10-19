@@ -107,6 +107,7 @@ const CountrySelect: React.FC<CountrySelectProps> = ({
               type="text"
               placeholder={
                 t("countries.searchPlaceholder" as any) ||
+                t("placeholder.searchCountry") ||
                 "Rechercher un pays..."
               }
               value={searchTerm}

@@ -522,7 +522,7 @@ function LoginPageContent() {
         errorMessage.includes("server") ||
         errorMessage.includes("500")
       ) {
-        setError("Erreur technique du serveur. Veuillez réessayer.");
+        setError(t("error.serverError") || "Erreur technique du serveur. Veuillez réessayer.");
       } else {
         setError(errorMessage);
       }
@@ -571,8 +571,7 @@ function LoginPageContent() {
           router.push("/chat");
         }, 1000);
       } else {
-        alert("No token received");
-        setError("Authentication failed: No token received");
+        setError(t("error.noTokenReceived") || "Authentication failed: No token received");
       }
     } catch (err: any) {
       const errorMessage = err.message || t("auth.error") || "Authentication failed";

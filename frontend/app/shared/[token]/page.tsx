@@ -44,7 +44,7 @@ export default function SharedConversationPage() {
 
   useEffect(() => {
     if (!token) {
-      setError("Token de partage invalide");
+      setError(t("error.invalidShareToken") || "Token de partage invalide");
       setIsLoading(false);
       return;
     }
