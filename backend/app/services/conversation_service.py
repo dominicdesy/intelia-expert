@@ -14,13 +14,7 @@ from datetime import datetime
 from psycopg2.extras import RealDictCursor
 
 from app.core.database import get_pg_connection
-
-# Add llm directory to path for CoT parser
-llm_path = Path(__file__).parent.parent.parent.parent / "llm"
-if str(llm_path) not in sys.path:
-    sys.path.insert(0, str(llm_path))
-
-from utils.cot_parser import parse_cot_response
+from app.utils.cot_parser import parse_cot_response
 
 logger = logging.getLogger(__name__)
 
