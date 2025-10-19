@@ -10,6 +10,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr
 
+from app.utils.gdpr_helpers import mask_email
+
 # Optional Supabase import
 try:
     from supabase import create_client, Client
@@ -326,7 +328,7 @@ async def get_user_profile_from_supabase(user_id: str, email: str) -> Dict[str, 
                 "profile_id": profile.get("id"),
             }
         else:
-            logger.warning(f"Aucun profil trouvé pour {email} - rôle par défaut")
+            logger.warning(f"Aucun profil trouvé pour {mask_email(email)} - rôle par défaut")
             return {"user_type": "user"}
 
     except Exception as e:
@@ -485,7 +487,7 @@ async def login(request: LoginRequest):
     Authenticate user and return a JWT access token.
     Version corrigée avec gestion d'erreurs détaillée + session tracking
     """
-    logger.info(f"[Login] Tentative de connexion: {request.email}")
+    logger.info(f"[Login] Tentative de connexion: {mask_email(request.email)}")
 
     if not SUPABASE_AVAILABLE:
         logger.error("Supabase client not available")
@@ -542,14 +544,14 @@ async def login(request: LoginRequest):
         )
 
         if user is None:
-            logger.warning(f"[Login] Authentification échouée pour: {request.email}")
+            logger.warning(f"[Login] Authentification échouée pour: {mask_email(request.email)}")
             raise HTTPException(
                 status_code=401, detail="Email ou mot de passe incorrect"
             )
 
         # Vérifier si l'email est confirmé
         if hasattr(user, "email_confirmed_at") and not user.email_confirmed_at:
-            logger.warning(f"[Login] Email non confirmé pour: {request.email}")
+            logger.warning(f"[Login] Email non confirmé pour: {mask_email(request.email)}")
             raise HTTPException(
                 status_code=401,
                 detail="Veuillez confirmer votre email avant de vous connecter",
@@ -585,7 +587,7 @@ async def login(request: LoginRequest):
             logger.warning(f"[Login] Erreur session tracking: {e}")
             # Ne pas faire échouer le login si le tracking échoue
 
-        logger.info(f"[Login] Connexion réussie pour: {request.email}")
+        logger.info(f"[Login] Connexion réussie pour: {mask_email(request.email)}")
 
         return TokenResponse(
             access_token=token, token_type="bearer", expires_at=expires_at
@@ -748,7 +750,7 @@ async def refresh_token(current_user: Dict[str, Any] = Depends(get_current_user)
     new_token = create_access_token(token_data, expires)
     expires_at = datetime.utcnow() + expires
 
-    logger.info(f"[RefreshToken] Token rafraîchi pour: {email}")
+    logger.info(f"[RefreshToken] Token rafraîchi pour: {mask_email(email)}")
 
     return TokenResponse(
         access_token=new_token, token_type="bearer", expires_at=expires_at
@@ -985,7 +987,7 @@ async def oauth_backend_callback(
         if not email or not user_id:
             raise Exception("Données utilisateur OAuth incomplètes")
 
-        logger.info(f"[OAuth/Callback] Utilisateur: {email} (ID: {user_id})")
+        logger.info(f"[OAuth/Callback] Utilisateur: {mask_email(email)} (ID: {user_id})")
 
         # NOUVEAU : Générer session_id pour OAuth
         session_id = str(uuid.uuid4())
@@ -1119,7 +1121,7 @@ async def handle_oauth_callback(request: OAuthCallbackRequest):
         ) or user_data.get("name")
         avatar_url = user_data.get("user_metadata", {}).get("avatar_url")
 
-        logger.info(f"[OAuth] Utilisateur: {email} (ID: {user_id})")
+        logger.info(f"[OAuth] Utilisateur: {mask_email(email)} (ID: {user_id})")
 
         # Créer notre token JWT pour l'utilisateur
         expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -1144,7 +1146,7 @@ async def handle_oauth_callback(request: OAuthCallbackRequest):
             "created_at": datetime.utcnow().isoformat(),
         }
 
-        logger.info(f"[OAuth] Connexion réussie via {request.provider}: {email}")
+        logger.info(f"[OAuth] Connexion réussie via {request.provider}: {mask_email(email)}")
 
         return OAuthCallbackResponse(
             success=True,

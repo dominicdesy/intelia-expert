@@ -12,6 +12,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from app.utils.gdpr_helpers import mask_email
+
 logger = logging.getLogger(__name__)
 
 
@@ -575,7 +577,7 @@ class EmailService:
                 logger.error("SMTP credentials not configured")
                 return False
 
-            logger.info(f"[EmailService] Tentative envoi email à {to_email}")
+            logger.info(f"[EmailService] Tentative envoi email à {mask_email(to_email)}")
             logger.info(f"[EmailService] SMTP: {self.smtp_host}:{self.smtp_port}")
 
             # Créer le message
@@ -610,11 +612,11 @@ class EmailService:
                     server.send_message(msg)
                     logger.info("[EmailService] Message envoyé avec succès")
 
-            logger.info(f"✅ Email sent successfully to {to_email}")
+            logger.info(f"✅ Email sent successfully to {mask_email(to_email)}")
             return True
 
         except Exception as e:
-            logger.error(f"❌ Failed to send email to {to_email}: {type(e).__name__}: {e}")
+            logger.error(f"❌ Failed to send email to {mask_email(to_email)}: {type(e).__name__}: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return False

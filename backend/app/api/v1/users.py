@@ -16,6 +16,7 @@ import logging
 
 # Import de la fonction d'authentification existante
 from .auth import get_current_user
+from app.utils.gdpr_helpers import mask_email
 
 # Import Supabase - CORRECTION F401: Suppression de Client non utilisé
 try:
@@ -425,7 +426,7 @@ async def delete_user_profile(current_user: Dict[str, Any] = Depends(get_current
 async def export_user_data(current_user: Dict[str, Any] = Depends(get_current_user)):
     """Exporte toutes les données utilisateur (RGPD)"""
 
-    logger.info(f"[export_user_data] Export données pour {current_user.get('email')}")
+    logger.info(f"[export_user_data] Export données pour {mask_email(current_user.get('email'))}")
 
     try:
         supabase = get_supabase_admin_client()

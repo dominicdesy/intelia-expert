@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
 from app.core.database import get_pg_connection
 from app.core.stripe_mode import is_quota_enforcement_enabled, get_stripe_config
+from app.utils.gdpr_helpers import mask_email
 from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ def get_user_plan_and_quota(user_email: str) -> Tuple[str, int, bool]:
                 )
 
             # Par défaut: plan gratuit avec quota limité
-            logger.warning(f"Aucun plan trouvé pour {user_email}, utilisation du plan par défaut")
+            logger.warning(f"Aucun plan trouvé pour {mask_email(user_email)}, utilisation du plan par défaut")
             return ('essential', 3, True)  # TEMPORAIRE: 3 pour tests (normalement 50)
 
 
@@ -160,7 +161,7 @@ def get_or_create_monthly_usage(user_email: str, month_year: str, monthly_quota:
             )
 
             result = cur.fetchone()
-            logger.info(f"Créé nouvel enregistrement monthly_usage_tracking pour {user_email} - {month_year}")
+            logger.info(f"Créé nouvel enregistrement monthly_usage_tracking pour {mask_email(user_email)} - {month_year}")
 
             return dict(result)
 
@@ -242,7 +243,7 @@ def check_user_quota(user_email: str) -> Dict[str, Any]:
     except QuotaExceededException:
         raise
     except Exception as e:
-        logger.error(f"Erreur vérification quota pour {user_email}: {e}")
+        logger.error(f"Erreur vérification quota pour {mask_email(user_email)}: {e}")
         # En cas d'erreur, autoriser par défaut (fail-open pour ne pas bloquer les utilisateurs)
         return {
             'can_ask': True,
@@ -346,7 +347,7 @@ def increment_question_count(user_email: str, success: bool = True, cost_usd: fl
                 return {'error': 'Failed to update usage'}
 
     except Exception as e:
-        logger.error(f"Erreur incrémentation question pour {user_email}: {e}")
+        logger.error(f"Erreur incrémentation question pour {mask_email(user_email)}: {e}")
         return {'error': str(e)}
 
 
@@ -391,7 +392,7 @@ def get_user_usage_stats(user_email: str) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"Erreur récupération stats usage pour {user_email}: {e}")
+        logger.error(f"Erreur récupération stats usage pour {mask_email(user_email)}: {e}")
         return {
             'error': str(e),
             'plan_name': 'unknown',
