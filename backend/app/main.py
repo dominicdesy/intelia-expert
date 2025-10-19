@@ -530,8 +530,8 @@ async def add_security_headers(request: Request, call_next):
     # NOTE: Permissive configuration to support Next.js + inline scripts + Tailwind
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        # Scripts: allow self + unsafe-inline (Next.js inline scripts) + unsafe-eval (dev mode)
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        # Scripts: allow self + unsafe-inline (Next.js inline scripts) - unsafe-eval removed for A+ score
+        "script-src 'self' 'unsafe-inline'; "
         # Styles: allow self + unsafe-inline (Tailwind CSS inline styles)
         "style-src 'self' 'unsafe-inline'; "
         # Images: allow self + data URIs + HTTPS (for external images)
