@@ -340,17 +340,20 @@ class PostgreSQLRetriever(InitializableMixin):
                             )
 
                 # Créer un contenu textuel naturel et lisible pour le LLM
+                # ✅ CORRECTION: Utiliser breed + strain pour nom complet (ex: "Cobb 500", "Ross 308")
+                full_breed_name = f"{metric.breed} {metric.strain}" if metric.breed else metric.strain
+
                 if display_value is not None:
                     # Phrase complète avec contexte
                     content = (
-                        f"At {metric.age_min} days old, {metric.strain} {sex_info} chickens "
+                        f"At {metric.age_min} days old, {full_breed_name} {sex_info} chickens "
                         f"have an average {metric_type_clean} of {display_value} "
                         f"{display_unit or 'grams'}."
                     )
                 else:
                     # Fallback pour valeurs textuelles
                     content = (
-                        f"For {metric.strain} at {metric.age_min} days ({sex_info}): "
+                        f"For {full_breed_name} at {metric.age_min} days ({sex_info}): "
                         f"{metric_type_clean} = {metric.value_text or 'N/A'}"
                     )
 

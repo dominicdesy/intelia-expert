@@ -31,11 +31,11 @@ export const CotReasoning: React.FC<CotReasoningProps> = ({ sections, className 
   }
 
   return (
-    <div className={`cot-reasoning-container ${className}`}>
+    <div className={`cot-reasoning-container bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800 shadow-sm ${className}`}>
       {/* Toggle Button */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors py-2 px-3 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20"
+        className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 transition-colors py-2 px-3 rounded-md hover:bg-blue-100 dark:hover:bg-blue-800/30 font-medium"
         aria-expanded={isExpanded}
         aria-label={isExpanded ? t('chat.cot.hideReasoning') : t('chat.cot.showReasoning')}
       >
