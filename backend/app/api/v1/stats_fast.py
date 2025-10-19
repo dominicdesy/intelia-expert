@@ -87,7 +87,7 @@ def enrich_users_data(user_ids: list[str]) -> Dict[str, Dict]:
         else:
             logger.warning(f"[ENRICHMENT] User NOT found in Supabase for user_id: {user_id}")
             users_data[user_id] = {
-                "email": user_id,  # Fallback: utiliser l'ID
+                "email": f"Utilisateur supprimé ({user_id[:8]})",  # ✅ Texte clair avec début UUID pour traçabilité
                 "first_name": "",
                 "last_name": "",
                 "plan": "free",
