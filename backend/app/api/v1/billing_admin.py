@@ -54,6 +54,10 @@ class CurrencyRateUpdate(BaseModel):
     rate_to_usd: float = Field(..., gt=0, description="Taux de conversion vers USD")
 
 
+class CountryTierUpdate(BaseModel):
+    tier_level: int = Field(..., ge=1, le=4, description="Niveau de tier (1-4)")
+
+
 # ============================================================================
 # UTILS
 # ============================================================================
@@ -287,6 +291,119 @@ async def update_plan_name(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/plans/{plan_name}/tier-prices")
+async def get_plan_tier_prices(
+    plan_name: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Récupère les prix par tier pour un plan donné
+    """
+    verify_super_admin(current_user)
+
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT tier_level, price_usd
+                    FROM stripe_pricing_tiers
+                    WHERE plan_name = %s AND active = TRUE
+                    ORDER BY tier_level
+                    """,
+                    (plan_name,)
+                )
+                tier_prices = cur.fetchall()
+
+                if not tier_prices:
+                    raise HTTPException(status_code=404, detail=f"No tier prices found for plan '{plan_name}'")
+
+                return {
+                    "success": True,
+                    "plan_name": plan_name,
+                    "tier_prices": [dict(tp) for tp in tier_prices]
+                }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error get tier prices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/plans/{plan_name}/tier-prices/{tier_level}")
+async def update_tier_price(
+    plan_name: str,
+    tier_level: int,
+    data: TierPriceUpdate,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Modifie le prix USD d'un plan pour un tier spécifique
+    """
+    verify_super_admin(current_user)
+
+    if tier_level < 1 or tier_level > 4:
+        raise HTTPException(status_code=400, detail="Tier level must be between 1 and 4")
+
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Récupérer l'ancien prix
+                cur.execute(
+                    """
+                    SELECT price_usd
+                    FROM stripe_pricing_tiers
+                    WHERE plan_name = %s AND tier_level = %s
+                    """,
+                    (plan_name, tier_level)
+                )
+                old_price = cur.fetchone()
+
+                if not old_price:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Tier {tier_level} not found for plan '{plan_name}'"
+                    )
+
+                # Mettre à jour le prix
+                cur.execute(
+                    """
+                    UPDATE stripe_pricing_tiers
+                    SET price_usd = %s
+                    WHERE plan_name = %s AND tier_level = %s
+                    """,
+                    (data.price_usd, plan_name, tier_level)
+                )
+                conn.commit()
+
+                # Logger le changement
+                log_admin_action(
+                    action_type="tier_price_change",
+                    target_entity=f"{plan_name}-tier{tier_level}",
+                    admin_email=current_user.get("email"),
+                    old_value={"price_usd": float(old_price["price_usd"])},
+                    new_value={"price_usd": data.price_usd},
+                    ip_address=request.client.host
+                )
+
+                logger.info(f"Tier price updated: {plan_name} Tier {tier_level} → ${data.price_usd}")
+
+                return {
+                    "success": True,
+                    "plan_name": plan_name,
+                    "tier_level": tier_level,
+                    "old_price_usd": float(old_price["price_usd"]),
+                    "new_price_usd": data.price_usd
+                }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error update tier price: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # ENDPOINTS: Country Pricing Management
 # ============================================================================
@@ -458,6 +575,159 @@ async def update_country_pricing(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/countries/{country_code}")
+async def delete_country(
+    country_code: str,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Désactive un pays (soft delete)
+    Supprime les prix personnalisés associés
+    """
+    verify_super_admin(current_user)
+
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Vérifier que le pays existe
+                cur.execute(
+                    """
+                    SELECT country_code, country_name, tier_level
+                    FROM stripe_country_tiers
+                    WHERE country_code = %s AND active = TRUE
+                    """,
+                    (country_code.upper(),)
+                )
+                country = cur.fetchone()
+
+                if not country:
+                    raise HTTPException(status_code=404, detail=f"Country '{country_code}' not found")
+
+                # Désactiver le pays (soft delete)
+                cur.execute(
+                    """
+                    UPDATE stripe_country_tiers
+                    SET active = FALSE
+                    WHERE country_code = %s
+                    """,
+                    (country_code.upper(),)
+                )
+
+                # Désactiver les prix personnalisés
+                cur.execute(
+                    """
+                    UPDATE stripe_country_pricing
+                    SET active = FALSE
+                    WHERE country_code = %s
+                    """,
+                    (country_code.upper(),)
+                )
+
+                conn.commit()
+
+                # Logger le changement
+                log_admin_action(
+                    action_type="country_delete",
+                    target_entity=country_code.upper(),
+                    admin_email=current_user.get("email"),
+                    old_value={
+                        "country_name": country["country_name"],
+                        "tier_level": country["tier_level"],
+                        "active": True
+                    },
+                    new_value={"active": False},
+                    ip_address=request.client.host
+                )
+
+                logger.info(f"Country deleted: {country_code.upper()}")
+
+                return {
+                    "success": True,
+                    "country_code": country_code.upper(),
+                    "country_name": country["country_name"],
+                    "message": "Country deactivated successfully"
+                }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error delete country: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/countries/{country_code}/tier")
+async def update_country_tier(
+    country_code: str,
+    data: CountryTierUpdate,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Modifie le tier d'un pays
+    Recalcule automatiquement les prix par défaut
+    """
+    verify_super_admin(current_user)
+
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Récupérer l'ancien tier
+                cur.execute(
+                    """
+                    SELECT tier_level, country_name
+                    FROM stripe_country_tiers
+                    WHERE country_code = %s AND active = TRUE
+                    """,
+                    (country_code.upper(),)
+                )
+                country = cur.fetchone()
+
+                if not country:
+                    raise HTTPException(status_code=404, detail=f"Country '{country_code}' not found")
+
+                old_tier = country["tier_level"]
+
+                # Mettre à jour le tier
+                cur.execute(
+                    """
+                    UPDATE stripe_country_tiers
+                    SET tier_level = %s
+                    WHERE country_code = %s
+                    """,
+                    (data.tier_level, country_code.upper())
+                )
+
+                conn.commit()
+
+                # Logger le changement
+                log_admin_action(
+                    action_type="tier_change",
+                    target_entity=country_code.upper(),
+                    admin_email=current_user.get("email"),
+                    old_value={"tier": old_tier},
+                    new_value={"tier": data.tier_level},
+                    ip_address=request.client.host
+                )
+
+                logger.info(f"Tier changed: {country_code.upper()} → Tier {data.tier_level}")
+
+                return {
+                    "success": True,
+                    "country_code": country_code.upper(),
+                    "country_name": country["country_name"],
+                    "old_tier": old_tier,
+                    "new_tier": data.tier_level,
+                    "message": "Tier updated successfully"
+                }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error update tier: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def _get_currency_symbol(currency_code: str) -> str:
     """Retourne le symbole de la devise"""
     symbols = {
@@ -565,4 +835,53 @@ async def get_admin_stats(current_user: dict = Depends(get_current_user)):
                 }
     except Exception as e:
         logger.error(f"❌ Erreur get stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/recalculate-prices")
+async def recalculate_all_prices(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Recalcule tous les prix automatiques marketing pour tous les pays
+    Utilise les prix tier comme base et applique les taux de change + ajustement marketing
+    Ne touche PAS aux prix custom définis manuellement
+    """
+    verify_super_admin(current_user)
+
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Compter les prix qui seront mis à jour
+                cur.execute("""
+                    SELECT COUNT(*) as total
+                    FROM complete_pricing_matrix
+                    WHERE price_type = 'auto_marketing'
+                """)
+                result = cur.fetchone()
+                total_auto_prices = result["total"]
+
+                # Log l'action
+                log_admin_action(
+                    action_type="recalculate_prices",
+                    target_entity="all_countries",
+                    admin_email=current_user.get("email"),
+                    old_value={"auto_prices_count": total_auto_prices},
+                    new_value={"recalculated": True},
+                    ip_address=request.client.host
+                )
+
+                logger.info(f"Price recalculation triggered by {current_user.get('email')}")
+                logger.info(f"{total_auto_prices} automatic marketing prices will be refreshed on next query")
+
+                return {
+                    "success": True,
+                    "message": "Prix marketing recalculés automatiquement",
+                    "auto_prices_count": total_auto_prices,
+                    "note": "Les prix custom ne sont pas affectés. La vue complete_pricing_matrix calcule automatiquement les prix marketing."
+                }
+
+    except Exception as e:
+        logger.error(f"Error recalculate prices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
