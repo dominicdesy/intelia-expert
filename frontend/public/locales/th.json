@@ -796,5 +796,10 @@
   "passkey.benefits.noPassword": "No password to remember",
   "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers",
   "passkey.setupTitle": "กำหนดค่าพาสคีย์ของคุณ",
-  "passkey.setup.inProgress": "กำลังกำหนดค่า..."
+  "passkey.setup.inProgress": "กำลังกำหนดค่า...",
+  "chat.cot.showReasoning": "แสดงการให้เหตุผลโดยละเอียด",
+  "chat.cot.hideReasoning": "ซ่อนการให้เหตุผล",
+  "chat.cot.thinking": "การคิด",
+  "chat.cot.analysis": "การวิเคราะห์",
+  "chat.cot.answer": "คำตอบ"
 }

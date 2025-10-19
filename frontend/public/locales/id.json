@@ -796,5 +796,10 @@
   "passkey.benefits.noPassword": "No password to remember",
   "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers",
   "passkey.setupTitle": "Konfigurasi Passkey Anda",
-  "passkey.setup.inProgress": "Mengkonfigurasi..."
+  "passkey.setup.inProgress": "Mengkonfigurasi...",
+  "chat.cot.showReasoning": "Tampilkan penalaran detail",
+  "chat.cot.hideReasoning": "Sembunyikan penalaran",
+  "chat.cot.thinking": "Pemikiran",
+  "chat.cot.analysis": "Analisis",
+  "chat.cot.answer": "Jawaban"
 }

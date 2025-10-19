@@ -796,5 +796,10 @@
   "passkey.benefits.noPassword": "No password to remember",
   "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers",
   "passkey.setupTitle": "تكوين المفتاح الرئيسي الخاص بك",
-  "passkey.setup.inProgress": "جارٍ التكوين..."
+  "passkey.setup.inProgress": "جارٍ التكوين...",
+  "chat.cot.showReasoning": "عرض التفكير التفصيلي",
+  "chat.cot.hideReasoning": "إخفاء التفكير",
+  "chat.cot.thinking": "التفكير",
+  "chat.cot.analysis": "التحليل",
+  "chat.cot.answer": "الإجابة"
 }

@@ -796,5 +796,10 @@
   "passkey.benefits.noPassword": "No password to remember",
   "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers",
   "passkey.setupTitle": "パスキーを設定する",
-  "passkey.setup.inProgress": "設定中..."
+  "passkey.setup.inProgress": "設定中...",
+  "chat.cot.showReasoning": "詳細な推論を表示",
+  "chat.cot.hideReasoning": "推論を非表示",
+  "chat.cot.thinking": "思考",
+  "chat.cot.analysis": "分析",
+  "chat.cot.answer": "回答"
 }

@@ -796,5 +796,10 @@
   "passkey.benefits.noPassword": "No password to remember",
   "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers",
   "passkey.setupTitle": "Configura il tuo Passkey",
-  "passkey.setup.inProgress": "Configurazione..."
+  "passkey.setup.inProgress": "Configurazione...",
+  "chat.cot.showReasoning": "Mostra ragionamento dettagliato",
+  "chat.cot.hideReasoning": "Nascondi ragionamento",
+  "chat.cot.thinking": "Pensiero",
+  "chat.cot.analysis": "Analisi",
+  "chat.cot.answer": "Risposta"
 }

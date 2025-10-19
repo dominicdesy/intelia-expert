@@ -178,6 +178,101 @@ def _get_safe_temperature(requested: Optional[float], model: str) -> Optional[fl
     return max(0.0, min(2.0, t))
 
 
+def _detect_poultry_type(text: str) -> str:
+    """Detect if question is about broilers or layers (egg-laying hens).
+
+    Returns:
+        'layer' if question is about egg production/layers
+        'broiler' otherwise (default)
+    """
+    layer_keywords = [
+        'pondeuse', 'layer', 'œuf', 'egg', 'ponte', 'laying',
+        'production d\'œufs', 'egg production', 'hen house',
+        'poulailler', 'coquille', 'shell', 'albumine', 'albumen'
+    ]
+
+    text_lower = text.lower()
+    if any(keyword in text_lower for keyword in layer_keywords):
+        logger.debug("Poultry type detected: LAYER")
+        return 'layer'
+
+    logger.debug("Poultry type detected: BROILER (default)")
+    return 'broiler'
+
+
+def _build_poultry_expert_prompt(poultry_type: str) -> str:
+    """Build specialized system prompt based on poultry type.
+
+    Args:
+        poultry_type: 'broiler' or 'layer'
+
+    Returns:
+        Specialized system prompt for the poultry type
+    """
+    if poultry_type == 'layer':
+        return (
+            "Tu es un expert en volaille spécialisé en poules pondeuses. "
+            "Tu possèdes une connaissance approfondie de la production d'œufs, "
+            "de la nutrition des pondeuses, de la qualité de coquille, "
+            "du bien-être et des maladies spécifiques aux pondeuses. "
+            "Réponds de manière concise, précise et professionnelle. "
+            "Utilise un français clair et structure ton texte avec du Markdown si approprié."
+        )
+    else:
+        # Default: broiler
+        return (
+            "Tu es un expert en volaille spécialisé en poulets de chair (broilers). "
+            "Tu possèdes une connaissance approfondie de la croissance, "
+            "de l'indice de conversion alimentaire, de la qualité de viande, "
+            "du bien-être et des maladies spécifiques aux poulets de chair. "
+            "Réponds de manière concise, précise et professionnelle. "
+            "Utilise un français clair et structure ton texte avec du Markdown si approprié."
+        )
+
+
+def _add_cot_instruction(prompt: str, structured: bool = True) -> str:
+    """Add Chain-of-Thought instruction to prompt.
+
+    Phase 1 (structured=False): Simple "step by step" instruction (+20-50% quality)
+    Phase 2 (structured=True): XML-structured reasoning (parsable output)
+
+    Args:
+        prompt: Original user prompt
+        structured: If True, request XML-structured output
+
+    Returns:
+        Enhanced prompt with CoT instruction
+    """
+    # Don't add if already present
+    if "étape par étape" in prompt.lower() or "step by step" in prompt.lower():
+        return prompt
+
+    if structured:
+        # Phase 2: Structured CoT with XML tags
+        cot_instruction = """
+
+Structure ta réponse avec les balises XML suivantes:
+
+<thinking>
+[Ton raisonnement initial et réflexion sur la question]
+</thinking>
+
+<analysis>
+[Ton analyse détaillée étape par étape avec les données techniques]
+</analysis>
+
+<answer>
+[Ta réponse finale claire et concise]
+</answer>
+
+Important: Utilise EXACTEMENT ces balises XML. Le contenu entre les balises peut utiliser du Markdown."""
+    else:
+        # Phase 1: Simple CoT instruction
+        cot_instruction = "\n\nApproche cette question étape par étape:"
+
+    return prompt + cot_instruction
+
+
 # ----------------------------------------------------------------------------
 # Token utilities (heuristics kept for compatibility)
 # ----------------------------------------------------------------------------
@@ -319,6 +414,10 @@ def complete_text(
 ) -> str:
     """Legacy wrapper that builds chat messages and returns text content.
     Applies safe temperature and tolerant output parsing.
+
+    NOW WITH:
+    - Dynamic broiler/layer detection
+    - Phase 1 Chain-of-Thought prompting
     """
     if not prompt or not prompt.strip():
         raise ValueError("Le prompt ne peut pas être vide")
@@ -326,9 +425,18 @@ def complete_text(
     model = model or os.getenv("OPENAI_SYNTHESIS_MODEL", _DEFAULT_MODEL)
     safe_temp = _get_safe_temperature(temperature, model)
 
+    # Detect poultry type (broiler vs layer)
+    poultry_type = _detect_poultry_type(prompt)
+
+    # Build specialized system prompt
+    system_prompt = _build_poultry_expert_prompt(poultry_type)
+
+    # Add Chain-of-Thought instruction (Phase 2: Structured CoT with XML)
+    enhanced_prompt = _add_cot_instruction(prompt.strip(), structured=True)
+
     # Adaptive token budget
     if max_tokens is None:
-        plen = len(prompt)
+        plen = len(enhanced_prompt)
         if plen < 500:
             max_tokens = 500 if model.startswith("gpt-5") else 300
         elif plen < 1500:
@@ -338,20 +446,16 @@ def complete_text(
         else:
             max_tokens = 2000 if model.startswith("gpt-5") else 800
         model_limit = get_model_max_tokens(model)
-        available = model_limit - estimate_tokens(prompt, model) - 100
+        available = model_limit - estimate_tokens(enhanced_prompt, model) - 100
         if available > 0:
             max_tokens = min(max_tokens, available)
 
     messages = [
         {
             "role": "system",
-            "content": (
-                "Tu es un expert en synthèse de contenu technique avicole. "
-                "Réponds de manière concise, précise et professionnelle. "
-                "Utilise un français clair et structure ton texte avec du Markdown si approprié."
-            ),
+            "content": system_prompt,
         },
-        {"role": "user", "content": prompt.strip()},
+        {"role": "user", "content": enhanced_prompt},
     ]
 
     response = complete(

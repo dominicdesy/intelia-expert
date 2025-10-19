@@ -796,5 +796,10 @@
   "passkey.benefits.noPassword": "No password to remember",
   "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers",
   "passkey.setupTitle": "अपनी पासकी कॉन्फ़िगर करें",
-  "passkey.setup.inProgress": "कॉन्फ़िगर कर रहे हैं..."
+  "passkey.setup.inProgress": "कॉन्फ़िगर कर रहे हैं...",
+  "chat.cot.showReasoning": "विस्तृत तर्क दिखाएं",
+  "chat.cot.hideReasoning": "तर्क छुपाएं",
+  "chat.cot.thinking": "सोच",
+  "chat.cot.analysis": "विश्लेषण",
+  "chat.cot.answer": "उत्तर"
 }

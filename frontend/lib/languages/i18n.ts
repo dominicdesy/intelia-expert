@@ -278,6 +278,11 @@ export interface TranslationKeys {
   "chat.upgradePrompt": string;
   "chat.newConversation": string;
   "chat.disclaimer": string;
+  "chat.cot.showReasoning": string;
+  "chat.cot.hideReasoning": string;
+  "chat.cot.thinking": string;
+  "chat.cot.analysis": string;
+  "chat.cot.answer": string;
   "chat.send": string;
   "chat.askQuestion": string;
   "chat.analyzeImageDefault": string;

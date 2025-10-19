@@ -796,5 +796,10 @@
   "passkey.benefits.noPassword": "No password to remember",
   "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers",
   "passkey.setupTitle": "配置您的通行密钥",
-  "passkey.setup.inProgress": "配置中..."
+  "passkey.setup.inProgress": "配置中...",
+  "chat.cot.showReasoning": "显示详细推理",
+  "chat.cot.hideReasoning": "隐藏推理",
+  "chat.cot.thinking": "思考",
+  "chat.cot.analysis": "分析",
+  "chat.cot.answer": "答案"
 }

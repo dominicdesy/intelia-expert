@@ -796,5 +796,10 @@
   "passkey.benefits.noPassword": "No password to remember",
   "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers",
   "passkey.setupTitle": "Passkey'inizi yapılandırın",
-  "passkey.setup.inProgress": "Yapılandırılıyor..."
+  "passkey.setup.inProgress": "Yapılandırılıyor...",
+  "chat.cot.showReasoning": "Detaylı akıl yürütmeyi göster",
+  "chat.cot.hideReasoning": "Akıl yürütmeyi gizle",
+  "chat.cot.thinking": "Düşünme",
+  "chat.cot.analysis": "Analiz",
+  "chat.cot.answer": "Cevap"
 }

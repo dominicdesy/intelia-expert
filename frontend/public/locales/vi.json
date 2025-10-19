@@ -796,5 +796,10 @@
   "passkey.benefits.noPassword": "No password to remember",
   "passkey.devices.supported": "Works on iPhone, iPad, Android phones and modern browsers",
   "passkey.setupTitle": "Cấu hình Passkey của bạn",
-  "passkey.setup.inProgress": "Đang cấu hình..."
+  "passkey.setup.inProgress": "Đang cấu hình...",
+  "chat.cot.showReasoning": "Hiển thị lý luận chi tiết",
+  "chat.cot.hideReasoning": "Ẩn lý luận",
+  "chat.cot.thinking": "Suy nghĩ",
+  "chat.cot.analysis": "Phân tích",
+  "chat.cot.answer": "Câu trả lời"
 }
