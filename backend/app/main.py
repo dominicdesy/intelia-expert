@@ -509,9 +509,9 @@ async def add_security_headers(request: Request, call_next):
     """
     response = await call_next(request)
 
-    # HSTS - Force HTTPS for 1 year with subdomains
+    # HSTS - Force HTTPS for 1 year with subdomains + preload
     response.headers["Strict-Transport-Security"] = (
-        "max-age=31536000; includeSubDomains"
+        "max-age=31536000; includeSubDomains; preload"
     )
 
     # X-Frame-Options - Prevent clickjacking attacks
