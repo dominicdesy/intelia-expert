@@ -758,12 +758,18 @@ export interface TranslationKeys {
   // GDPR & LEGAL - NOUVELLES CLÉS AJOUTÉES
   // ===========================================
   "gdpr.notice": string;
+  "gdpr.signupNotice": string;
   "gdpr.deleteAccount": string;
   "gdpr.exportData": string;
   "gdpr.confirmDelete": string;
   "gdpr.contactSupport": string;
+  "gdpr.dpoTitle": string;
+  "gdpr.dpoContactTitle": string;
+  "gdpr.dpoDescription": string;
+  "gdpr.dpoResponseTime": string;
   "legal.terms": string;
   "legal.privacy": string;
+  "legal.and": string;
 
   // ===========================================
   // COUNTRIES LIST - NOUVELLES CLÉS AJOUTÉES
