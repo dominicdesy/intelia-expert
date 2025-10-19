@@ -234,6 +234,7 @@ async function streamAIResponseInternal(
   conversation_id: string,
   user_context?: any,
   callbacks?: StreamCallbacks,
+  abortSignal?: AbortSignal, // ✅ NOUVEAU: Support pour annulation
 ): Promise<StreamResult> {
   const payload = {
     tenant_id,
@@ -251,7 +252,7 @@ async function streamAIResponseInternal(
     agent_callbacks: !!(callbacks?.onAgentStart || callbacks?.onAgentThinking),
   });
 
-  // Headers SSE complets avec Cache-Control
+  // Headers SSE complets avec Cache-Control + AbortSignal
   const response = await fetch("/llm/chat", {
     method: "POST",
     headers: {
@@ -260,6 +261,7 @@ async function streamAIResponseInternal(
       "Cache-Control": "no-cache",
     },
     body: JSON.stringify(payload),
+    signal: abortSignal, // ✅ NOUVEAU: Propagation du signal d'annulation
   });
 
   if (!response.ok) {
@@ -537,6 +539,7 @@ export const generateAIResponse = async (
   originalQuestion?: string,
   clarificationEntities?: Record<string, any>,
   callbacks?: StreamCallbacks,
+  abortSignal?: AbortSignal, // ✅ NOUVEAU: Support pour annulation
 ): Promise<EnhancedAIResponse> => {
   if (!question || question.trim() === "") {
     throw new Error("Question requise");
@@ -633,6 +636,7 @@ export const generateAIResponse = async (
         }),
       },
       callbacks, // PROPAGATION DES CALLBACKS AGENT
+      abortSignal, // ✅ NOUVEAU: Propagation du signal d'annulation
     );
 
     const finalResponse = streamResult.response;

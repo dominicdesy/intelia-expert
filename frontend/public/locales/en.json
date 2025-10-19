@@ -80,6 +80,7 @@
   "chat.sendError": "Send message error:",
   "chat.sending": "Sending...",
   "chat.sessionExpired": "Session expired",
+  "chat.stop": "Stop",
   "chat.startQuestion": "Start by asking a question",
   "chat.suggestedTopics": "Here are some topics I can help you with:",
   "chat.uploadImages": "Select images to upload",

@@ -84,6 +84,7 @@
   "chat.sendError": "メッセージ送信エラー:",
   "chat.sending": "送信中...",
   "chat.sessionExpired": "セッションが期限切れです",
+  "chat.stop": "停止",
   "chat.startQuestion": "質問から始めましょう",
   "chat.suggestedTopics": "以下のトピックについてお手伝いできます:",
   "chat.upgradePrompt": "質問を続けるには、プランをアップグレードしてください。",

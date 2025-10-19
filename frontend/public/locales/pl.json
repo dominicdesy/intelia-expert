@@ -84,6 +84,7 @@
   "chat.sendError": "Błąd wysyłania wiadomości:",
   "chat.sending": "Wysyłanie...",
   "chat.sessionExpired": "Sesja wygasła",
+  "chat.stop": "Zatrzymaj",
   "chat.startQuestion": "Zacznij od zadania pytania",
   "chat.suggestedTopics": "Oto kilka tematów, w których mogę ci pomóc:",
   "chat.upgradePrompt": "Proszę zaktualizować plan, aby kontynuować zadawanie pytań.",

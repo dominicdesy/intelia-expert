@@ -271,3 +271,15 @@ export const XMarkIcon = ({ className = "w-4 h-4" }: IconProps) => (
     />
   </svg>
 );
+
+// ==================== ICÔNE STOP ====================
+
+export const StopIcon = ({ className = "w-5 h-5" }: IconProps) => (
+  <svg
+    className={className}
+    fill="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <rect x="6" y="6" width="12" height="12" rx="2" />
+  </svg>
+);

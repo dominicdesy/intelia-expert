@@ -84,6 +84,7 @@
   "chat.sendError": "Mesaj gönderme hatası:",
   "chat.sending": "Gönderiliyor...",
   "chat.sessionExpired": "Oturum süresi doldu",
+  "chat.stop": "Durdur",
   "chat.startQuestion": "Bir soru sorarak başlayın",
   "chat.suggestedTopics": "Yardımcı olabileceğim bazı konular:",
   "chat.upgradePrompt": "Soru sormaya devam etmek için lütfen planınızı yükseltin.",

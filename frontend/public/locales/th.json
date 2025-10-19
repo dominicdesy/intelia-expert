@@ -84,6 +84,7 @@
   "chat.sendError": "ข้อผิดพลาดในการส่งข้อความ:",
   "chat.sending": "กำลังส่ง...",
   "chat.sessionExpired": "เซสชันหมดอายุ",
+  "chat.stop": "หยุด",
   "chat.startQuestion": "เริ่มต้นด้วยการถามคำถาม",
   "chat.suggestedTopics": "นี่คือหัวข้อบางอย่างที่ฉันสามารถช่วยคุณได้:",
   "chat.upgradePrompt": "กรุณาอัปเกรดแผนของคุณเพื่อถามคำถามต่อไป",

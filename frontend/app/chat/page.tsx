@@ -32,6 +32,7 @@ import {
   ThumbDownIcon,
   CameraIcon,
   XMarkIcon,
+  StopIcon,
 } from "./utils/icons";
 import { HistoryMenu } from "./components/HistoryMenu";
 import { UserMenuButton } from "./components/UserMenuButton";
@@ -50,6 +51,7 @@ const ChatInput = React.memo(
     inputMessage,
     setInputMessage,
     onSendMessage,
+    onStopGeneration,
     isLoadingChat,
     clarificationState,
     isMobileDevice,
@@ -63,6 +65,7 @@ const ChatInput = React.memo(
     inputMessage: string;
     setInputMessage: (value: string) => void;
     onSendMessage: () => void;
+    onStopGeneration: () => void;
     isLoadingChat: boolean;
     clarificationState: any;
     isMobileDevice: boolean;
@@ -209,20 +212,24 @@ const ChatInput = React.memo(
             />
           </div>
 
-          {/* Send Button */}
+          {/* Send/Stop Button - Change dynamiquement selon l'état */}
           <button
-            onClick={handleButtonClick}
-            disabled={isLoadingChat || (!inputMessage.trim() && selectedImages.length === 0)}
-            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${isMobileDevice ? "mobile-send-button" : ""}`}
-            title={isLoadingChat ? t("chat.sending") : t("chat.send")}
-            aria-label={isLoadingChat ? t("chat.sending") : t("chat.send")}
+            onClick={isLoadingChat ? onStopGeneration : handleButtonClick}
+            disabled={!isLoadingChat && (!inputMessage.trim() && selectedImages.length === 0)}
+            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center ${
+              isLoadingChat
+                ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                : "text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:text-gray-300"
+            } transition-colors rounded-full ${isMobileDevice ? "mobile-send-button" : ""}`}
+            title={isLoadingChat ? t("chat.stop") || "Arrêter" : t("chat.send")}
+            aria-label={isLoadingChat ? t("chat.stop") || "Arrêter" : t("chat.send")}
             style={{
               minWidth: "48px",
               width: "48px",
               height: "48px",
             }}
           >
-            <PaperAirplaneIcon />
+            {isLoadingChat ? <StopIcon /> : <PaperAirplaneIcon />}
           </button>
 
           {/* Camera Button - Visible uniquement sur desktop */}
@@ -472,6 +479,9 @@ function ChatInterface() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  // ✅ NOUVEAU: AbortController pour annuler la requête en cours avec ESC
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const [clarificationState, setClarificationState] = useState<{
     messageId: string;
@@ -950,10 +960,6 @@ function ChatInterface() {
     }
   }, [isAuthenticated, user?.id]);
 
-
-
-
-
 	// FONCTION POUR CHAT (texte + images)
 	const handleSendMessage = useCallback(async () => {
 	  const safeText = inputMessage;
@@ -1002,6 +1008,10 @@ function ChatInterface() {
 	  // Variables pour le streaming
 	  let assistantId: string | null = null;
 	  let messageCreated = false;
+
+	  // ✅ NOUVEAU: Créer un AbortController pour permettre l'annulation avec ESC
+	  const abortController = new AbortController();
+	  abortControllerRef.current = abortController;
 
 	  try {
 		// 🔒 VÉRIFICATION QUOTA AVANT D'APPELER LE LLM
@@ -1053,7 +1063,7 @@ function ChatInterface() {
 
 		  const optimalLevel = undefined;
 
-		  // APPEL AVEC CALLBACKS DE STREAMING
+		  // APPEL AVEC CALLBACKS DE STREAMING + AbortSignal
 		  response = await generateAIResponse(
 			finalQuestionOrSafeText,
 			user,
@@ -1105,6 +1115,7 @@ function ChatInterface() {
 				}
 			  },
 			},
+			abortController.signal, // ✅ NOUVEAU: Signal d'annulation
 		  );
 		}
 
@@ -1193,6 +1204,12 @@ function ChatInterface() {
 		// ✅ FIN DE L'AJOUT
 
 	  } catch (error: any) {
+		// ✅ NOUVEAU: Gérer l'annulation de la requête (pas une vraie erreur)
+		if (error.name === "AbortError" || error.message?.includes("aborted")) {
+		  secureLog.log("[Chat] 🛑 Génération annulée par l'utilisateur");
+		  return; // Sortir silencieusement, pas besoin d'afficher d'erreur
+		}
+
 		secureLog.error(t("chat.sendError"), error);
 
 		// Gérer spécifiquement l'erreur de quota dépassé
@@ -1258,6 +1275,35 @@ function ChatInterface() {
 	  loadConversations,
 	]);
 
+  // ✅ NOUVEAU: Fonction pour arrêter la génération en cours
+  const handleStopGeneration = useCallback(() => {
+	if (!isMountedRef.current) return;
+
+	secureLog.log("[Chat] 🛑 Arrêt de la génération demandé par l'utilisateur");
+
+	// Annuler la requête en cours via AbortController
+	if (abortControllerRef.current) {
+	  abortControllerRef.current.abort();
+	  abortControllerRef.current = null;
+	}
+
+	// Réinitialiser l'état de chargement
+	setIsLoadingChat(false);
+  }, []);
+
+  // ✅ NOUVEAU: Écouter la touche ESC pour arrêter la génération
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Si ESC est pressé ET qu'une génération est en cours
+      if (event.key === "Escape" && isLoadingChat) {
+        event.preventDefault();
+        handleStopGeneration();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isLoadingChat, handleStopGeneration]);
 
   // Fonctions de feedback
   const handleFeedbackClick = useCallback(
@@ -1641,6 +1687,7 @@ function ChatInterface() {
                 inputMessage={inputMessage}
                 setInputMessage={setInputMessage}
                 onSendMessage={handleSendMessage}
+                onStopGeneration={handleStopGeneration}
                 isLoadingChat={isLoadingChat}
                 clarificationState={clarificationState}
                 isMobileDevice={isMobileDevice}

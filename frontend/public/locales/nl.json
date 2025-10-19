@@ -84,6 +84,7 @@
   "chat.sendError": "Fout verzenden bericht:",
   "chat.sending": "Verzenden...",
   "chat.sessionExpired": "Sessie verlopen",
+  "chat.stop": "Stop",
   "chat.startQuestion": "Begin met het stellen van een vraag",
   "chat.suggestedTopics": "Hier zijn enkele onderwerpen waarmee ik u kan helpen:",
   "chat.upgradePrompt": "Upgrade uw plan om meer vragen te stellen.",

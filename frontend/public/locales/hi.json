@@ -84,6 +84,7 @@
   "chat.sendError": "संदेश भेजने में त्रुटि:",
   "chat.sending": "भेजा जा रहा है...",
   "chat.sessionExpired": "सत्र समाप्त",
+  "chat.stop": "रोकें",
   "chat.startQuestion": "एक प्रश्न पूछकर शुरू करें",
   "chat.suggestedTopics": "यहां कुछ विषय हैं जिनमें मैं आपकी सहायता कर सकता हूं:",
   "chat.upgradePrompt": "कृपया प्रश्न पूछना जारी रखने के लिए अपनी योजना को अपग्रेड करें।",

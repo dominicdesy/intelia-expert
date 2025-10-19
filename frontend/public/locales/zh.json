@@ -84,6 +84,7 @@
   "chat.sendError": "发送消息错误:",
   "chat.sending": "发送中...",
   "chat.sessionExpired": "会话已过期",
+  "chat.stop": "停止",
   "chat.startQuestion": "从问问题开始",
   "chat.suggestedTopics": "以下是我可以帮助您的一些主题:",
   "chat.upgradePrompt": "请升级您的计划以继续提问。",

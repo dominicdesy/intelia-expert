@@ -84,6 +84,7 @@
   "chat.sendError": "Lỗi gửi tin nhắn:",
   "chat.sending": "Đang gửi...",
   "chat.sessionExpired": "Phiên đã hết hạn",
+  "chat.stop": "Dừng",
   "chat.startQuestion": "Bắt đầu bằng cách đặt câu hỏi",
   "chat.suggestedTopics": "Dưới đây là một số chủ đề tôi có thể giúp bạn:",
   "chat.upgradePrompt": "Vui lòng nâng cấp gói của bạn để tiếp tục đặt câu hỏi.",

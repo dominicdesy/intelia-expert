@@ -84,6 +84,7 @@
   "chat.sendError": "Nachricht senden Fehler:",
   "chat.sending": "Senden...",
   "chat.sessionExpired": "Sitzung abgelaufen",
+  "chat.stop": "Stoppen",
   "chat.startQuestion": "Beginnen Sie mit einer Frage",
   "chat.suggestedTopics": "Hier sind einige Themen, bei denen ich Ihnen helfen kann:",
   "chat.upgradePrompt": "Bitte aktualisieren Sie Ihren Plan, um weitere Fragen zu stellen.",
