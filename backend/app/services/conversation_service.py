@@ -2,15 +2,25 @@
 Service de gestion des conversations et messages
 
 Architecture: conversations + messages séparés
+Includes Chain-of-Thought parsing and storage for assistant messages
 """
 
 import logging
+import sys
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 from uuid import UUID, uuid4
 from datetime import datetime
 from psycopg2.extras import RealDictCursor
 
 from app.core.database import get_pg_connection
+
+# Add llm directory to path for CoT parser
+llm_path = Path(__file__).parent.parent.parent.parent / "llm"
+if str(llm_path) not in sys.path:
+    sys.path.insert(0, str(llm_path))
+
+from utils.cot_parser import parse_cot_response
 
 logger = logging.getLogger(__name__)
 
@@ -91,34 +101,62 @@ class ConversationService:
         """
         Ajoute un message à une conversation existante
 
+        For assistant messages: Parses Chain-of-Thought structure and saves
+        thinking/analysis to database for analytics while displaying only
+        the final answer to users.
+
         Args:
             conversation_id: UUID de la conversation
             role: 'user' ou 'assistant'
-            content: Contenu du message
+            content: Contenu du message (avec ou sans structure CoT)
 
         Returns:
             {
                 "message_id": UUID,
-                "sequence_number": int
+                "sequence_number": int,
+                "has_cot_structure": bool (for assistant messages)
             }
         """
         try:
+            # Parse CoT structure for assistant messages
+            cot_thinking = None
+            cot_analysis = None
+            has_cot_structure = False
+            final_content = content
+
+            if role == 'assistant':
+                parsed = parse_cot_response(content)
+                cot_thinking = parsed['thinking']
+                cot_analysis = parsed['analysis']
+                has_cot_structure = parsed['has_structure']
+                final_content = parsed['answer']  # Only save answer in content field
+
+                if has_cot_structure:
+                    logger.info(
+                        f"🧠 CoT detected in assistant message - "
+                        f"thinking: {len(cot_thinking or '')} chars, "
+                        f"analysis: {len(cot_analysis or '')} chars"
+                    )
+
             with get_pg_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Utiliser la fonction SQL helper
+                    # Utiliser la fonction SQL helper avec paramètres CoT
                     cur.execute(
                         """
                         SELECT add_message_to_conversation(
-                            %s::uuid, %s, %s, %s, %s, %s
+                            %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s
                         ) as message_id
                         """,
                         (
                             conversation_id,
                             role,
-                            content,
+                            final_content,  # Only answer for assistant, full content for user
                             response_source,
                             response_confidence,
-                            processing_time_ms
+                            processing_time_ms,
+                            cot_thinking,
+                            cot_analysis,
+                            has_cot_structure
                         )
                     )
 
@@ -139,12 +177,13 @@ class ConversationService:
 
                     logger.info(
                         f"Message ajouté: {message_id} "
-                        f"(conversation: {conversation_id}, sequence: {sequence})"
+                        f"(conversation: {conversation_id}, sequence: {sequence}, CoT: {has_cot_structure})"
                     )
 
                     return {
                         "message_id": str(message_id),
-                        "sequence_number": sequence
+                        "sequence_number": sequence,
+                        "has_cot_structure": has_cot_structure
                     }
 
         except Exception as e:
