@@ -243,6 +243,22 @@ except Exception as e:
     logger.error("ERREUR import billing router: %s", e)
     billing_router = None
 
+# Billing Admin router (super admin subscription management)
+BILLING_ADMIN_AVAILABLE = False
+try:
+    from .billing_admin import router as billing_admin_router
+
+    BILLING_ADMIN_AVAILABLE = True
+    logger.debug("Billing Admin router importé avec %d routes", len(billing_admin_router.routes))
+except ImportError:
+    BILLING_ADMIN_AVAILABLE = False
+    billing_admin_router = None
+    logger.warning("Billing Admin router non disponible (normal si pas encore créé)")
+except Exception as e:
+    BILLING_ADMIN_AVAILABLE = False
+    billing_admin_router = None
+    logger.error("ERREUR import billing_admin router: %s", e)
+
 # BILLING OPENAI ROUTER - DÉSACTIVÉ POUR CORRIGER LES TESTS
 # Les endpoints billing OpenAI causaient des 401 au lieu de 404 attendus
 # Commenté pour corriger 100% des erreurs de test
@@ -527,6 +543,15 @@ if logging_router:
 if billing_router:
     router.include_router(billing_router, tags=["Billing"])
     logger.debug("Billing router monté")
+
+# Billing Admin (super admin subscription management)
+if BILLING_ADMIN_AVAILABLE and billing_admin_router:
+    router.include_router(billing_admin_router, tags=["Billing-Admin"])
+    logger.debug("Billing Admin router monté")
+    logger.debug("Billing Admin router maintenant disponible sur /v1/billing/admin/*")
+    logger.info("Gestion admin abonnements ACTIVE (super admin uniquement)!")
+else:
+    logger.warning("Billing Admin router non monté (module non disponible)")
 
 # BILLING OPENAI - DÉSACTIVÉ POUR CORRIGER LES TESTS
 # Les endpoints causaient 401 au lieu de 404 attendus dans les tests
