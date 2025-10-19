@@ -717,6 +717,13 @@ export const generateAIResponse = async (
 
     return processedResponse;
   } catch (error) {
+    // ✅ NOUVEAU: Ne pas logger les AbortError (annulation volontaire par l'utilisateur)
+    if (error instanceof Error && error.name === "AbortError") {
+      secureLog.log("[apiService] 🛑 Génération annulée par l'utilisateur (ESC ou bouton Stop)");
+      throw error; // Re-throw pour gestion dans page.tsx
+    }
+
+    // Logger les vraies erreurs
     secureLog.error("[apiService] Erreur génération AI Agent:", error);
 
     // Gestion des erreurs avec messages appropriés
@@ -877,6 +884,12 @@ export const generateAIResponsePublic = async (
       },
     };
   } catch (error) {
+    // ✅ NOUVEAU: Ne pas logger les AbortError (annulation volontaire par l'utilisateur)
+    if (error instanceof Error && error.name === "AbortError") {
+      secureLog.log("[apiService] 🛑 Génération publique annulée par l'utilisateur");
+      throw error;
+    }
+
     secureLog.error("[apiService] Erreur génération AI publique Agent:", error);
     throw error;
   }
