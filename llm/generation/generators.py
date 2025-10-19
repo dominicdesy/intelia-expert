@@ -90,6 +90,134 @@ class EnhancedResponseGenerator:
         self.translator = LLMTranslator(cache_enabled=True)
         logger.info("✅ LLMTranslator initialized for response translation")
 
+    def _detect_poultry_type(self, query: str) -> str:
+        """
+        Détecte automatiquement le type de volaille (broiler ou layer) depuis la question
+
+        Args:
+            query: Question de l'utilisateur
+
+        Returns:
+            'broiler' ou 'layer' selon les mots-clés détectés
+        """
+        query_lower = query.lower()
+
+        # Mots-clés pour les poules pondeuses (layer)
+        layer_keywords = [
+            'pondeuse', 'layer', 'ponte', 'œuf', 'egg', 'laying',
+            'poedeira', 'gallina ponedora', 'eierlegen', 'uovo',
+            'production d\'œufs', 'egg production', 'isa brown',
+            'lohmann', 'hy-line', 'bovans'
+        ]
+
+        # Mots-clés pour poulets de chair (broiler)
+        broiler_keywords = [
+            'broiler', 'poulet de chair', 'chair', 'meat chicken',
+            'frango de corte', 'pollo de engorde', 'masthuhn',
+            'ross', 'cobb', 'aviagen', 'hubbard'
+        ]
+
+        # Détection layer (priorité si détectée)
+        if any(keyword in query_lower for keyword in layer_keywords):
+            logger.info(f"🐔 Poultry type detected: LAYER (pondeuse)")
+            return 'layer'
+
+        # Sinon, par défaut broiler
+        logger.info(f"🐔 Poultry type detected: BROILER (chair)")
+        return 'broiler'
+
+    def _build_poultry_system_prompt(self, poultry_type: str, language: str) -> str:
+        """
+        Construit un prompt système spécialisé pour broiler ou layer
+
+        Args:
+            poultry_type: 'broiler' ou 'layer'
+            language: Code langue (fr, en, etc.)
+
+        Returns:
+            Prompt système adapté au type de volaille
+        """
+        language_name = self.language_display_names.get(language, language.upper())
+
+        if poultry_type == 'layer':
+            return f"""Tu es un expert en production de poules pondeuses (layers).
+CRITIQUE: Réponds EXCLUSIVEMENT en {language_name} ({language}).
+
+🐔 EXPERTISE SPÉCIALISÉE - POULES PONDEUSES:
+- Production d'œufs et qualité de coquille
+- Paramètres de ponte (taux, poids, classement)
+- Nutrition spécifique layers (calcium, protéines)
+- Gestion de la photopériode et maturité sexuelle
+- Lignées commerciales: ISA Brown, Lohmann, Hy-Line, Bovans
+- Cycle de production 18-80 semaines
+
+MÉTRIQUES CLÉS LAYERS:
+- Taux de ponte (%), masse d'œufs (g)
+- Consommation alimentaire (g/jour/poule)
+- Ratio conversion alimentaire (kg aliment/kg œufs)
+- Mortalité et uniformité du troupeau
+"""
+        else:  # broiler
+            return f"""Tu es un expert en production de poulets de chair (broilers).
+CRITIQUE: Réponds EXCLUSIVEMENT en {language_name} ({language}).
+
+🐔 EXPERTISE SPÉCIALISÉE - POULETS DE CHAIR:
+- Croissance et gain de poids quotidien
+- Indice de conversion alimentaire (FCR/IC)
+- Paramètres d'ambiance et densité
+- Nutrition haute performance (protéines, énergie)
+- Lignées commerciales: Ross 308, Cobb 500, Aviagen, Hubbard
+- Cycle de production 35-56 jours
+
+MÉTRIQUES CLÉS BROILERS:
+- Poids vif (g) et GMQ (gain moyen quotidien)
+- Indice de consommation (IC/FCR)
+- Consommation alimentaire cumulée
+- Mortalité et homogénéité
+"""
+
+    def _add_cot_instruction(self, prompt: str, structured: bool = True) -> str:
+        """
+        Ajoute les instructions Chain-of-Thought au prompt
+
+        Args:
+            prompt: Prompt de base
+            structured: Si True, utilise CoT structuré XML (Phase 2), sinon CoT simple (Phase 1)
+
+        Returns:
+            Prompt enrichi avec instructions CoT
+        """
+        if structured:
+            # Phase 2: CoT structuré avec balises XML
+            cot_instruction = """
+
+🧠 CHAIN-OF-THOUGHT REASONING - STRUCTURE TA RÉPONSE:
+
+Structure ta réponse avec les balises XML suivantes pour montrer ton raisonnement:
+
+<thinking>
+[Ton raisonnement initial sur la question: que demande l'utilisateur? quelles informations sont pertinentes? quelle approche adopter?]
+</thinking>
+
+<analysis>
+[Ton analyse détaillée étape par étape: extraction des données du contexte, calculs si nécessaire, vérification de la cohérence, identification des informations clés]
+</analysis>
+
+<answer>
+[Ta réponse finale claire, concise et directe à la question de l'utilisateur - SANS les balises XML dans cette section]
+</answer>
+
+⚠️ IMPORTANT:
+- Les sections <thinking> et <analysis> permettent à l'utilisateur de voir ton raisonnement
+- La section <answer> contient la réponse finale formatée normalement (markdown, listes, etc.)
+- Chaque section doit être substantielle et informative
+"""
+        else:
+            # Phase 1: CoT simple
+            cot_instruction = "\n\n🧠 APPROCHE: Analyse cette question étape par étape avant de répondre."
+
+        return prompt + cot_instruction
+
     def _load_language_names(self) -> Dict[str, str]:
         """
         Charge les noms d'affichage des langues depuis languages.json
@@ -613,9 +741,16 @@ class EnhancedResponseGenerator:
             else:
                 logger.debug(f"❓ Context source unknown: {first_source}")
 
+        # 🐔 NOUVEAU: Détecter le type de volaille pour personnalisation
+        poultry_type = self._detect_poultry_type(query)
+
         # Construction du prompt système avec domaine spécialisé
         if self.prompts_manager:
             system_prompt_parts = []
+
+            # 🐔 NOUVEAU: Ajouter prompt spécialisé broiler/layer EN PREMIER
+            poultry_prompt = self._build_poultry_system_prompt(poultry_type, language)
+            system_prompt_parts.append(poultry_prompt)
 
             # ✅ Instructions de langue EN TÊTE (UNE SEULE FOIS)
             # 🌍 Generate response directly in target language (no post-translation)
@@ -834,7 +969,7 @@ MÉTRIQUES PRIORITAIRES:
         limited_context = conversation_context if conversation_context else ""
 
         # Prompt utilisateur simplifié
-        user_prompt = f"""CONTEXTE CONVERSATIONNEL:
+        user_prompt_base = f"""CONTEXTE CONVERSATIONNEL:
 {limited_context}
 
 INFORMATIONS TECHNIQUES DISPONIBLES:
@@ -849,6 +984,9 @@ QUESTION:
 {query}
 
 RÉPONSE EXPERTE (affirmative, structurée, sans mention de sources):"""
+
+        # 🧠 NOUVEAU: Ajouter instruction Chain-of-Thought (Phase 2 - Structured XML)
+        user_prompt = self._add_cot_instruction(user_prompt_base, structured=True)
 
         return system_prompt, user_prompt
 
