@@ -33,6 +33,7 @@ export default function CountryPricingManager({
   const [currencyValue, setCurrencyValue] = useState<string>("USD");
   const [editingTier, setEditingTier] = useState<string | null>(null);
   const [tierValue, setTierValue] = useState<number>(1);
+  const [showPlanMenu, setShowPlanMenu] = useState<string | null>(null);
 
   const availableCurrencies = ["CAD", "USD", "EUR"];
   const availablePlans = ["essential", "pro", "elite"];
@@ -40,6 +41,18 @@ export default function CountryPricingManager({
   useEffect(() => {
     fetchCountries();
   }, []);
+
+  // Close plan menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showPlanMenu) {
+        setShowPlanMenu(null);
+      }
+    };
+
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [showPlanMenu]);
 
   const fetchCountries = async () => {
     setIsLoading(true);
@@ -416,27 +429,41 @@ export default function CountryPricingManager({
                   {editingPrice?.startsWith(country.country_code) ||
                   editingTier === country.country_code ? null : (
                     <div className="flex items-center justify-end gap-2">
-                      <select
-                        onChange={(e) => {
-                          const planName = e.target.value;
-                          if (planName) {
-                            const pricing = country.plans[planName];
-                            const editKey = `${country.country_code}-${planName}`;
-                            setEditingPrice(editKey);
-                            setPriceValue(pricing?.display_price || 0);
-                            setCurrencyValue(pricing?.display_currency || "USD");
-                          }
-                        }}
-                        className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:border-blue-500 focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
-                        defaultValue=""
-                      >
-                        <option value="">✏️  Modifier...</option>
-                        {availablePlans.map((plan) => (
-                          <option key={plan} value={plan}>
-                            {plan.charAt(0).toUpperCase() + plan.slice(1)}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowPlanMenu(
+                              showPlanMenu === country.country_code
+                                ? null
+                                : country.country_code
+                            );
+                          }}
+                          className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:border-blue-500 focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white"
+                        >
+                          ✏️  Modifier...
+                        </button>
+                        {showPlanMenu === country.country_code && (
+                          <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-300 rounded-md shadow-lg z-10">
+                            {availablePlans.map((plan) => (
+                              <button
+                                key={plan}
+                                onClick={() => {
+                                  const pricing = country.plans[plan];
+                                  const editKey = `${country.country_code}-${plan}`;
+                                  setEditingPrice(editKey);
+                                  setPriceValue(pricing?.display_price || 0);
+                                  setCurrencyValue(pricing?.display_currency || "USD");
+                                  setShowPlanMenu(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 transition-colors"
+                              >
+                                {plan.charAt(0).toUpperCase() + plan.slice(1)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <button
                         onClick={() =>
                           handleDeleteCountry(
