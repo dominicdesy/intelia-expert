@@ -1268,6 +1268,16 @@ Style professionnel et structuré avec recommandations actionnables.""",
         #         response = response + disclaimer
         #         logger.info(f"🏥 Disclaimer vétérinaire ajouté (langue: {language})")
 
+        # DEBUG: Log response before CoT parsing
+        logger.debug(f"🔍 Response before CoT parsing (first 500 chars): {response[:500]}")
+        logger.debug(f"🔍 Response length: {len(response)} chars")
+
+        # Check for CoT tags presence
+        has_thinking = "<thinking>" in response.lower()
+        has_analysis = "<analysis>" in response.lower()
+        has_answer = "<answer>" in response.lower()
+        logger.debug(f"🔍 CoT tags present: thinking={has_thinking}, analysis={has_analysis}, answer={has_answer}")
+
         # Parse CoT structure to extract only the answer (remove thinking/analysis tags)
         parsed_response = parse_cot_response(response)
 
@@ -1282,6 +1292,7 @@ Style professionnel et structuré avec recommandations actionnables.""",
             return parsed_response["answer"]
 
         # No CoT structure found, return response as-is
+        logger.warning(f"⚠️ No CoT structure found despite prompt requesting it - returning full response")
         return response
 
 
