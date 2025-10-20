@@ -34,6 +34,7 @@ export default function CountryPricingManager({
   const [editingTier, setEditingTier] = useState<string | null>(null);
   const [tierValue, setTierValue] = useState<number>(1);
   const [showPlanMenu, setShowPlanMenu] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"name" | "tier">("name");
 
   const availableCurrencies = ["CAD", "USD", "EUR"];
   const availablePlans = ["essential", "pro", "elite"];
@@ -197,9 +198,17 @@ export default function CountryPricingManager({
     return acc;
   }, {} as Record<string, any>);
 
-  const countryEntries = Object.values(groupedByCountry).sort((a: any, b: any) =>
-    a.country_name.localeCompare(b.country_name)
-  );
+  const countryEntries = Object.values(groupedByCountry).sort((a: any, b: any) => {
+    if (sortBy === "tier") {
+      // Sort by tier first, then by name
+      if (a.tier_level !== b.tier_level) {
+        return a.tier_level - b.tier_level;
+      }
+      return a.country_name.localeCompare(b.country_name);
+    }
+    // Default: sort alphabetically by name
+    return a.country_name.localeCompare(b.country_name);
+  });
 
   if (isLoading) {
     return (
@@ -221,12 +230,36 @@ export default function CountryPricingManager({
               {countryEntries.length} pays configurés • Devises: CAD, USD, EUR
             </p>
           </div>
-          <button
-            onClick={fetchCountries}
-            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            🔄 Actualiser
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-white border border-gray-300 rounded-md overflow-hidden">
+              <button
+                onClick={() => setSortBy("name")}
+                className={`px-3 py-1.5 text-sm transition-colors ${
+                  sortBy === "name"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                A-Z
+              </button>
+              <button
+                onClick={() => setSortBy("tier")}
+                className={`px-3 py-1.5 text-sm transition-colors ${
+                  sortBy === "tier"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                Tier
+              </button>
+            </div>
+            <button
+              onClick={fetchCountries}
+              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              🔄 Actualiser
+            </button>
+          </div>
         </div>
 
         {/* Search */}
