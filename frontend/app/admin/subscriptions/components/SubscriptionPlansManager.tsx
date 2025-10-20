@@ -541,7 +541,6 @@ export default function SubscriptionPlansManager({
                 </p>
               </div>
             </div>
-          </div>
         </div>
       )}
     </div>
