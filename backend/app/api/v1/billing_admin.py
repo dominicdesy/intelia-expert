@@ -891,6 +891,62 @@ async def recalculate_all_prices(
 # ENDPOINTS: Currency Rates Management
 # ============================================================================
 
+@router.post("/currency-rates/update-cron")
+async def update_currency_rates_cron(request: Request):
+    """
+    Mise à jour des taux de change via CRON externe (cron-job.org)
+    Sécurisé par clé API au lieu de JWT
+
+    Header requis: X-Cron-Secret: <votre_cle_secrete>
+    """
+    # Vérifier la clé secrète
+    cron_secret = request.headers.get("X-Cron-Secret")
+    expected_secret = os.getenv("CRON_SECRET_KEY")
+
+    if not expected_secret:
+        logger.error("CRON_SECRET_KEY not configured in environment")
+        raise HTTPException(status_code=500, detail="CRON secret not configured")
+
+    if not cron_secret or cron_secret != expected_secret:
+        logger.warning(f"Invalid CRON secret attempt from {request.client.host}")
+        raise HTTPException(status_code=401, detail="Invalid CRON secret")
+
+    try:
+        from app.services.currency_rates_updater import CurrencyRatesUpdater
+
+        logger.info(f"Currency rates CRON update triggered from {request.client.host}")
+
+        # Use database connection
+        with get_db() as conn:
+            updater = CurrencyRatesUpdater(conn)
+            result = updater.update_all_rates()
+
+            if result["success"]:
+                logger.info(f"CRON update successful: {result['database_stats']['total']} currencies")
+
+                return {
+                    "success": True,
+                    "message": "Taux de change mis à jour avec succès",
+                    "rates_date": result["rates_date"],
+                    "currencies_fetched": result["currencies_fetched"],
+                    "updated": result["database_stats"]["updated"],
+                    "new": result["database_stats"]["new"],
+                    "failed": result["database_stats"]["failed"],
+                    "timestamp": result["timestamp"]
+                }
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=result.get("error", "Failed to update currency rates")
+                )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in CRON currency update: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/currency-rates/update")
 async def update_currency_rates(
     request: Request,
