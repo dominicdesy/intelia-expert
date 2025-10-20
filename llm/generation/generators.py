@@ -1214,7 +1214,26 @@ Style professionnel et structuré avec recommandations actionnables.""",
         """
         response = response.strip()
 
+        # 🧠 CRITICAL: Parse CoT structure BEFORE any text cleaning
+        # Text cleaning regex can break XML tags, so we extract the answer first
+        logger.debug(f"🔍 Raw response (first 500 chars): {response[:500]}")
+
+        parsed_response = parse_cot_response(response)
+
+        if parsed_response["has_structure"]:
+            logger.info(
+                f"🧠 CoT structure detected in generator - "
+                f"thinking: {len(parsed_response['thinking'] or '')} chars, "
+                f"analysis: {len(parsed_response['analysis'] or '')} chars, "
+                f"answer (before cleaning): {len(parsed_response['answer'])} chars"
+            )
+            # Extract the clean answer content (without XML tags)
+            response = parsed_response["answer"]
+        else:
+            logger.warning(f"⚠️ No CoT structure found despite prompt requesting it")
+
         # ✅ NETTOYAGE AMÉLIORÉ DU FORMATAGE
+        # Apply text cleaning to the extracted answer (or full response if no CoT)
 
         # 0. NEW: Supprimer les citations de sources (Source: ..., Link: ...)
         # Enlève "Source: Lean IJ et al. (2016)" et "Link: https://..." des réponses
@@ -1268,31 +1287,7 @@ Style professionnel et structuré avec recommandations actionnables.""",
         #         response = response + disclaimer
         #         logger.info(f"🏥 Disclaimer vétérinaire ajouté (langue: {language})")
 
-        # DEBUG: Log response before CoT parsing
-        logger.debug(f"🔍 Response before CoT parsing (first 500 chars): {response[:500]}")
-        logger.debug(f"🔍 Response length: {len(response)} chars")
-
-        # Check for CoT tags presence
-        has_thinking = "<thinking>" in response.lower()
-        has_analysis = "<analysis>" in response.lower()
-        has_answer = "<answer>" in response.lower()
-        logger.debug(f"🔍 CoT tags present: thinking={has_thinking}, analysis={has_analysis}, answer={has_answer}")
-
-        # Parse CoT structure to extract only the answer (remove thinking/analysis tags)
-        parsed_response = parse_cot_response(response)
-
-        if parsed_response["has_structure"]:
-            logger.info(
-                f"🧠 CoT structure detected in generator - "
-                f"thinking: {len(parsed_response['thinking'] or '')} chars, "
-                f"analysis: {len(parsed_response['analysis'] or '')} chars, "
-                f"answer: {len(parsed_response['answer'])} chars"
-            )
-            # Return only the clean answer without XML tags
-            return parsed_response["answer"]
-
-        # No CoT structure found, return response as-is
-        logger.warning(f"⚠️ No CoT structure found despite prompt requesting it - returning full response")
+        logger.debug(f"🔍 Final cleaned response length: {len(response)} chars")
         return response
 
 
