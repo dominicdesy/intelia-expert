@@ -65,17 +65,41 @@ class CotParser:
             logger.debug(f"🔍 Thinking found: {len(thinking)} chars")
         if analysis_match:
             logger.debug(f"🔍 Analysis found: {len(analysis)} chars")
-        if not answer_match:
-            logger.warning(f"⚠️ Answer tag NOT found in content! Content length: {len(content)}, first 200 chars: {content[:200]}")
-            logger.warning(f"⚠️ Last 200 chars: {content[-200:]}")
 
         if answer_match:
+            # Perfect case: all three tags present
             answer = answer_match.group(1).strip()
             has_structure = True
+            logger.debug(f"✅ Complete CoT structure with <answer> tag")
+        elif thinking_match or analysis_match:
+            # Fallback: thinking/analysis present but answer tag missing
+            # This happens when max_tokens is reached before </answer> can be generated
+            # Extract everything after </analysis> or </thinking> as the answer
+            logger.warning(f"⚠️ Answer tag NOT found, but thinking/analysis present - extracting content after tags")
+
+            # Find the last closing tag (</analysis> or </thinking>)
+            last_closing_analysis = content.rfind("</analysis>")
+            last_closing_thinking = content.rfind("</thinking>")
+
+            # Get position after the last closing tag
+            split_pos = max(last_closing_analysis, last_closing_thinking)
+
+            if split_pos > 0:
+                # Extract everything after the last closing tag
+                split_pos += len("</analysis>") if last_closing_analysis > last_closing_thinking else len("</thinking>")
+                answer = content[split_pos:].strip()
+                has_structure = True
+                logger.info(f"🔧 Extracted answer from content after tags: {len(answer)} chars")
+            else:
+                # Fallback: use full content
+                answer = content.strip()
+                has_structure = False
+                logger.warning(f"⚠️ Could not find closing tags, using full content")
         else:
-            # No CoT structure - use full content as answer
+            # No CoT structure at all - use full content as answer
             answer = content.strip()
             has_structure = False
+            logger.debug(f"No CoT tags found, using full content as answer")
 
         # Log CoT detection
         if has_structure:
