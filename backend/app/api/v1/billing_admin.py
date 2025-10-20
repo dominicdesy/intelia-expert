@@ -892,22 +892,21 @@ async def recalculate_all_prices(
 # ============================================================================
 
 @router.post("/currency-rates/update-cron")
-async def update_currency_rates_cron(request: Request):
+async def update_currency_rates_cron(request: Request, secret: str = None):
     """
     Mise à jour des taux de change via CRON externe (cron-job.org)
     Sécurisé par clé API au lieu de JWT
 
-    Header requis: X-Cron-Secret: <votre_cle_secrete>
+    URL: /currency-rates/update-cron?secret=<votre_cle_secrete>
     """
     # Vérifier la clé secrète
-    cron_secret = request.headers.get("X-Cron-Secret")
     expected_secret = os.getenv("CRON_SECRET_KEY")
 
     if not expected_secret:
         logger.error("CRON_SECRET_KEY not configured in environment")
         raise HTTPException(status_code=500, detail="CRON secret not configured")
 
-    if not cron_secret or cron_secret != expected_secret:
+    if not secret or secret != expected_secret:
         logger.warning(f"Invalid CRON secret attempt from {request.client.host}")
         raise HTTPException(status_code=401, detail="Invalid CRON secret")
 
