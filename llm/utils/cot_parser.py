@@ -88,6 +88,12 @@ class CotParser:
                 # Extract everything after the last closing tag
                 split_pos += len("</analysis>") if last_closing_analysis > last_closing_thinking else len("</thinking>")
                 answer = content[split_pos:].strip()
+
+                # Remove orphan opening <answer> tag if present (LLM ran out of tokens before </answer>)
+                if answer.lower().startswith("<answer>"):
+                    answer = answer[8:].strip()  # Remove "<answer>" (8 chars)
+                    logger.info(f"🔧 Removed orphan <answer> opening tag from extracted content")
+
                 has_structure = True
                 logger.info(f"🔧 Extracted answer from content after tags: {len(answer)} chars")
             else:
