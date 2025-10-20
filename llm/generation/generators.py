@@ -16,6 +16,7 @@ from utils.utilities import METRICS
 from .entity_manager import EntityEnrichmentBuilder
 from .models import ContextEnrichment
 from utils.llm_translator import LLMTranslator
+from utils.cot_parser import parse_cot_response
 
 # Import message handler for veterinary disclaimers
 try:
@@ -1267,6 +1268,20 @@ Style professionnel et structuré avec recommandations actionnables.""",
         #         response = response + disclaimer
         #         logger.info(f"🏥 Disclaimer vétérinaire ajouté (langue: {language})")
 
+        # Parse CoT structure to extract only the answer (remove thinking/analysis tags)
+        parsed_response = parse_cot_response(response)
+
+        if parsed_response["has_structure"]:
+            logger.info(
+                f"🧠 CoT structure detected in generator - "
+                f"thinking: {len(parsed_response['thinking'] or '')} chars, "
+                f"analysis: {len(parsed_response['analysis'] or '')} chars, "
+                f"answer: {len(parsed_response['answer'])} chars"
+            )
+            # Return only the clean answer without XML tags
+            return parsed_response["answer"]
+
+        # No CoT structure found, return response as-is
         return response
 
 
