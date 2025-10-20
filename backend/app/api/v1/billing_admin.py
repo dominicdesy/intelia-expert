@@ -906,8 +906,12 @@ async def update_currency_rates_cron(request: Request, secret: str = None):
         logger.error("CRON_SECRET_KEY not configured in environment")
         raise HTTPException(status_code=500, detail="CRON secret not configured")
 
-    if not secret or secret != expected_secret:
-        logger.warning(f"Invalid CRON secret attempt from {request.client.host}")
+    if not secret:
+        logger.warning(f"No secret provided from {request.client.host}")
+        raise HTTPException(status_code=401, detail="Missing secret parameter")
+
+    if secret != expected_secret:
+        logger.warning(f"Invalid CRON secret attempt from {request.client.host} - secret length: {len(secret)} vs expected: {len(expected_secret)}")
         raise HTTPException(status_code=401, detail="Invalid CRON secret")
 
     try:
