@@ -155,10 +155,11 @@ COMMENT ON FUNCTION suggest_billing_currency IS
 'Suggests billing currency based on country code. Covers 16 supported currencies (USD, EUR, CNY, INR, BRL, IDR, MXN, JPY, TRY, GBP, ZAR, THB, MYR, PHP, PLN, VND) with intelligent regional defaults.';
 
 -- ============================================================================
--- EXAMPLES
+-- EXAMPLES (Execute these manually AFTER the migration is complete)
 -- ============================================================================
 
 -- Test suggestions for all 16 supported currencies
+-- NOTE: Run these queries manually to validate the migration
 SELECT 'US' as country, suggest_billing_currency('US') as suggested_currency, 'Should be USD' as expected
 UNION ALL
 SELECT 'FR' as country, suggest_billing_currency('FR') as suggested_currency, 'Should be EUR' as expected
@@ -206,14 +207,25 @@ SELECT 'KR' as country, suggest_billing_currency('KR') as suggested_currency, 'S
 UNION ALL
 SELECT 'PK' as country, suggest_billing_currency('PK') as suggested_currency, 'Should be INR (Pakistan → regional)' as expected;
 
+-- ============================================================================
+-- VALIDATION QUERIES (Run these manually to check data)
+-- ============================================================================
+
 -- Check existing users without billing_currency
+-- NOTE: This query is commented out to prevent execution errors during migration
+-- Uncomment and run manually after migration is complete
+/*
 SELECT
     COUNT(*) as users_without_currency,
     COUNT(*) FILTER (WHERE plan_name != 'essential') as paid_users_without_currency
 FROM user_billing_info
 WHERE billing_currency IS NULL;
+*/
 
 -- Show distribution of billing currencies (after users select them)
+-- NOTE: This query is commented out to prevent execution errors during migration
+-- Uncomment and run manually after migration is complete
+/*
 SELECT
     billing_currency,
     COUNT(*) as user_count,
@@ -222,3 +234,4 @@ FROM user_billing_info
 WHERE billing_currency IS NOT NULL
 GROUP BY billing_currency
 ORDER BY user_count DESC;
+*/
