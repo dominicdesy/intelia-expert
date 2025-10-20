@@ -609,11 +609,49 @@ def my_billing_info(current_user: dict = Depends(get_current_user)) -> Dict[str,
 def change_user_plan(
     new_plan: str, current_user: dict = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    """Changement de plan de facturation"""
+    """
+    Changement de plan de facturation
+
+    Vérifie que l'utilisateur a choisi sa devise de facturation
+    avant de permettre l'upgrade vers un plan payant
+    """
 
     user_email = current_user.get("email")
     if not user_email:
         raise HTTPException(status_code=400, detail="User email not found")
+
+    # Si upgrade vers un plan payant, vérifier que la devise est définie
+    if new_plan != "essential":
+        try:
+            with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute("""
+                        SELECT billing_currency
+                        FROM user_billing_info
+                        WHERE user_email = %s
+                    """, (user_email,))
+
+                    result = cur.fetchone()
+                    billing_currency = result["billing_currency"] if result else None
+
+                    if not billing_currency:
+                        raise HTTPException(
+                            status_code=400,
+                            detail={
+                                "error": "billing_currency_required",
+                                "message": "Please select your billing currency before upgrading to a paid plan",
+                                "action_required": "set_billing_currency",
+                                "available_currencies": ["USD", "EUR", "CAD"]
+                            }
+                        )
+
+                    logger.info(f"Billing currency verified for {user_email}: {billing_currency}")
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error checking billing currency: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     billing = get_billing_manager()
     return billing.change_user_plan(user_email, new_plan)
@@ -636,7 +674,7 @@ def generate_invoice(
 
 
 @router.get("/plans")
-def available_plans(request: Request, country: str = None) -> Dict[str, Any]:
+def available_plans(request: Request, country: str = None, current_user: dict = None) -> Dict[str, Any]:
     """
     Liste des plans disponibles avec prix localisés - ENDPOINT PUBLIC
 
@@ -646,10 +684,46 @@ def available_plans(request: Request, country: str = None) -> Dict[str, Any]:
     Args:
         request: FastAPI Request object (pour extraire l'IP)
         country: Code pays optionnel (2 lettres) pour forcer un pays spécifique
+        current_user: Utilisateur connecté (optionnel)
 
     Returns:
         Plans avec prix localisés selon le pays détecté
+        + billing_currency si utilisateur connecté
     """
+
+    # Essayer de récupérer l'utilisateur connecté (optionnel)
+    user_billing_currency = None
+    try:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            from fastapi.security import HTTPAuthorizationCredentials
+            credentials = HTTPAuthorizationCredentials(
+                scheme="Bearer",
+                credentials=auth_header.replace("Bearer ", "")
+            )
+            from app.api.v1.auth import get_current_user
+            import asyncio
+            current_user = asyncio.run(get_current_user(credentials))
+
+            # Si l'utilisateur est authentifié, récupérer sa devise de facturation
+            if current_user:
+                try:
+                    with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+                        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                            cur.execute("""
+                                SELECT billing_currency
+                                FROM user_billing_info
+                                WHERE user_email = %s
+                            """, (current_user.get("email"),))
+                            billing_row = cur.fetchone()
+                            if billing_row:
+                                user_billing_currency = billing_row.get("billing_currency")
+                                logger.debug(f"User {current_user.get('email')} billing_currency: {user_billing_currency}")
+                except Exception as e:
+                    logger.warning(f"Could not fetch billing_currency for user: {e}")
+    except:
+        # Pas grave si l'auth échoue, endpoint reste public
+        current_user = None
 
     # Étape 1: Déterminer le pays
     detected_country = None
@@ -759,7 +833,7 @@ def available_plans(request: Request, country: str = None) -> Dict[str, Any]:
 
                 logger.info(f"Returning {len(plans)} plans for {detected_country} ({country_name}) in {currency}")
 
-                return {
+                response_data = {
                     "plans": plans,
                     "currency": currency,
                     "currency_symbol": currency_symbol,
@@ -769,6 +843,17 @@ def available_plans(request: Request, country: str = None) -> Dict[str, Any]:
                     "public": True,
                     "description": f"Plans de facturation pour {country_name}",
                 }
+
+                # Ajouter billing_currency si utilisateur authentifié
+                if user_billing_currency:
+                    response_data["billing_currency"] = user_billing_currency
+                    response_data["billing_currency_set"] = True
+                elif current_user:
+                    # Utilisateur connecté mais pas de billing_currency définie
+                    response_data["billing_currency"] = None
+                    response_data["billing_currency_set"] = False
+
+                return response_data
 
     except Exception as e:
         logger.error(f"Error fetching localized plans: {e}")
@@ -785,6 +870,120 @@ def available_plans(request: Request, country: str = None) -> Dict[str, Any]:
             "description": "Plans de facturation (fallback)",
             "error": str(e)
         }
+
+
+@router.get("/currency-preference")
+async def get_currency_preference(
+    current_user: dict = Depends(get_current_user),
+    request: Request = None
+) -> Dict[str, Any]:
+    """
+    Récupère la devise de facturation choisie par l'utilisateur
+    Avec suggestion intelligente selon le pays détecté
+    """
+    user_email = current_user.get("email")
+
+    try:
+        with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Récupérer la devise actuelle
+                cur.execute("""
+                    SELECT billing_currency
+                    FROM user_billing_info
+                    WHERE user_email = %s
+                """, (user_email,))
+
+                result = cur.fetchone()
+                current_currency = result["billing_currency"] if result else None
+
+                # Détection du pays pour suggestion
+                client_ip = GeoLocationService.get_client_ip(request) if request else None
+                geo_info = GeoLocationService.get_country_from_ip(client_ip) if client_ip else None
+                detected_country = geo_info["country_code"] if geo_info else "US"
+
+                # Suggestion basée sur le pays
+                cur.execute("""
+                    SELECT suggest_billing_currency(%s) as suggested_currency
+                """, (detected_country,))
+
+                suggestion = cur.fetchone()
+                suggested_currency = suggestion["suggested_currency"]
+
+                return {
+                    "billing_currency": current_currency,
+                    "is_set": current_currency is not None,
+                    "suggested_currency": suggested_currency,
+                    "detected_country": detected_country,
+                    "available_currencies": ["USD", "EUR", "CAD"],
+                    "currency_names": {
+                        "USD": "US Dollar ($)",
+                        "EUR": "Euro (€)",
+                        "CAD": "Canadian Dollar (CA$)"
+                    }
+                }
+
+    except Exception as e:
+        logger.error(f"Error fetching currency preference: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/set-currency")
+async def set_currency_preference(
+    currency: str,
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Définit la devise de facturation préférée de l'utilisateur
+
+    Args:
+        currency: Code devise (USD, EUR, ou CAD)
+    """
+    user_email = current_user.get("email")
+
+    # Validation
+    if currency not in ["USD", "EUR", "CAD"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid currency. Must be USD, EUR, or CAD. Got: {currency}"
+        )
+
+    try:
+        with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Mettre à jour la devise
+                cur.execute("""
+                    UPDATE user_billing_info
+                    SET billing_currency = %s
+                    WHERE user_email = %s
+                    RETURNING billing_currency
+                """, (currency, user_email))
+
+                result = cur.fetchone()
+
+                # Si l'utilisateur n'existe pas encore dans user_billing_info
+                if not result:
+                    cur.execute("""
+                        INSERT INTO user_billing_info (user_email, plan_name, billing_currency)
+                        VALUES (%s, 'essential', %s)
+                        ON CONFLICT (user_email) DO UPDATE
+                        SET billing_currency = EXCLUDED.billing_currency
+                        RETURNING billing_currency
+                    """, (user_email, currency))
+                    result = cur.fetchone()
+
+                conn.commit()
+
+                logger.info(f"Billing currency set for {user_email}: {currency}")
+
+                return {
+                    "success": True,
+                    "billing_currency": currency,
+                    "message": f"Billing currency set to {currency}"
+                }
+
+    except Exception as e:
+        logger.error(f"Error setting currency preference: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/admin")
