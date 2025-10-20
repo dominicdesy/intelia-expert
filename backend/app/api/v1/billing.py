@@ -23,6 +23,45 @@ from app.services.geo_location import GeoLocationService
 router = APIRouter(prefix="/billing", tags=["billing"])
 logger = logging.getLogger(__name__)
 
+# Supported billing currencies (16 currencies covering 87-90% of global poultry production)
+SUPPORTED_BILLING_CURRENCIES = [
+    "USD",  # United States
+    "EUR",  # Eurozone (France, Germany, Spain, Italy, Netherlands, etc.)
+    "CNY",  # China
+    "INR",  # India
+    "BRL",  # Brazil
+    "IDR",  # Indonesia
+    "MXN",  # Mexico
+    "JPY",  # Japan
+    "TRY",  # Turkey
+    "GBP",  # United Kingdom
+    "ZAR",  # South Africa
+    "THB",  # Thailand
+    "MYR",  # Malaysia
+    "PHP",  # Philippines
+    "PLN",  # Poland
+    "VND",  # Vietnam
+]
+
+CURRENCY_NAMES = {
+    "USD": "US Dollar ($)",
+    "EUR": "Euro (€)",
+    "CNY": "Chinese Yuan (¥)",
+    "INR": "Indian Rupee (₹)",
+    "BRL": "Brazilian Real (R$)",
+    "IDR": "Indonesian Rupiah (Rp)",
+    "MXN": "Mexican Peso (MX$)",
+    "JPY": "Japanese Yen (¥)",
+    "TRY": "Turkish Lira (₺)",
+    "GBP": "British Pound (£)",
+    "ZAR": "South African Rand (R)",
+    "THB": "Thai Baht (฿)",
+    "MYR": "Malaysian Ringgit (RM)",
+    "PHP": "Philippine Peso (₱)",
+    "PLN": "Polish Zloty (zł)",
+    "VND": "Vietnamese Dong (₫)",
+}
+
 
 class PlanType(str, Enum):
     ESSENTIAL = "essential"
@@ -641,7 +680,7 @@ def change_user_plan(
                                 "error": "billing_currency_required",
                                 "message": "Please select your billing currency before upgrading to a paid plan",
                                 "action_required": "set_billing_currency",
-                                "available_currencies": ["USD", "EUR", "CAD"]
+                                "available_currencies": SUPPORTED_BILLING_CURRENCIES
                             }
                         )
 
@@ -914,12 +953,8 @@ async def get_currency_preference(
                     "is_set": current_currency is not None,
                     "suggested_currency": suggested_currency,
                     "detected_country": detected_country,
-                    "available_currencies": ["USD", "EUR", "CAD"],
-                    "currency_names": {
-                        "USD": "US Dollar ($)",
-                        "EUR": "Euro (€)",
-                        "CAD": "Canadian Dollar (CA$)"
-                    }
+                    "available_currencies": SUPPORTED_BILLING_CURRENCIES,
+                    "currency_names": CURRENCY_NAMES
                 }
 
     except Exception as e:
@@ -941,10 +976,10 @@ async def set_currency_preference(
     user_email = current_user.get("email")
 
     # Validation
-    if currency not in ["USD", "EUR", "CAD"]:
+    if currency not in SUPPORTED_BILLING_CURRENCIES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid currency. Must be USD, EUR, or CAD. Got: {currency}"
+            detail=f"Invalid currency. Must be one of: {', '.join(SUPPORTED_BILLING_CURRENCIES)}. Got: {currency}"
         )
 
     try:
