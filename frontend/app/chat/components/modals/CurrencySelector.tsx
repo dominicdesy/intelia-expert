@@ -30,9 +30,29 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
 
   const fetchCurrencyPreference = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      if (!token) return;
+      // Try multiple token sources
+      let token = localStorage.getItem("access_token");
 
+      if (!token) {
+        const authData = localStorage.getItem("intelia-expert-auth");
+        if (authData) {
+          try {
+            const parsed = JSON.parse(authData);
+            token = parsed.access_token;
+            console.log("[CurrencySelector] Token found in intelia-expert-auth");
+          } catch (e) {
+            console.error("[CurrencySelector] Error parsing auth data:", e);
+          }
+        }
+      }
+
+      if (!token) {
+        console.error("[CurrencySelector] No token found");
+        setIsLoading(false);
+        return;
+      }
+
+      console.log("[CurrencySelector] Fetching currency preference...");
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v1/billing/currency-preference`,
         {
@@ -42,9 +62,15 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
         }
       );
 
+      console.log("[CurrencySelector] Response status:", response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log("[CurrencySelector] Currency data received:", data);
         setCurrencyInfo(data);
+      } else {
+        const errorText = await response.text();
+        console.error("[CurrencySelector] API error:", response.status, errorText);
       }
     } catch (error) {
       console.error("[CurrencySelector] Error fetching currency:", error);
@@ -121,7 +147,35 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
     );
   }
 
-  if (!currencyInfo) return null;
+  if (!currencyInfo) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div className="flex items-center">
+          <svg
+            className="w-5 h-5 text-red-600 mr-3"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
+          </svg>
+          <div>
+            <p className="text-sm font-medium text-red-900">
+              Erreur de chargement des devises
+            </p>
+            <p className="text-xs text-red-700 mt-1">
+              Vérifiez la console (F12) pour plus de détails
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const currentCurrency = currencyInfo.billing_currency || currencyInfo.suggested_currency;
   const currentCurrencyName = currencyInfo.currency_names[currentCurrency];
