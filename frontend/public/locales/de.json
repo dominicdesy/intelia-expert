@@ -808,5 +808,15 @@
   "verification.supportQuestion": "Problem mit der Verifizierung?",
   "verification.supportSubject": "Problem E-Mail-Verifizierung",
   "verification.title": "E-Mail-Verifizierung",
-  "verification.verifying": "Verifizieren..."
+  "verification.verifying": "Verifizieren...",
+  "billing.billingCurrency": "Abrechnungswährung",
+  "billing.current": "Aktuell",
+  "billing.suggested": "Vorgeschlagen",
+  "billing.notSetYet": "Noch nicht festgelegt",
+  "billing.currencyRequiredForUpgrade": "Sie müssen eine Abrechnungswährung auswählen, bevor Sie auf einen kostenpflichtigen Plan upgraden",
+  "billing.changeCurrency": "Ändern",
+  "billing.selectCurrency": "Wählen Sie Ihre Abrechnungswährung",
+  "billing.loadingCurrency": "Lade Währungsinformationen...",
+  "billing.currencyUpdated": "Abrechnungswährung erfolgreich aktualisiert",
+  "billing.currencyUpdateFailed": "Fehler beim Aktualisieren der Abrechnungswährung"
 }

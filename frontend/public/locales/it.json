@@ -808,5 +808,15 @@
   "verification.supportQuestion": "Problema con la verifica?",
   "verification.supportSubject": "Problema verifica email",
   "verification.title": "Verifica Email",
-  "verification.verifying": "Verifica in corso..."
+  "verification.verifying": "Verifica in corso...",
+  "billing.billingCurrency": "Valuta di fatturazione",
+  "billing.current": "Attuale",
+  "billing.suggested": "Suggerita",
+  "billing.notSetYet": "Non ancora impostata",
+  "billing.currencyRequiredForUpgrade": "È necessario selezionare una valuta di fatturazione prima di passare a un piano a pagamento",
+  "billing.changeCurrency": "Cambia",
+  "billing.selectCurrency": "Seleziona la tua valuta di fatturazione",
+  "billing.loadingCurrency": "Caricamento informazioni valuta...",
+  "billing.currencyUpdated": "Valuta di fatturazione aggiornata con successo",
+  "billing.currencyUpdateFailed": "Impossibile aggiornare la valuta di fatturazione"
 }

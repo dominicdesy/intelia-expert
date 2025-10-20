@@ -808,5 +808,15 @@
   "verification.supportQuestion": "มีปัญหากับการตรวจสอบ?",
   "verification.supportSubject": "ปัญหาการตรวจสอบอีเมล",
   "verification.title": "การตรวจสอบอีเมล",
-  "verification.verifying": "กำลังตรวจสอบ..."
+  "verification.verifying": "กำลังตรวจสอบ...",
+  "billing.billingCurrency": "สกุลเงินสำหรับการเรียกเก็บเงิน",
+  "billing.current": "ปัจจุบัน",
+  "billing.suggested": "แนะนำ",
+  "billing.notSetYet": "ยังไม่ได้ตั้งค่า",
+  "billing.currencyRequiredForUpgrade": "คุณต้องเลือกสกุลเงินสำหรับการเรียกเก็บเงินก่อนอัปเกรดเป็นแผนแบบชำระเงิน",
+  "billing.changeCurrency": "เปลี่ยน",
+  "billing.selectCurrency": "เลือกสกุลเงินสำหรับการเรียกเก็บเงินของคุณ",
+  "billing.loadingCurrency": "กำลังโหลดข้อมูลสกุลเงิน...",
+  "billing.currencyUpdated": "อัปเดตสกุลเงินสำหรับการเรียกเก็บเงินสำเร็จ",
+  "billing.currencyUpdateFailed": "ไม่สามารถอัปเดตสกุลเงินสำหรับการเรียกเก็บเงิน"
 }

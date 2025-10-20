@@ -808,5 +808,15 @@
   "verification.supportQuestion": "مشكلة في التحقق؟",
   "verification.supportSubject": "مشكلة في التحقق من البريد الإلكتروني",
   "verification.title": "التحقق من البريد الإلكتروني",
-  "verification.verifying": "جاري التحقق..."
+  "verification.verifying": "جاري التحقق...",
+  "billing.billingCurrency": "عملة الفواتير",
+  "billing.current": "الحالية",
+  "billing.suggested": "مقترحة",
+  "billing.notSetYet": "لم يتم تعيينها بعد",
+  "billing.currencyRequiredForUpgrade": "يجب عليك تحديد عملة الفواتير قبل الترقية إلى خطة مدفوعة",
+  "billing.changeCurrency": "تغيير",
+  "billing.selectCurrency": "حدد عملة الفواتير الخاصة بك",
+  "billing.loadingCurrency": "جارٍ تحميل معلومات العملة...",
+  "billing.currencyUpdated": "تم تحديث عملة الفواتير بنجاح",
+  "billing.currencyUpdateFailed": "فشل تحديث عملة الفواتير"
 }

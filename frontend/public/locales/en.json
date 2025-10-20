@@ -808,5 +808,15 @@
   "chat.cot.hideReasoning": "Hide reasoning",
   "chat.cot.thinking": "Thinking",
   "chat.cot.analysis": "Analysis",
-  "chat.cot.answer": "Answer"
+  "chat.cot.answer": "Answer",
+  "billing.billingCurrency": "Billing Currency",
+  "billing.current": "Current",
+  "billing.suggested": "Suggested",
+  "billing.notSetYet": "Not set yet",
+  "billing.currencyRequiredForUpgrade": "You must select a billing currency before upgrading to a paid plan",
+  "billing.changeCurrency": "Change",
+  "billing.selectCurrency": "Select your billing currency",
+  "billing.loadingCurrency": "Loading currency information...",
+  "billing.currencyUpdated": "Billing currency updated successfully",
+  "billing.currencyUpdateFailed": "Failed to update billing currency"
 }

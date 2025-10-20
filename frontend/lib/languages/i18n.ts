@@ -421,6 +421,20 @@ export interface TranslationKeys {
   "subscription.featuresIncluded": string;
 
   // ===========================================
+  // BILLING & CURRENCY
+  // ===========================================
+  "billing.billingCurrency": string;
+  "billing.current": string;
+  "billing.suggested": string;
+  "billing.notSetYet": string;
+  "billing.currencyRequiredForUpgrade": string;
+  "billing.changeCurrency": string;
+  "billing.selectCurrency": string;
+  "billing.loadingCurrency": string;
+  "billing.currencyUpdated": string;
+  "billing.currencyUpdateFailed": string;
+
+  // ===========================================
   // CONTACT & SUPPORT
   // ===========================================
   "contact.title": string;

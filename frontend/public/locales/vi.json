@@ -808,5 +808,15 @@
   "verification.supportQuestion": "Gặp vấn đề với xác thực?",
   "verification.supportSubject": "Vấn đề xác thực email",
   "verification.title": "Xác thực Email",
-  "verification.verifying": "Đang xác thực..."
+  "verification.verifying": "Đang xác thực...",
+  "billing.billingCurrency": "Tiền tệ thanh toán",
+  "billing.current": "Hiện tại",
+  "billing.suggested": "Được đề xuất",
+  "billing.notSetYet": "Chưa được thiết lập",
+  "billing.currencyRequiredForUpgrade": "Bạn phải chọn tiền tệ thanh toán trước khi nâng cấp lên gói trả phí",
+  "billing.changeCurrency": "Thay đổi",
+  "billing.selectCurrency": "Chọn tiền tệ thanh toán của bạn",
+  "billing.loadingCurrency": "Đang tải thông tin tiền tệ...",
+  "billing.currencyUpdated": "Đã cập nhật tiền tệ thanh toán thành công",
+  "billing.currencyUpdateFailed": "Không thể cập nhật tiền tệ thanh toán"
 }

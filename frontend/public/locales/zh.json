@@ -808,5 +808,15 @@
   "verification.supportQuestion": "验证有问题？",
   "verification.supportSubject": "邮箱验证问题",
   "verification.title": "邮箱验证",
-  "verification.verifying": "验证中..."
+  "verification.verifying": "验证中...",
+  "billing.billingCurrency": "计费货币",
+  "billing.current": "当前",
+  "billing.suggested": "建议",
+  "billing.notSetYet": "尚未设置",
+  "billing.currencyRequiredForUpgrade": "在升级到付费计划之前，您必须选择计费货币",
+  "billing.changeCurrency": "更改",
+  "billing.selectCurrency": "选择您的计费货币",
+  "billing.loadingCurrency": "正在加载货币信息...",
+  "billing.currencyUpdated": "计费货币更新成功",
+  "billing.currencyUpdateFailed": "计费货币更新失败"
 }

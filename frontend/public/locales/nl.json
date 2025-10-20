@@ -808,5 +808,15 @@
   "verification.supportQuestion": "Probleem met de verificatie?",
   "verification.supportSubject": "E-mail verificatie probleem",
   "verification.title": "E-mail Verificatie",
-  "verification.verifying": "Verificatie bezig..."
+  "verification.verifying": "Verificatie bezig...",
+  "billing.billingCurrency": "Factureringsvaluta",
+  "billing.current": "Huidige",
+  "billing.suggested": "Voorgesteld",
+  "billing.notSetYet": "Nog niet ingesteld",
+  "billing.currencyRequiredForUpgrade": "U moet een factureringsvaluta selecteren voordat u naar een betaald abonnement kunt upgraden",
+  "billing.changeCurrency": "Wijzigen",
+  "billing.selectCurrency": "Selecteer uw factureringsvaluta",
+  "billing.loadingCurrency": "Valuta-informatie laden...",
+  "billing.currencyUpdated": "Factureringsvaluta succesvol bijgewerkt",
+  "billing.currencyUpdateFailed": "Kan factureringsvaluta niet bijwerken"
 }

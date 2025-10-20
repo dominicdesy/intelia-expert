@@ -808,5 +808,15 @@
   "verification.supportQuestion": "Doğrulama ile ilgili sorun mu var?",
   "verification.supportSubject": "E-posta doğrulama sorunu",
   "verification.title": "E-posta Doğrulama",
-  "verification.verifying": "Doğrulanıyor..."
+  "verification.verifying": "Doğrulanıyor...",
+  "billing.billingCurrency": "Faturalama para birimi",
+  "billing.current": "Mevcut",
+  "billing.suggested": "Önerilen",
+  "billing.notSetYet": "Henüz ayarlanmadı",
+  "billing.currencyRequiredForUpgrade": "Ücretli bir plana yükseltmeden önce bir faturalama para birimi seçmelisiniz",
+  "billing.changeCurrency": "Değiştir",
+  "billing.selectCurrency": "Faturalama para biriminizi seçin",
+  "billing.loadingCurrency": "Para birimi bilgileri yükleniyor...",
+  "billing.currencyUpdated": "Faturalama para birimi başarıyla güncellendi",
+  "billing.currencyUpdateFailed": "Faturalama para birimi güncellenemedi"
 }

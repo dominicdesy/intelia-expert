@@ -808,5 +808,15 @@
   "verification.supportQuestion": "確認に問題がありますか?",
   "verification.supportSubject": "メール確認の問題",
   "verification.title": "メール確認",
-  "verification.verifying": "確認中..."
+  "verification.verifying": "確認中...",
+  "billing.billingCurrency": "請求通貨",
+  "billing.current": "現在",
+  "billing.suggested": "推奨",
+  "billing.notSetYet": "未設定",
+  "billing.currencyRequiredForUpgrade": "有料プランにアップグレードする前に請求通貨を選択する必要があります",
+  "billing.changeCurrency": "変更",
+  "billing.selectCurrency": "請求通貨を選択してください",
+  "billing.loadingCurrency": "通貨情報を読み込んでいます...",
+  "billing.currencyUpdated": "請求通貨が正常に更新されました",
+  "billing.currencyUpdateFailed": "請求通貨の更新に失敗しました"
 }

@@ -808,5 +808,15 @@
   "verification.supportQuestion": "सत्यापन में समस्या?",
   "verification.supportSubject": "ईमेल सत्यापन समस्या",
   "verification.title": "ईमेल सत्यापन",
-  "verification.verifying": "सत्यापित किया जा रहा है..."
+  "verification.verifying": "सत्यापित किया जा रहा है...",
+  "billing.billingCurrency": "बिलिंग मुद्रा",
+  "billing.current": "वर्तमान",
+  "billing.suggested": "सुझाया गया",
+  "billing.notSetYet": "अभी तक सेट नहीं किया गया",
+  "billing.currencyRequiredForUpgrade": "भुगतान योजना में अपग्रेड करने से पहले आपको बिलिंग मुद्रा का चयन करना होगा",
+  "billing.changeCurrency": "बदलें",
+  "billing.selectCurrency": "अपनी बिलिंग मुद्रा चुनें",
+  "billing.loadingCurrency": "मुद्रा जानकारी लोड हो रही है...",
+  "billing.currencyUpdated": "बिलिंग मुद्रा सफलतापूर्वक अपडेट की गई",
+  "billing.currencyUpdateFailed": "बिलिंग मुद्रा अपडेट करने में विफल"
 }

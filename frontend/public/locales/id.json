@@ -808,5 +808,15 @@
   "verification.supportQuestion": "Masalah dengan verifikasi?",
   "verification.supportSubject": "Masalah verifikasi email",
   "verification.title": "Verifikasi Email",
-  "verification.verifying": "Memverifikasi..."
+  "verification.verifying": "Memverifikasi...",
+  "billing.billingCurrency": "Mata uang penagihan",
+  "billing.current": "Saat ini",
+  "billing.suggested": "Disarankan",
+  "billing.notSetYet": "Belum diatur",
+  "billing.currencyRequiredForUpgrade": "Anda harus memilih mata uang penagihan sebelum meningkatkan ke paket berbayar",
+  "billing.changeCurrency": "Ubah",
+  "billing.selectCurrency": "Pilih mata uang penagihan Anda",
+  "billing.loadingCurrency": "Memuat informasi mata uang...",
+  "billing.currencyUpdated": "Mata uang penagihan berhasil diperbarui",
+  "billing.currencyUpdateFailed": "Gagal memperbarui mata uang penagihan"
 }

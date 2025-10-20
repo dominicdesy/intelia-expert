@@ -808,5 +808,15 @@
   "verification.supportQuestion": "Problem z weryfikacją?",
   "verification.supportSubject": "Problem weryfikacji email",
   "verification.title": "Weryfikacja Email",
-  "verification.verifying": "Weryfikowanie..."
+  "verification.verifying": "Weryfikowanie...",
+  "billing.billingCurrency": "Waluta rozliczeniowa",
+  "billing.current": "Aktualna",
+  "billing.suggested": "Sugerowana",
+  "billing.notSetYet": "Jeszcze nie ustawiona",
+  "billing.currencyRequiredForUpgrade": "Musisz wybrać walutę rozliczeniową przed przejściem na plan płatny",
+  "billing.changeCurrency": "Zmień",
+  "billing.selectCurrency": "Wybierz swoją walutę rozliczeniową",
+  "billing.loadingCurrency": "Ładowanie informacji o walucie...",
+  "billing.currencyUpdated": "Waluta rozliczeniowa została pomyślnie zaktualizowana",
+  "billing.currencyUpdateFailed": "Nie udało się zaktualizować waluty rozliczeniowej"
 }
