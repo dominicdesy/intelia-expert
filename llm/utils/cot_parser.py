@@ -59,6 +59,16 @@ class CotParser:
             r"<answer>(.*?)</answer>", content, re.DOTALL | re.IGNORECASE
         )
 
+        # DEBUG: Log what was found
+        logger.debug(f"🔍 Regex matches - thinking: {thinking_match is not None}, analysis: {analysis_match is not None}, answer: {answer_match is not None}")
+        if thinking_match:
+            logger.debug(f"🔍 Thinking found: {len(thinking)} chars")
+        if analysis_match:
+            logger.debug(f"🔍 Analysis found: {len(analysis)} chars")
+        if not answer_match:
+            logger.warning(f"⚠️ Answer tag NOT found in content! Content length: {len(content)}, first 200 chars: {content[:200]}")
+            logger.warning(f"⚠️ Last 200 chars: {content[-200:]}")
+
         if answer_match:
             answer = answer_match.group(1).strip()
             has_structure = True
