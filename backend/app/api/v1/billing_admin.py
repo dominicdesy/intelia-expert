@@ -885,3 +885,99 @@ async def recalculate_all_prices(
     except Exception as e:
         logger.error(f"Error recalculate prices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ENDPOINTS: Currency Rates Management
+# ============================================================================
+
+@router.post("/currency-rates/update")
+async def update_currency_rates(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Mise à jour des taux de change depuis l'API Frankfurter
+    Récupère les taux en temps réel et met à jour la table stripe_currency_rates
+    """
+    verify_super_admin(current_user)
+
+    try:
+        from app.services.currency_rates_updater import CurrencyRatesUpdater
+
+        logger.info(f"Currency rates update triggered by {current_user.get('email')}")
+
+        # Use database connection
+        with get_db() as conn:
+            updater = CurrencyRatesUpdater(conn)
+            result = updater.update_all_rates()
+
+            if result["success"]:
+                # Log l'action
+                log_admin_action(
+                    action_type="update_currency_rates",
+                    target_entity="stripe_currency_rates",
+                    admin_email=current_user.get("email"),
+                    old_value={"source": "manual_trigger"},
+                    new_value={
+                        "currencies_updated": result["database_stats"]["total"],
+                        "rates_date": result["rates_date"]
+                    },
+                    ip_address=request.client.host
+                )
+
+                logger.info(f"Currency rates updated successfully: {result['database_stats']['total']} currencies")
+
+                return {
+                    "success": True,
+                    "message": "Taux de change mis à jour avec succès",
+                    "rates_date": result["rates_date"],
+                    "currencies_fetched": result["currencies_fetched"],
+                    "updated": result["database_stats"]["updated"],
+                    "new": result["database_stats"]["new"],
+                    "failed": result["database_stats"]["failed"],
+                    "timestamp": result["timestamp"]
+                }
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=result.get("error", "Failed to update currency rates")
+                )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating currency rates: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/currency-rates")
+async def get_currency_rates(current_user: dict = Depends(get_current_user)):
+    """
+    Récupère tous les taux de change actuels
+    """
+    verify_super_admin(current_user)
+
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT
+                        currency_code,
+                        currency_name,
+                        rate_to_usd,
+                        last_updated
+                    FROM stripe_currency_rates
+                    ORDER BY currency_code
+                """)
+                rates = cur.fetchall()
+
+                return {
+                    "success": True,
+                    "count": len(rates),
+                    "rates": rates
+                }
+
+    except Exception as e:
+        logger.error(f"Error fetching currency rates: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
