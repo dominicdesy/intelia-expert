@@ -7,6 +7,7 @@ import logging
 from utils.types import Dict, Any
 
 from .data_models import RAGResult, RAGSource
+from utils.cot_parser import parse_cot_response
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,11 @@ class RAGResponseGenerator:
                             intent_result=None,
                         )
 
-                        result.answer = generated_answer
+                        # Parse CoT structure to separate thinking/analysis from answer
+                        parsed_response = parse_cot_response(generated_answer)
+
+                        # Only send the answer to the user (not thinking/analysis)
+                        result.answer = parsed_response["answer"]
 
                         # Ensure metadata exists before updating
                         if not result.metadata:
@@ -148,8 +153,21 @@ class RAGResponseGenerator:
                             conversation_context
                         )
 
+                        # Store thinking/analysis for database (not sent to user)
+                        if parsed_response["has_structure"]:
+                            result.metadata["cot_thinking"] = parsed_response["thinking"]
+                            result.metadata["cot_analysis"] = parsed_response["analysis"]
+                            result.metadata["cot_structure_used"] = True
+                            logger.info(
+                                f"🧠 CoT structure parsed - thinking: {len(parsed_response['thinking'] or '')} chars, "
+                                f"analysis: {len(parsed_response['analysis'] or '')} chars, "
+                                f"answer: {len(result.answer)} chars"
+                            )
+                        else:
+                            result.metadata["cot_structure_used"] = False
+
                         logger.info(
-                            f"LLM response generated ({len(generated_answer)} characters)"
+                            f"LLM response generated ({len(result.answer)} characters)"
                         )
 
                     except Exception as e:
@@ -179,7 +197,11 @@ class RAGResponseGenerator:
                             domain=result.metadata.get("detected_domain", "poultry"),
                         )
 
-                        result.answer = ensemble_result["final_answer"]
+                        # Parse CoT structure to separate thinking/analysis from answer
+                        parsed_response = parse_cot_response(ensemble_result["final_answer"])
+
+                        # Only send the answer to the user (not thinking/analysis)
+                        result.answer = parsed_response["answer"]
                         result.source = RAGSource.FALLBACK_NEEDED
 
                         if not result.metadata:
@@ -190,6 +212,19 @@ class RAGResponseGenerator:
                         result.metadata["ensemble_provider"] = ensemble_result.get("provider")
                         result.metadata["ensemble_confidence"] = ensemble_result.get("confidence")
                         result.metadata["no_documents_reason"] = "LOW_CONFIDENCE"
+
+                        # Store thinking/analysis for database (not sent to user)
+                        if parsed_response["has_structure"]:
+                            result.metadata["cot_thinking"] = parsed_response["thinking"]
+                            result.metadata["cot_analysis"] = parsed_response["analysis"]
+                            result.metadata["cot_structure_used"] = True
+                            logger.info(
+                                f"🧠 CoT structure parsed (ensemble) - thinking: {len(parsed_response['thinking'] or '')} chars, "
+                                f"analysis: {len(parsed_response['analysis'] or '')} chars, "
+                                f"answer: {len(result.answer)} chars"
+                            )
+                        else:
+                            result.metadata["cot_structure_used"] = False
 
                         logger.info(
                             f"LLM Ensemble fallback response generated ({len(result.answer)} characters) "
@@ -275,7 +310,11 @@ class RAGResponseGenerator:
                 conversation_context="",
             )
 
-            result.answer = generated_answer
+            # Parse CoT structure to separate thinking/analysis from answer
+            parsed_response = parse_cot_response(generated_answer)
+
+            # Only send the answer to the user (not thinking/analysis)
+            result.answer = parsed_response["answer"]
             result.source = RAGSource.FALLBACK_NEEDED
 
             if not result.metadata:
@@ -285,8 +324,21 @@ class RAGResponseGenerator:
             result.metadata["llm_ensemble_used"] = False
             result.metadata["no_documents_reason"] = "LOW_CONFIDENCE"
 
+            # Store thinking/analysis for database (not sent to user)
+            if parsed_response["has_structure"]:
+                result.metadata["cot_thinking"] = parsed_response["thinking"]
+                result.metadata["cot_analysis"] = parsed_response["analysis"]
+                result.metadata["cot_structure_used"] = True
+                logger.info(
+                    f"🧠 CoT structure parsed (fallback) - thinking: {len(parsed_response['thinking'] or '')} chars, "
+                    f"analysis: {len(parsed_response['analysis'] or '')} chars, "
+                    f"answer: {len(result.answer)} chars"
+                )
+            else:
+                result.metadata["cot_structure_used"] = False
+
             logger.info(
-                f"Single LLM fallback response generated ({len(generated_answer)} characters)"
+                f"Single LLM fallback response generated ({len(result.answer)} characters)"
             )
 
         except Exception as e:
