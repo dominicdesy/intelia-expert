@@ -57,7 +57,8 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
     try {
       console.log("[CurrencySelector] Updating currency to:", currency);
 
-      const response = await apiClient.postSecure("billing/set-currency", { currency });
+      // FastAPI expects currency as query parameter, not JSON body
+      const response = await apiClient.postSecure(`billing/set-currency?currency=${currency}`);
 
       console.log("[CurrencySelector] Update response:", response);
 
@@ -67,7 +68,10 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
         setIsDropdownOpen(false);
       } else {
         console.error("[CurrencySelector] Update error:", response.error);
-        toast.error(response.error?.message || t("billing.currencyUpdateFailed"));
+        const errorMsg = typeof response.error?.message === 'string'
+          ? response.error.message
+          : t("billing.currencyUpdateFailed");
+        toast.error(errorMsg);
       }
     } catch (error) {
       console.error("[CurrencySelector] Error updating currency:", error);
