@@ -11,11 +11,14 @@ from typing import Dict, Any, Tuple
 from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from enum import Enum
 
 # Import authentification
 from app.api.v1.auth import get_current_user
+
+# Import geo-location service
+from app.services.geo_location import GeoLocationService
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 logger = logging.getLogger(__name__)
@@ -633,18 +636,155 @@ def generate_invoice(
 
 
 @router.get("/plans")
-def available_plans() -> Dict[str, Any]:
-    """Liste des plans disponibles - ENDPOINT PUBLIC"""
-    # CORRECTION: Suppression de get_current_user = Depends(...)
-    # Cet endpoint doit être accessible sans authentification
+def available_plans(request: Request, country: str = None) -> Dict[str, Any]:
+    """
+    Liste des plans disponibles avec prix localisés - ENDPOINT PUBLIC
 
-    billing = get_billing_manager()
-    return {
-        "plans": billing.plans,
-        "currency": "EUR",
-        "public": True,
-        "description": "Plans de facturation disponibles",
-    }
+    Détecte automatiquement le pays de l'utilisateur via son IP
+    et retourne les prix dans la devise locale
+
+    Args:
+        request: FastAPI Request object (pour extraire l'IP)
+        country: Code pays optionnel (2 lettres) pour forcer un pays spécifique
+
+    Returns:
+        Plans avec prix localisés selon le pays détecté
+    """
+
+    # Étape 1: Déterminer le pays
+    detected_country = None
+    detection_method = "default"
+
+    if country:
+        # Pays spécifié manuellement
+        detected_country = country.upper()
+        detection_method = "manual"
+        logger.info(f"Using manually specified country: {detected_country}")
+    else:
+        # Détecter automatiquement via IP
+        client_ip = GeoLocationService.get_client_ip(request)
+        geo_info = GeoLocationService.get_country_from_ip(client_ip)
+
+        if geo_info:
+            detected_country = geo_info["country_code"]
+            detection_method = "auto_ip"
+            logger.info(f"Auto-detected country for {client_ip}: {detected_country} ({geo_info['country_name']})")
+        else:
+            logger.warning(f"Could not detect country for IP {client_ip}, using default (US)")
+
+    # Fallback to USA if detection failed
+    if not detected_country:
+        detected_country = "US"
+        detection_method = "fallback"
+
+    # Étape 2: Récupérer les prix depuis complete_pricing_matrix
+    try:
+        with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Récupérer les prix pour ce pays
+                cur.execute("""
+                    SELECT
+                        plan_name,
+                        tier_price_usd,
+                        display_price,
+                        display_currency,
+                        display_currency_symbol,
+                        price_type,
+                        country_name,
+                        tier_level
+                    FROM complete_pricing_matrix
+                    WHERE country_code = %s
+                    ORDER BY
+                        CASE plan_name
+                            WHEN 'essential' THEN 1
+                            WHEN 'pro' THEN 2
+                            WHEN 'elite' THEN 3
+                            ELSE 4
+                        END
+                """, (detected_country,))
+
+                pricing_data = cur.fetchall()
+
+                # Si le pays n'existe pas dans notre base, fallback vers USA
+                if not pricing_data:
+                    logger.warning(f"Country {detected_country} not found in pricing matrix, falling back to US")
+                    detected_country = "US"
+                    detection_method = "fallback_not_found"
+
+                    cur.execute("""
+                        SELECT
+                            plan_name,
+                            tier_price_usd,
+                            display_price,
+                            display_currency,
+                            display_currency_symbol,
+                            price_type,
+                            country_name,
+                            tier_level
+                        FROM complete_pricing_matrix
+                        WHERE country_code = 'US'
+                        ORDER BY
+                            CASE plan_name
+                                WHEN 'essential' THEN 1
+                                WHEN 'pro' THEN 2
+                                WHEN 'elite' THEN 3
+                                ELSE 4
+                            END
+                    """)
+                    pricing_data = cur.fetchall()
+
+                # Formater les données des plans
+                plans = {}
+                currency = "USD"
+                currency_symbol = "$"
+                country_name = "United States"
+
+                for row in pricing_data:
+                    plan_name = row["plan_name"]
+                    currency = row["display_currency"]
+                    currency_symbol = row["display_currency_symbol"]
+                    country_name = row["country_name"]
+
+                    plans[plan_name] = {
+                        "name": plan_name,
+                        "display_name": plan_name.capitalize(),
+                        "price": float(row["display_price"]),
+                        "price_usd": float(row["tier_price_usd"]),
+                        "currency": currency,
+                        "currency_symbol": currency_symbol,
+                        "price_type": row["price_type"],  # "auto_marketing" or "custom"
+                        "tier_level": row["tier_level"],
+                        "formatted_price": f"{currency_symbol}{row['display_price']:.2f}"
+                    }
+
+                logger.info(f"Returning {len(plans)} plans for {detected_country} ({country_name}) in {currency}")
+
+                return {
+                    "plans": plans,
+                    "currency": currency,
+                    "currency_symbol": currency_symbol,
+                    "country_code": detected_country,
+                    "country_name": country_name,
+                    "detection_method": detection_method,
+                    "public": True,
+                    "description": f"Plans de facturation pour {country_name}",
+                }
+
+    except Exception as e:
+        logger.error(f"Error fetching localized plans: {e}")
+        # En cas d'erreur, retourner les plans de base
+        billing = get_billing_manager()
+        return {
+            "plans": billing.plans,
+            "currency": "USD",
+            "currency_symbol": "$",
+            "country_code": "US",
+            "country_name": "United States",
+            "detection_method": "error_fallback",
+            "public": True,
+            "description": "Plans de facturation (fallback)",
+            "error": str(e)
+        }
 
 
 @router.get("/admin")
