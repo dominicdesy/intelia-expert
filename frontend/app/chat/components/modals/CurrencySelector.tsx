@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
+import { apiClient } from "@/lib/api/client";
 import toast from "react-hot-toast";
 
 interface CurrencyInfo {
@@ -30,50 +31,22 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
 
   const fetchCurrencyPreference = async () => {
     try {
-      // Try multiple token sources
-      let token = localStorage.getItem("access_token");
-
-      if (!token) {
-        const authData = localStorage.getItem("intelia-expert-auth");
-        if (authData) {
-          try {
-            const parsed = JSON.parse(authData);
-            token = parsed.access_token;
-            console.log("[CurrencySelector] Token found in intelia-expert-auth");
-          } catch (e) {
-            console.error("[CurrencySelector] Error parsing auth data:", e);
-          }
-        }
-      }
-
-      if (!token) {
-        console.error("[CurrencySelector] No token found");
-        setIsLoading(false);
-        return;
-      }
-
       console.log("[CurrencySelector] Fetching currency preference...");
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/billing/currency-preference`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
 
-      console.log("[CurrencySelector] Response status:", response.status);
+      const response = await apiClient.getSecure<CurrencyInfo>("billing/currency-preference");
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log("[CurrencySelector] Currency data received:", data);
-        setCurrencyInfo(data);
+      console.log("[CurrencySelector] API response:", response);
+
+      if (response.success && response.data) {
+        console.log("[CurrencySelector] Currency data received:", response.data);
+        setCurrencyInfo(response.data);
       } else {
-        const errorText = await response.text();
-        console.error("[CurrencySelector] API error:", response.status, errorText);
+        console.error("[CurrencySelector] API error:", response.error);
+        toast.error(response.error?.message || "Erreur de chargement des devises");
       }
     } catch (error) {
       console.error("[CurrencySelector] Error fetching currency:", error);
+      toast.error("Erreur de chargement des devises");
     } finally {
       setIsLoading(false);
     }
@@ -82,31 +55,19 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
   const handleCurrencyChange = async (currency: string) => {
     setIsChanging(true);
     try {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        toast.error(t("chat.sessionExpired"));
-        return;
-      }
+      console.log("[CurrencySelector] Updating currency to:", currency);
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/billing/set-currency`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ currency }),
-        }
-      );
+      const response = await apiClient.postSecure("billing/set-currency", { currency });
 
-      if (response.ok) {
+      console.log("[CurrencySelector] Update response:", response);
+
+      if (response.success) {
         toast.success(t("billing.currencyUpdated"));
         await fetchCurrencyPreference();
         setIsDropdownOpen(false);
       } else {
-        const error = await response.json();
-        toast.error(error.detail || t("billing.currencyUpdateFailed"));
+        console.error("[CurrencySelector] Update error:", response.error);
+        toast.error(response.error?.message || t("billing.currencyUpdateFailed"));
       }
     } catch (error) {
       console.error("[CurrencySelector] Error updating currency:", error);
