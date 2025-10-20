@@ -577,7 +577,7 @@ Structure ta réponse avec les balises XML suivantes pour montrer ton raisonneme
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.1,  # Optimal: 0.05 caused RAGAS timeouts, 0.1 provides best balance (Faithfulness: 71.57%)
-                max_tokens=900,
+                max_tokens=1500,  # Increased from 900 to allow complete CoT structure (thinking + analysis + answer)
             )
 
             generated_response = response.choices[0].message.content.strip()
