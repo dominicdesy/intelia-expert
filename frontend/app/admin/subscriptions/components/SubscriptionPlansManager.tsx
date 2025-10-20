@@ -82,10 +82,14 @@ export default function SubscriptionPlansManager({
 
         if (response.ok) {
           const data = await response.json();
+          console.log(`[PlansManager] Loaded tier prices for ${plan.plan_name}:`, data.tier_prices);
           tierPricesMap[plan.plan_name] = data.tier_prices || [];
+        } else {
+          console.error(`[PlansManager] Failed to load tier prices for ${plan.plan_name}:`, response.status);
         }
       }
 
+      console.log("[PlansManager] Final tierPricesMap:", tierPricesMap);
       setTierPrices(tierPricesMap);
     } catch (error) {
       console.error("[PlansManager] Erreur fetch tier prices:", error);
