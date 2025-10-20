@@ -5,7 +5,6 @@ import { useTranslation } from "@/lib/languages/i18n";
 import { PLAN_CONFIGS } from "@/types";
 import { BaseDialog } from "../BaseDialog";
 import { UpgradePlanModal } from "./UpgradePlanModal";
-import { CurrencySelector } from "./CurrencySelector";
 import { redirectToCustomerPortal } from "@/lib/api/stripe";
 import toast from "react-hot-toast";
 
@@ -67,9 +66,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         description={t("subscription.description")}
       >
         <div className="space-y-8">
-          {/* Currency Selector */}
-          <CurrencySelector user={user} />
-
           {/* Pricing Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {plans.map((plan) => {
@@ -231,6 +227,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         currentPlan={currentPlan}
+        user={user}
       />
     </>
   );

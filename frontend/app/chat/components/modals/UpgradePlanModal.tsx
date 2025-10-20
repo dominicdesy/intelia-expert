@@ -5,6 +5,7 @@ import { BaseDialog } from "../BaseDialog";
 import { PLAN_CONFIGS } from "@/types";
 import { redirectToCheckout } from "@/lib/api/stripe";
 import { useTranslation } from "@/lib/languages/i18n";
+import { CurrencySelector } from "./CurrencySelector";
 import { supabase } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 
@@ -12,12 +13,14 @@ interface UpgradePlanModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentPlan?: string;
+  user?: any;
 }
 
 export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
   isOpen,
   onClose,
   currentPlan = "essential",
+  user,
 }) => {
   const { t, currentLanguage } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
@@ -91,6 +94,9 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
       description={t("stripe.upgrade.choosePlan")}
     >
       <div className="space-y-6">
+        {/* Currency Selector */}
+        {user && <CurrencySelector user={user} />}
+
         {/* Description */}
         <div className="text-center text-sm text-gray-600">
           {t("stripe.upgrade.choosePlan")}
