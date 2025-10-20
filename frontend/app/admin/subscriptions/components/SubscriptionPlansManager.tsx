@@ -34,7 +34,6 @@ export default function SubscriptionPlansManager({
   const [tierPrices, setTierPrices] = useState<Record<string, TierPrice[]>>({});
   const [editingTierPrice, setEditingTierPrice] = useState<string | null>(null);
   const [tierPriceValue, setTierPriceValue] = useState<number>(0);
-  const [showTierPrices, setShowTierPrices] = useState(false);
 
   useEffect(() => {
     fetchPlans();
@@ -270,9 +269,6 @@ export default function SubscriptionPlansManager({
                 Quota Mensuel
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Prix/Mois
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Statut
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -366,10 +362,6 @@ export default function SubscriptionPlansManager({
                   )}
                 </td>
 
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  ${plan.price_per_month.toFixed(2)}
-                </td>
-
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
                     className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -425,10 +417,7 @@ export default function SubscriptionPlansManager({
       {/* Tier Prices Section */}
       {plans.length > 0 && (
         <div className="border-t border-gray-200">
-          <button
-            onClick={() => setShowTierPrices(!showTierPrices)}
-            className="w-full px-6 py-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
-          >
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-gray-900">
                 Prix par Tier (Tier 1-4)
@@ -437,25 +426,9 @@ export default function SubscriptionPlansManager({
                 Définir les prix USD pour chaque niveau de marché
               </span>
             </div>
-            <svg
-              className={`w-5 h-5 text-gray-500 transition-transform ${
-                showTierPrices ? "transform rotate-180" : ""
-              }`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
+          </div>
 
-          {showTierPrices && (
-            <div className="px-6 py-4 bg-white">
+          <div className="px-6 py-4 bg-white">
               <div className="grid grid-cols-1 gap-6">
                 {plans.map((plan) => {
                   const planTierPrices = tierPrices[plan.plan_name] || [];
@@ -568,7 +541,7 @@ export default function SubscriptionPlansManager({
                 </p>
               </div>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
