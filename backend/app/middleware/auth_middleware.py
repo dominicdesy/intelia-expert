@@ -56,6 +56,8 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/system/status",
     # === ENDPOINTS QA QUALITY PUBLICS (cron avec secret) ===
     "/api/v1/qa-quality/cron",
+    # === ENDPOINTS CURRENCY RATES PUBLICS (cron avec secret) ===
+    "/api/v1/billing/admin/currency-rates/update-cron",
     # === ENDPOINTS SANS PREFIX /api ===
     "/",
     "/docs",
