@@ -376,8 +376,9 @@ class ChatHandlers:
                 "has_cot_structure": has_cot_structure,
             }
 
-            logger.info(f"🔍 END event full data: {safe_serialize_for_json(end_data)[:500]}")
-            yield sse_event(safe_serialize_for_json(end_data))
+            serialized_data = safe_serialize_for_json(end_data)
+            logger.info(f"🔍 END event full data: {str(serialized_data)[:500]}")
+            yield sse_event(serialized_data)
 
             # Sauvegarder dans les deux systèmes de mémoire
             # Seulement si c'est une vraie réponse (pas une clarification)
