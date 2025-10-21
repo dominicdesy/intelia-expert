@@ -79,11 +79,11 @@ const nextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://expert.intelia.com https://*.supabase.co wss://*.supabase.co https://restcountries.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri https://expert.intelia.com/api/v1/csp-report",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://expert.intelia.com wss://expert.intelia.com https://*.supabase.co wss://*.supabase.co https://restcountries.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri https://expert.intelia.com/api/v1/csp-report",
           },
           {
             key: "Permissions-Policy",
-            value: "geolocation=(), microphone=(), camera=()",
+            value: "geolocation=(), microphone=(self), camera=()",
           },
         ],
       },
