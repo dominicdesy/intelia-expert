@@ -298,6 +298,7 @@ async function streamAIResponseInternal(
     sources_used: 0,
     processing_time: Date.now(),
     decisions: [],
+    response_source: "unknown", // 🆕 Capturer la vraie source (PostgreSQL/Weaviate/External LLM)
   };
 
   try {
@@ -337,6 +338,15 @@ async function streamAIResponseInternal(
 
           // GESTION COMPLÈTE DES ÉVÉNEMENTS AGENT
           switch (event.type) {
+            case "start":
+              // 🆕 Event "start" du streaming (contient source, confidence, etc.)
+              const startEvent = event as any;
+              if (startEvent.source) {
+                agentMetadata.response_source = startEvent.source;
+                secureLog.log(`[apiService] Source détectée au start: ${startEvent.source}`);
+              }
+              break;
+
             case "agent_start":
               const agentStartEvent = event as AgentStartEvent;
               secureLog.log(`[apiService] Agent démarré: ${agentStartEvent.complexity} sous-requêtes: ${agentStartEvent.sub_queries_count} `);
@@ -417,6 +427,11 @@ async function streamAIResponseInternal(
               if (endEvent.confidence !== undefined) {
                 // Stocker la confidence finale pour référence
                 (agentMetadata as any).final_confidence = endEvent.confidence;
+              }
+              // 🆕 CAPTURER LA SOURCE RÉELLE (PostgreSQL/Weaviate/External LLM)
+              if (endEvent.source) {
+                agentMetadata.response_source = endEvent.source;
+                secureLog.log(`[apiService] Source capturée: ${endEvent.source}`);
               }
               break;
 
@@ -755,7 +770,7 @@ async function saveConversationToBackend(
       response: response,
       user_id: userId,
       timestamp: new Date().toISOString(),
-      source: "llm_streaming_agent",
+      source: agentMetadata?.response_source || "llm_streaming_agent", // 🆕 Utiliser la vraie source
       metadata: {
         mode: "streaming",
         backend: "llm_backend_agent",
