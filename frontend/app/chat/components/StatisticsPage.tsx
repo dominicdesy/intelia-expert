@@ -593,6 +593,9 @@ export const StatisticsPage: React.FC = () => {
         session_id: q.session_id,
         feedback: q.feedback,
         feedback_comment: q.feedback_comment,
+        cot_thinking: q.cot_thinking,
+        cot_analysis: q.cot_analysis,
+        has_cot_structure: q.has_cot_structure,
       }));
 
       setQuestionLogs(adaptedQuestions);
@@ -1118,7 +1121,7 @@ export const StatisticsPage: React.FC = () => {
                   </div>
 
                   {/* Affichage des balises CoT */}
-                  {selectedQuestion.has_cot_structure && (
+                  {(selectedQuestion.cot_thinking || selectedQuestion.cot_analysis) && (
                     <>
                       {selectedQuestion.cot_thinking && (
                         <div className="bg-blue-50 p-4 border border-blue-200">
