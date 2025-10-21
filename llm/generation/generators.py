@@ -759,9 +759,8 @@ Para manejar el estrés térmico en pollos de engorde, tres estrategias son esen
                     messages=[
                         {"role": "user", "content": combined_prompt},
                     ],
-                    # O1 models don't support temperature or max_tokens
-                    # They use max_completion_tokens instead
-                    max_completion_tokens=1500,
+                    # O1 models don't support temperature, max_tokens, or max_completion_tokens in async
+                    # They manage token limits internally with native CoT reasoning
                 )
                 logger.info(f"🧠 Using O1 model: {self.cot_model} (native CoT reasoning)")
             else:
