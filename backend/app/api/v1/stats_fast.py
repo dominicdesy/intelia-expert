@@ -591,6 +591,7 @@ async def get_questions(
                     conversations.append({
                         "id": conversation_id,
                         "session_id": conv_row["session_id"],
+                        "user_id": conv_row["user_id"],  # ← FIX: Ajouter user_id de la conversation
                         "title": conv_row["title"],
                         "language": conv_row["language"],
                         "message_count": conv_row["message_count"],
