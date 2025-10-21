@@ -219,6 +219,15 @@ MÉTRIQUES CLÉS BROILERS:
         Returns:
             Prompt enrichi avec instructions CoT
         """
+        # ✅ NOUVELLE APPROCHE: Utiliser SystemPromptsManager pour CoT multilingue unifié
+        if self.prompts_manager:
+            # Utiliser le système centralisé de prompts
+            cot_instruction = self.prompts_manager.get_cot_prompt(
+                language=language, use_simple=not structured
+            )
+            return prompt + cot_instruction
+
+        # Fallback: utiliser les anciens templates si prompts_manager n'est pas disponible
         if structured:
             # Phase 2: CoT structuré avec balises XML - MULTILINGUE
             cot_templates = {
