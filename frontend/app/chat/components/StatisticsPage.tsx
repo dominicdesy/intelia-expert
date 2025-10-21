@@ -186,6 +186,23 @@ interface QuestionLog {
   response: string;
   response_source:
     | "rag"
+    | "rag_success"
+    | "rag_knowledge"
+    | "rag_verified"
+    | "retrieval_success"
+    | "fallback_needed"
+    | "ood_filtered"
+    | "no_results"
+    | "no_documents_found"
+    | "insufficient_context"
+    | "needs_clarification"
+    | "awaiting_user_input"
+    | "embedding_failed"
+    | "search_failed"
+    | "low_confidence"
+    | "generation_failed"
+    | "internal_error"
+    | "error"
     | "openai_fallback"
     | "table_lookup"
     | "validation_rejected"
@@ -699,9 +716,55 @@ export const StatisticsPage: React.FC = () => {
   const mapResponseSource = (
     source: string,
   ): QuestionLog["response_source"] => {
+    // Map all possible RAGSource enum values from LLM backend
     switch (source) {
+      // Success sources
       case "rag":
         return "rag";
+      case "rag_success":
+        return "rag_success";
+      case "rag_knowledge":
+        return "rag_knowledge";
+      case "rag_verified":
+        return "rag_verified";
+      case "retrieval_success":
+        return "retrieval_success";
+
+      // Fallback sources
+      case "fallback_needed":
+        return "fallback_needed";
+      case "ood_filtered":
+        return "ood_filtered";
+
+      // No results sources
+      case "no_results":
+        return "no_results";
+      case "no_documents_found":
+        return "no_documents_found";
+
+      // Clarification sources
+      case "insufficient_context":
+        return "insufficient_context";
+      case "needs_clarification":
+        return "needs_clarification";
+      case "awaiting_user_input":
+        return "awaiting_user_input";
+
+      // Error sources
+      case "embedding_failed":
+        return "embedding_failed";
+      case "search_failed":
+        return "search_failed";
+      case "low_confidence":
+        return "low_confidence";
+      case "generation_failed":
+        return "generation_failed";
+      case "internal_error":
+        return "internal_error";
+      case "error":
+        return "error";
+
+      // Legacy sources
       case "openai_fallback":
         return "openai_fallback";
       case "table_lookup":
@@ -710,6 +773,7 @@ export const StatisticsPage: React.FC = () => {
         return "validation_rejected";
       case "quota_exceeded":
         return "quota_exceeded";
+
       default:
         return "unknown";
     }
