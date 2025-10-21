@@ -26,7 +26,15 @@ try:
     EMAIL_SERVICE_AVAILABLE = True
 except ImportError:
     EMAIL_SERVICE_AVAILABLE = False
-    logger.warning("Email service not available")
+
+# Initialize logger BEFORE using it
+logger = logging.getLogger(__name__)
+
+try:
+    if not EMAIL_SERVICE_AVAILABLE:
+        logger.warning("Email service not available")
+except:
+    pass
 
 # Import country tracking service for fraud detection
 try:
@@ -45,7 +53,6 @@ except ImportError:
     logger.warning("Geo-location service not available")
 
 router = APIRouter(prefix="/auth")
-logger = logging.getLogger(__name__)
 
 
 # ==================== HELPER FUNCTIONS ====================
