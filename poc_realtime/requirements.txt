@@ -1,0 +1,13 @@
+# POC OpenAI Realtime API - Requirements
+
+# OpenAI SDK (pour API Realtime)
+openai>=1.55.0
+
+# WebSocket client
+websockets>=12.0
+
+# Async utilities
+asyncio-mqtt>=0.16.0
+
+# Load environment variables
+python-dotenv>=1.0.0
