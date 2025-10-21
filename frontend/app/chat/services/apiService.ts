@@ -788,7 +788,11 @@ async function saveConversationToBackend(
     secureLog.log(`[apiService] 💾 Saving conversation with source: "${source_to_save}"`, {
       agentMetadata_exists: !!agentMetadata,
       response_source_value: agentMetadata?.response_source,
-      fallback_used: !agentMetadata?.response_source
+      fallback_used: !agentMetadata?.response_source,
+      // 🧠 DEBUG: CoT fields
+      has_cot_structure: agentMetadata?.has_cot_structure,
+      cot_thinking_length: agentMetadata?.cot_thinking?.length || 0,
+      cot_analysis_length: agentMetadata?.cot_analysis?.length || 0
     });
 
     const payload = {

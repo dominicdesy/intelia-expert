@@ -155,6 +155,10 @@ class RAGResponseGenerator:
 
                         # Store thinking/analysis for database (not sent to user)
                         if parsed_response["has_structure"]:
+                            # 🧠 Store in BOTH metadata AND direct attributes
+                            result.cot_thinking = parsed_response["thinking"]
+                            result.cot_analysis = parsed_response["analysis"]
+                            result.has_cot_structure = True
                             result.metadata["cot_thinking"] = parsed_response["thinking"]
                             result.metadata["cot_analysis"] = parsed_response["analysis"]
                             result.metadata["cot_structure_used"] = True
@@ -164,6 +168,7 @@ class RAGResponseGenerator:
                                 f"answer: {len(result.answer)} chars"
                             )
                         else:
+                            result.has_cot_structure = False
                             result.metadata["cot_structure_used"] = False
 
                         logger.info(
@@ -215,6 +220,10 @@ class RAGResponseGenerator:
 
                         # Store thinking/analysis for database (not sent to user)
                         if parsed_response["has_structure"]:
+                            # 🧠 Store in BOTH metadata AND direct attributes
+                            result.cot_thinking = parsed_response["thinking"]
+                            result.cot_analysis = parsed_response["analysis"]
+                            result.has_cot_structure = True
                             result.metadata["cot_thinking"] = parsed_response["thinking"]
                             result.metadata["cot_analysis"] = parsed_response["analysis"]
                             result.metadata["cot_structure_used"] = True
@@ -224,6 +233,7 @@ class RAGResponseGenerator:
                                 f"answer: {len(result.answer)} chars"
                             )
                         else:
+                            result.has_cot_structure = False
                             result.metadata["cot_structure_used"] = False
 
                         logger.info(
@@ -326,6 +336,10 @@ class RAGResponseGenerator:
 
             # Store thinking/analysis for database (not sent to user)
             if parsed_response["has_structure"]:
+                # 🧠 Store in BOTH metadata AND direct attributes
+                result.cot_thinking = parsed_response["thinking"]
+                result.cot_analysis = parsed_response["analysis"]
+                result.has_cot_structure = True
                 result.metadata["cot_thinking"] = parsed_response["thinking"]
                 result.metadata["cot_analysis"] = parsed_response["analysis"]
                 result.metadata["cot_structure_used"] = True
@@ -335,6 +349,7 @@ class RAGResponseGenerator:
                     f"answer: {len(result.answer)} chars"
                 )
             else:
+                result.has_cot_structure = False
                 result.metadata["cot_structure_used"] = False
 
             logger.info(
