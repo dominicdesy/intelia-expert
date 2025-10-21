@@ -44,6 +44,66 @@ def is_super_admin(current_user: dict) -> bool:
     user_email = current_user.get("email", "")
     return user_email in super_admins
 
+
+def map_response_source_to_display(raw_source: str, metadata: Optional[Dict] = None) -> str:
+    """
+    Convertit la source brute en format lisible pour affichage admin
+
+    Args:
+        raw_source: Source brute depuis la DB (ex: "rag_success", "RAGSource.RAG_SUCCESS")
+        metadata: Métadonnées optionnelles pour détection PostgreSQL vs Weaviate
+
+    Returns:
+        Source formatée pour affichage (Performance Metrics, Knowledge Base, External LLM)
+    """
+    if not raw_source:
+        return "Unknown"
+
+    # Normaliser la source (supprimer "RAGSource." si présent)
+    source = raw_source.replace("RAGSource.", "").lower()
+
+    # Vérifier les métadonnées pour distinguer PostgreSQL vs Weaviate
+    if metadata:
+        source_type = metadata.get("source_type", "")
+        source_meta = metadata.get("source", "")
+
+        # Détection PostgreSQL via metadata
+        if "postgresql" in source_type.lower() or "postgresql" in source_meta.lower():
+            return "Performance Metrics"
+
+        # Détection Weaviate via metadata
+        if "weaviate" in source_type.lower() or "weaviate" in source_meta.lower():
+            return "Knowledge Base"
+
+    # Mapping des sources vers affichage lisible
+    # PostgreSQL sources (si détecté dans le nom)
+    if "postgresql" in source or "pg_" in source:
+        return "Performance Metrics"
+
+    # Weaviate sources
+    if "weaviate" in source:
+        return "Knowledge Base"
+
+    # rag_success peut être PostgreSQL OU Weaviate - nécessite metadata
+    # Sans metadata, on assume Knowledge Base par défaut
+    if source in ["rag_success", "rag_knowledge", "rag_verified", "retrieval_success"]:
+        return "Knowledge Base"
+
+    # External/Fallback sources
+    if source in ["fallback_needed", "generation_failed", "no_documents_found", "low_confidence"]:
+        return "External LLM"
+
+    # OOD or errors
+    if source in ["ood_filtered", "embedding_failed", "search_failed", "internal_error", "error", "no_results"]:
+        return "Error/Filtered"
+
+    # Clarification needed
+    if source in ["insufficient_context", "needs_clarification", "awaiting_user_input"]:
+        return "Clarification Needed"
+
+    # Default: capitalize first letter
+    return source.replace("_", " ").title()
+
 router = APIRouter(prefix="/stats-fast", tags=["statistics-fast"])
 
 # Cache local
@@ -619,6 +679,10 @@ async def get_questions(
                         conversation_user_id = conv.get("user_id", user_id)
                         user_info = get_user_from_supabase(conversation_user_id)
 
+                        # Mapper la source brute vers format lisible
+                        raw_source = assistant_msg.get("response_source", "")
+                        source_display = map_response_source_to_display(raw_source)
+
                         questions.append({
                             "id": conv["id"],
                             "timestamp": conv["created_at"],
@@ -626,7 +690,8 @@ async def get_questions(
                             "user_name": f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip() if user_info else "",
                             "question": user_msg["content"],
                             "response": assistant_msg["content"],
-                            "response_source": assistant_msg.get("response_source", ""),
+                            "response_source": raw_source,  # Source brute (pour debug)
+                            "source_display": source_display,  # Source formatée pour affichage
                             "confidence_score": assistant_msg.get("response_confidence"),
                             "response_time": assistant_msg.get("processing_time_ms"),
                             "language": conv.get("language", ""),
