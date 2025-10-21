@@ -3,6 +3,7 @@ API Stats Fast - CORRIGÉ pour nouvelle architecture
 
 PostgreSQL: conversations, feedback, invitations
 Supabase: users (via helper function)
+Version: 1.2.0 - Admin Q&R avec CoT support
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
