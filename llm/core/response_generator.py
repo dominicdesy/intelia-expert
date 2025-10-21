@@ -32,7 +32,7 @@ except ImportError:
 
 
 class RAGResponseGenerator:
-    """Generates LLM responses from retrieved documents"""
+    """Generates LLM responses from retrieved documents with CoT support"""
 
     def __init__(self, llm_generator, enable_proactive: bool = True):
         """
