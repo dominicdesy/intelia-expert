@@ -660,9 +660,9 @@ try:
     from app.api.v1 import voice_realtime  # Voice Realtime WebSocket endpoint
 
     app.include_router(api_v1_router)
-    app.include_router(voice_realtime.router, prefix="/v1", tags=["voice-realtime"])  # Voice Realtime
+    app.include_router(voice_realtime.router, prefix="/api/v1", tags=["voice-realtime"])  # Voice Realtime
     logger.info("Router API v1 charge depuis __init__.py")
-    logger.info("Voice Realtime router charge (WebSocket /v1/ws/voice)")
+    logger.info("Voice Realtime router charge (WebSocket /api/v1/ws/voice)")
 except ImportError as e:
     logger.warning(f"Impossible de charger le router v1 depuis __init__.py: {e}")
     logger.info("Creation d'un router v1 temporaire avec endpoints selectionnes...")
