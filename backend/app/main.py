@@ -550,9 +550,9 @@ async def add_security_headers(request: Request, call_next):
         "report-uri https://expert.intelia.com/api/v1/csp-report"
     )
 
-    # Permissions-Policy - Disable unnecessary browser features
+    # Permissions-Policy - Allow microphone for voice realtime feature
     response.headers["Permissions-Policy"] = (
-        "geolocation=(), microphone=(), camera=()"
+        "geolocation=(), microphone=(self), camera=()"
     )
 
     return response
