@@ -167,6 +167,13 @@ class RAGResponseGenerator:
                                 f"analysis: {len(parsed_response['analysis'] or '')} chars, "
                                 f"answer: {len(result.answer)} chars"
                             )
+                            # 🔍 DEBUG: Verify attributes were actually set
+                            logger.info(
+                                f"🔍 VERIFY attributes after assignment - "
+                                f"result.cot_thinking: {len(result.cot_thinking or '')} chars, "
+                                f"result.cot_analysis: {len(result.cot_analysis or '')} chars, "
+                                f"result.has_cot_structure: {result.has_cot_structure}"
+                            )
                         else:
                             result.has_cot_structure = False
                             result.metadata["cot_structure_used"] = False
@@ -231,6 +238,13 @@ class RAGResponseGenerator:
                                 f"🧠 CoT structure parsed (ensemble) - thinking: {len(parsed_response['thinking'] or '')} chars, "
                                 f"analysis: {len(parsed_response['analysis'] or '')} chars, "
                                 f"answer: {len(result.answer)} chars"
+                            )
+                            # 🔍 DEBUG: Verify attributes were actually set
+                            logger.info(
+                                f"🔍 VERIFY ensemble attributes after assignment - "
+                                f"result.cot_thinking: {len(result.cot_thinking or '')} chars, "
+                                f"result.cot_analysis: {len(result.cot_analysis or '')} chars, "
+                                f"result.has_cot_structure: {result.has_cot_structure}"
                             )
                         else:
                             result.has_cot_structure = False
@@ -298,6 +312,15 @@ class RAGResponseGenerator:
                 "🔒 Skipping proactive follow-up for clarification (waiting for user input)"
             )
 
+        # 🔍 CRITICAL DEBUG: Final state check before returning result
+        logger.info(
+            f"🔍 FINAL RESULT STATE before return - "
+            f"result.cot_thinking: {len(result.cot_thinking or '')} chars, "
+            f"result.cot_analysis: {len(result.cot_analysis or '')} chars, "
+            f"result.has_cot_structure: {result.has_cot_structure}, "
+            f"metadata.cot_structure_used: {result.metadata.get('cot_structure_used', False)}"
+        )
+
         return result
 
     async def _fallback_single_llm(
@@ -347,6 +370,13 @@ class RAGResponseGenerator:
                     f"🧠 CoT structure parsed (fallback) - thinking: {len(parsed_response['thinking'] or '')} chars, "
                     f"analysis: {len(parsed_response['analysis'] or '')} chars, "
                     f"answer: {len(result.answer)} chars"
+                )
+                # 🔍 DEBUG: Verify attributes were actually set
+                logger.info(
+                    f"🔍 VERIFY fallback attributes after assignment - "
+                    f"result.cot_thinking: {len(result.cot_thinking or '')} chars, "
+                    f"result.cot_analysis: {len(result.cot_analysis or '')} chars, "
+                    f"result.has_cot_structure: {result.has_cot_structure}"
                 )
             else:
                 result.has_cot_structure = False
