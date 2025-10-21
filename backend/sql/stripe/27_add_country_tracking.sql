@@ -7,16 +7,20 @@
 -- 1. Add country tracking columns to user_billing_info
 -- ============================================================================
 
-ALTER TABLE user_billing_info
-    ADD COLUMN IF NOT EXISTS signup_country VARCHAR(2),
-    ADD COLUMN IF NOT EXISTS signup_ip VARCHAR(45),
-    ADD COLUMN IF NOT EXISTS signup_detected_at TIMESTAMP,
-    ADD COLUMN IF NOT EXISTS pricing_tier VARCHAR(20) DEFAULT 'tier1',
-    ADD COLUMN IF NOT EXISTS pricing_country VARCHAR(2),
-    ADD COLUMN IF NOT EXISTS pricing_locked_at TIMESTAMP,
-    ADD COLUMN IF NOT EXISTS last_login_country VARCHAR(2),
-    ADD COLUMN IF NOT EXISTS last_login_ip VARCHAR(45),
-    ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;
+-- Signup tracking columns
+ALTER TABLE user_billing_info ADD COLUMN IF NOT EXISTS signup_country VARCHAR(2);
+ALTER TABLE user_billing_info ADD COLUMN IF NOT EXISTS signup_ip VARCHAR(45);
+ALTER TABLE user_billing_info ADD COLUMN IF NOT EXISTS signup_detected_at TIMESTAMP;
+
+-- Pricing tier columns
+ALTER TABLE user_billing_info ADD COLUMN IF NOT EXISTS pricing_tier VARCHAR(20) DEFAULT 'tier1';
+ALTER TABLE user_billing_info ADD COLUMN IF NOT EXISTS pricing_country VARCHAR(2);
+ALTER TABLE user_billing_info ADD COLUMN IF NOT EXISTS pricing_locked_at TIMESTAMP;
+
+-- Last login tracking columns
+ALTER TABLE user_billing_info ADD COLUMN IF NOT EXISTS last_login_country VARCHAR(2);
+ALTER TABLE user_billing_info ADD COLUMN IF NOT EXISTS last_login_ip VARCHAR(45);
+ALTER TABLE user_billing_info ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;
 
 -- Add indexes for performance
 CREATE INDEX IF NOT EXISTS idx_user_billing_signup_country
