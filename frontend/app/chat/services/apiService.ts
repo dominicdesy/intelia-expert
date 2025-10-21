@@ -341,9 +341,16 @@ async function streamAIResponseInternal(
             case "start":
               // 🆕 Event "start" du streaming (contient source, confidence, etc.)
               const startEvent = event as any;
+              secureLog.log(`[apiService] ⚡ START event received:`, {
+                has_source: !!startEvent.source,
+                source_value: startEvent.source,
+                full_event: JSON.stringify(startEvent).slice(0, 200)
+              });
               if (startEvent.source) {
                 agentMetadata.response_source = startEvent.source;
-                secureLog.log(`[apiService] Source détectée au start: ${startEvent.source}`);
+                secureLog.log(`[apiService] ✅ Source captured: ${startEvent.source}`);
+              } else {
+                secureLog.warn(`[apiService] ⚠️ START event missing source field!`);
               }
               break;
 
@@ -777,13 +784,20 @@ async function saveConversationToBackend(
   try {
     const headers = await getAuthHeaders();
 
+    const source_to_save = agentMetadata?.response_source || "llm_streaming_agent";
+    secureLog.log(`[apiService] 💾 Saving conversation with source: "${source_to_save}"`, {
+      agentMetadata_exists: !!agentMetadata,
+      response_source_value: agentMetadata?.response_source,
+      fallback_used: !agentMetadata?.response_source
+    });
+
     const payload = {
       conversation_id: conversationId,
       question: question.trim(),
       response: response,
       user_id: userId,
       timestamp: new Date().toISOString(),
-      source: agentMetadata?.response_source || "llm_streaming_agent", // 🆕 Utiliser la vraie source
+      source: source_to_save, // 🆕 Utiliser la vraie source
       metadata: {
         mode: "streaming",
         backend: "llm_backend_agent",
