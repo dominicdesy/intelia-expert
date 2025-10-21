@@ -36,6 +36,14 @@ except ImportError:
     COUNTRY_TRACKING_AVAILABLE = False
     logger.warning("Country tracking service not available")
 
+# Import geo-location service for country detection
+try:
+    from app.services.geo_location import GeoLocationService
+    GEO_LOCATION_AVAILABLE = True
+except ImportError:
+    GEO_LOCATION_AVAILABLE = False
+    logger.warning("Geo-location service not available")
+
 router = APIRouter(prefix="/auth")
 logger = logging.getLogger(__name__)
 
@@ -1303,6 +1311,52 @@ async def change_password(
             status_code=500,
             detail="Erreur technique lors du changement de mot de passe",
         )
+
+
+# === ENDPOINT DETECT COUNTRY (Public) ===
+@router.get("/detect-country")
+async def detect_country(request: Request) -> Dict[str, Any]:
+    """
+    Detect user's country from IP address (public endpoint - no authentication required)
+    Used to pre-select country in registration form for better UX
+    """
+    if not GEO_LOCATION_AVAILABLE:
+        logger.warning("[DetectCountry] Geo-location service not available, returning default")
+        return {
+            "success": False,
+            "country_code": "US",
+            "country_name": "United States",
+            "message": "Geo-location service not available"
+        }
+
+    try:
+        # Get client IP
+        client_ip = GeoLocationService.get_client_ip(request)
+        logger.info(f"[DetectCountry] Detecting country for IP: {client_ip}")
+
+        # Get country info
+        country_info = GeoLocationService.get_country_from_ip(client_ip)
+
+        country_code = country_info.get("country_code", "US")
+        country_name = country_info.get("country_name", "United States")
+
+        logger.info(f"[DetectCountry] Detected country: {country_code} ({country_name})")
+
+        return {
+            "success": True,
+            "country_code": country_code,
+            "country_name": country_name
+        }
+
+    except Exception as e:
+        logger.error(f"[DetectCountry] Error detecting country: {e}")
+        # Fallback to US as default
+        return {
+            "success": False,
+            "country_code": "US",
+            "country_name": "United States",
+            "error": str(e)
+        }
 
 
 # === NOUVEL ENDPOINT REGISTER ===

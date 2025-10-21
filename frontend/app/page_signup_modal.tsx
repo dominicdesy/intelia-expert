@@ -413,6 +413,30 @@ export function SignupModal({
     [handleSignupChange],
   );
 
+  // Auto-détecter le pays de l'utilisateur via son IP
+  React.useEffect(() => {
+    const detectUserCountry = async () => {
+      // Ne détecter que si le pays n'est pas déjà sélectionné
+      if (signupData.country) return;
+
+      try {
+        const response = await fetch("/v1/auth/detect-country");
+        const data = await response.json();
+
+        if (data.success && data.country_code) {
+          // Pré-sélectionner le pays détecté
+          handleCountryChange(data.country_code);
+          console.log(`🌍 Pays détecté automatiquement: ${data.country_name} (${data.country_code})`);
+        }
+      } catch (error) {
+        console.error("Erreur lors de la détection du pays:", error);
+        // Échec silencieux - l'utilisateur peut sélectionner manuellement
+      }
+    };
+
+    detectUserCountry();
+  }, [signupData.country, handleCountryChange]);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
