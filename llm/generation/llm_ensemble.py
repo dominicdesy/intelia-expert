@@ -673,6 +673,64 @@ Réponds directement en {language}, sans préambule."""
             query, responses, quality_assessments, language
         )
 
+    def _get_cot_prompt(self, language: str) -> str:
+        """
+        Get Chain-of-Thought prompt template for the specified language
+
+        Returns structured CoT prompt with XML tags for thinking/analysis/answer
+        """
+        cot_templates = {
+            "fr": """
+
+🧠 CHAIN-OF-THOUGHT REASONING - STRUCTURE TA RÉPONSE:
+
+Structure ta réponse avec les balises XML suivantes pour montrer ton raisonnement:
+
+<thinking>
+[Ton raisonnement initial sur la question: que demande l'utilisateur? quelles informations sont pertinentes? quelle approche adopter?]
+</thinking>
+
+<analysis>
+[Ton analyse détaillée étape par étape: extraction des données du contexte, calculs si nécessaire, vérification de la cohérence, identification des informations clés]
+</analysis>
+
+<answer>
+[Ta réponse finale claire, concise et directe à la question de l'utilisateur - SANS les balises XML dans cette section]
+</answer>
+
+⚠️ IMPORTANT:
+- Les sections <thinking> et <analysis> permettent à l'utilisateur de voir ton raisonnement
+- La section <answer> contient la réponse finale formatée normalement (markdown, listes, etc.)
+- Chaque section doit être substantielle et informative
+""",
+            "en": """
+
+🧠 CHAIN-OF-THOUGHT REASONING - STRUCTURE YOUR RESPONSE:
+
+Structure your response with the following XML tags to show your reasoning:
+
+<thinking>
+[Your initial reasoning about the question: what is the user asking? what information is relevant? what approach to take?]
+</thinking>
+
+<analysis>
+[Your detailed step-by-step analysis: data extraction from context, calculations if needed, consistency verification, key information identification]
+</analysis>
+
+<answer>
+[Your final answer, clear, concise and directly addressing the user's question - WITHOUT XML tags in this section]
+</answer>
+
+⚠️ IMPORTANT:
+- The <thinking> and <analysis> sections let the user see your reasoning
+- The <answer> section contains the final answer formatted normally (markdown, lists, etc.)
+- Each section must be substantial and informative
+""",
+        }
+
+        # Default to French if language not found
+        return cot_templates.get(language, cot_templates["fr"])
+
     async def _fallback_single_llm(
         self,
         query: str,
@@ -695,6 +753,13 @@ Réponds directement en {language}, sans préambule."""
         )
         logger.info(f"📏 Adaptive max_tokens for fallback: {max_tokens}")
 
+        # Build system prompt with CoT instructions
+        cot_instructions = self._get_cot_prompt(language)
+        if system_prompt:
+            enhanced_system_prompt = f"{system_prompt}\n\n{cot_instructions}"
+        else:
+            enhanced_system_prompt = f"Tu es un expert en production avicole. Réponds de manière factuelle et précise.\n\n{cot_instructions}"
+
         context_text = self._format_context(context_docs)
         user_message = f"""Contexte:
 {context_text}
@@ -703,15 +768,15 @@ Question: {query}
 
 Réponds en {language}."""
 
-        # Use Claude if available, else GPT-4o
+        # Use Claude if available, else GPT-4o (with CoT-enhanced system prompt)
         if self.claude_client:
             result = await self._generate_claude_response(
-                query, user_message, system_prompt, max_tokens
+                query, user_message, enhanced_system_prompt, max_tokens
             )
             provider = "claude"
         elif self.openai_client:
             result = await self._generate_openai_response(
-                "gpt4o", "gpt-4o", query, user_message, system_prompt, max_tokens
+                "gpt4o", "gpt-4o", query, user_message, enhanced_system_prompt, max_tokens
             )
             provider = "gpt4o"
         else:
