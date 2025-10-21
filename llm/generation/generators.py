@@ -743,15 +743,40 @@ Para manejar el estrés térmico en pollos de engorde, tres estrategias son esen
             )
 
             # Génération avec modèle CoT configuré
-            response = await self.client.chat.completions.create(
-                model=self.cot_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0.1,  # Optimal: 0.05 caused RAGAS timeouts, 0.1 provides best balance (Faithfulness: 71.57%)
-                max_tokens=1500,  # Increased from 900 to allow complete CoT structure (thinking + analysis + answer)
-            )
+            # 🧠 O1 models (o1-preview, o1-mini) have special requirements:
+            # - NO system messages (merge into user message)
+            # - NO temperature control (always 1.0)
+            # - NO max_tokens (use max_completion_tokens instead)
+            is_o1_model = self.cot_model.startswith("o1-")
+
+            if is_o1_model:
+                # O1 models: Merge system + user into single user message
+                combined_prompt = f"""{system_prompt}
+
+{user_prompt}"""
+                response = await self.client.chat.completions.create(
+                    model=self.cot_model,
+                    messages=[
+                        {"role": "user", "content": combined_prompt},
+                    ],
+                    # O1 models don't support temperature or max_tokens
+                    # They use max_completion_tokens instead
+                    max_completion_tokens=1500,
+                )
+                logger.info(f"🧠 Using O1 model: {self.cot_model} (native CoT reasoning)")
+            else:
+                # Standard models (gpt-4o, gpt-4o-2024-08-06, etc.)
+                response = await self.client.chat.completions.create(
+                    model=self.cot_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.1,  # Optimal: 0.05 caused RAGAS timeouts, 0.1 provides best balance (Faithfulness: 71.57%)
+                    max_tokens=1500,  # Increased from 900 to allow complete CoT structure (thinking + analysis + answer)
+                )
+                logger.info(f"🧠 Using standard model: {self.cot_model} (structured CoT)")
+
 
             generated_response = response.choices[0].message.content.strip()
 
