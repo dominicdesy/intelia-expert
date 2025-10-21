@@ -38,16 +38,22 @@ class SystemPromptsManager:
     Charge depuis system_prompts.json avec résolution de chemin robuste
     """
 
-    def __init__(self, prompts_path: Optional[str] = None):
+    def __init__(self, prompts_path: Optional[str] = None, terminology_path: Optional[str] = None):
         """
         Initialise le gestionnaire de prompts
 
         Args:
             prompts_path: Chemin vers system_prompts.json (optionnel)
                          Si None, utilise une résolution automatique
+            terminology_path: Chemin vers poultry_terminology.json (optionnel)
+                            Si None, utilise une résolution automatique
         """
         self.prompts_path = self._resolve_config_path(prompts_path)
         self.prompts = self._load_prompts()
+
+        # Charger le glossaire de terminologie
+        self.terminology_path = self._resolve_terminology_path(terminology_path)
+        self.terminology = self._load_terminology()
 
         # Log conditionnel pour éviter messages contradictoires
         if self.prompts:
@@ -56,6 +62,11 @@ class SystemPromptsManager:
             logger.error(
                 "❌ SystemPromptsManager non chargé - fichier absent ou invalide"
             )
+
+        if self.terminology:
+            logger.info(f"✅ Terminologie avicole chargée depuis {self.terminology_path}")
+        else:
+            logger.warning("⚠️ Terminologie avicole non chargée - fichier absent ou invalide")
 
     def _resolve_config_path(self, prompts_path: Optional[str]) -> Path:
         """
@@ -103,6 +114,44 @@ class SystemPromptsManager:
             "Chemins testés:\n" + "\n".join(f"  - {p}" for p in tested_paths)
         )
 
+    def _resolve_terminology_path(self, terminology_path: Optional[str]) -> Path:
+        """
+        Résolution robuste du chemin du fichier de terminologie
+
+        Args:
+            terminology_path: Chemin fourni par l'utilisateur ou None
+
+        Returns:
+            Path résolu et validé
+        """
+        # Si un chemin est fourni, l'utiliser en priorité
+        if terminology_path:
+            path = Path(terminology_path)
+            if path.exists():
+                return path.resolve()
+
+        # Chemins à tester par ordre de priorité
+        alternative_paths = [
+            # 1. Même dossier que system_prompts.json
+            Path(__file__).parent / "poultry_terminology.json",
+            # 2. Depuis la racine du projet
+            Path.cwd() / "config" / "poultry_terminology.json",
+            # 3. Ancien chemin pour compatibilité
+            Path.cwd() / "llm" / "config" / "poultry_terminology.json",
+            # 4. Chemin absolu si déployé dans /app
+            Path("/app/config/poultry_terminology.json"),
+        ]
+
+        # Tester chaque chemin
+        for alt_path in alternative_paths:
+            if alt_path.exists():
+                logger.debug(f"Fichier terminologie trouvé: {alt_path}")
+                return alt_path.resolve()
+
+        # Si aucun fichier trouvé, retourner le chemin par défaut (pour logging)
+        logger.warning("poultry_terminology.json introuvable")
+        return Path(__file__).parent / "poultry_terminology.json"
+
     def _load_prompts(self) -> Dict:
         """Charge system_prompts.json avec gestion d'erreurs"""
         try:
@@ -118,6 +167,23 @@ class SystemPromptsManager:
             return {}
         except Exception as e:
             logger.error(f"❌ Erreur chargement {self.prompts_path}: {e}")
+            return {}
+
+    def _load_terminology(self) -> Dict:
+        """Charge poultry_terminology.json avec gestion d'erreurs"""
+        try:
+            with open(self.terminology_path, "r", encoding="utf-8") as f:
+                terminology = json.load(f)
+                logger.debug(f"Terminologie chargée: {len(terminology.get('terminology', {}))} termes")
+                return terminology
+        except FileNotFoundError:
+            logger.warning(f"⚠️ Fichier terminologie non trouvé: {self.terminology_path}")
+            return {}
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Erreur JSON dans {self.terminology_path}: {e}")
+            return {}
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur chargement {self.terminology_path}: {e}")
             return {}
 
     def get_specialized_prompt(
@@ -158,16 +224,17 @@ class SystemPromptsManager:
             logger.error(f"Missing placeholder in prompt template: {e}")
             return prompt_template
 
-    def get_base_prompt(self, key: str, language: str = "fr") -> Optional[str]:
+    def get_base_prompt(self, key: str, language: str = "fr", include_terminology: bool = True) -> Optional[str]:
         """
-        Récupère un prompt de base (avec injection de langue)
+        Récupère un prompt de base (avec injection de langue et terminologie)
 
         Args:
             key: Clé du prompt (ex: "expert_identity", "response_guidelines")
             language: "fr", "en", "es", etc.
+            include_terminology: Si True, ajoute automatiquement les instructions de terminologie
 
         Returns:
-            Prompt string avec {language_name} remplacé, ou None
+            Prompt string avec {language_name} remplacé et terminologie ajoutée, ou None
         """
         base_prompts = self.prompts.get("base_prompts", {})
         prompt_template = base_prompts.get(key)
@@ -181,6 +248,13 @@ class SystemPromptsManager:
 
         try:
             prompt = prompt_template.format(language_name=language_name)
+
+            # Ajouter les instructions de terminologie si demandé et disponibles
+            if include_terminology and key == "expert_identity":
+                terminology_instructions = self.get_terminology_instructions(language)
+                if terminology_instructions:
+                    prompt += terminology_instructions
+
             return prompt
         except KeyError as e:
             logger.error(f"Missing placeholder in base prompt: {e}")
@@ -406,6 +480,61 @@ class SystemPromptsManager:
                 )
 
         return confirmation
+
+    # ================================================================
+    # TERMINOLOGY METHODS
+    # ================================================================
+
+    def get_terminology_instructions(self, language: str = "fr") -> str:
+        """
+        🆕 Génère les instructions de terminologie pour une langue
+
+        Cette méthode crée des instructions concises basées sur le glossaire
+        de terminologie avicole pour éviter les traductions littérales.
+
+        Args:
+            language: Langue cible (fr, en, es, etc.)
+
+        Returns:
+            Instructions de terminologie formatées
+
+        Examples:
+            >>> manager = SystemPromptsManager()
+            >>> instructions = manager.get_terminology_instructions("fr")
+            >>> "poulailler" in instructions
+            True
+        """
+        if not self.terminology or "terminology" not in self.terminology:
+            return ""
+
+        language_name = LANGUAGE_DISPLAY_NAMES.get(language, language.upper())
+        terms = self.terminology.get("terminology", {})
+
+        # Sélectionner les termes les plus importants (top 5)
+        key_terms = ["poultry_house", "poultry_farm", "broiler", "layer", "flock"]
+        examples = []
+
+        for term_key in key_terms:
+            if term_key in terms:
+                term_data = terms[term_key]
+                correct_term = term_data.get(language, term_data.get("en", ""))
+                avoid_terms = term_data.get("avoid", {}).get(language, "")
+
+                if correct_term:
+                    if avoid_terms:
+                        examples.append(f"  * Use: {correct_term} (NOT: {avoid_terms})")
+                    else:
+                        examples.append(f"  * Use: {correct_term}")
+
+        if not examples:
+            return ""
+
+        instructions = f"""
+IMPORTANT - POULTRY TERMINOLOGY for {language_name}:
+Use proper technical terminology, NOT literal word-for-word translations:
+{chr(10).join(examples[:5])}
+"""
+        return instructions
 
     # ================================================================
     # CHAIN-OF-THOUGHT (CoT) PROMPT METHODS
