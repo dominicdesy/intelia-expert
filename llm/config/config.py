@@ -3,6 +3,7 @@
 config.py - Configuration centralisée avec support multilingue
 OptimisÉ pour Digital Ocean App Platform
 Version multilingue: Support 13 langues + service traduction hybride
+Updated: 2025-10-21 - CoT pipeline + sentence-transformers support
 """
 
 import os
