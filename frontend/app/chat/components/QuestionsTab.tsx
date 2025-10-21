@@ -16,6 +16,7 @@ interface QuestionLog {
     | "validation_rejected"
     | "quota_exceeded"
     | "unknown";
+  source_display?: string; // Format lisible: "Performance Metrics", "Knowledge Base", "External LLM"
   confidence_score: number;
   response_time: number;
   language: string;
@@ -136,6 +137,19 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
     }
   };
 
+  const getSourceDisplayColor = (sourceDisplay: string) => {
+    if (sourceDisplay.includes("Performance") || sourceDisplay.includes("Metrics")) {
+      return "text-green-700 bg-green-100";
+    }
+    if (sourceDisplay.includes("Knowledge") || sourceDisplay.includes("Base")) {
+      return "text-blue-700 bg-blue-100";
+    }
+    if (sourceDisplay.includes("External") || sourceDisplay.includes("LLM")) {
+      return "text-purple-700 bg-purple-100";
+    }
+    return "text-gray-700 bg-gray-100";
+  };
+
   const getFeedbackIcon = (feedback: number | null) => {
     if (feedback === 1) return "👍";
     if (feedback === -1) return "👎";
@@ -176,7 +190,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
         total_questions: sessionQuestions.length,
         questions: sessionQuestions.map((q) => q.question),
         responses: sessionQuestions.map((q) => q.response),
-        sources: sessionQuestions.map((q) => getSourceLabel(q.response_source)),
+        sources: sessionQuestions.map((q) => q.source_display || getSourceLabel(q.response_source)),
         confidence_scores: sessionQuestions.map((q) => q.confidence_score),
         response_times: sessionQuestions.map((q) => q.response_time),
         feedback_scores: sessionQuestions.map((q) => q.feedback),
@@ -644,7 +658,7 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                       question: q.question.substring(0, 100) + "...",
                       feedback: q.feedback === 1 ? "Positif" : "Négatif",
                       comment: q.feedback_comment,
-                      source: getSourceLabel(q.response_source),
+                      source: q.source_display || getSourceLabel(q.response_source),
                       confidence: (q.confidence_score * 100).toFixed(1) + "%",
                     }));
 
@@ -794,14 +808,19 @@ export const QuestionsTab: React.FC<QuestionsTabProps> = ({
                     </div>
 
                     {/* Métadonnées */}
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                      <div className="flex items-center space-x-4">
-                        <span>
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <div className="flex items-center space-x-4 flex-wrap gap-y-2">
+                        <span className="text-gray-500">
                           {new Date(question.timestamp).toLocaleString("fr-FR")}
                         </span>
-                        <span>{question.response_time}s</span>
-                        <span>{question.language.toUpperCase()}</span>
-                        <span>{question.session_id.substring(0, 8)}...</span>
+                        <span className="text-gray-500">{question.response_time}s</span>
+                        <span className="text-gray-500">{question.language.toUpperCase()}</span>
+                        <span className="text-gray-500">{question.session_id.substring(0, 8)}...</span>
+                        {question.source_display && (
+                          <span className={`px-2 py-1 rounded font-medium ${getSourceDisplayColor(question.source_display)}`}>
+                            📊 {question.source_display}
+                          </span>
+                        )}
                       </div>
                       <button
                         onClick={() => setSelectedQuestion(question)}
