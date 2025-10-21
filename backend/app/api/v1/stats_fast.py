@@ -615,7 +615,9 @@ async def get_questions(
                         # Récupérer les infos utilisateur depuis Supabase
                         # Pour les admins, utiliser le user_id de la conversation, pas celui de l'admin
                         conversation_user_id = conv.get("user_id", user_id)
+                        logger.info(f"🔍 [DEBUG] Conv ID: {conv['id']}, user_id from conv: {conversation_user_id}")
                         user_info = get_user_from_supabase(conversation_user_id)
+                        logger.info(f"🔍 [DEBUG] User info email: {user_info.get('email') if user_info else 'None'}")
 
                         questions.append({
                             "id": conv["id"],
