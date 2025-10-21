@@ -44,6 +44,7 @@ import { HelpButton, HelpTour } from "./components/HelpTour";
 import { secureLog } from "@/lib/utils/secureLogger";
 import { VoiceInput } from "./components/VoiceInput";
 import { TypewriterMessage } from "./components/TypewriterMessage";
+import { VoiceRealtimeButton } from "@/components/VoiceRealtimeButton";
 
 // Composant ChatInput optimisé avec React.memo
 const ChatInput = React.memo(
@@ -1719,6 +1720,8 @@ function ChatInterface() {
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
       />
+
+      <VoiceRealtimeButton />
     </>
   );
 }
