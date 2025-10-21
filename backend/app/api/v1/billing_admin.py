@@ -171,6 +171,7 @@ async def update_plan_quota(
     """
     Modifie le quota mensuel d'un plan
     SÉCURISÉ: Quota = logique métier, pas de paiement Stripe impliqué
+    PROPAGATION: Met à jour automatiquement tous les utilisateurs du plan
     """
     verify_super_admin(current_user)
 
@@ -187,7 +188,7 @@ async def update_plan_quota(
                 if not old_quota:
                     raise HTTPException(status_code=404, detail=f"Plan '{plan_name}' not found")
 
-                # Mettre à jour
+                # Mettre à jour le plan
                 cur.execute(
                     """
                     UPDATE billing_plans
@@ -196,25 +197,77 @@ async def update_plan_quota(
                     """,
                     (data.monthly_quota, plan_name)
                 )
+
+                # PROPAGATION 1: Mettre à jour monthly_usage_tracking pour le mois en cours
+                # Pour tous les utilisateurs de ce plan qui n'ont pas de custom_monthly_quota
+                cur.execute(
+                    """
+                    UPDATE monthly_usage_tracking mut
+                    SET monthly_quota = %s,
+                        current_status = CASE
+                            WHEN questions_used >= %s THEN 'quota_exceeded'
+                            ELSE 'active'
+                        END,
+                        quota_exceeded_at = CASE
+                            WHEN questions_used >= %s AND quota_exceeded_at IS NULL THEN CURRENT_TIMESTAMP
+                            WHEN questions_used < %s THEN NULL
+                            ELSE quota_exceeded_at
+                        END
+                    FROM user_billing_info ubi
+                    WHERE mut.user_email = ubi.user_email
+                      AND ubi.plan_name = %s
+                      AND ubi.custom_monthly_quota IS NULL
+                      AND mut.month_year = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+                    """,
+                    (data.monthly_quota, data.monthly_quota, data.monthly_quota,
+                     data.monthly_quota, plan_name)
+                )
+                users_updated = cur.rowcount
+
+                # PROPAGATION 2: Mettre à jour stripe_subscriptions si nécessaire
+                cur.execute(
+                    """
+                    UPDATE stripe_subscriptions
+                    SET updated_at = CURRENT_TIMESTAMP
+                    WHERE plan_name = %s
+                      AND status IN ('active', 'trialing')
+                    """,
+                    (plan_name,)
+                )
+                subscriptions_updated = cur.rowcount
+
                 conn.commit()
 
-                # Logger le changement
+                # Logger le changement avec le nombre d'utilisateurs affectés
                 log_admin_action(
                     action_type="quota_change",
                     target_entity=plan_name,
                     admin_email=current_user.get("email"),
-                    old_value={"quota": old_quota["monthly_quota"]},
-                    new_value={"quota": data.monthly_quota},
+                    old_value={
+                        "quota": old_quota["monthly_quota"],
+                        "users_before": users_updated
+                    },
+                    new_value={
+                        "quota": data.monthly_quota,
+                        "users_updated": users_updated,
+                        "subscriptions_updated": subscriptions_updated
+                    },
                     ip_address=request.client.host
                 )
 
-                logger.info(f"✅ Quota modifié: {plan_name} → {data.monthly_quota} questions/mois")
+                logger.info(
+                    f"✅ Quota modifié: {plan_name} → {data.monthly_quota} questions/mois "
+                    f"({users_updated} utilisateurs mis à jour)"
+                )
 
                 return {
                     "success": True,
                     "plan_name": plan_name,
                     "old_quota": old_quota["monthly_quota"],
-                    "new_quota": data.monthly_quota
+                    "new_quota": data.monthly_quota,
+                    "users_updated": users_updated,
+                    "subscriptions_updated": subscriptions_updated,
+                    "message": f"Quota mis à jour pour {users_updated} utilisateur(s) du plan {plan_name}"
                 }
 
     except HTTPException:
