@@ -35,9 +35,9 @@ if LANGSMITH_ENABLED and not LANGSMITH_API_KEY:
     )
 
 # ===== NOUVEAU: CONFIGURATION MULTILINGUE =====
-# Langues supportées (16 langues ISO 639-1) - Alignées avec le frontend
+# Langues supportées (12 langues ISO 639-1) - Seulement celles avec dictionnaires
 SUPPORTED_LANGUAGES = {
-    "ar",  # Arabe
+    # "ar",  # Arabe - dictionnaire manquant
     "de",  # Allemand
     "en",  # Anglais
     "es",  # Espagnol
@@ -45,13 +45,13 @@ SUPPORTED_LANGUAGES = {
     "hi",  # Hindi
     "id",  # Indonésien
     "it",  # Italien
-    "ja",  # Japonais
+    # "ja",  # Japonais - dictionnaire manquant
     "nl",  # Néerlandais
     "pl",  # Polonais
     "pt",  # Portugais
     "th",  # Thaï
-    "tr",  # Turc
-    "vi",  # Vietnamien
+    # "tr",  # Turc - dictionnaire manquant
+    # "vi",  # Vietnamien - dictionnaire manquant
     "zh",  # Chinois
 }
 DEFAULT_LANGUAGE = "fr"
