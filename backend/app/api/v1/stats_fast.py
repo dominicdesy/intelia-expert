@@ -559,6 +559,9 @@ async def get_questions(
                             sequence_number,
                             feedback,
                             feedback_comment,
+                            cot_thinking,
+                            cot_analysis,
+                            has_cot_structure,
                             created_at
                         FROM messages
                         WHERE conversation_id = %s
@@ -579,6 +582,9 @@ async def get_questions(
                             "sequence_number": msg_row["sequence_number"],
                             "feedback": msg_row["feedback"],
                             "feedback_comment": msg_row["feedback_comment"],
+                            "cot_thinking": msg_row["cot_thinking"],
+                            "cot_analysis": msg_row["cot_analysis"],
+                            "has_cot_structure": msg_row["has_cot_structure"],
                             "created_at": msg_row["created_at"].isoformat() if msg_row["created_at"] else None
                         })
 
@@ -607,7 +613,9 @@ async def get_questions(
 
                     if user_msg and assistant_msg:
                         # Récupérer les infos utilisateur depuis Supabase
-                        user_info = get_user_from_supabase(user_id)
+                        # Pour les admins, utiliser le user_id de la conversation, pas celui de l'admin
+                        conversation_user_id = conv.get("user_id", user_id)
+                        user_info = get_user_from_supabase(conversation_user_id)
 
                         questions.append({
                             "id": conv["id"],
@@ -622,7 +630,10 @@ async def get_questions(
                             "language": conv.get("language", ""),
                             "session_id": conv["session_id"],
                             "feedback": assistant_msg.get("feedback"),
-                            "feedback_comment": assistant_msg.get("feedback_comment")
+                            "feedback_comment": assistant_msg.get("feedback_comment"),
+                            "cot_thinking": assistant_msg.get("cot_thinking"),
+                            "cot_analysis": assistant_msg.get("cot_analysis"),
+                            "has_cot_structure": assistant_msg.get("has_cot_structure", False)
                         })
 
                 # Calculer le nombre de pages

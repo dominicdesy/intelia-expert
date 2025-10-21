@@ -22,6 +22,9 @@ interface QuestionLog {
   session_id: string;
   feedback: number | null;
   feedback_comment: string | null;
+  cot_thinking?: string | null;
+  cot_analysis?: string | null;
+  has_cot_structure?: boolean;
 }
 
 // Props du composant
