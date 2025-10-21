@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr
@@ -27,6 +27,14 @@ try:
 except ImportError:
     EMAIL_SERVICE_AVAILABLE = False
     logger.warning("Email service not available")
+
+# Import country tracking service for fraud detection
+try:
+    from app.services.country_tracking_service import CountryTrackingService
+    COUNTRY_TRACKING_AVAILABLE = True
+except ImportError:
+    COUNTRY_TRACKING_AVAILABLE = False
+    logger.warning("Country tracking service not available")
 
 router = APIRouter(prefix="/auth")
 logger = logging.getLogger(__name__)
@@ -482,10 +490,11 @@ async def get_current_user(
 
 # === ENDPOINT LOGIN MODIFIÉ AVEC SESSION TRACKING ===
 @router.post("/login", response_model=TokenResponse)
-async def login(request: LoginRequest):
+async def login(request: LoginRequest, http_request: Request):
     """
     Authenticate user and return a JWT access token.
     Version corrigée avec gestion d'erreurs détaillée + session tracking
+    Tracks login country for pricing fraud detection
     """
     logger.info(f"[Login] Tentative de connexion: {mask_email(request.email)}")
 
@@ -588,6 +597,32 @@ async def login(request: LoginRequest):
             # Ne pas faire échouer le login si le tracking échoue
 
         logger.info(f"[Login] Connexion réussie pour: {mask_email(request.email)}")
+
+        # Track login country for fraud detection
+        if COUNTRY_TRACKING_AVAILABLE:
+            try:
+                login_info = await CountryTrackingService.track_login(
+                    request.email,
+                    http_request,
+                    login_method="password",
+                    session_id=session_id
+                )
+                if login_info.get("is_suspicious"):
+                    logger.warning(
+                        f"[Login] ⚠️ Suspicious login detected: {mask_email(request.email)} "
+                        f"from {login_info.get('country_code')} "
+                        f"(risk_score: {login_info.get('risk_score')}, "
+                        f"VPN: {login_info.get('is_vpn')})"
+                    )
+                else:
+                    logger.info(
+                        f"[Login] Country tracked: {mask_email(request.email)} from "
+                        f"{login_info.get('country_code')} "
+                        f"(risk_score: {login_info.get('risk_score')})"
+                    )
+            except Exception as e:
+                logger.error(f"[Login] Failed to track login country: {e}")
+                # Don't fail login if tracking fails
 
         return TokenResponse(
             access_token=token, token_type="bearer", expires_at=expires_at
@@ -1272,10 +1307,11 @@ async def change_password(
 
 # === NOUVEL ENDPOINT REGISTER ===
 @router.post("/register", response_model=AuthResponse)
-async def register_user(user_data: UserRegister):
+async def register_user(user_data: UserRegister, request: Request):
     """
     Inscription d'un nouvel utilisateur
     Crée le compte dans Supabase et retourne un token JWT
+    Tracks signup country for pricing fraud detection
     """
     logger.info(f"[Register] Tentative inscription: {user_data.email}")
 
@@ -1509,6 +1545,18 @@ async def register_user(user_data: UserRegister):
         # Le login sera possible uniquement après confirmation de l'email
 
         logger.info(f"[Register] Inscription réussie: {user_data.email} - Email de confirmation requis")
+
+        # Track signup country for pricing fraud detection
+        if COUNTRY_TRACKING_AVAILABLE:
+            try:
+                signup_info = await CountryTrackingService.track_signup(user_data.email, request)
+                logger.info(
+                    f"[Register] Country tracked: {user_data.email} from "
+                    f"{signup_info.get('signup_country')} (tier: {signup_info.get('pricing_tier')})"
+                )
+            except Exception as e:
+                logger.error(f"[Register] Failed to track signup country: {e}")
+                # Don't fail registration if tracking fails
 
         return AuthResponse(
             success=True,

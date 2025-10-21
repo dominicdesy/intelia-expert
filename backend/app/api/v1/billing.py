@@ -20,6 +20,14 @@ from app.api.v1.auth import get_current_user
 # Import geo-location service
 from app.services.geo_location import GeoLocationService
 
+# Import country tracking service for pricing fraud detection
+try:
+    from app.services.country_tracking_service import CountryTrackingService
+    COUNTRY_TRACKING_AVAILABLE = True
+except ImportError:
+    COUNTRY_TRACKING_AVAILABLE = False
+    logger.warning("Country tracking service not available")
+
 router = APIRouter(prefix="/billing", tags=["billing"])
 logger = logging.getLogger(__name__)
 
@@ -1018,6 +1026,167 @@ async def set_currency_preference(
 
     except Exception as e:
         logger.error(f"Error setting currency preference: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# PRICING FRAUD PREVENTION ENDPOINTS
+# ============================================================================
+
+@router.get("/pricing-info")
+async def get_pricing_info(
+    current_user: dict = Depends(get_current_user),
+    request: Request = None
+) -> Dict[str, Any]:
+    """
+    Get user's pricing tier and regionalized prices
+    Returns the pricing tier (locked or suggested) and converted prices
+    """
+    if not COUNTRY_TRACKING_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Country tracking service not available"
+        )
+
+    user_email = current_user.get("email")
+
+    try:
+        billing = get_billing_manager()
+
+        with psycopg2.connect(billing.dsn) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Get user's billing info
+                cur.execute("""
+                    SELECT
+                        pricing_tier,
+                        pricing_country,
+                        signup_country,
+                        pricing_locked_at,
+                        billing_currency
+                    FROM user_billing_info
+                    WHERE user_email = %s
+                """, (user_email,))
+
+                billing_info = cur.fetchone()
+
+                if not billing_info or not billing_info.get('pricing_tier'):
+                    # First time - detect country and suggest tier
+                    country_info = await CountryTrackingService.get_user_country(user_email, request)
+                    country_code = country_info.get('country_code', 'US')
+
+                    # Get suggested pricing tier
+                    cur.execute("""
+                        SELECT tier, base_price_usd
+                        FROM pricing_tiers
+                        WHERE country_code = %s
+                    """, (country_code,))
+
+                    tier_info = cur.fetchone()
+
+                    if not tier_info:
+                        # Default to tier1 if country not found
+                        tier_info = {'tier': 'tier1', 'base_price_usd': 18.00}
+
+                    return {
+                        "pricing_tier": tier_info['tier'],
+                        "pricing_country": country_code,
+                        "signup_country": billing_info.get('signup_country') if billing_info else country_code,
+                        "is_locked": False,
+                        "base_price_usd": float(tier_info['base_price_usd']),
+                        "billing_currency": billing_info.get('billing_currency') if billing_info else "USD",
+                        "available_currencies": SUPPORTED_BILLING_CURRENCIES
+                    }
+
+                # Get base price for tier
+                cur.execute("""
+                    SELECT base_price_usd
+                    FROM pricing_tiers
+                    WHERE country_code = %s
+                """, (billing_info['pricing_country'],))
+
+                tier_price = cur.fetchone()
+                base_price = float(tier_price['base_price_usd']) if tier_price else 18.00
+
+                return {
+                    "pricing_tier": billing_info['pricing_tier'],
+                    "pricing_country": billing_info['pricing_country'],
+                    "signup_country": billing_info['signup_country'],
+                    "is_locked": billing_info['pricing_locked_at'] is not None,
+                    "locked_at": billing_info['pricing_locked_at'].isoformat() if billing_info['pricing_locked_at'] else None,
+                    "base_price_usd": base_price,
+                    "billing_currency": billing_info['billing_currency'] or "USD",
+                    "available_currencies": SUPPORTED_BILLING_CURRENCIES
+                }
+
+    except Exception as e:
+        logger.error(f"Error getting pricing info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/fraud-analysis")
+async def get_fraud_analysis(
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get fraud risk analysis for current user
+    Admin or user themselves can access this
+    """
+    if not COUNTRY_TRACKING_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Country tracking service not available"
+        )
+
+    user_email = current_user.get("email")
+
+    try:
+        analysis = await CountryTrackingService.get_user_fraud_analysis(user_email)
+
+        return {
+            "success": True,
+            "fraud_analysis": analysis
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting fraud analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/lock-pricing-tier")
+async def lock_pricing_tier(
+    current_user: dict = Depends(get_current_user),
+    request: Request = None
+) -> Dict[str, Any]:
+    """
+    Lock the pricing tier for a user (called when they subscribe)
+    This prevents them from changing their pricing tier later
+    """
+    if not COUNTRY_TRACKING_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Country tracking service not available"
+        )
+
+    user_email = current_user.get("email")
+
+    try:
+        lock_info = await CountryTrackingService.lock_pricing_tier(user_email, request)
+
+        logger.info(
+            f"[Pricing] Tier locked for {user_email}: "
+            f"{lock_info['pricing_tier']} (country: {lock_info['pricing_country']})"
+        )
+
+        return {
+            "success": True,
+            "pricing_tier": lock_info['pricing_tier'],
+            "pricing_country": lock_info['pricing_country'],
+            "base_price_usd": lock_info['base_price_usd'],
+            "message": "Pricing tier locked successfully"
+        }
+
+    except Exception as e:
+        logger.error(f"Error locking pricing tier: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
