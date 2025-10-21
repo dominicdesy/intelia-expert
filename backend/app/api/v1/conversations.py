@@ -162,7 +162,7 @@ async def save_conversation(
             # Conversation existante - ajouter les nouveaux messages
             logger.info(f"Conversation existante trouvée: {existing_conv['id']}")
 
-            # 🔍 DEBUG: Log received data
+            # 🔍 DEBUG: Log received data from frontend
             logger.info(f"🔍 Backend received - source: '{conversation_data.source}', confidence: {conversation_data.confidence}")
             logger.info(f"🔍 Backend received - metadata: {conversation_data.metadata}")
 
@@ -223,7 +223,7 @@ async def save_conversation(
             # Nouvelle conversation - créer avec le premier échange
             logger.info("Création d'une nouvelle conversation")
 
-            # 🔍 DEBUG: Log received data
+            # 🔍 DEBUG: Log received data from frontend
             logger.info(f"🔍 Backend received - source: '{conversation_data.source}', confidence: {conversation_data.confidence}")
             logger.info(f"🔍 Backend received - metadata: {conversation_data.metadata}")
 
