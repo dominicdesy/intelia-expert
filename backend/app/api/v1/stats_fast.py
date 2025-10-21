@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 import logging
 import asyncio
 import aiohttp
+import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from psycopg2.extras import RealDictCursor
@@ -31,6 +32,16 @@ except ImportError as e:
     logger.warning(f"Auth module non disponible: {e}")
     get_current_user = None
     AUTH_AVAILABLE = False
+
+
+def is_super_admin(current_user: dict) -> bool:
+    """
+    Vérifie si l'utilisateur est super admin
+    Returns True si admin, False sinon (ne lève pas d'exception)
+    """
+    super_admins = os.getenv("SUPER_ADMIN_EMAILS", "").split(",")
+    user_email = current_user.get("email", "")
+    return user_email in super_admins
 
 router = APIRouter(prefix="/stats-fast", tags=["statistics-fast"])
 
@@ -436,16 +447,23 @@ async def get_questions(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentification requise")
 
+    # Vérifier si l'utilisateur est admin
+    user_is_admin = is_super_admin(current_user)
+
     user_id = (
         current_user.get("user_id") or
         current_user.get("sub") or
         current_user.get("id")
     )
-    if not user_id:
+
+    if not user_is_admin and not user_id:
         logger.error(f"[QUESTIONS] User ID manquant")
         raise HTTPException(status_code=400, detail="User ID manquant")
 
-    logger.info(f"🔍 [QUESTIONS] Fetching conversations for user_id: {user_id}")
+    if user_is_admin:
+        logger.info(f"🔍 [QUESTIONS] Admin mode: Fetching ALL conversations")
+    else:
+        logger.info(f"🔍 [QUESTIONS] Fetching conversations for user_id: {user_id}")
 
     try:
         with get_pg_connection() as conn:
@@ -453,39 +471,76 @@ async def get_questions(
                 offset = (page - 1) * limit
 
                 # Compter le total de conversations
-                cur.execute(
-                    """
-                    SELECT COUNT(*) as total
-                    FROM conversations
-                    WHERE user_id = %s AND status = 'active'
-                    """,
-                    (user_id,)
-                )
+                if user_is_admin:
+                    # Admin voit toutes les conversations
+                    cur.execute(
+                        """
+                        SELECT COUNT(*) as total
+                        FROM conversations
+                        WHERE status = 'active'
+                        """
+                    )
+                else:
+                    # Utilisateur normal voit seulement ses conversations
+                    cur.execute(
+                        """
+                        SELECT COUNT(*) as total
+                        FROM conversations
+                        WHERE user_id = %s AND status = 'active'
+                        """,
+                        (user_id,)
+                    )
                 total = cur.fetchone()["total"]
 
                 logger.info(f"[QUESTIONS] Found {total} conversations")
 
                 # Récupérer les conversations paginées
-                cur.execute(
-                    """
-                    SELECT
-                        c.id::text as id,
-                        c.session_id::text as session_id,
-                        c.title,
-                        c.language,
-                        c.message_count,
-                        c.first_message_preview,
-                        c.last_message_preview,
-                        c.created_at,
-                        c.updated_at,
-                        c.last_activity_at
-                    FROM conversations c
-                    WHERE c.user_id = %s AND c.status = 'active'
-                    ORDER BY c.last_activity_at DESC
-                    LIMIT %s OFFSET %s
-                    """,
-                    (user_id, limit, offset)
-                )
+                if user_is_admin:
+                    # Admin voit toutes les conversations
+                    cur.execute(
+                        """
+                        SELECT
+                            c.id::text as id,
+                            c.session_id::text as session_id,
+                            c.user_id::text as user_id,
+                            c.title,
+                            c.language,
+                            c.message_count,
+                            c.first_message_preview,
+                            c.last_message_preview,
+                            c.created_at,
+                            c.updated_at,
+                            c.last_activity_at
+                        FROM conversations c
+                        WHERE c.status = 'active'
+                        ORDER BY c.last_activity_at DESC
+                        LIMIT %s OFFSET %s
+                        """,
+                        (limit, offset)
+                    )
+                else:
+                    # Utilisateur normal voit seulement ses conversations
+                    cur.execute(
+                        """
+                        SELECT
+                            c.id::text as id,
+                            c.session_id::text as session_id,
+                            c.user_id::text as user_id,
+                            c.title,
+                            c.language,
+                            c.message_count,
+                            c.first_message_preview,
+                            c.last_message_preview,
+                            c.created_at,
+                            c.updated_at,
+                            c.last_activity_at
+                        FROM conversations c
+                        WHERE c.user_id = %s AND c.status = 'active'
+                        ORDER BY c.last_activity_at DESC
+                        LIMIT %s OFFSET %s
+                        """,
+                        (user_id, limit, offset)
+                    )
 
                 conversations = []
                 for conv_row in cur.fetchall():
