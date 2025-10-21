@@ -640,13 +640,16 @@ _global_prompts_manager: Optional[SystemPromptsManager] = None
 
 
 def get_prompts_manager(
-    prompts_path: Optional[str] = None, force_reload: bool = False
+    prompts_path: Optional[str] = None,
+    terminology_path: Optional[str] = None,
+    force_reload: bool = False
 ) -> SystemPromptsManager:
     """
     Factory pour obtenir l'instance globale du gestionnaire (singleton)
 
     Args:
         prompts_path: Chemin vers system_prompts.json (optionnel)
+        terminology_path: Chemin vers poultry_terminology.json (optionnel)
         force_reload: Si True, recharge même si existe
 
     Returns:
@@ -659,7 +662,7 @@ def get_prompts_manager(
     global _global_prompts_manager
 
     if _global_prompts_manager is None or force_reload:
-        _global_prompts_manager = SystemPromptsManager(prompts_path)
+        _global_prompts_manager = SystemPromptsManager(prompts_path, terminology_path)
 
     return _global_prompts_manager
 
