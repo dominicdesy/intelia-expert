@@ -162,6 +162,10 @@ async def save_conversation(
             # Conversation existante - ajouter les nouveaux messages
             logger.info(f"Conversation existante trouvée: {existing_conv['id']}")
 
+            # 🔍 DEBUG: Log received data
+            logger.info(f"🔍 Backend received - source: '{conversation_data.source}', confidence: {conversation_data.confidence}")
+            logger.info(f"🔍 Backend received - metadata: {conversation_data.metadata}")
+
             # Ajouter le message user
             user_msg = conversation_service.add_message(
                 conversation_id=existing_conv["id"],
@@ -175,6 +179,8 @@ async def save_conversation(
             cot_thinking = agent_metadata.get("cot_thinking")
             cot_analysis = agent_metadata.get("cot_analysis")
             has_cot = agent_metadata.get("has_cot_structure", False)
+
+            logger.info(f"🧠 CoT extracted - has_cot: {has_cot}, thinking: {len(cot_thinking or '')} chars, analysis: {len(cot_analysis or '')} chars")
 
             assistant_msg = conversation_service.add_message(
                 conversation_id=existing_conv["id"],
@@ -217,11 +223,17 @@ async def save_conversation(
             # Nouvelle conversation - créer avec le premier échange
             logger.info("Création d'une nouvelle conversation")
 
+            # 🔍 DEBUG: Log received data
+            logger.info(f"🔍 Backend received - source: '{conversation_data.source}', confidence: {conversation_data.confidence}")
+            logger.info(f"🔍 Backend received - metadata: {conversation_data.metadata}")
+
             # 🧠 Extract CoT sections from metadata.agent_metadata if available
             agent_metadata = conversation_data.metadata.get("agent_metadata", {}) if conversation_data.metadata else {}
             cot_thinking = agent_metadata.get("cot_thinking")
             cot_analysis = agent_metadata.get("cot_analysis")
             has_cot = agent_metadata.get("has_cot_structure", False)
+
+            logger.info(f"🧠 CoT extracted - has_cot: {has_cot}, thinking: {len(cot_thinking or '')} chars, analysis: {len(cot_analysis or '')} chars")
 
             result = conversation_service.create_conversation(
                 session_id=conversation_data.conversation_id,
