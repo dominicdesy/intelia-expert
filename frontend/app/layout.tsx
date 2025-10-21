@@ -8,7 +8,7 @@ import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import { AdProvider } from "@/components/AdSystem/AdProvider";
 import { MenuProvider } from "@/lib/contexts/MenuContext";
 import { Toaster } from "react-hot-toast";
-import { VoiceRealtimeProvider } from "@/components/providers/VoiceRealtimeProvider";
+// import { VoiceRealtimeProvider } from "@/components/providers/VoiceRealtimeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -509,7 +509,7 @@ export default function RootLayout({
                     },
                   }}
                 />
-                <VoiceRealtimeProvider />
+                {/* <VoiceRealtimeProvider /> */}
               </AdProvider>
             </MenuProvider>
           </LanguageProvider>
