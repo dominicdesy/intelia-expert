@@ -272,6 +272,7 @@ class ChatHandlers:
                 source = str(source)
 
             # Event START
+            logger.info(f"📤 Sending START event with source='{source}', confidence={confidence}")
             start_data = {
                 "type": "start",
                 "source": source,
