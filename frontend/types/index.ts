@@ -521,6 +521,14 @@ export type ErrorEvent = {
   message?: string;
 };
 
+export type StartEvent = {
+  type: "start";
+  source?: string;
+  confidence?: number;
+  processing_time?: number;
+  fallback_used?: boolean;
+};
+
 export type EndEvent = {
   type: "end";
   total_time?: number;
@@ -533,6 +541,7 @@ export type StreamEvent =
   | DeltaEvent
   | FinalEvent
   | ErrorEvent
+  | StartEvent
   | AgentStartEvent
   | AgentThinkingEvent
   | ChunkEvent
