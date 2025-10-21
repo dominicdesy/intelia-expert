@@ -1240,30 +1240,9 @@ INSTRUCTIONS CRITIQUES - STRUCTURE ET FORMAT:
 - Utilise un ton affirmatif mais sobre, sans formatage excessif
 - NE conclus PAS avec des recommandations pratiques sauf si explicitement demandé
 
-RÈGLE ABSOLUE - RÉPONSE MINIMALISTE:
-- Question sur le poids → Donne UNIQUEMENT le poids (1-2 phrases maximum)
-- Question sur le FCR → Donne UNIQUEMENT le FCR (1-2 phrases maximum)
-- Question sur "what about X?" → Donne UNIQUEMENT X (1-2 phrases maximum)
-- N'ajoute JAMAIS de métriques supplémentaires non demandées
-- Une question = une métrique = une réponse courte
-- Si on demande seulement le poids, NE DONNE PAS feed intake, FCR, daily gain, etc.
-
-EXEMPLES DE RÉPONSES CORRECTES:
-Question: "What's the target weight for Ross 308 males at 35 days?"
-❌ MAUVAIS: "At 35 days, males weigh 2441g with FCR 1.52 and feed intake 3720g."
-✅ BON: "The target weight for Ross 308 males at 35 days is 2441 grams."
-
-Question: "And what about females at the same age?"
-❌ MAUVAIS: "At 35 days, females weigh 2150g. Feed intake is 3028g. Daily gain is 89g."
-✅ BON: "At 35 days old, Ross 308 females have an average body weight of 2150 grams."
-
-Question: "Quel est le poids cible à 35 jours?"
-❌ MAUVAIS: "Le poids cible est 2441g avec un FCR de 1.52 et une consommation de 3720g."
-✅ BON: "Le poids cible pour les mâles Ross 308 à 35 jours est de 2441 grammes."
-
 COMPORTEMENT CONVERSATIONNEL:
-- Pour questions techniques: réponse ULTRA-CONCISE avec données chiffrées
-- Pour questions générales: ton professionnel mais accessible, réponses courtes
+- Pour questions techniques: réponse précise avec données chiffrées
+- Pour questions générales: ton professionnel mais accessible
 - Évite de poser trop de questions - réponds d'abord à la requête
 - N'utilise PAS d'emojis sauf si l'utilisateur en utilise
 - Maintiens la cohérence de format entre TOUTES les langues
@@ -1283,11 +1262,8 @@ YOUR RESPONSE LANGUAGE MUST BE: ENGLISH
 
 🎯 CRITICAL FORMAT CONSISTENCY:
 - Answer format MUST be IDENTICAL regardless of language
-- ONE question = ONE metric = ONE short answer (1-2 sentences)
-- If question asks ONLY for weight → give ONLY weight
-- If question asks ONLY for FCR → give ONLY FCR
-- NO extra metrics, NO extra sections, NO extra information beyond what was asked
-- Maintain EXACT SAME concise format across ALL languages
+- Provide complete, well-reasoned answers using the CoT structure
+- Maintain EXACT SAME format across ALL languages
 
 {"="*80}
 """
