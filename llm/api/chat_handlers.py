@@ -343,6 +343,13 @@ class ChatHandlers:
                 documents_used = len(context_docs)
 
             # Event END
+            # 🔍 DEBUG: Extract CoT fields before building end_data
+            cot_thinking = safe_get_attribute(rag_result, "cot_thinking", None)
+            cot_analysis = safe_get_attribute(rag_result, "cot_analysis", None)
+            has_cot_structure = safe_get_attribute(rag_result, "has_cot_structure", False)
+
+            logger.info(f"🧠 END event CoT fields - has_cot: {has_cot_structure}, thinking: {len(cot_thinking or '') } chars, analysis: {len(cot_analysis or '')} chars")
+
             end_data = {
                 "type": "end",
                 "total_time": total_processing_time,
@@ -364,11 +371,12 @@ class ChatHandlers:
                 ),
                 "detection_version": "5.1.0_conversation_memory",
                 # 🧠 Chain-of-Thought sections for PostgreSQL storage
-                "cot_thinking": safe_get_attribute(rag_result, "cot_thinking", None),
-                "cot_analysis": safe_get_attribute(rag_result, "cot_analysis", None),
-                "has_cot_structure": safe_get_attribute(rag_result, "has_cot_structure", False),
+                "cot_thinking": cot_thinking,
+                "cot_analysis": cot_analysis,
+                "has_cot_structure": has_cot_structure,
             }
 
+            logger.info(f"🔍 END event full data: {safe_serialize_for_json(end_data)[:500]}")
             yield sse_event(safe_serialize_for_json(end_data))
 
             # Sauvegarder dans les deux systèmes de mémoire
