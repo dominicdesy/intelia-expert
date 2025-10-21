@@ -24,6 +24,7 @@ except ImportError:
 from core.data_models import RAGResult, RAGSource, Document
 from core.memory import ConversationMemory
 from core.base import InitializableMixin
+from utils.cot_parser import parse_cot_response
 from config.config import (
     DEFAULT_ALPHA,
     RAG_SIMILARITY_TOP_K,
@@ -739,13 +740,19 @@ class WeaviateCore(InitializableMixin):
                     metadata={"reason": "no_generator_configured"},
                 )
 
+            # 🧠 CRITICAL FIX: Parse CoT structure from generator response
+            parsed_response = parse_cot_response(response_text)
+
+            # Extract answer only (thinking/analysis stored separately for database)
+            final_answer = parsed_response["answer"]
+
             # Calcul confiance finale
             final_confidence = self._calculate_confidence(filtered_docs)
 
             # Construction résultat
             result = RAGResult(
                 source=RAGSource.RAG_SUCCESS,
-                answer=response_text,
+                answer=final_answer,  # 🧠 Only the answer, not thinking/analysis
                 confidence=final_confidence,
                 context_docs=filtered_docs,  # ✅ FIX: Peupler context_docs pour RAGAS evaluation
                 metadata={
@@ -764,6 +771,22 @@ class WeaviateCore(InitializableMixin):
                     ),  # ✅ Traçabilité
                 },
             )
+
+            # 🧠 Store CoT sections in BOTH metadata AND direct attributes
+            if parsed_response["has_structure"]:
+                result.cot_thinking = parsed_response["thinking"]
+                result.cot_analysis = parsed_response["analysis"]
+                result.has_cot_structure = True
+                result.metadata["cot_thinking"] = parsed_response["thinking"]
+                result.metadata["cot_analysis"] = parsed_response["analysis"]
+                result.metadata["cot_structure_used"] = True
+                logger.info(
+                    f"🧠 CoT extracted in Weaviate handler - thinking: {len(parsed_response['thinking'] or '')} chars, "
+                    f"analysis: {len(parsed_response['analysis'] or '')} chars, answer: {len(final_answer)} chars"
+                )
+            else:
+                result.has_cot_structure = False
+                result.metadata["cot_structure_used"] = False
 
             # Mise en cache
             if cache_key and self.cache_manager and self.cache_manager.enabled:
