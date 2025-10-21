@@ -420,7 +420,8 @@ export function SignupModal({
       if (signupData.country) return;
 
       try {
-        const response = await fetch("/v1/auth/detect-country");
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+        const response = await fetch(`${apiBaseUrl}/v1/auth/detect-country`);
         const data = await response.json();
 
         if (data.success && data.country_code) {
