@@ -19,6 +19,14 @@ from pydantic import BaseModel, EmailStr
 
 from app.api.v1.auth import get_current_user
 
+# Import country tracking service for fraud detection
+try:
+    from app.services.country_tracking_service import CountryTrackingService
+    COUNTRY_TRACKING_AVAILABLE = True
+except ImportError:
+    COUNTRY_TRACKING_AVAILABLE = False
+    logger.warning("Country tracking service not available")
+
 router = APIRouter(prefix="/stripe", tags=["stripe-subscriptions"])
 logger = logging.getLogger(__name__)
 
@@ -272,7 +280,8 @@ def save_subscription_to_db(subscription_data: Dict[str, Any], user_email: str) 
 @router.post("/create-checkout-session", response_model=CreateCheckoutSessionResponse)
 async def create_checkout_session(
     request: CreateCheckoutSessionRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    http_request: Request = None
 ):
     """
     Crée une Stripe Checkout Session pour un upgrade de plan
@@ -281,14 +290,47 @@ async def create_checkout_session(
     - Stripe Link (paiement 1-click)
     - Paiement par carte
     - Tarification régionale automatique
+    - Fraud detection avec country tracking
     """
     try:
         user_email = current_user.get("email")
         user_name = current_user.get("full_name") or current_user.get("email", "").split("@")[0]
 
-        # Récupérer le pays de l'utilisateur (depuis profil ou IP)
-        # TODO: Implémenter détection pays via IP ou profil utilisateur
-        country_code = "US"  # Default pour l'instant
+        # Récupérer le pays de l'utilisateur depuis la BD (signup_country) + fraud analysis
+        country_code = "US"  # Default
+        pricing_tier = "tier1"  # Default
+        fraud_risk_score = 0
+        fraud_risk_level = "LOW"
+
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Récupérer signup_country et pricing_tier
+                    cur.execute("""
+                        SELECT signup_country, pricing_tier, pricing_locked_at
+                        FROM user_billing_info
+                        WHERE user_email = %s
+                    """, (user_email,))
+
+                    billing_info = cur.fetchone()
+
+                    if billing_info and billing_info.get('signup_country'):
+                        country_code = billing_info['signup_country']
+                        pricing_tier = billing_info.get('pricing_tier', 'tier1')
+                        logger.info(f"Country from DB: {country_code}, Tier: {pricing_tier}")
+
+                    # Obtenir l'analyse de fraude
+                    if COUNTRY_TRACKING_AVAILABLE:
+                        try:
+                            fraud_analysis = await CountryTrackingService.get_user_fraud_analysis(user_email)
+                            fraud_risk_score = fraud_analysis.get('avg_risk_score', 0)
+                            fraud_risk_level = fraud_analysis.get('risk_level', 'LOW')
+                            logger.info(f"Fraud analysis: score={fraud_risk_score}, level={fraud_risk_level}")
+                        except Exception as e:
+                            logger.warning(f"Could not get fraud analysis: {e}")
+
+        except Exception as e:
+            logger.warning(f"Could not get user country from DB: {e}, using default US")
 
         plan_name = request.plan_name.lower()
 
@@ -424,14 +466,20 @@ async def create_checkout_session(
             success_url=request.success_url or SUCCESS_URL,
             cancel_url=request.cancel_url or CANCEL_URL,
 
-            # Métadonnées pour tracking
+            # Métadonnées pour tracking ET fraud detection
             metadata={
                 "user_email": user_email,
                 "plan_name": plan_name,
                 "price_monthly": str(price),
                 "currency": currency,
                 "country_code": country_code,
-                "tier_level": str(tier_level)
+                "tier_level": str(tier_level),
+                # Fraud detection metadata
+                "signup_country": country_code,
+                "pricing_tier": pricing_tier,
+                "fraud_risk_score": str(fraud_risk_score),
+                "fraud_risk_level": fraud_risk_level,
+                "source": "intelia_expert_fraud_protected"
             },
 
             # Remplir automatiquement l'email

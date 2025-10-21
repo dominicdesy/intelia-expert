@@ -20,6 +20,14 @@ from fastapi import APIRouter, Request, HTTPException, Header
 router = APIRouter(tags=["stripe-webhooks"])
 logger = logging.getLogger(__name__)
 
+# Import country tracking service for pricing tier lock
+try:
+    from app.services.country_tracking_service import CountryTrackingService
+    COUNTRY_TRACKING_AVAILABLE = True
+except ImportError:
+    COUNTRY_TRACKING_AVAILABLE = False
+    logger.warning("Country tracking service not available")
+
 # Configuration
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -131,10 +139,11 @@ def get_user_email_from_customer_id(customer_id: str) -> str:
         return None
 
 
-def handle_checkout_completed(session: Dict[str, Any]):
+async def handle_checkout_completed(session: Dict[str, Any]):
     """
     Traite l'événement checkout.session.completed
     Déclenché quand un paiement est réussi
+    Verrouille automatiquement le pricing tier après le premier paiement
     """
     try:
         customer_id = session.get("customer")
@@ -196,6 +205,24 @@ def handle_checkout_completed(session: Dict[str, Any]):
                     conn.commit()
 
             logger.info(f"✅ Abonnement activé pour {user_email}: {metadata.get('plan_name')}")
+
+            # Lock pricing tier after first successful payment
+            if COUNTRY_TRACKING_AVAILABLE:
+                try:
+                    # Create a mock request object for lock_pricing_tier
+                    # (it needs the request to detect current IP/country)
+                    mock_request = type('MockRequest', (), {'headers': {}, 'client': None})()
+
+                    lock_result = await CountryTrackingService.lock_pricing_tier(user_email, mock_request)
+
+                    if lock_result:
+                        logger.info(
+                            f"✅ Pricing tier locked for {user_email}: "
+                            f"{lock_result.get('pricing_tier')} (country: {lock_result.get('pricing_country')})"
+                        )
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not lock pricing tier: {e}")
+                    # Don't fail the webhook if tier locking fails
 
             # TODO: Envoyer email de confirmation
 
@@ -416,7 +443,7 @@ async def stripe_webhook(
     # Router vers le bon handler
     try:
         if event_type == "checkout.session.completed":
-            handle_checkout_completed(event_data)
+            await handle_checkout_completed(event_data)
 
         elif event_type == "customer.subscription.created":
             logger.info("✅ Abonnement créé (déjà géré dans checkout.completed)")
