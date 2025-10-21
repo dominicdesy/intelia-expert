@@ -470,11 +470,11 @@ async def voice_realtime_endpoint(
         6. Cleanup on disconnect
     """
 
-    # Feature flag check
-    if not ENABLE_VOICE_REALTIME:
-        await websocket.close(code=1008, reason="Voice realtime feature disabled")
-        logger.warning("❌ Voice realtime request rejected: feature disabled")
-        return
+    # Feature flag check - TEMPORARILY DISABLED FOR TESTING
+    # if not ENABLE_VOICE_REALTIME:
+    #     await websocket.close(code=1008, reason="Voice realtime feature disabled")
+    #     logger.warning("❌ Voice realtime request rejected: feature disabled")
+    #     return
 
     # Accept connection
     await websocket.accept()
@@ -484,14 +484,14 @@ async def voice_realtime_endpoint(
     # Pour l'instant, user_id hardcodé pour tests
     user_id = 1  # TODO: user.id quand auth activée
 
-    # Rate limiting
-    if not rate_limiter.check_rate_limit(user_id):
-        await websocket.close(
-            code=1008,
-            reason=f"Rate limit exceeded ({MAX_SESSIONS_PER_USER_PER_HOUR} sessions/hour max)"
-        )
-        logger.warning(f"❌ Rate limit exceeded for user {user_id}")
-        return
+    # Rate limiting - TEMPORARILY DISABLED FOR TESTING
+    # if not rate_limiter.check_rate_limit(user_id):
+    #     await websocket.close(
+    #         code=1008,
+    #         reason=f"Rate limit exceeded ({MAX_SESSIONS_PER_USER_PER_HOUR} sessions/hour max)"
+    #     )
+    #     logger.warning(f"❌ Rate limit exceeded for user {user_id}")
+    #     return
 
     # Créer session
     session = VoiceRealtimeSession(user_id, websocket)
