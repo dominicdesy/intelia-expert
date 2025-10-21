@@ -39,6 +39,7 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/auth/register",
     "/api/v1/auth/reset-password",
     "/api/v1/auth/confirm-email",
+    "/api/v1/auth/detect-country",  # Country detection for signup (no auth required)
     # === ENDPOINTS OAUTH PUBLICS ===
     "/api/v1/auth/oauth/linkedin/login",
     "/api/v1/auth/oauth/facebook/login",
