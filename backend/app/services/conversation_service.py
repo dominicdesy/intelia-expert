@@ -31,7 +31,11 @@ class ConversationService:
         language: str = "fr",
         response_source: str = "rag",
         response_confidence: float = 0.85,
-        processing_time_ms: int = None
+        processing_time_ms: int = None,
+        # 🧠 Optional CoT sections (if already parsed by frontend/backend)
+        cot_thinking: str = None,
+        cot_analysis: str = None,
+        has_cot_structure: bool = False
     ) -> Dict[str, Any]:
         """
         Crée une nouvelle conversation avec le premier échange Q&R
@@ -44,19 +48,29 @@ class ConversationService:
             }
         """
         try:
-            # Parse CoT structure from assistant response BEFORE saving
-            parsed = parse_cot_response(assistant_response)
-            cot_thinking = parsed['thinking']
-            cot_analysis = parsed['analysis']
-            has_cot_structure = parsed['has_structure']
-            final_answer = parsed['answer']  # Only save answer in content field
-
-            if has_cot_structure:
+            # 🧠 Use provided CoT sections if available, otherwise parse
+            if has_cot_structure and cot_thinking is not None:
+                # Use provided CoT sections (from SSE metadata)
+                final_answer = assistant_response  # Already clean
                 logger.info(
-                    f"🧠 CoT detected in new conversation - "
+                    f"🧠 Using provided CoT sections - "
                     f"thinking: {len(cot_thinking or '')} chars, "
                     f"analysis: {len(cot_analysis or '')} chars"
                 )
+            else:
+                # Parse CoT structure from assistant response (legacy behavior)
+                parsed = parse_cot_response(assistant_response)
+                cot_thinking = parsed['thinking']
+                cot_analysis = parsed['analysis']
+                has_cot_structure = parsed['has_structure']
+                final_answer = parsed['answer']  # Only save answer in content field
+
+                if has_cot_structure:
+                    logger.info(
+                        f"🧠 CoT parsed from content - "
+                        f"thinking: {len(cot_thinking or '')} chars, "
+                        f"analysis: {len(cot_analysis or '')} chars"
+                    )
 
             with get_pg_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -128,7 +142,11 @@ class ConversationService:
         content: str,
         response_source: str = None,
         response_confidence: float = None,
-        processing_time_ms: int = None
+        processing_time_ms: int = None,
+        # 🧠 Optional CoT sections (if already parsed by frontend/backend)
+        cot_thinking_override: str = None,
+        cot_analysis_override: str = None,
+        has_cot_structure_override: bool = None
     ) -> Dict[str, Any]:
         """
         Ajoute un message à une conversation existante
@@ -141,6 +159,9 @@ class ConversationService:
             conversation_id: UUID de la conversation
             role: 'user' ou 'assistant'
             content: Contenu du message (avec ou sans structure CoT)
+            cot_thinking_override: Override thinking section (from frontend metadata)
+            cot_analysis_override: Override analysis section (from frontend metadata)
+            has_cot_structure_override: Override has_cot flag (from frontend metadata)
 
         Returns:
             {
@@ -157,11 +178,20 @@ class ConversationService:
             final_content = content
 
             if role == 'assistant':
-                parsed = parse_cot_response(content)
-                cot_thinking = parsed['thinking']
-                cot_analysis = parsed['analysis']
-                has_cot_structure = parsed['has_structure']
-                final_content = parsed['answer']  # Only save answer in content field
+                # 🧠 Use override values if provided (from SSE metadata)
+                if has_cot_structure_override is not None:
+                    cot_thinking = cot_thinking_override
+                    cot_analysis = cot_analysis_override
+                    has_cot_structure = has_cot_structure_override
+                    # Content is already the clean answer (no CoT tags)
+                    final_content = content
+                else:
+                    # Fallback: try parsing from content (legacy behavior)
+                    parsed = parse_cot_response(content)
+                    cot_thinking = parsed['thinking']
+                    cot_analysis = parsed['analysis']
+                    has_cot_structure = parsed['has_structure']
+                    final_content = parsed['answer']  # Only save answer in content field
 
                 if has_cot_structure:
                     logger.info(

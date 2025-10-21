@@ -170,13 +170,23 @@ async def save_conversation(
             )
 
             # Ajouter la réponse assistant
+            # 🧠 Extract CoT sections from metadata.agent_metadata if available
+            agent_metadata = conversation_data.metadata.get("agent_metadata", {}) if conversation_data.metadata else {}
+            cot_thinking = agent_metadata.get("cot_thinking")
+            cot_analysis = agent_metadata.get("cot_analysis")
+            has_cot = agent_metadata.get("has_cot_structure", False)
+
             assistant_msg = conversation_service.add_message(
                 conversation_id=existing_conv["id"],
                 role="assistant",
                 content=conversation_data.response,
                 response_source=conversation_data.source,
                 response_confidence=conversation_data.confidence,
-                processing_time_ms=conversation_data.processing_time_ms
+                processing_time_ms=conversation_data.processing_time_ms,
+                # 🧠 Pass CoT sections
+                cot_thinking_override=cot_thinking,
+                cot_analysis_override=cot_analysis,
+                has_cot_structure_override=has_cot
             )
 
             logger.info(
@@ -207,6 +217,12 @@ async def save_conversation(
             # Nouvelle conversation - créer avec le premier échange
             logger.info("Création d'une nouvelle conversation")
 
+            # 🧠 Extract CoT sections from metadata.agent_metadata if available
+            agent_metadata = conversation_data.metadata.get("agent_metadata", {}) if conversation_data.metadata else {}
+            cot_thinking = agent_metadata.get("cot_thinking")
+            cot_analysis = agent_metadata.get("cot_analysis")
+            has_cot = agent_metadata.get("has_cot_structure", False)
+
             result = conversation_service.create_conversation(
                 session_id=conversation_data.conversation_id,
                 user_id=conversation_data.user_id,
@@ -215,7 +231,11 @@ async def save_conversation(
                 language=conversation_data.language or "fr",
                 response_source=conversation_data.source,
                 response_confidence=conversation_data.confidence,
-                processing_time_ms=conversation_data.processing_time_ms
+                processing_time_ms=conversation_data.processing_time_ms,
+                # 🧠 Pass CoT sections
+                cot_thinking=cot_thinking,
+                cot_analysis=cot_analysis,
+                has_cot_structure=has_cot
             )
 
             logger.info(f"Nouvelle conversation créée: {result['conversation_id']}")

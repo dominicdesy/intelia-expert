@@ -91,6 +91,8 @@ unidecode==1.4.0
 # === RERANKING - PRODUCTION ===
 # Cohere API for result reranking (lightweight, API-based)
 cohere>=5.0.0
+# Sentence Transformers for cross-encoder reranking (semantic_reranker.py)
+sentence-transformers>=2.2.0
 
 # === HYBRID SEARCH ===
 # BM25 ranking algorithm (lightweight)

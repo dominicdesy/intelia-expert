@@ -72,6 +72,11 @@ class EnhancedResponseGenerator:
         self.cot_model = os.getenv("COT_MODEL", "gpt-4o")
         logger.info(f"🧠 CoT model configured: {self.cot_model}")
 
+        # 🧠 Last CoT sections (populated after generate_response call)
+        self.last_cot_thinking: Optional[str] = None
+        self.last_cot_analysis: Optional[str] = None
+        self.last_has_cot_structure: bool = False
+
         # Load centralized prompts manager
         if PROMPTS_AVAILABLE:
             try:
@@ -742,6 +747,10 @@ Para manejar el estrés térmico en pollos de engorde, tres estrategias son esen
                 detected_domain,
             )
 
+            # 🧠 DEBUG: Log CoT instruction to verify it's being sent
+            logger.info(f"🔍 CoT instruction length: {len(user_prompt.split('STRUCTURE DE RÉPONSE OBLIGATOIRE:')[-1] if 'STRUCTURE DE RÉPONSE OBLIGATOIRE:' in user_prompt else '')} chars")
+            logger.debug(f"🔍 Full user prompt (last 500 chars): {user_prompt[-500:]}")
+
             # Génération avec modèle CoT configuré
             # 🧠 O1 models (o1-preview, o1-mini) have special requirements:
             # - NO system messages (merge into user message)
@@ -778,6 +787,13 @@ Para manejar el estrés térmico en pollos de engorde, tres estrategias son esen
 
 
             generated_response = response.choices[0].message.content.strip()
+
+            # 🧠 DEBUG: Log raw LLM response to check for CoT tags
+            logger.info(f"🔍 Raw LLM response length: {len(generated_response)} chars")
+            logger.info(f"🔍 Has <thinking> tag: {'<thinking>' in generated_response.lower()}")
+            logger.info(f"🔍 Has <analysis> tag: {'<analysis>' in generated_response.lower()}")
+            logger.info(f"🔍 Has <answer> tag: {'<answer>' in generated_response.lower()}")
+            logger.debug(f"🔍 Raw response (first 300 chars): {generated_response[:300]}")
 
             # Post-traitement avec disclaimer vétérinaire
             enhanced_response = self._post_process_response(
@@ -1404,8 +1420,17 @@ Style professionnel et structuré avec recommandations actionnables.""",
             )
             # Extract the clean answer content (without XML tags)
             response = parsed_response["answer"]
+
+            # 🧠 Store CoT sections in instance variables for later retrieval
+            self.last_cot_thinking = parsed_response['thinking']
+            self.last_cot_analysis = parsed_response['analysis']
+            self.last_has_cot_structure = True
         else:
             logger.warning(f"⚠️ No CoT structure found despite prompt requesting it")
+            # Reset CoT sections
+            self.last_cot_thinking = None
+            self.last_cot_analysis = None
+            self.last_has_cot_structure = False
 
         # ✅ NETTOYAGE AMÉLIORÉ DU FORMATAGE
         # Apply text cleaning to the extracted answer (or full response if no CoT)

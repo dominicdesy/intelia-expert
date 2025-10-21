@@ -433,6 +433,19 @@ async function streamAIResponseInternal(
                 agentMetadata.response_source = endEvent.source;
                 secureLog.log(`[apiService] Source capturée: ${endEvent.source}`);
               }
+              // 🧠 CAPTURER LES SECTIONS CoT (Chain-of-Thought)
+              if ((endEvent as any).cot_thinking !== undefined) {
+                agentMetadata.cot_thinking = (endEvent as any).cot_thinking;
+              }
+              if ((endEvent as any).cot_analysis !== undefined) {
+                agentMetadata.cot_analysis = (endEvent as any).cot_analysis;
+              }
+              if ((endEvent as any).has_cot_structure !== undefined) {
+                agentMetadata.has_cot_structure = (endEvent as any).has_cot_structure;
+                if (agentMetadata.has_cot_structure) {
+                  secureLog.log("[apiService] CoT structure detected and captured");
+                }
+              }
               break;
 
             // ÉVÉNEMENTS LEGACY MAINTENUS

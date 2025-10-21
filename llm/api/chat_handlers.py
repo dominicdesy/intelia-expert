@@ -362,6 +362,10 @@ class ChatHandlers:
                     "genetic_lines_detected", []
                 ),
                 "detection_version": "5.1.0_conversation_memory",
+                # 🧠 Chain-of-Thought sections for PostgreSQL storage
+                "cot_thinking": safe_get_attribute(rag_result, "cot_thinking", None),
+                "cot_analysis": safe_get_attribute(rag_result, "cot_analysis", None),
+                "has_cot_structure": safe_get_attribute(rag_result, "has_cot_structure", False),
             }
 
             yield sse_event(safe_serialize_for_json(end_data))

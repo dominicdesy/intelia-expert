@@ -207,13 +207,18 @@ class StandardQueryHandler(BaseQueryHandler):
                     logger.info(f"PostgreSQL results relevant for '{query[:50]}...'")
 
                     if result.context_docs and not result.answer:
-                        result.answer = await generate_response_with_generator(
+                        # 🧠 Generate response and retrieve CoT sections
+                        answer, cot_thinking, cot_analysis, has_cot = await generate_response_with_generator(
                             self.response_generator,
                             result.context_docs,
                             query,
                             language,
                             preprocessed_data or {},
                         )
+                        result.answer = answer
+                        result.cot_thinking = cot_thinking
+                        result.cot_analysis = cot_analysis
+                        result.has_cot_structure = has_cot
 
                     return result
                 else:
@@ -354,13 +359,18 @@ class StandardQueryHandler(BaseQueryHandler):
 
                     if pg_result.context_docs and not pg_result.answer:
                         logger.info("Generating PostgreSQL response with context")
-                        pg_result.answer = await generate_response_with_generator(
+                        # 🧠 Generate response and retrieve CoT sections
+                        answer, cot_thinking, cot_analysis, has_cot = await generate_response_with_generator(
                             self.response_generator,
                             pg_result.context_docs,
                             query,
                             language,
                             preprocessed_data or {},
                         )
+                        pg_result.answer = answer
+                        pg_result.cot_thinking = cot_thinking
+                        pg_result.cot_analysis = cot_analysis
+                        pg_result.has_cot_structure = has_cot
 
                     pg_result.metadata.update(
                         {
@@ -534,13 +544,18 @@ class StandardQueryHandler(BaseQueryHandler):
                     if "language" not in preprocessed_data:
                         preprocessed_data["language"] = language
 
-                    result.answer = await generate_response_with_generator(
+                    # 🧠 Generate response and retrieve CoT sections
+                    answer, cot_thinking, cot_analysis, has_cot = await generate_response_with_generator(
                         self.response_generator,
                         result.context_docs,
                         query,
                         language,
                         preprocessed_data,
                     )
+                    result.answer = answer
+                    result.cot_thinking = cot_thinking
+                    result.cot_analysis = cot_analysis
+                    result.has_cot_structure = has_cot
 
                 # Enrich metadata
                 if is_optimization:

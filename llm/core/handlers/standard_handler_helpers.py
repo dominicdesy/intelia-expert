@@ -137,12 +137,17 @@ async def generate_response_with_generator(
         except Exception as val_err:
             logger.error(f"Erreur validation qualité: {val_err}")
 
-        return response
+        # 🧠 Retrieve CoT sections from generator (if available)
+        cot_thinking = getattr(response_generator, 'last_cot_thinking', None)
+        cot_analysis = getattr(response_generator, 'last_cot_analysis', None)
+        has_cot_structure = getattr(response_generator, 'last_has_cot_structure', False)
+
+        return response, cot_thinking, cot_analysis, has_cot_structure
 
     except Exception as e:
         logger.error(f"Error generating response with history: {e}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
-        return format_context_as_fallback(context_docs)
+        return format_context_as_fallback(context_docs), None, None, False
 
 
 def format_context_as_fallback(context_docs: List) -> str:
