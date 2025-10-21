@@ -2,6 +2,7 @@
 """
 generators.py - Enhanced response generators with entity enrichment and cache integration
 Handles multilingual response generation with specialized prompts and domain detection
+Version: 2.1.0 - CoT support with structured XML tags
 """
 
 import logging
