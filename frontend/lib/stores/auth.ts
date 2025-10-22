@@ -727,6 +727,9 @@ export const useAuthStore = create<AuthState>()(
             phone: userData.phone,
             country: userData.country,
             preferred_language: preferredLanguage,
+            production_type: (userData as any).production_type,
+            category: (userData as any).category,
+            category_other: (userData as any).category_other,
           };
 
           secureLog.log("[AuthStore] Registration payload prepared");
