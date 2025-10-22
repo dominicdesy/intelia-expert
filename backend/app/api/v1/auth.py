@@ -1378,7 +1378,7 @@ async def register_user(user_data: UserRegister, request: Request):
     Tracks signup country for pricing fraud detection
     """
     logger.info(f"[Register] Tentative inscription: {user_data.email}")
-    logger.info(f"[Register] Données reçues - production_type: {user_data.production_type}, category: {user_data.category}")
+    logger.info(f"[Register] Profiling - production_type: {user_data.production_type}, category: {user_data.category}")
 
     if not SUPABASE_AVAILABLE:
         logger.error("Supabase client non disponible")
