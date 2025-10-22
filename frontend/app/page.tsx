@@ -236,6 +236,9 @@ function LoginPageContent() {
     companyName: "",
     companyWebsite: "",
     companyLinkedin: "",
+    productionType: [] as string[],
+    category: "",
+    categoryOther: "",
   });
 
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -284,7 +287,7 @@ function LoginPageContent() {
   };
 
   // Gestion des changements du formulaire signup
-  const handleSignupChange = (field: string, value: string) => {
+  const handleSignupChange = (field: string, value: string | string[]) => {
     setSignupData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -369,6 +372,9 @@ function LoginPageContent() {
             ? `${signupData.countryCode}${signupData.areaCode}${signupData.phoneNumber}`
             : undefined,
         preferredLanguage: currentLanguage, // Passer la langue actuelle du frontend
+        production_type: signupData.productionType.length > 0 ? signupData.productionType : null,
+        category: signupData.category || null,
+        category_other: signupData.category === 'other' ? signupData.categoryOther : null,
       };
 
       console.log("[Signup] Langue envoyée au backend:", currentLanguage);
