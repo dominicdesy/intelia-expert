@@ -43,6 +43,28 @@ export interface VoiceRealtimeError {
 }
 
 // ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+/**
+ * Détecte la langue d'un texte basé sur les caractères Unicode
+ */
+function detectLanguage(text: string): string {
+  if (!text) return "en";
+
+  // Chinois (CJK Unified Ideographs)
+  if (/[\u4e00-\u9fff]/.test(text)) return "zh";
+
+  // Japonais (Hiragana, Katakana)
+  if (/[\u3040-\u309f\u30a0-\u30ff]/.test(text)) return "ja";
+
+  // Coréen (Hangul)
+  if (/[\uac00-\ud7af]/.test(text)) return "ko";
+
+  return "en"; // Par défaut
+}
+
+// ============================================================
 // CONSTANTES
 // ============================================================
 
@@ -81,6 +103,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const isPlayingRef = useRef(false); // Prevent overlapping audio playback
   const isBufferingRef = useRef(true); // Pre-buffer chunks before playing
   const nextPlayTimeRef = useRef<number>(0); // Track scheduled playback time for seamless chunks
+  const detectedLanguageRef = useRef<string>("en"); // Detected language from transcript
   const reconnectAttemptsRef = useRef(0);
 
   // ============================================================
@@ -228,6 +251,11 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
 
       case "conversation.item.input_audio_transcription.completed":
         console.log("📝 Transcription:", data.transcript);
+        if (data.transcript) {
+          const detectedLang = detectLanguage(data.transcript);
+          detectedLanguageRef.current = detectedLang;
+          console.log("🌍 Detected language:", detectedLang);
+        }
         break;
 
       case "response.audio_transcript.delta":
@@ -389,9 +417,17 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       const now = audioContext.currentTime;
       const duration = audioBuffer.duration;
 
+      // Accélération pour chinois: 15% plus rapide
+      const playbackRate = detectedLanguageRef.current === "zh" ? 1.15 : 1.0;
+      const effectiveDuration = duration / playbackRate;
+
+      if (playbackRate !== 1.0) {
+        console.log(`🌍 Language: ${detectedLanguageRef.current} - playback speed: ${playbackRate}x (duration: ${duration.toFixed(3)}s → ${effectiveDuration.toFixed(3)}s)`);
+      }
+
       // Schedule playback: either now or seamlessly after previous chunk
       const startTime = Math.max(now, nextPlayTimeRef.current);
-      const endTime = startTime + duration;
+      const endTime = startTime + effectiveDuration;
 
       // Update next play time for seamless chain
       nextPlayTimeRef.current = endTime;
@@ -401,7 +437,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       gainNode.gain.linearRampToValueAtTime(1, startTime + 0.003);
 
       // Fade out: 1 → 0 over last 3ms (crossfade avec prochain chunk)
-      if (duration > 0.006) {
+      if (effectiveDuration > 0.006) {
         gainNode.gain.setValueAtTime(1, endTime - 0.003);
         gainNode.gain.linearRampToValueAtTime(0, endTime);
       }
@@ -409,6 +445,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       // Create source and connect through gain node
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
+      source.playbackRate.value = playbackRate; // Apply speed adjustment for Chinese
       source.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
@@ -426,7 +463,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
         }
       };
 
-      console.log(`🔊 Starting audio playback... (scheduled at ${startTime.toFixed(3)}s, duration ${duration.toFixed(3)}s)`);
+      console.log(`🔊 Starting audio playback... (scheduled at ${startTime.toFixed(3)}s, duration ${effectiveDuration.toFixed(3)}s, rate ${playbackRate}x)`);
       source.start(startTime);
     } catch (err) {
       console.error("❌ Audio playback error:", err);
