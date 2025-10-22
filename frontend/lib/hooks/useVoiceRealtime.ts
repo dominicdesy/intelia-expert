@@ -417,17 +417,9 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       const now = audioContext.currentTime;
       const duration = audioBuffer.duration;
 
-      // Accélération pour chinois: 15% plus rapide
-      const playbackRate = detectedLanguageRef.current === "zh" ? 1.15 : 1.0;
-      const effectiveDuration = duration / playbackRate;
-
-      if (playbackRate !== 1.0) {
-        console.log(`🌍 Language: ${detectedLanguageRef.current} - playback speed: ${playbackRate}x (duration: ${duration.toFixed(3)}s → ${effectiveDuration.toFixed(3)}s)`);
-      }
-
       // Schedule playback: either now or seamlessly after previous chunk
       const startTime = Math.max(now, nextPlayTimeRef.current);
-      const endTime = startTime + effectiveDuration;
+      const endTime = startTime + duration;
 
       // Update next play time for seamless chain
       nextPlayTimeRef.current = endTime;
@@ -437,7 +429,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       gainNode.gain.linearRampToValueAtTime(1, startTime + 0.003);
 
       // Fade out: 1 → 0 over last 3ms (crossfade avec prochain chunk)
-      if (effectiveDuration > 0.006) {
+      if (duration > 0.006) {
         gainNode.gain.setValueAtTime(1, endTime - 0.003);
         gainNode.gain.linearRampToValueAtTime(0, endTime);
       }
@@ -445,7 +437,6 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       // Create source and connect through gain node
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
-      source.playbackRate.value = playbackRate; // Apply speed adjustment for Chinese
       source.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
@@ -463,7 +454,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
         }
       };
 
-      console.log(`🔊 Starting audio playback... (scheduled at ${startTime.toFixed(3)}s, duration ${effectiveDuration.toFixed(3)}s, rate ${playbackRate}x)`);
+      console.log(`🔊 Starting audio playback... (scheduled at ${startTime.toFixed(3)}s, duration ${duration.toFixed(3)}s)`);
       source.start(startTime);
     } catch (err) {
       console.error("❌ Audio playback error:", err);
