@@ -5,6 +5,7 @@
 Endpoints pour la gestion des profils utilisateur
 Résout le problème UserInfoModal qui contourne l'API backend
 VERSION CORRIGÉE: F401, F821, F841
+Updated: 2025-10-22 - Added user profiling fields (production_type, category, category_other)
 
 """
 
