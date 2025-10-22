@@ -620,9 +620,6 @@ async def get_questions(
                             sequence_number,
                             feedback,
                             feedback_comment,
-                            cot_thinking,
-                            cot_analysis,
-                            has_cot_structure,
                             created_at
                         FROM messages
                         WHERE conversation_id = %s
@@ -643,9 +640,6 @@ async def get_questions(
                             "sequence_number": msg_row["sequence_number"],
                             "feedback": msg_row["feedback"],
                             "feedback_comment": msg_row["feedback_comment"],
-                            "cot_thinking": msg_row["cot_thinking"],
-                            "cot_analysis": msg_row["cot_analysis"],
-                            "has_cot_structure": msg_row["has_cot_structure"],
                             "created_at": msg_row["created_at"].isoformat() if msg_row["created_at"] else None
                         })
 
@@ -697,10 +691,7 @@ async def get_questions(
                             "language": conv.get("language", ""),
                             "session_id": conv["session_id"],
                             "feedback": assistant_msg.get("feedback"),
-                            "feedback_comment": assistant_msg.get("feedback_comment"),
-                            "cot_thinking": assistant_msg.get("cot_thinking"),
-                            "cot_analysis": assistant_msg.get("cot_analysis"),
-                            "has_cot_structure": assistant_msg.get("has_cot_structure", False)
+                            "feedback_comment": assistant_msg.get("feedback_comment")
                         })
 
                 # Calculer le nombre de pages

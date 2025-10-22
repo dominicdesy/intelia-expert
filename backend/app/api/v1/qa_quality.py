@@ -117,9 +117,6 @@ async def get_problematic_qa(
                         qc.reviewed_at,
                         qc.reviewed_by::text as reviewed_by,
                         qc.reviewer_notes,
-                        qc.cot_thinking,
-                        qc.cot_analysis,
-                        qc.has_cot_structure,
                         c.language,
                         c.created_at as conversation_created_at
                     FROM qa_quality_checks qc
@@ -173,10 +170,7 @@ async def get_problematic_qa(
                         "reviewed": row["reviewed"],
                         "reviewed_at": row["reviewed_at"].isoformat() if row["reviewed_at"] else None,
                         "reviewed_by": row["reviewed_by"],
-                        "reviewer_notes": row["reviewer_notes"],
-                        "cot_thinking": row.get("cot_thinking"),
-                        "cot_analysis": row.get("cot_analysis"),
-                        "has_cot_structure": row.get("has_cot_structure", False)
+                        "reviewer_notes": row["reviewer_notes"]
                     })
 
                 pages = (total + limit - 1) // limit
