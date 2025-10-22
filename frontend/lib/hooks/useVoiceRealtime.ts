@@ -79,6 +79,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false); // Prevent overlapping audio playback
+  const isBufferingRef = useRef(true); // Pre-buffer chunks before playing
   const reconnectAttemptsRef = useRef(0);
 
   // ============================================================
@@ -346,6 +347,13 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       return;
     }
 
+    // Pre-buffer: wait for at least 2 chunks before starting (reduces gaps)
+    if (isBufferingRef.current && audioQueueRef.current.length < 2) {
+      console.log("🔊 Buffering... waiting for more chunks");
+      return;
+    }
+    isBufferingRef.current = false;
+
     isPlayingRef.current = true;
     const pcm16Buffer = audioQueueRef.current.shift()!;
     console.log("🔊 Playing audio chunk, buffer size:", pcm16Buffer.byteLength);
@@ -372,10 +380,24 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       audioBuffer.getChannelData(0).set(float32);
       console.log("🔊 AudioBuffer created, duration:", audioBuffer.duration, "seconds");
 
-      // Create source and play
+      // Create gain node for fade in/out (prevents clicks)
+      const gainNode = playbackAudioContextRef.current.createGain();
+      const currentTime = playbackAudioContextRef.current.currentTime;
+      const duration = audioBuffer.duration;
+
+      // Fade in (first 10ms)
+      gainNode.gain.setValueAtTime(0, currentTime);
+      gainNode.gain.linearRampToValueAtTime(1, currentTime + 0.01);
+
+      // Fade out (last 10ms)
+      gainNode.gain.setValueAtTime(1, currentTime + duration - 0.01);
+      gainNode.gain.linearRampToValueAtTime(0, currentTime + duration);
+
+      // Create source and connect through gain node
       const source = playbackAudioContextRef.current.createBufferSource();
       source.buffer = audioBuffer;
-      source.connect(playbackAudioContextRef.current.destination);
+      source.connect(gainNode);
+      gainNode.connect(playbackAudioContextRef.current.destination);
 
       source.onended = () => {
         console.log("🔊 Audio chunk finished playing");
@@ -386,6 +408,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
           playAudioQueue();
         } else {
           setState("listening");
+          isBufferingRef.current = true; // Reset buffering for next response
         }
       };
 
@@ -394,6 +417,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
     } catch (err) {
       console.error("❌ Audio playback error:", err);
       isPlayingRef.current = false; // Reset on error
+      isBufferingRef.current = true; // Reset buffering
     }
   };
 
