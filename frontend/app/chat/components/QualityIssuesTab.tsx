@@ -459,10 +459,10 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
                           ✓ Revu
                         </button>
                         <button
-                          onClick={() => handleReview(qa, true)}
-                          className="text-gray-600 hover:text-gray-800 text-sm font-medium px-3 py-1 border border-gray-300 rounded hover:bg-gray-50"
+                          onClick={() => handleDelete(qa)}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium px-3 py-1 border border-red-200 rounded hover:bg-red-50"
                         >
-                          Faux positif
+                          🗑️ Effacer
                         </button>
                       </>
                     )}
