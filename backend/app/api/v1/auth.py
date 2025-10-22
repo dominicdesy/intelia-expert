@@ -2438,6 +2438,28 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
 
         # Fallback: retourner les données du JWT token si Supabase non disponible
         logger.info(f"[/auth/me] Fallback vers données JWT pour {current_user.get('email')}")
+
+        # Récupérer le plan même en fallback
+        user_plan = "essential"  # Default
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+
+            with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute("""
+                        SELECT plan_name
+                        FROM user_billing_info
+                        WHERE user_email = %s
+                    """, (current_user.get("email"),))
+
+                    billing_row = cur.fetchone()
+                    if billing_row:
+                        user_plan = billing_row["plan_name"]
+                        logger.debug(f"[/auth/me] Fallback - Plan récupéré: {user_plan}")
+        except Exception as e:
+            logger.warning(f"[/auth/me] Fallback - Erreur récupération plan: {e}")
+
         return {
             "user_id": current_user.get("user_id"),
             "email": current_user.get("email"),
@@ -2448,9 +2470,32 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
             "preferences": current_user.get("preferences", {}),
             "profile_id": current_user.get("profile_id"),
             "jwt_secret_used": current_user.get("jwt_secret_used"),
+            "plan": user_plan,  # 🎯 Plan chargé même en fallback
         }
     except Exception as e:
         logger.error(f"[/auth/me] Erreur inattendue: {e}")
+
+        # Récupérer le plan même en cas d'erreur
+        user_plan = "essential"  # Default
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+
+            with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute("""
+                        SELECT plan_name
+                        FROM user_billing_info
+                        WHERE user_email = %s
+                    """, (current_user.get("email"),))
+
+                    billing_row = cur.fetchone()
+                    if billing_row:
+                        user_plan = billing_row["plan_name"]
+                        logger.debug(f"[/auth/me] Exception fallback - Plan récupéré: {user_plan}")
+        except Exception as plan_error:
+            logger.warning(f"[/auth/me] Exception fallback - Erreur récupération plan: {plan_error}")
+
         # En cas d'erreur, retourner au minimum les données du JWT
         return {
             "user_id": current_user.get("user_id"),
@@ -2462,6 +2507,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
             "preferences": current_user.get("preferences", {}),
             "profile_id": current_user.get("profile_id"),
             "jwt_secret_used": current_user.get("jwt_secret_used"),
+            "plan": user_plan,  # 🎯 Plan chargé même en exception fallback
         }
 
 
