@@ -499,6 +499,7 @@ class ProactiveAssistant:
         metric_names = {
             "fr": {
                 "body_weight": "poids",
+                "target_weight": "poids cible",
                 "feed_conversion_ratio": "FCR",
                 "daily_gain": "gain quotidien",
                 "mortality": "mortalité",
@@ -508,6 +509,7 @@ class ProactiveAssistant:
             },
             "en": {
                 "body_weight": "weight",
+                "target_weight": "target weight",
                 "feed_conversion_ratio": "FCR",
                 "daily_gain": "daily gain",
                 "mortality": "mortality",
@@ -517,6 +519,7 @@ class ProactiveAssistant:
             },
             "es": {
                 "body_weight": "peso",
+                "target_weight": "peso objetivo",
                 "feed_conversion_ratio": "FCR",
                 "daily_gain": "ganancia diaria",
                 "mortality": "mortalidad",
@@ -526,6 +529,7 @@ class ProactiveAssistant:
             },
             "de": {
                 "body_weight": "Gewicht",
+                "target_weight": "Zielgewicht",
                 "feed_conversion_ratio": "Futterverwertung",
                 "daily_gain": "tägliche Zunahme",
                 "mortality": "Mortalität",
@@ -535,6 +539,7 @@ class ProactiveAssistant:
             },
             "it": {
                 "body_weight": "peso",
+                "target_weight": "peso obiettivo",
                 "feed_conversion_ratio": "conversione alimentare",
                 "daily_gain": "crescita giornaliera",
                 "mortality": "mortalità",
@@ -544,6 +549,7 @@ class ProactiveAssistant:
             },
             "pt": {
                 "body_weight": "peso",
+                "target_weight": "peso alvo",
                 "feed_conversion_ratio": "conversão alimentar",
                 "daily_gain": "ganho diário",
                 "mortality": "mortalidade",
@@ -553,6 +559,7 @@ class ProactiveAssistant:
             },
             "pl": {
                 "body_weight": "waga",
+                "target_weight": "waga docelowa",
                 "feed_conversion_ratio": "współczynnik konwersji paszy",
                 "daily_gain": "przyrost dzienny",
                 "mortality": "śmiertelność",
@@ -562,6 +569,7 @@ class ProactiveAssistant:
             },
             "nl": {
                 "body_weight": "gewicht",
+                "target_weight": "streefgewicht",
                 "feed_conversion_ratio": "voederconversie",
                 "daily_gain": "dagelijkse groei",
                 "mortality": "mortaliteit",
@@ -571,6 +579,7 @@ class ProactiveAssistant:
             },
             "id": {
                 "body_weight": "berat",
+                "target_weight": "berat target",
                 "feed_conversion_ratio": "konversi pakan",
                 "daily_gain": "pertambahan harian",
                 "mortality": "mortalitas",
@@ -580,6 +589,7 @@ class ProactiveAssistant:
             },
             "hi": {
                 "body_weight": "वजन",
+                "target_weight": "लक्ष्य वजन",
                 "feed_conversion_ratio": "चारा रूपांतरण अनुपात",
                 "daily_gain": "दैनिक वृद्धि",
                 "mortality": "मृत्यु दर",
@@ -589,6 +599,7 @@ class ProactiveAssistant:
             },
             "zh": {
                 "body_weight": "体重",
+                "target_weight": "目标体重",
                 "feed_conversion_ratio": "饲料转化率",
                 "daily_gain": "日增重",
                 "mortality": "死亡率",
@@ -598,6 +609,7 @@ class ProactiveAssistant:
             },
             "th": {
                 "body_weight": "น้ำหนัก",
+                "target_weight": "น้ำหนักเป้าหมาย",
                 "feed_conversion_ratio": "อัตราการแปลงอาหาร",
                 "daily_gain": "การเพิ่มน้ำหนักรายวัน",
                 "mortality": "อัตราการตาย",
