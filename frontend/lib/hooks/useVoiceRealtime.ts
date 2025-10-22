@@ -80,6 +80,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false); // Prevent overlapping audio playback
   const isBufferingRef = useRef(true); // Pre-buffer chunks before playing
+  const nextPlayTimeRef = useRef<number>(0); // Track scheduled playback time for seamless chunks
   const reconnectAttemptsRef = useRef(0);
 
   // ============================================================
@@ -384,38 +385,49 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
 
       // Create gain node for fade in/out (prevents clicks)
       const gainNode = playbackAudioContextRef.current.createGain();
-      const currentTime = playbackAudioContextRef.current.currentTime;
+      const audioContext = playbackAudioContextRef.current;
+      const now = audioContext.currentTime;
       const duration = audioBuffer.duration;
 
-      // Fade in (first 10ms)
-      gainNode.gain.setValueAtTime(0, currentTime);
-      gainNode.gain.linearRampToValueAtTime(1, currentTime + 0.01);
+      // Schedule playback: either now or seamlessly after previous chunk
+      const startTime = Math.max(now, nextPlayTimeRef.current);
+      const endTime = startTime + duration;
 
-      // Fade out (last 10ms)
-      gainNode.gain.setValueAtTime(1, currentTime + duration - 0.01);
-      gainNode.gain.linearRampToValueAtTime(0, currentTime + duration);
+      // Update next play time for seamless chain
+      nextPlayTimeRef.current = endTime;
+
+      // Fade in: 0 → 1 over first 3ms (très court pour éviter latence)
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(1, startTime + 0.003);
+
+      // Fade out: 1 → 0 over last 3ms (crossfade avec prochain chunk)
+      if (duration > 0.006) {
+        gainNode.gain.setValueAtTime(1, endTime - 0.003);
+        gainNode.gain.linearRampToValueAtTime(0, endTime);
+      }
 
       // Create source and connect through gain node
-      const source = playbackAudioContextRef.current.createBufferSource();
+      const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(gainNode);
-      gainNode.connect(playbackAudioContextRef.current.destination);
+      gainNode.connect(audioContext.destination);
 
       source.onended = () => {
         console.log("🔊 Audio chunk finished playing");
         isPlayingRef.current = false;
 
-        // Play next chunk
+        // Play next chunk immediately (seamless scheduling)
         if (audioQueueRef.current.length > 0) {
           playAudioQueue();
         } else {
           setState("listening");
           isBufferingRef.current = true; // Reset buffering for next response
+          nextPlayTimeRef.current = 0; // Reset scheduling
         }
       };
 
-      console.log("🔊 Starting audio playback...");
-      source.start();
+      console.log(`🔊 Starting audio playback... (scheduled at ${startTime.toFixed(3)}s, duration ${duration.toFixed(3)}s)`);
+      source.start(startTime);
     } catch (err) {
       console.error("❌ Audio playback error:", err);
       isPlayingRef.current = false; // Reset on error
@@ -570,6 +582,9 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
     setIsConnected(false);
     setState("idle");
     audioQueueRef.current = [];
+    isPlayingRef.current = false;
+    isBufferingRef.current = true;
+    nextPlayTimeRef.current = 0; // Reset audio scheduling
   }, [stopMicrophone]);
 
   const interrupt = useCallback(() => {
@@ -582,8 +597,11 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       );
     }
 
-    // Clear audio queue
+    // Clear audio queue and reset scheduling
     audioQueueRef.current = [];
+    isPlayingRef.current = false;
+    isBufferingRef.current = true;
+    nextPlayTimeRef.current = 0;
 
     setState("listening");
   }, []);
