@@ -74,7 +74,8 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const playbackAudioContextRef = useRef<AudioContext | null>(null); // For playing OpenAI audio
+  const micAudioContextRef = useRef<AudioContext | null>(null); // For capturing microphone
   const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const reconnectAttemptsRef = useRef(0);
@@ -295,9 +296,9 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       console.log("🔊 Audio queue length:", audioQueueRef.current.length);
 
       // Jouer si pas déjà en cours
-      if (!audioContextRef.current) {
-        console.log("🔊 Initializing AudioContext...");
-        await initAudioContext();
+      if (!playbackAudioContextRef.current) {
+        console.log("🔊 Initializing playback AudioContext...");
+        await initPlaybackAudioContext();
       }
 
       playAudioQueue();
@@ -306,22 +307,35 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
     }
   }, []);
 
-  const initAudioContext = async () => {
-    if (audioContextRef.current) return;
+  const initPlaybackAudioContext = async () => {
+    if (playbackAudioContextRef.current) {
+      // Always try to resume if suspended (autoplay policy)
+      if (playbackAudioContextRef.current.state === "suspended") {
+        console.log("🔊 Playback AudioContext suspended, resuming...");
+        await playbackAudioContextRef.current.resume();
+        console.log("🔊 Playback AudioContext state:", playbackAudioContextRef.current.state);
+      }
+      return;
+    }
 
-    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
-      sampleRate: finalConfig.sampleRate,
+    console.log("🔊 Creating new playback AudioContext at 24kHz");
+    playbackAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
+      sampleRate: 24000, // Match OpenAI output sample rate
     });
 
-    // iOS Safari fix: resume context
-    if (audioContextRef.current.state === "suspended") {
-      await audioContextRef.current.resume();
+    console.log("🔊 Playback AudioContext created, state:", playbackAudioContextRef.current.state);
+
+    // iOS Safari fix: resume context immediately
+    if (playbackAudioContextRef.current.state === "suspended") {
+      console.log("🔊 Playback AudioContext suspended on creation, resuming...");
+      await playbackAudioContextRef.current.resume();
+      console.log("🔊 Playback AudioContext resumed, state:", playbackAudioContextRef.current.state);
     }
   };
 
   const playAudioQueue = async () => {
-    if (!audioContextRef.current || audioQueueRef.current.length === 0) {
-      console.log("🔊 playAudioQueue: AudioContext or queue empty");
+    if (!playbackAudioContextRef.current || audioQueueRef.current.length === 0) {
+      console.log("🔊 playAudioQueue: Playback AudioContext or queue empty");
       return;
     }
 
@@ -341,7 +355,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       console.log("🔊 Converted to Float32, samples:", float32.length);
 
       // Create AudioBuffer manually (OpenAI sends PCM16 at 24kHz mono)
-      const audioBuffer = audioContextRef.current.createBuffer(
+      const audioBuffer = playbackAudioContextRef.current.createBuffer(
         1, // mono
         float32.length,
         24000 // OpenAI sample rate
@@ -351,9 +365,9 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       console.log("🔊 AudioBuffer created, duration:", audioBuffer.duration, "seconds");
 
       // Create source and play
-      const source = audioContextRef.current.createBufferSource();
+      const source = playbackAudioContextRef.current.createBufferSource();
       source.buffer = audioBuffer;
-      source.connect(audioContextRef.current.destination);
+      source.connect(playbackAudioContextRef.current.destination);
 
       source.onended = () => {
         console.log("🔊 Audio chunk finished playing");
@@ -392,13 +406,13 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       mediaStreamRef.current = stream;
 
       // AudioContext pour capturer en PCM16 (format OpenAI)
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+      const micAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
         sampleRate: 24000, // OpenAI requires 24kHz
       });
-      audioContextRef.current = audioContext;
+      micAudioContextRef.current = micAudioContext;
 
-      const microphone = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      const microphone = micAudioContext.createMediaStreamSource(stream);
+      const processor = micAudioContext.createScriptProcessor(4096, 1, 1);
       audioProcessorRef.current = processor;
 
       processor.onaudioprocess = (event) => {
@@ -427,7 +441,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       };
 
       microphone.connect(processor);
-      processor.connect(audioContext.destination);
+      processor.connect(micAudioContext.destination);
 
       // Audio level (pour UI feedback)
       startAudioLevelMonitoring(stream);
@@ -544,8 +558,11 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   useEffect(() => {
     return () => {
       disconnect();
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
+      if (playbackAudioContextRef.current) {
+        playbackAudioContextRef.current.close();
+      }
+      if (micAudioContextRef.current) {
+        micAudioContextRef.current.close();
       }
     };
   }, [disconnect]);
