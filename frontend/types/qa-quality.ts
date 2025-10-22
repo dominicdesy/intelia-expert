@@ -91,3 +91,17 @@ export interface ReviewQAResponse {
   false_positive: boolean;
   message: string;
 }
+
+export interface CoTAnalysisResponse {
+  check_id: number;
+  response: string;
+  thinking: string;
+  thinking_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  analyzed_at: string;
+  analyzed_by: string;
+  original_question: string;
+  original_response: string;
+}

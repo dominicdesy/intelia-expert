@@ -12,7 +12,9 @@ import {
   analyzeBatch,
   reviewQA,
   getQualityStats,
+  analyzeCoT,
 } from "../../../lib/services/qaQualityService";
+import type { CoTAnalysisResponse } from "../../../types/qa-quality";
 import { secureLog } from "@/lib/utils/secureLogger";
 
 interface QualityIssuesTabProps {
@@ -54,6 +56,11 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
 
   // Batch analysis
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // CoT Analysis
+  const [cotResult, setCotResult] = useState<CoTAnalysisResponse | null>(null);
+  const [isAnalyzingCoT, setIsAnalyzingCoT] = useState(false);
+  const [cotError, setCotError] = useState<string | null>(null);
 
   // Charger les données
   const loadData = async () => {
@@ -164,6 +171,20 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
       loadData(); // Recharger les données
     } catch (err: any) {
       alert(`Erreur: ${err.message}`);
+    }
+  };
+
+  const handleAnalyzeCoT = async (checkId: string) => {
+    try {
+      setIsAnalyzingCoT(true);
+      setCotError(null);
+      const result = await analyzeCoT(parseInt(checkId));
+      setCotResult(result);
+    } catch (err: any) {
+      secureLog.error("Error analyzing CoT:", err);
+      setCotError(err.message || "Erreur lors de l'analyse CoT");
+    } finally {
+      setIsAnalyzingCoT(false);
     }
   };
 
@@ -559,31 +580,172 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
                   </div>
                 </div>
 
-                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                  {!selectedQA.reviewed && (
-                    <>
-                      <button
-                        onClick={() => {
-                          handleReview(selectedQA, true);
-                          setSelectedQA(null);
-                        }}
-                        className="px-4 py-2 border border-gray-300 text-sm rounded hover:bg-gray-50"
-                      >
-                        Marquer comme faux positif
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleReview(selectedQA, false);
-                          setSelectedQA(null);
-                        }}
-                        className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-                      >
-                        Marquer comme revu
-                      </button>
-                    </>
-                  )}
+                <div className="flex justify-between pt-4 border-t border-gray-200">
                   <button
-                    onClick={() => setSelectedQA(null)}
+                    onClick={() => handleAnalyzeCoT(selectedQA.id)}
+                    disabled={isAnalyzingCoT}
+                    className="px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {isAnalyzingCoT ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        <span>Analyse en cours...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>🧠 Analyser le raisonnement</span>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="flex space-x-3">
+                    {!selectedQA.reviewed && (
+                      <>
+                        <button
+                          onClick={() => {
+                            handleReview(selectedQA, true);
+                            setSelectedQA(null);
+                          }}
+                          className="px-4 py-2 border border-gray-300 text-sm rounded hover:bg-gray-50"
+                        >
+                          Marquer comme faux positif
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleReview(selectedQA, false);
+                            setSelectedQA(null);
+                          }}
+                          className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                        >
+                          Marquer comme revu
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => setSelectedQA(null)}
+                      className="px-4 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CoT Analysis Modal */}
+      {cotResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-purple-900 flex items-center space-x-2">
+                  <span>🧠</span>
+                  <span>Analyse du raisonnement (Claude Extended Thinking)</span>
+                </h3>
+                <button
+                  onClick={() => setCotResult(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Metadata */}
+                <div className="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-500">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-purple-700 font-medium">Tokens de raisonnement</p>
+                      <p className="text-purple-900 font-bold">{cotResult.thinking_tokens.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-purple-700 font-medium">Tokens d'entrée</p>
+                      <p className="text-purple-900 font-bold">{cotResult.input_tokens.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-purple-700 font-medium">Tokens de sortie</p>
+                      <p className="text-purple-900 font-bold">{cotResult.output_tokens.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-purple-700 font-medium">Coût</p>
+                      <p className="text-purple-900 font-bold">${cotResult.cost_usd.toFixed(4)}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-purple-200">
+                    <p className="text-xs text-purple-700">
+                      Analysé par <strong>{cotResult.analyzed_by}</strong> le{" "}
+                      {new Date(cotResult.analyzed_at).toLocaleString("fr-FR")}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Original Question */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Question originale:</p>
+                  <div className="bg-blue-50 p-4 rounded border-l-4 border-blue-400">
+                    <p className="text-gray-900">{cotResult.original_question}</p>
+                  </div>
+                </div>
+
+                {/* Thinking Blocks - The REASON for this analysis */}
+                <div>
+                  <p className="text-sm font-medium text-purple-700 mb-2 flex items-center space-x-2">
+                    <span>🧠</span>
+                    <span>Raisonnement de Claude (Extended Thinking):</span>
+                  </p>
+                  <div className="bg-purple-50 p-6 rounded border-2 border-purple-300 max-h-96 overflow-y-auto">
+                    <pre className="text-sm text-purple-900 whitespace-pre-wrap font-mono">
+                      {cotResult.thinking}
+                    </pre>
+                  </div>
+                  <p className="text-xs text-purple-600 mt-2 italic">
+                    ⚠️ Cette section montre la logique interne de Claude. Utilisez-la pour identifier
+                    les données manquantes, les prompts à améliorer ou les problèmes de contexte.
+                  </p>
+                </div>
+
+                {/* Claude's Response */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Réponse de Claude:</p>
+                  <div className="bg-green-50 p-4 rounded border-l-4 border-green-400 max-h-64 overflow-y-auto">
+                    <p className="text-gray-900 whitespace-pre-wrap">{cotResult.response}</p>
+                  </div>
+                </div>
+
+                {/* Original Response Comparison */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Réponse originale (système):</p>
+                  <div className="bg-gray-50 p-4 rounded border border-gray-200 max-h-64 overflow-y-auto">
+                    <p className="text-gray-900 whitespace-pre-wrap">{cotResult.original_response}</p>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(cotResult.thinking);
+                      alert("Raisonnement copié dans le presse-papiers !");
+                    }}
+                    className="px-4 py-2 border border-purple-300 text-purple-700 text-sm rounded hover:bg-purple-50"
+                  >
+                    📋 Copier le raisonnement
+                  </button>
+                  <button
+                    onClick={() => setCotResult(null)}
                     className="px-4 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
                   >
                     Fermer
@@ -591,6 +753,27 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* CoT Error Toast */}
+      {cotError && (
+        <div className="fixed bottom-4 right-4 bg-red-100 border-2 border-red-400 text-red-800 px-6 py-4 rounded-lg shadow-lg z-50 max-w-md">
+          <div className="flex items-start space-x-3">
+            <span className="text-2xl">⚠️</span>
+            <div className="flex-1">
+              <p className="font-bold">Erreur d'analyse CoT</p>
+              <p className="text-sm mt-1">{cotError}</p>
+            </div>
+            <button
+              onClick={() => setCotError(null)}
+              className="text-red-600 hover:text-red-800"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}

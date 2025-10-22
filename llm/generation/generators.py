@@ -17,6 +17,7 @@ from utils.utilities import METRICS
 from .entity_manager import EntityEnrichmentBuilder
 from .models import ContextEnrichment
 from utils.llm_translator import LLMTranslator
+import anthropic  # For Claude Extended Thinking (CoT debugging)
 
 # Import message handler for veterinary disclaimers
 try:
@@ -74,6 +75,13 @@ class EnhancedResponseGenerator:
         self.last_cot_thinking: Optional[str] = None
         self.last_cot_analysis: Optional[str] = None
         self.last_has_cot_structure: bool = False
+
+        # 🧠 Claude Extended Thinking for CoT debugging
+        # Only initialized when needed (on-demand CoT analysis by admins)
+        self.anthropic_client = None
+        self.claude_cot_model = os.getenv("CLAUDE_COT_MODEL", "claude-3-7-sonnet-20250219")
+        self.claude_cot_budget = int(os.getenv("CLAUDE_COT_BUDGET", "4000"))
+        logger.info(f"🧠 Claude CoT configured: {self.claude_cot_model} (budget: {self.claude_cot_budget} tokens)")
 
         # Load centralized prompts manager
         if PROMPTS_AVAILABLE:
@@ -1277,6 +1285,141 @@ Style professionnel et structuré avec recommandations actionnables.""",
 
         logger.debug(f"🔍 Final cleaned response length: {len(response)} chars")
         return response
+
+    async def generate_response_with_cot(
+        self,
+        query: str,
+        context_docs: List[Union[Document, dict]],
+        conversation_context: str = "",
+        language: Optional[str] = None,
+        intent_result=None,
+        detected_domain: str = None,
+    ) -> Dict[str, any]:
+        """
+        Generate response with Claude Extended Thinking (CoT) for debugging anomalies.
+
+        This method is ONLY used for admin debugging of problematic Q&A pairs.
+        It returns both the response AND the thinking blocks for analysis.
+
+        Args:
+            query: User question
+            context_docs: Retrieved documents
+            conversation_context: Chat history
+            language: Target language
+            intent_result: Intent detection result
+            detected_domain: Detected domain
+
+        Returns:
+            Dict with keys:
+                - response: Final answer text
+                - thinking: Claude's reasoning blocks
+                - thinking_tokens: Number of thinking tokens used
+                - cost_usd: Cost of this CoT analysis in USD
+        """
+        lang = language or self.language
+
+        # Initialize Anthropic client if needed
+        if self.anthropic_client is None:
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                logger.error("❌ ANTHROPIC_API_KEY not set - CoT analysis unavailable")
+                raise ValueError("ANTHROPIC_API_KEY environment variable required for CoT analysis")
+            self.anthropic_client = anthropic.Anthropic(api_key=api_key)
+            logger.info("✅ Anthropic client initialized for CoT analysis")
+
+        # Build enrichment
+        enrichment = (
+            self.entity_enrichment_builder.build_enrichment(intent_result)
+            if intent_result
+            else ContextEnrichment("", "", "", "", [], [])
+        )
+
+        # Build prompts
+        system_prompt, user_prompt = self._build_enhanced_prompt(
+            query,
+            context_docs,
+            enrichment,
+            conversation_context,
+            lang,
+            detected_domain,
+        )
+
+        # Combine prompts for Claude (it prefers single user message)
+        combined_prompt = f"""SYSTEM INSTRUCTIONS:
+{system_prompt}
+
+USER QUERY:
+{user_prompt}"""
+
+        logger.info(f"🧠 Starting Claude Extended Thinking analysis (budget: {self.claude_cot_budget} tokens)")
+
+        try:
+            # Call Claude with Extended Thinking
+            response = self.anthropic_client.messages.create(
+                model=self.claude_cot_model,
+                max_tokens=2048,  # For the final response
+                thinking={
+                    "type": "enabled",
+                    "budget_tokens": self.claude_cot_budget
+                },
+                messages=[
+                    {"role": "user", "content": combined_prompt}
+                ]
+            )
+
+            # Extract thinking blocks and response
+            thinking_blocks = []
+            response_text = ""
+
+            for block in response.content:
+                if block.type == "thinking":
+                    thinking_blocks.append(block.thinking)
+                    logger.debug(f"🧠 Thinking block: {block.thinking[:200]}...")
+                elif block.type == "text":
+                    response_text += block.text
+
+            # Combine all thinking blocks
+            full_thinking = "\n\n".join(thinking_blocks)
+
+            # Calculate costs
+            # Claude 3.7 Sonnet pricing: $3/1M input, $15/1M output
+            # Extended Thinking pricing: $3/1M thinking tokens, $15/1M output tokens
+            thinking_tokens = getattr(response.usage, "thinking_tokens", 0)
+            input_tokens = response.usage.input_tokens
+            output_tokens = response.usage.output_tokens
+
+            cost_thinking = (thinking_tokens / 1_000_000) * 3.00
+            cost_input = (input_tokens / 1_000_000) * 3.00
+            cost_output = (output_tokens / 1_000_000) * 15.00
+            total_cost = cost_thinking + cost_input + cost_output
+
+            logger.info(f"🧠 CoT Analysis complete:")
+            logger.info(f"   - Thinking tokens: {thinking_tokens} (${cost_thinking:.4f})")
+            logger.info(f"   - Input tokens: {input_tokens} (${cost_input:.4f})")
+            logger.info(f"   - Output tokens: {output_tokens} (${cost_output:.4f})")
+            logger.info(f"   - Total cost: ${total_cost:.4f}")
+
+            # Post-process response
+            enhanced_response = self._post_process_response(
+                response_text,
+                enrichment,
+                [self._doc_to_dict(doc) for doc in context_docs],
+                query=query,
+                language=lang,
+            )
+
+            return {
+                "response": enhanced_response,
+                "thinking": full_thinking,
+                "thinking_tokens": thinking_tokens,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cost_usd": total_cost,
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Claude Extended Thinking failed: {e}")
+            raise
 
 
 # Factory function

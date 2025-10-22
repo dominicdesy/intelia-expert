@@ -9,10 +9,18 @@ from datetime import datetime, timedelta
 import logging
 from psycopg2.extras import RealDictCursor
 import json
+import os
+import sys
 
 from app.core.database import get_pg_connection, get_user_from_supabase
 from app.services.qa_quality_analyzer import qa_analyzer
 from app.api.v1.auth import get_current_user
+
+# Import LLM generator for CoT analysis
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
+from llm.generation.generators import create_enhanced_generator
+from llm.core.data_models import Document
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -706,6 +714,184 @@ async def cron_analyze_batch(
     except Exception as e:
         logger.error(f"[QA_QUALITY_CRON] Erreur critique: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ANALYZE COT - Admin debugging with Claude Extended Thinking
+# ============================================================================
+
+@router.post("/analyze-cot/{check_id}")
+async def analyze_cot(
+    check_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Analyze a specific QA quality check with Claude Extended Thinking.
+
+    This endpoint is ONLY for admin debugging of anomalies.
+    It re-generates the response using Claude Extended Thinking to understand
+    WHY the system gave a problematic response.
+
+    Args:
+        check_id: ID of the qa_quality_checks record to analyze
+        current_user: Authenticated admin user
+
+    Returns:
+        Dict with CoT analysis results:
+            - response: The re-generated response with Claude
+            - thinking: Claude's reasoning blocks
+            - thinking_tokens: Number of thinking tokens used
+            - cost_usd: Cost of this analysis
+            - analyzed_at: Timestamp
+            - analyzed_by: Admin email
+    """
+    verify_admin_access(current_user)
+    admin_email = current_user.get("email")
+
+    logger.info(f"🧠 [COT_ANALYSIS] Admin {admin_email} requesting CoT for check_id={check_id}")
+
+    try:
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 1. Fetch the QA quality check record
+                cur.execute("""
+                    SELECT
+                        qc.*,
+                        m.content as user_message_content,
+                        c.user_id,
+                        c.language
+                    FROM qa_quality_checks qc
+                    LEFT JOIN messages m ON m.id = qc.user_message_id
+                    LEFT JOIN conversations c ON c.id = qc.conversation_id
+                    WHERE qc.id = %s
+                """, (check_id,))
+
+                qa_check = cur.fetchone()
+
+                if not qa_check:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"QA quality check {check_id} not found"
+                    )
+
+                logger.info(f"🧠 [COT_ANALYSIS] Found QA check: conversation_id={qa_check['conversation_id']}")
+
+                # 2. Fetch the original documents/context used
+                # We need to retrieve the documents that were used to generate the original response
+                # This requires looking at the retrieval logs or reconstructing the search
+
+                # For now, we'll use the question to search again (same as original)
+                # In production, you might want to store retrieval_ids in qa_quality_checks
+                question = qa_check['question']
+                language = qa_check.get('language', 'fr')
+
+                # 3. Reconstruct context documents
+                # We'll fetch from messages table to get the context that was used
+                cur.execute("""
+                    SELECT metadata
+                    FROM messages
+                    WHERE id = %s
+                """, (qa_check['assistant_message_id'],))
+
+                assistant_msg = cur.fetchone()
+                context_docs = []
+
+                if assistant_msg and assistant_msg['metadata']:
+                    metadata = assistant_msg['metadata']
+                    # Check if retrieval data is stored in metadata
+                    if isinstance(metadata, dict) and 'retrieved_docs' in metadata:
+                        # Convert stored docs to Document objects
+                        for doc_data in metadata['retrieved_docs']:
+                            context_docs.append(Document(
+                                content=doc_data.get('content', ''),
+                                metadata=doc_data.get('metadata', {}),
+                                score=doc_data.get('score', 0.0)
+                            ))
+
+                # If no docs in metadata, create placeholder
+                if not context_docs:
+                    logger.warning(f"🧠 [COT_ANALYSIS] No context docs found, using response as context")
+                    context_docs = [Document(
+                        content=f"Original Response: {qa_check['response']}",
+                        metadata={"source": "original_response"},
+                        score=1.0
+                    )]
+
+                logger.info(f"🧠 [COT_ANALYSIS] Reconstructed {len(context_docs)} context documents")
+
+                # 4. Initialize OpenAI client and generator
+                openai_api_key = os.getenv("OPENAI_API_KEY")
+                if not openai_api_key:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="OPENAI_API_KEY not configured"
+                    )
+
+                openai_client = AsyncOpenAI(api_key=openai_api_key)
+                generator = create_enhanced_generator(
+                    openai_client=openai_client,
+                    cache_manager=None,  # Disable cache for CoT analysis
+                    language=language
+                )
+
+                # 5. Call Claude Extended Thinking
+                logger.info(f"🧠 [COT_ANALYSIS] Calling Claude Extended Thinking...")
+
+                cot_result = await generator.generate_response_with_cot(
+                    query=question,
+                    context_docs=context_docs,
+                    conversation_context="",  # Could fetch from conversation history if needed
+                    language=language,
+                    intent_result=None,
+                    detected_domain=None
+                )
+
+                logger.info(f"🧠 [COT_ANALYSIS] CoT complete: {cot_result['thinking_tokens']} thinking tokens, ${cot_result['cost_usd']:.4f}")
+
+                # 6. Store CoT results in database
+                cur.execute("""
+                    UPDATE qa_quality_checks
+                    SET
+                        cot_thinking = %s,
+                        cot_analyzed_at = NOW(),
+                        cot_analyzed_by = %s,
+                        cot_token_count = %s,
+                        cot_cost_usd = %s
+                    WHERE id = %s
+                """, (
+                    cot_result['thinking'],
+                    admin_email,
+                    cot_result['thinking_tokens'],
+                    cot_result['cost_usd'],
+                    check_id
+                ))
+                conn.commit()
+
+                logger.info(f"🧠 [COT_ANALYSIS] CoT results saved to database")
+
+                # 7. Return results
+                return {
+                    "check_id": check_id,
+                    "response": cot_result['response'],
+                    "thinking": cot_result['thinking'],
+                    "thinking_tokens": cot_result['thinking_tokens'],
+                    "input_tokens": cot_result['input_tokens'],
+                    "output_tokens": cot_result['output_tokens'],
+                    "cost_usd": cot_result['cost_usd'],
+                    "analyzed_at": datetime.now().isoformat(),
+                    "analyzed_by": admin_email,
+                    "original_question": question,
+                    "original_response": qa_check['response']
+                }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"🧠 [COT_ANALYSIS] Error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"CoT analysis failed: {str(e)}"
+        )
 
 
 logger.info("qa_quality.py loaded")

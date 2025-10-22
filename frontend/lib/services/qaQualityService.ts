@@ -10,6 +10,7 @@ import type {
   AnalyzeBatchResponse,
   ReviewQARequest,
   ReviewQAResponse,
+  CoTAnalysisResponse,
 } from "../../types/qa-quality";
 
 /**
@@ -101,6 +102,22 @@ export async function getQualityStats(params?: {
 
   if (!response.success) {
     throw new Error(response.error?.message || "Error fetching quality stats");
+  }
+
+  return response.data!;
+}
+
+/**
+ * Analyze QA with Claude Extended Thinking (CoT) for debugging
+ * Admin-only feature to understand WHY the system gave a problematic response
+ */
+export async function analyzeCoT(checkId: number): Promise<CoTAnalysisResponse> {
+  const response = await apiClient.postSecure<CoTAnalysisResponse>(
+    `qa-quality/analyze-cot/${checkId}`
+  );
+
+  if (!response.success) {
+    throw new Error(response.error?.message || "Error analyzing with CoT");
   }
 
   return response.data!;
