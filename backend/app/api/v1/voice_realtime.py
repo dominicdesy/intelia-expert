@@ -341,14 +341,32 @@ class VoiceRealtimeSession:
                     break
 
                 data = json.loads(message)
-
-                # Transférer à OpenAI
-                await self.openai_ws.send(message)
-
-                # Tracking
                 msg_type = data.get("type")
-                if msg_type == "audio.input":
+
+                # Convert frontend protocol → OpenAI protocol
+                if msg_type == "auth":
+                    # Skip auth messages (handled at WebSocket level)
+                    logger.debug("Skipping auth message (not needed for OpenAI)")
+                    continue
+
+                elif msg_type == "audio.input":
+                    # Convert audio.input → input_audio_buffer.append
+                    openai_message = {
+                        "type": "input_audio_buffer.append",
+                        "audio": data.get("audio")
+                    }
+                    await self.openai_ws.send(json.dumps(openai_message))
                     self.metrics["total_audio_chunks_sent"] += 1
+
+                elif msg_type == "interrupt":
+                    # Convert interrupt → response.cancel
+                    openai_message = {"type": "response.cancel"}
+                    await self.openai_ws.send(json.dumps(openai_message))
+                    logger.info("🛑 Interrupt signal sent to OpenAI")
+
+                else:
+                    # Forward other messages as-is (assumed to be OpenAI format)
+                    await self.openai_ws.send(message)
 
         except WebSocketDisconnect:
             logger.info(f"🔌 Client disconnected (session {self.session_id})")
