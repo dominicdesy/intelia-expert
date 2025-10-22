@@ -16,12 +16,6 @@ from app.core.database import get_pg_connection, get_user_from_supabase
 from app.services.qa_quality_analyzer import qa_analyzer
 from app.api.v1.auth import get_current_user
 
-# Import LLM generator for CoT analysis
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
-from llm.generation.generators import create_enhanced_generator
-from llm.core.data_models import Document
-from openai import AsyncOpenAI
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/qa-quality", tags=["qa-quality"])
@@ -749,6 +743,19 @@ async def analyze_cot(
     admin_email = current_user.get("email")
 
     logger.info(f"🧠 [COT_ANALYSIS] Admin {admin_email} requesting CoT for check_id={check_id}")
+
+    # Import LLM dependencies only when needed (avoids breaking module if LLM not available)
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), "../../../.."))
+        from llm.generation.generators import create_enhanced_generator
+        from llm.core.data_models import Document
+        from openai import AsyncOpenAI
+    except ImportError as e:
+        logger.error(f"🧠 [COT_ANALYSIS] Failed to import LLM dependencies: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"CoT analysis unavailable: LLM dependencies not found ({str(e)})"
+        )
 
     try:
         with get_pg_connection() as conn:
