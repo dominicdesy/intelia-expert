@@ -21,7 +21,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Intelia Expert - AI Advisor",
+  title: "Intelia Cognito - AI Advisor",
   description: "Assistant IA spécialisé pour les producteurs avicoles",
   keywords: "agriculture, IA, santé animale, nutrition, élevage, expert",
   authors: [{ name: "Intelia" }],
@@ -36,10 +36,10 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_APP_URL || "https://intelia-expert.com",
   ),
   openGraph: {
-    title: "Intelia Expert - Assistant IA Agriculture",
+    title: "Intelia Cognito - Assistant IA Agriculture",
     description: "Assistant IA spécialisé en santé et nutrition animale",
     url: "https://intelia-expert.com",
-    siteName: "Intelia Expert",
+    siteName: "Intelia Cognito",
     locale: "fr_CA",
     type: "website",
   },
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
 
 // Script de log de version - uniquement en développement
 const versionLogScript = process.env.NODE_ENV === 'development' ? `
-  console.log('Intelia Expert Frontend v1.0.0.25');
+  console.log('Intelia Cognito Frontend v1.0.0.25');
   console.log('Environment:', window.location.hostname === 'localhost' ? 'development' : 'production');
 
   // Force cache refresh
@@ -218,12 +218,12 @@ export default function RootLayout({
         {/* Meta tags PWA pour fullscreen - Safari iOS et Edge iOS */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Intelia Expert" />
+        <meta name="apple-mobile-web-app-title" content="Intelia Cognito" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="format-detection" content="telephone=no" />
 
         {/* Meta tags pour Edge et autres navigateurs mobiles */}
-        <meta name="application-name" content="Intelia Expert" />
+        <meta name="application-name" content="Intelia Cognito" />
         <meta name="msapplication-TileColor" content="#2563eb" />
         <meta name="msapplication-tap-highlight" content="no" />
 
@@ -272,7 +272,7 @@ export default function RootLayout({
             }
             
             html:not(.language-ready) body::after {
-              content: 'Intelia Expert';
+              content: 'Intelia Cognito';
               position: fixed;
               top: 50%;
               left: 50%;
@@ -486,7 +486,7 @@ export default function RootLayout({
             }}
           >
             <div style={{ fontSize: "24px", fontWeight: 600 }}>
-              Intelia Expert
+              Intelia Cognito
             </div>
             <div>JavaScript est requis pour utiliser cette application</div>
           </div>

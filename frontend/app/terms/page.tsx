@@ -21,7 +21,7 @@ export default function TermsPage() {
             >
               <InteliaLogo className="w-8 h-8" />
               <span className="text-xl font-bold text-gray-900">
-                Intelia Expert
+                Intelia Cognito
               </span>
             </Link>
             <Link
@@ -53,7 +53,7 @@ export default function TermsPage() {
                   between Intelia Technologies Inc., a corporation duly
                   incorporated under the Business Corporations Act (Quebec),
                   having its head office at 839 Papineau, Joliette, Québec J6E
-                  2L6, Canada ("Intelia Expert," "we," "us," or "our") and you
+                  2L6, Canada ("Intelia Cognito," "we," "us," or "our") and you
                   ("User" or "you") regarding your use of our artificial
                   intelligence services, platform, and related tools
                   (collectively, the "Services").

@@ -124,7 +124,7 @@ export default function SharedConversationPage() {
                 <MessageCircle className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Intelia Expert</h1>
+                <h1 className="text-xl font-bold text-gray-900">Intelia Cognito</h1>
                 <p className="text-sm text-gray-500">Conversation partagée</p>
               </div>
             </div>
@@ -217,7 +217,7 @@ export default function SharedConversationPage() {
             Impressionné par la qualité des réponses ?
           </h2>
           <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
-            Créez votre compte gratuit et posez vos propres questions à Intelia Expert,
+            Créez votre compte gratuit et posez vos propres questions à Intelia Cognito,
             votre assistant expert en production avicole.
           </p>
           <div className="flex items-center justify-center gap-4">
@@ -244,7 +244,7 @@ export default function SharedConversationPage() {
               href="https://expert.intelia.com"
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
-              Intelia Expert
+              Intelia Cognito
             </a>
           </p>
           {share_info.anonymized && (

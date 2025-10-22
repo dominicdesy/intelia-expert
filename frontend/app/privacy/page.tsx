@@ -21,7 +21,7 @@ export default function PrivacyPage() {
             >
               <InteliaLogo className="w-8 h-8" />
               <span className="text-xl font-bold text-gray-900">
-                Intelia Expert
+                Intelia Cognito
               </span>
             </Link>
             <Link

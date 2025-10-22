@@ -1,4 +1,4 @@
-// types/supabase.ts - Types de base Supabase pour Intelia Expert
+// types/supabase.ts - Types de base Supabase pour Intelia Cognito
 
 export interface Database {
   public: {

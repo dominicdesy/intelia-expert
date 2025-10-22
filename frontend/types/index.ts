@@ -3293,7 +3293,7 @@ export interface NotificationSettings {
 }
 
 export const APP_CONFIG = {
-  NAME: "Intelia Expert",
+  NAME: "Intelia Cognito",
   VERSION: "4.0.0", // Version JSON System
   DESCRIPTION: "Plateforme IA spécialisée en élevage avicole avec système RAG JSON avancé",
   COMPANY: "Intelia",

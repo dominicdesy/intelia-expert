@@ -8,7 +8,7 @@ import { secureLog } from "@/lib/utils/secureLogger";
 // Traductions
 export const translations = {
   fr: {
-    title: "Intelia Expert",
+    title: "Intelia Cognito",
     email: "Email",
     password: "Mot de passe",
     confirmPassword: "Confirmer le mot de passe",
@@ -69,7 +69,7 @@ export const translations = {
     selectCountry: "Sélectionner un pays...",
   },
   en: {
-    title: "Intelia Expert",
+    title: "Intelia Cognito",
     email: "Email",
     password: "Password",
     confirmPassword: "Confirm password",
