@@ -113,6 +113,9 @@ export const UserMenuButton = () => {
       profile_id: user.profile_id,
       preferences: user.preferences,
       is_admin: user.is_admin,
+      production_type: user.production_type,
+      category: user.category,
+      category_other: user.category_other,
     };
   }, [
     user?.id,
@@ -127,6 +130,9 @@ export const UserMenuButton = () => {
     user?.country_code,
     user?.area_code,
     user?.phone_number,
+    user?.production_type,
+    user?.category,
+    user?.category_other,
   ]);
 
   // Handlers

@@ -38,6 +38,9 @@ interface BackendUserData {
   profile_id?: string;
   preferences?: any;
   is_admin?: boolean;
+  production_type?: string[];  // NOUVEAU: User profiling
+  category?: string;  // NOUVEAU: User profiling
+  category_other?: string;  // NOUVEAU: User profiling
 }
 
 // Types d'état du store
@@ -324,6 +327,9 @@ export const useAuthStore = create<AuthState>()(
               profile_id: userData.profile_id,
               preferences: userData.preferences || {},
               is_admin: userData.is_admin || false,
+              production_type: userData.production_type || [],
+              category: userData.category || "",
+              category_other: userData.category_other || "",
             };
 
             set({
