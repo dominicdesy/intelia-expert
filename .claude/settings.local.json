@@ -12,7 +12,11 @@
       "Bash(psql:*)",
       "Bash(python -m py_compile:*)",
       "Bash(find:*)",
-      "Bash(git revert:*)"
+      "Bash(git revert:*)",
+      "WebFetch(domain:community.openai.com)",
+      "WebFetch(domain:cookbook.openai.com)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []

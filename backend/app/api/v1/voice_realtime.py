@@ -200,6 +200,9 @@ class VoiceRealtimeSession:
         self.context_ready = False
         self.context_task: Optional[asyncio.Task] = None
 
+        # Langue détectée (pour ajuster vitesse)
+        self.detected_language: Optional[str] = None
+
     async def connect_openai(self):
         """Connexion WebSocket à OpenAI Realtime API"""
         logger.info(f"🔌 Connecting to OpenAI Realtime API (session {self.session_id})")
@@ -227,8 +230,11 @@ class VoiceRealtimeSession:
             self.metrics["errors"].append(f"OpenAI connection: {str(e)}")
             return False
 
-    async def configure_openai_session(self):
-        """Configurer session OpenAI avec instructions multilingues"""
+    async def configure_openai_session(self, language: Optional[str] = None):
+        """Configurer session OpenAI avec instructions multilingues et vitesse ajustée"""
+        # Ajuster vitesse pour chinois: 15% plus rapide
+        speed = 1.15 if language == "zh" else 1.0
+
         config = {
             "type": "session.update",
             "session": {
@@ -270,9 +276,15 @@ class VoiceRealtimeSession:
                     "prefix_padding_ms": 300,
                     "silence_duration_ms": 500
                 },
-                "temperature": 0.8
+                "temperature": 0.8,
+                "max_response_output_tokens": 4096
             }
         }
+
+        # Ajouter paramètre speed seulement si différent de 1.0
+        if speed != 1.0:
+            config["session"]["speed"] = speed
+            logger.info(f"⚡ Adjusting playback speed to {speed}x for language: {language}")
 
         await self.openai_ws.send(json.dumps(config))
         logger.info("⚙️  OpenAI session configured")
@@ -381,6 +393,14 @@ class VoiceRealtimeSession:
                     openai_message = {"type": "response.cancel"}
                     await self.openai_ws.send(json.dumps(openai_message))
                     logger.info("🛑 Interrupt signal sent to OpenAI")
+
+                elif msg_type == "language.detected":
+                    # Langue détectée par le frontend - reconfigurer session avec vitesse ajustée
+                    language = data.get("language")
+                    if language and language != self.detected_language:
+                        self.detected_language = language
+                        logger.info(f"🌍 Language detected: {language}")
+                        await self.configure_openai_session(language=language)
 
                 else:
                     # Forward other messages as-is (assumed to be OpenAI format)

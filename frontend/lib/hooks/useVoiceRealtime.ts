@@ -255,6 +255,16 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
           const detectedLang = detectLanguage(data.transcript);
           detectedLanguageRef.current = detectedLang;
           console.log("🌍 Detected language:", detectedLang);
+
+          // Envoyer langue au backend pour ajuster vitesse si nécessaire
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(
+              JSON.stringify({
+                type: "language.detected",
+                language: detectedLang,
+              })
+            );
+          }
         }
         break;
 
