@@ -780,10 +780,10 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     }
   }, [isLoading, onClose]);
 
-  const handleFormDataChange = useCallback((field: string, value: string) => {
+  const handleFormDataChange = useCallback((field: string, value: string | string[]) => {
     debugLog("INTERACTION", "Form data changed", {
       field,
-      value: value.substring(0, 20) + "...",
+      value: typeof value === 'string' ? value.substring(0, 20) + "..." : value,
     });
     setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
