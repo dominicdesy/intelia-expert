@@ -366,6 +366,10 @@ class VoiceRealtimeSession:
                 data = json.loads(message)
                 event_type = data.get("type")
 
+                # Log errors from OpenAI
+                if event_type == "error":
+                    logger.error(f"❌ OpenAI error: {data.get('error', {})}")
+
                 # OPTION B: Détecter transcription partielle
                 if event_type == "conversation.item.input_audio_transcription.completed":
                     transcript = data.get("transcript", "")
