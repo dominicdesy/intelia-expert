@@ -174,6 +174,9 @@ class UserRegister(BaseModel):
     phone: Optional[str] = None
     country: Optional[str] = None  # NOUVEAU: pays
     preferred_language: Optional[str] = "en"  # NOUVEAU: langue préférée
+    production_type: Optional[list[str]] = None  # NOUVEAU: broiler, layer, ou les deux
+    category: Optional[str] = None  # NOUVEAU: catégorie dans la value chain
+    category_other: Optional[str] = None  # NOUVEAU: description si category = "other"
 
 
 class AuthResponse(BaseModel):
@@ -1491,6 +1494,9 @@ async def register_user(user_data: UserRegister, request: Request):
                     "company_name": user_data.company,
                     "user_type": "user",
                     "language": user_data.preferred_language or "en",
+                    "production_type": user_data.production_type,
+                    "category": user_data.category,
+                    "category_other": user_data.category_other,
                     "created_at": datetime.utcnow().isoformat(),
                 }
 

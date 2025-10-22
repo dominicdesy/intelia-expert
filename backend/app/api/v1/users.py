@@ -49,6 +49,9 @@ class UserProfileUpdate(BaseModel):
     user_type: Optional[str] = None
     language: Optional[str] = None
     ad_history: Optional[list] = None  # 🎯 Ad rotation history (last 10 ads shown)
+    production_type: Optional[list[str]] = None  # 🆕 Production type: broiler, layer, or both
+    category: Optional[str] = None  # 🆕 Value chain category
+    category_other: Optional[str] = None  # 🆕 Description if category = "other"
 
     @validator("first_name", "last_name")
     def validate_names(cls, v):
@@ -97,6 +100,35 @@ class UserProfileUpdate(BaseModel):
             # Vérifier que ce sont des strings
             if not all(isinstance(item, str) for item in v):
                 raise ValueError("ad_history doit contenir uniquement des chaînes de caractères")
+        return v
+
+    @validator("production_type")
+    def validate_production_type(cls, v):
+        if v is not None:
+            if not isinstance(v, list):
+                raise ValueError("production_type doit être une liste")
+            valid_types = ["broiler", "layer"]
+            if not all(item in valid_types for item in v):
+                raise ValueError("production_type ne peut contenir que 'broiler' ou 'layer'")
+            if len(v) == 0:
+                raise ValueError("production_type ne peut pas être vide")
+        return v
+
+    @validator("category")
+    def validate_category(cls, v):
+        if v is not None:
+            valid_categories = [
+                "breeding_hatchery",
+                "feed_nutrition",
+                "farm_operations",
+                "health_veterinary",
+                "processing",
+                "management_oversight",
+                "equipment_technology",
+                "other"
+            ]
+            if v not in valid_categories:
+                raise ValueError(f"category invalide. Valeurs autorisées: {', '.join(valid_categories)}")
         return v
 
 
