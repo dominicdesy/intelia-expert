@@ -43,6 +43,39 @@ export interface VoiceRealtimeError {
 }
 
 // ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+/**
+ * Détecte la langue d'un texte basé sur les caractères
+ * Retourne "zh" pour chinois, "ja" pour japonais, "ko" pour coréen, "en" par défaut
+ */
+function detectLanguage(text: string): string {
+  if (!text) return "en";
+
+  // Détection des caractères chinois (CJK Unified Ideographs)
+  const chineseRegex = /[\u4e00-\u9fff]/;
+  if (chineseRegex.test(text)) {
+    return "zh";
+  }
+
+  // Détection japonais (Hiragana, Katakana)
+  const japaneseRegex = /[\u3040-\u309f\u30a0-\u30ff]/;
+  if (japaneseRegex.test(text)) {
+    return "ja";
+  }
+
+  // Détection coréen (Hangul)
+  const koreanRegex = /[\uac00-\ud7af]/;
+  if (koreanRegex.test(text)) {
+    return "ko";
+  }
+
+  // Par défaut (anglais, français, espagnol, etc.)
+  return "en";
+}
+
+// ============================================================
 // CONSTANTES
 // ============================================================
 
@@ -81,6 +114,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const isPlayingRef = useRef(false); // Prevent overlapping audio playback
   const isBufferingRef = useRef(true); // Pre-buffer chunks before playing
   const nextPlayTimeRef = useRef<number>(0); // Track scheduled playback time for seamless chunks
+  const detectedLanguageRef = useRef<string>("en"); // Detected language from transcript
   const reconnectAttemptsRef = useRef(0);
 
   // ============================================================
@@ -228,6 +262,12 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
 
       case "conversation.item.input_audio_transcription.completed":
         console.log("📝 Transcription:", data.transcript);
+        // Détecter la langue depuis la transcription
+        if (data.transcript) {
+          const detectedLang = detectLanguage(data.transcript);
+          detectedLanguageRef.current = detectedLang;
+          console.log("🌍 Detected language:", detectedLang);
+        }
         break;
 
       case "response.audio_transcript.delta":
@@ -389,9 +429,13 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       const now = audioContext.currentTime;
       const duration = audioBuffer.duration;
 
+      // Déterminer la vitesse de lecture selon la langue
+      const playbackRate = detectedLanguageRef.current === "zh" ? 1.15 : 1.0;
+      const effectiveDuration = duration / playbackRate;
+
       // Schedule playback: either now or seamlessly after previous chunk
       const startTime = Math.max(now, nextPlayTimeRef.current);
-      const endTime = startTime + duration;
+      const endTime = startTime + effectiveDuration;
 
       // Update next play time for seamless chain
       nextPlayTimeRef.current = endTime;
@@ -409,6 +453,13 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       // Create source and connect through gain node
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
+
+      // Ajuster la vitesse selon la langue
+      source.playbackRate.value = playbackRate;
+      if (playbackRate !== 1.0) {
+        console.log(`🌍 Language: ${detectedLanguageRef.current} - playback speed: ${playbackRate}x`);
+      }
+
       source.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
@@ -585,6 +636,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
     isPlayingRef.current = false;
     isBufferingRef.current = true;
     nextPlayTimeRef.current = 0; // Reset audio scheduling
+    detectedLanguageRef.current = "en"; // Reset language detection
   }, [stopMicrophone]);
 
   const interrupt = useCallback(() => {
