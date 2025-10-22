@@ -2401,7 +2401,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
                             logger.warning(f"[/auth/me] Erreur récupération plan: {e}")
 
                         # Retourner les données complètes incluant first_name, last_name, country
-                        return {
+                        result = {
                             "user_id": current_user.get("user_id"),
                             "email": current_user.get("email"),
                             "session_id": current_user.get("session_id"),
@@ -2432,6 +2432,8 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
                             "created_at": profile_data.get("created_at"),
                             "updated_at": profile_data.get("updated_at"),
                         }
+                        logger.info(f"[/auth/me] ✅ Main path - Returning for {result['email']} with plan={result['plan']}, is_admin={result['is_admin']}")
+                        return result
                 except Exception as e:
                     logger.warning(f"[/auth/me] Erreur récupération profil Supabase: {e}")
                     # Fallback vers données JWT si erreur Supabase
@@ -2460,7 +2462,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
         except Exception as e:
             logger.warning(f"[/auth/me] Fallback - Erreur récupération plan: {e}")
 
-        return {
+        result = {
             "user_id": current_user.get("user_id"),
             "email": current_user.get("email"),
             "session_id": current_user.get("session_id"),
@@ -2472,6 +2474,8 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
             "jwt_secret_used": current_user.get("jwt_secret_used"),
             "plan": user_plan,  # 🎯 Plan chargé même en fallback
         }
+        logger.info(f"[/auth/me] ⚠️ Fallback path - Returning for {result['email']} with plan={result['plan']}, is_admin={result['is_admin']}")
+        return result
     except Exception as e:
         logger.error(f"[/auth/me] Erreur inattendue: {e}")
 
@@ -2497,7 +2501,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
             logger.warning(f"[/auth/me] Exception fallback - Erreur récupération plan: {plan_error}")
 
         # En cas d'erreur, retourner au minimum les données du JWT
-        return {
+        result = {
             "user_id": current_user.get("user_id"),
             "email": current_user.get("email"),
             "session_id": current_user.get("session_id"),
@@ -2509,6 +2513,8 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
             "jwt_secret_used": current_user.get("jwt_secret_used"),
             "plan": user_plan,  # 🎯 Plan chargé même en exception fallback
         }
+        logger.error(f"[/auth/me] ❌ Exception path - Returning for {result.get('email', 'unknown')} with plan={result['plan']}, is_admin={result['is_admin']}")
+        return result
 
 
 @router.get("/debug/jwt-config")

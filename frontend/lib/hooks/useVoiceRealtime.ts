@@ -114,6 +114,17 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const hasInteliaPlan = user?.plan === "intelia";
   const canUseVoiceRealtime = isSuperAdmin || hasInteliaPlan;
 
+  // Debug: Log access check
+  console.log("🔐 [Voice Realtime] Access check:", {
+    email: user?.email,
+    plan: user?.plan,
+    is_admin: user?.is_admin,
+    isSuperAdmin,
+    hasInteliaPlan,
+    canUseVoiceRealtime,
+    isAuthenticated,
+  });
+
   // ============================================================
   // WEBSOCKET
   // ============================================================
