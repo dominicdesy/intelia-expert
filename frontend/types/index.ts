@@ -1244,6 +1244,9 @@ export interface User {
   preferences?: Record<string, any>;
   is_admin?: boolean;
   preferredLanguage?: string;
+  production_type?: string[];
+  category?: string;
+  category_other?: string;
 }
 
 export interface ProfileUpdateData {

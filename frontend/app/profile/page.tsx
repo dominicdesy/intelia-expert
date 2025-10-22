@@ -130,6 +130,9 @@ function ProfilePageContent() {
     fullName: "",
     email: "",
     userType: "producer" as "producer" | "professional",
+    productionType: [] as string[],
+    category: "",
+    categoryOther: "",
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -159,6 +162,9 @@ function ProfilePageContent() {
       fullName: getSafeName(user),
       email: getSafeEmail(user),
       userType: getSafeUserType(user) as "producer" | "professional",
+      productionType: user.production_type || [],
+      category: user.category || "",
+      categoryOther: user.category_other || "",
     });
 
     // Gestion de l'onglet depuis l'URL
@@ -257,6 +263,9 @@ function ProfilePageContent() {
       const dataToUpdate = {
         name: trimmedName,
         user_type: formData.userType,
+        production_type: formData.productionType.length > 0 ? formData.productionType : null,
+        category: formData.category || null,
+        category_other: formData.category === 'other' ? formData.categoryOther : null,
       };
 
       await updateProfile(dataToUpdate);
@@ -471,6 +480,86 @@ function ProfilePageContent() {
                           {t("profile.accountType.professional")}
                         </option>
                       </select>
+                    </div>
+
+                    {/* Production Type */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t("profile.productionType.label")}
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">
+                        {t("profile.productionType.why")}
+                      </p>
+                      <div className="space-y-2">
+                        <label className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.productionType.includes('broiler')}
+                            onChange={(e) => {
+                              const newProductionType = e.target.checked
+                                ? [...formData.productionType, 'broiler']
+                                : formData.productionType.filter(t => t !== 'broiler');
+                              setFormData(prev => ({ ...prev, productionType: newProductionType }));
+                            }}
+                            className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {t("profile.productionType.broiler")}
+                          </span>
+                        </label>
+                        <label className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.productionType.includes('layer')}
+                            onChange={(e) => {
+                              const newProductionType = e.target.checked
+                                ? [...formData.productionType, 'layer']
+                                : formData.productionType.filter(t => t !== 'layer');
+                              setFormData(prev => ({ ...prev, productionType: newProductionType }));
+                            }}
+                            className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {t("profile.productionType.layer")}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t("profile.category.label")}
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">
+                        {t("profile.category.why")}
+                      </p>
+                      <select
+                        value={formData.category}
+                        onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">-- {t("common.optional")} --</option>
+                        <option value="breeding_hatchery">{t("profile.category.breedingHatchery")}</option>
+                        <option value="feed_nutrition">{t("profile.category.feedNutrition")}</option>
+                        <option value="farm_operations">{t("profile.category.farmOperations")}</option>
+                        <option value="health_veterinary">{t("profile.category.healthVeterinary")}</option>
+                        <option value="processing">{t("profile.category.processing")}</option>
+                        <option value="management_oversight">{t("profile.category.managementOversight")}</option>
+                        <option value="equipment_technology">{t("profile.category.equipmentTechnology")}</option>
+                        <option value="other">{t("profile.category.other")}</option>
+                      </select>
+
+                      {/* Conditional: Other Category Input */}
+                      {formData.category === 'other' && (
+                        <input
+                          type="text"
+                          value={formData.categoryOther}
+                          onChange={(e) => setFormData(prev => ({ ...prev, categoryOther: e.target.value }))}
+                          placeholder={t("profile.category.otherPlaceholder")}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mt-2"
+                        />
+                      )}
                     </div>
 
                     <button
