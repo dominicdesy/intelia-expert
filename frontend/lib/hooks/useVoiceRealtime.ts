@@ -110,7 +110,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       // WebSocket URL
       const wsUrl = `${finalConfig.backendUrl?.replace("https://", "wss://").replace("http://", "ws://")}/api/v1/ws/voice`;
 
-      console.log("🔌 Connecting to WebSocket:", wsUrl);
+      console.log("🔌 [Voice Realtime] Connecting to WebSocket:", wsUrl);
 
       // Connexion WebSocket
       const ws = new WebSocket(wsUrl);
