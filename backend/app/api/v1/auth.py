@@ -1423,6 +1423,13 @@ async def register_user(user_data: UserRegister, request: Request):
         # NOUVEAU: Stocker la langue préférée
         if user_data.preferred_language:
             user_metadata["preferred_language"] = user_data.preferred_language
+        # NOUVEAU: Stocker les champs de profiling pour le trigger Supabase
+        if user_data.production_type:
+            user_metadata["production_type"] = user_data.production_type
+        if user_data.category:
+            user_metadata["category"] = user_data.category
+        if user_data.category_other:
+            user_metadata["category_other"] = user_data.category_other
 
         # Configuration de l'URL de redirection après confirmation
         frontend_url = os.getenv("FRONTEND_URL", "https://expert.intelia.com")
@@ -1451,6 +1458,8 @@ async def register_user(user_data: UserRegister, request: Request):
             # Capturer les erreurs Supabase (ex: utilisateur existant)
             error_msg = str(e)
             logger.error(f"[Register] Erreur Supabase sign_up: {error_msg}")
+            logger.error(f"[Register] Type d'erreur: {type(e).__name__}")
+            logger.error(f"[Register] Détails complets: {repr(e)}")
             if "already registered" in error_msg.lower() or "already exists" in error_msg.lower():
                 raise HTTPException(status_code=400, detail="Un compte avec cet email existe déjà")
             raise HTTPException(status_code=400, detail=error_msg)
