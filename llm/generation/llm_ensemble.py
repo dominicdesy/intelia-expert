@@ -23,6 +23,14 @@ from anthropic import AsyncAnthropic
 
 from generation.adaptive_length import get_adaptive_length
 
+# Import centralized prompts manager
+try:
+    from config.system_prompts import get_prompts_manager
+    PROMPTS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"⚠️ SystemPromptsManager not available: {e}")
+    PROMPTS_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -101,6 +109,7 @@ class LLMEnsemble:
         mode: EnsembleMode = EnsembleMode.BEST_OF_N,
         judge_model: str = "gpt-4o-mini",
         enable_ensemble: bool = None,
+        prompts_path: Optional[str] = None,
     ):
         """
         Initialize LLM ensemble
@@ -109,6 +118,7 @@ class LLMEnsemble:
             mode: Ensemble mode (best_of_n, fusion, voting)
             judge_model: Model to use for quality judging (default: gpt-4o-mini for cost)
             enable_ensemble: Enable/disable ensemble (reads from env if None)
+            prompts_path: Optional path to system_prompts.json
         """
         self.mode = mode
         self.judge_model = judge_model
@@ -119,6 +129,21 @@ class LLMEnsemble:
                 os.getenv("ENABLE_LLM_ENSEMBLE", "false").lower() == "true"
             )
         self.enabled = enable_ensemble
+
+        # Initialize prompts manager
+        if PROMPTS_AVAILABLE:
+            try:
+                if prompts_path:
+                    self.prompts_manager = get_prompts_manager(prompts_path)
+                else:
+                    self.prompts_manager = get_prompts_manager()
+                logger.info("✅ LLM Ensemble initialized with system_prompts.json")
+            except Exception as e:
+                logger.error(f"❌ Error loading prompts: {e}")
+                self.prompts_manager = None
+        else:
+            self.prompts_manager = None
+            logger.warning("⚠️ LLM Ensemble in fallback mode (no prompts manager)")
 
         # Initialize clients for all 3 providers
         self._init_clients()
@@ -673,20 +698,23 @@ Réponds directement en {language}, sans préambule."""
             query, responses, quality_assessments, language
         )
 
-    def _get_cot_prompt(self, language: str) -> str:
+    def _get_fallback_instructions(self, language: str) -> str:
         """
-        Get Chain-of-Thought prompt template for the specified language
+        Get fallback instructions when context is insufficient
 
-        ✅ NOUVELLE APPROCHE: Utilise SystemPromptsManager pour CoT multilingue unifié
-
-        Returns structured CoT prompt with XML tags for thinking/analysis/answer
+        Returns instructions to use general poultry expertise
         """
-        # ✅ Utiliser le système centralisé de prompts
+        # Use prompts manager if available
         if self.prompts_manager:
-            return self.prompts_manager.get_cot_prompt(language=language, use_simple=False)
+            # Try to get base identity with response guidelines
+            identity = self.prompts_manager.get_base_prompt("expert_identity", language)
+            guidelines = self.prompts_manager.get_base_prompt("response_guidelines", language)
 
-        # Fallback si prompts_manager n'est pas disponible
-        return "\n\n🧠 CHAIN-OF-THOUGHT: Structure your response with <thinking>, <analysis>, <answer> XML tags."
+            if identity and guidelines:
+                return f"{identity}\n\n{guidelines}"
+
+        # Fallback: simple instructions
+        return "You are a poultry production expert. Answer based on your expertise."
 
     async def _fallback_single_llm(
         self,
@@ -710,12 +738,12 @@ Réponds directement en {language}, sans préambule."""
         )
         logger.info(f"📏 Adaptive max_tokens for fallback: {max_tokens}")
 
-        # Build system prompt with CoT instructions
-        cot_instructions = self._get_cot_prompt(language)
+        # Build system prompt with fallback instructions
+        fallback_instructions = self._get_fallback_instructions(language)
         if system_prompt:
-            enhanced_system_prompt = f"{system_prompt}\n\n{cot_instructions}"
+            enhanced_system_prompt = f"{system_prompt}\n\n{fallback_instructions}"
         else:
-            enhanced_system_prompt = f"Tu es un expert en production avicole. Réponds de manière factuelle et précise.\n\n{cot_instructions}"
+            enhanced_system_prompt = fallback_instructions
 
         context_text = self._format_context(context_docs)
         user_message = f"""Contexte:
@@ -725,7 +753,7 @@ Question: {query}
 
 Réponds en {language}."""
 
-        # Use Claude if available, else GPT-4o (with CoT-enhanced system prompt)
+        # Use Claude if available, else GPT-4o
         if self.claude_client:
             result = await self._generate_claude_response(
                 query, user_message, enhanced_system_prompt, max_tokens
@@ -774,7 +802,9 @@ _ensemble_instance = None
 
 
 def get_llm_ensemble(
-    mode: EnsembleMode = EnsembleMode.BEST_OF_N, force_new: bool = False
+    mode: EnsembleMode = EnsembleMode.BEST_OF_N,
+    force_new: bool = False,
+    prompts_path: Optional[str] = None,
 ) -> LLMEnsemble:
     """
     Get or create LLM Ensemble singleton
@@ -782,6 +812,7 @@ def get_llm_ensemble(
     Args:
         mode: Ensemble mode to use
         force_new: Force creation of new instance
+        prompts_path: Optional path to system_prompts.json
 
     Returns:
         LLMEnsemble instance
@@ -789,6 +820,6 @@ def get_llm_ensemble(
     global _ensemble_instance
 
     if _ensemble_instance is None or force_new:
-        _ensemble_instance = LLMEnsemble(mode=mode)
+        _ensemble_instance = LLMEnsemble(mode=mode, prompts_path=prompts_path)
 
     return _ensemble_instance
