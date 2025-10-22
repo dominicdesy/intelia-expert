@@ -279,6 +279,8 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
 
   const handleAudioOutput = useCallback(async (base64Audio: string) => {
     try {
+      console.log("🔊 Received audio chunk, length:", base64Audio.length);
+
       // Décoder Base64
       const audioData = atob(base64Audio);
       const arrayBuffer = new Uint8Array(audioData.length);
@@ -286,11 +288,15 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
         arrayBuffer[i] = audioData.charCodeAt(i);
       }
 
+      console.log("🔊 Decoded audio buffer:", arrayBuffer.length, "bytes");
+
       // Ajouter à queue
       audioQueueRef.current.push(arrayBuffer.buffer);
+      console.log("🔊 Audio queue length:", audioQueueRef.current.length);
 
       // Jouer si pas déjà en cours
       if (!audioContextRef.current) {
+        console.log("🔊 Initializing AudioContext...");
         await initAudioContext();
       }
 
@@ -314,9 +320,13 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   };
 
   const playAudioQueue = async () => {
-    if (!audioContextRef.current || audioQueueRef.current.length === 0) return;
+    if (!audioContextRef.current || audioQueueRef.current.length === 0) {
+      console.log("🔊 playAudioQueue: AudioContext or queue empty");
+      return;
+    }
 
     const pcm16Buffer = audioQueueRef.current.shift()!;
+    console.log("🔊 Playing audio chunk, buffer size:", pcm16Buffer.byteLength);
 
     try {
       // Convert PCM16 (Int16) → Float32 for Web Audio API
@@ -328,6 +338,8 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
         float32[i] = pcm16[i] / (pcm16[i] < 0 ? 0x8000 : 0x7FFF);
       }
 
+      console.log("🔊 Converted to Float32, samples:", float32.length);
+
       // Create AudioBuffer manually (OpenAI sends PCM16 at 24kHz mono)
       const audioBuffer = audioContextRef.current.createBuffer(
         1, // mono
@@ -336,6 +348,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       );
 
       audioBuffer.getChannelData(0).set(float32);
+      console.log("🔊 AudioBuffer created, duration:", audioBuffer.duration, "seconds");
 
       // Create source and play
       const source = audioContextRef.current.createBufferSource();
@@ -343,6 +356,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       source.connect(audioContextRef.current.destination);
 
       source.onended = () => {
+        console.log("🔊 Audio chunk finished playing");
         // Play next chunk
         if (audioQueueRef.current.length > 0) {
           playAudioQueue();
@@ -351,6 +365,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
         }
       };
 
+      console.log("🔊 Starting audio playback...");
       source.start();
     } catch (err) {
       console.error("❌ Audio playback error:", err);
