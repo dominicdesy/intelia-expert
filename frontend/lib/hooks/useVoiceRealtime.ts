@@ -78,6 +78,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const micAudioContextRef = useRef<AudioContext | null>(null); // For capturing microphone
   const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
+  const isPlayingRef = useRef(false); // Prevent overlapping audio playback
   const reconnectAttemptsRef = useRef(0);
 
   // ============================================================
@@ -334,11 +335,18 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   };
 
   const playAudioQueue = async () => {
+    // Prevent overlapping playback
+    if (isPlayingRef.current) {
+      console.log("🔊 Already playing, skipping...");
+      return;
+    }
+
     if (!playbackAudioContextRef.current || audioQueueRef.current.length === 0) {
       console.log("🔊 playAudioQueue: Playback AudioContext or queue empty");
       return;
     }
 
+    isPlayingRef.current = true;
     const pcm16Buffer = audioQueueRef.current.shift()!;
     console.log("🔊 Playing audio chunk, buffer size:", pcm16Buffer.byteLength);
 
@@ -371,6 +379,8 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
 
       source.onended = () => {
         console.log("🔊 Audio chunk finished playing");
+        isPlayingRef.current = false;
+
         // Play next chunk
         if (audioQueueRef.current.length > 0) {
           playAudioQueue();
@@ -383,6 +393,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       source.start();
     } catch (err) {
       console.error("❌ Audio playback error:", err);
+      isPlayingRef.current = false; // Reset on error
     }
   };
 
