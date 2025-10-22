@@ -75,6 +75,7 @@ class PlanType(str, Enum):
     ESSENTIAL = "essential"
     PRO = "pro"
     ELITE = "elite"
+    INTELIA = "intelia"  # Plan employés - gratuit et illimité
 
 
 class QuotaStatus(str, Enum):
@@ -149,6 +150,16 @@ class BillingManager:
                         # Nouvel utilisateur - créer avec plan gratuit
                         self._initialize_new_user(user_email)
                         return self.check_quota_before_question(user_email)
+
+                    # Plan Intelia = illimité (employés)
+                    if user_info["plan_name"] == "intelia":
+                        return True, {
+                            "status": "unlimited",
+                            "quota": "unlimited",
+                            "used": user_info["questions_used"] or 0,
+                            "remaining": "unlimited",
+                            "plan": "Intelia Team",
+                        }
 
                     # Déterminer le quota effectif
                     quota = (
@@ -667,6 +678,13 @@ def change_user_plan(
     if not user_email:
         raise HTTPException(status_code=400, detail="User email not found")
 
+    # Bloquer le changement vers le plan Intelia (réservé aux employés)
+    if new_plan == "intelia":
+        raise HTTPException(
+            status_code=403,
+            detail="Le plan Intelia est réservé aux employés. Veuillez contacter l'équipe."
+        )
+
     # Si upgrade vers un plan payant, vérifier que la devise est définie
     if new_plan != "essential":
         try:
@@ -802,7 +820,7 @@ def available_plans(request: Request, country: str = None, current_user: dict = 
     try:
         with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Récupérer les prix pour ce pays
+                # Récupérer les prix pour ce pays (exclure le plan Intelia - employés seulement)
                 cur.execute("""
                     SELECT
                         plan_name,
@@ -815,6 +833,7 @@ def available_plans(request: Request, country: str = None, current_user: dict = 
                         tier_level
                     FROM complete_pricing_matrix
                     WHERE country_code = %s
+                      AND plan_name != 'intelia'
                     ORDER BY
                         CASE plan_name
                             WHEN 'essential' THEN 1
@@ -844,6 +863,7 @@ def available_plans(request: Request, country: str = None, current_user: dict = 
                             tier_level
                         FROM complete_pricing_matrix
                         WHERE country_code = 'US'
+                          AND plan_name != 'intelia'
                         ORDER BY
                             CASE plan_name
                                 WHEN 'essential' THEN 1
