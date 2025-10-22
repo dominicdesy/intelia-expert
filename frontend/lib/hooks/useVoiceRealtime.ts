@@ -196,6 +196,14 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
         }
         break;
 
+      case "session.created":
+        console.log("✅ OpenAI session created:", data.session?.id);
+        break;
+
+      case "session.updated":
+        console.log("✅ OpenAI session updated");
+        break;
+
       case "session.timeout":
         setError({
           type: "network",
