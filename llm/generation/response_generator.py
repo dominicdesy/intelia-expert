@@ -108,6 +108,7 @@ class ResponseGenerator:
         conversation_context: str = "",
         language: Optional[str] = None,
         intent_result=None,
+        user_id: Optional[str] = None,  # 🆕 User profiling
     ) -> str:
         """
         Generate enriched response with caching and post-processing
@@ -118,6 +119,7 @@ class ResponseGenerator:
             conversation_context: Optional conversation history
             language: Target language (uses default if not specified)
             intent_result: Optional intent classification result for enrichment
+            user_id: Optional user ID for profile-based personalization
 
         Returns:
             Generated and post-processed response
@@ -127,7 +129,8 @@ class ResponseGenerator:
             >>> response = await generator.generate_response(
             ...     query="What is the target weight at 35 days?",
             ...     context_docs=documents,
-            ...     language="en"
+            ...     language="en",
+            ...     user_id="user_12345"
             ... )
         """
         lang = language or self.language
@@ -161,13 +164,14 @@ class ResponseGenerator:
             # Build entity enrichment
             enrichment = self._build_enrichment(intent_result)
 
-            # Build prompts
+            # Build prompts (with user profiling if user_id provided)
             system_prompt, user_prompt = self.prompt_builder._build_enhanced_prompt(
                 query=query,
                 context_docs=context_docs,
                 enrichment=enrichment,
                 conversation_context=conversation_context,
                 language=lang,
+                user_id=user_id,  # 🆕 Pass user_id for profiling
             )
 
             # Route query to optimal LLM provider

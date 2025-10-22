@@ -79,6 +79,7 @@ class PromptBuilder:
         enrichment: ContextEnrichment,
         conversation_context: str,
         language: str,
+        user_id: Optional[str] = None,  # 🆕 User profiling
     ) -> Tuple[str, str]:
         """
         Build an enhanced prompt with entity enrichment and language instructions.
@@ -86,6 +87,7 @@ class PromptBuilder:
         This is the main prompt construction method that combines:
         - Language instructions (positioned at the top for emphasis)
         - Expert identity and response guidelines
+        - User profiling personalization (production type, expertise level)
         - Business context from entity enrichment
         - Conversation history
         - Technical documentation context
@@ -263,6 +265,19 @@ MÉTRIQUES PRIORITAIRES:
             system_prompt = "\n\n".join(system_prompt_parts)
         else:
             system_prompt = self._get_fallback_system_prompt(enrichment, language)
+
+        # 🆕 USER PROFILING PERSONALIZATION - Apply profile-based customizations
+        if user_id:
+            try:
+                from llm.core.user_profiling import get_user_profile, build_personalized_system_prompt
+                user_profile = get_user_profile(user_id)
+                if user_profile:
+                    system_prompt = build_personalized_system_prompt(system_prompt, user_profile)
+                    logger.info(f"✅ System prompt personalized for user {user_id} (production_type={user_profile.get('production_type')}, category={user_profile.get('category')})")
+                else:
+                    logger.debug(f"ℹ️ No profile found for user {user_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to personalize prompt for user {user_id}: {e}")
 
         # Simple validation of conversation context
         limited_context = conversation_context if conversation_context else ""

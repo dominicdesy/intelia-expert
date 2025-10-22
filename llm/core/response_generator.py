@@ -59,6 +59,7 @@ class RAGResponseGenerator:
         preprocessed_data: Dict[str, Any],
         original_query: str,
         language: str,
+        user_id: str = None,  # 🆕 User profiling
     ) -> RAGResult:
         """
         Ensure RAGResult has a generated answer
@@ -131,6 +132,7 @@ class RAGResponseGenerator:
                             conversation_context=conversation_context,
                             language=language,
                             intent_result=None,
+                            user_id=user_id,  # 🆕 Pass user_id for profiling
                         )
 
                         result.answer = generated_answer

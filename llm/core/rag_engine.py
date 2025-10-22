@@ -400,12 +400,13 @@ class InteliaRAGEngine(InitializableMixin):
                 conversation_context=context_dict,
             )
 
-            # Ensure answer is generated
+            # Ensure answer is generated (with user profiling)
             result = await self.response_generator.ensure_answer_generated(
                 result=result,
                 preprocessed_data=result.metadata,
                 original_query=query,
                 language=effective_language,
+                user_id=tenant_id,  # 🆕 Pass tenant_id as user_id for profiling
             )
 
             self.optimization_stats["routing_success"] += 1
@@ -486,12 +487,13 @@ class InteliaRAGEngine(InitializableMixin):
                 preextracted_entities=entities,
             )
 
-            # Ensure answer is generated
+            # Ensure answer is generated (with user profiling)
             result = await self.response_generator.ensure_answer_generated(
                 result=result,
                 preprocessed_data=result.metadata,
                 original_query=query,
                 language=effective_language,
+                user_id=tenant_id,  # 🆕 Pass tenant_id as user_id for profiling
             )
 
             self.optimization_stats["routing_success"] += 1
