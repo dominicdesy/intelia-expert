@@ -648,6 +648,24 @@ if WEBAUTHN_AVAILABLE and webauthn_router:
 else:
     logger.warning("WebAuthn router non monté (module non disponible)")
 
+# Voice Realtime (WebSocket conversation vocale avec OpenAI Realtime API)
+VOICE_REALTIME_AVAILABLE = False
+try:
+    from . import voice_realtime
+    voice_realtime_router = voice_realtime.router
+    VOICE_REALTIME_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Voice Realtime router import failed: {e}")
+    voice_realtime_router = None
+
+if VOICE_REALTIME_AVAILABLE and voice_realtime_router:
+    router.include_router(voice_realtime_router, tags=["Voice-Realtime"])
+    logger.debug("Voice Realtime router monté")
+    logger.debug("Voice Realtime router maintenant disponible sur /v1/voice/* et /v1/ws/voice")
+    logger.info("Voice Realtime activé (WebSocket + OpenAI Realtime API)!")
+else:
+    logger.warning("Voice Realtime router non monté (module non disponible)")
+
 # Résumé final
 total_routes = len(router.routes)
 logger.info("Router v1 créé avec %d routes au total", total_routes)
