@@ -113,7 +113,6 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false); // Prevent overlapping audio playback
   const isBufferingRef = useRef(true); // Pre-buffer chunks before playing
-  const nextPlayTimeRef = useRef<number>(0); // Track scheduled playback time for seamless chunks
   const detectedLanguageRef = useRef<string>("en"); // Detected language from transcript
   const reconnectAttemptsRef = useRef(0);
 
@@ -433,21 +432,14 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       const playbackRate = detectedLanguageRef.current === "zh" ? 1.15 : 1.0;
       const effectiveDuration = duration / playbackRate;
 
-      // Schedule playback: either now or seamlessly after previous chunk
-      const startTime = Math.max(now, nextPlayTimeRef.current);
-      const endTime = startTime + effectiveDuration;
-
-      // Update next play time for seamless chain
-      nextPlayTimeRef.current = endTime;
-
       // Fade in: 0 → 1 over first 3ms (très court pour éviter latence)
-      gainNode.gain.setValueAtTime(0, startTime);
-      gainNode.gain.linearRampToValueAtTime(1, startTime + 0.003);
+      gainNode.gain.setValueAtTime(0, 0);
+      gainNode.gain.linearRampToValueAtTime(1, 0.003);
 
       // Fade out: 1 → 0 over last 3ms (crossfade avec prochain chunk)
-      if (duration > 0.006) {
-        gainNode.gain.setValueAtTime(1, endTime - 0.003);
-        gainNode.gain.linearRampToValueAtTime(0, endTime);
+      if (effectiveDuration > 0.006) {
+        gainNode.gain.setValueAtTime(1, effectiveDuration - 0.003);
+        gainNode.gain.linearRampToValueAtTime(0, effectiveDuration);
       }
 
       // Create source and connect through gain node
@@ -473,12 +465,11 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
         } else {
           setState("listening");
           isBufferingRef.current = true; // Reset buffering for next response
-          nextPlayTimeRef.current = 0; // Reset scheduling
         }
       };
 
-      console.log(`🔊 Starting audio playback... (scheduled at ${startTime.toFixed(3)}s, duration ${duration.toFixed(3)}s)`);
-      source.start(startTime);
+      console.log(`🔊 Starting audio playback... (duration ${effectiveDuration.toFixed(3)}s, rate ${playbackRate}x)`);
+      source.start();
     } catch (err) {
       console.error("❌ Audio playback error:", err);
       isPlayingRef.current = false; // Reset on error
@@ -635,7 +626,6 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
     audioQueueRef.current = [];
     isPlayingRef.current = false;
     isBufferingRef.current = true;
-    nextPlayTimeRef.current = 0; // Reset audio scheduling
     detectedLanguageRef.current = "en"; // Reset language detection
   }, [stopMicrophone]);
 
@@ -649,11 +639,10 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       );
     }
 
-    // Clear audio queue and reset scheduling
+    // Clear audio queue and reset state
     audioQueueRef.current = [];
     isPlayingRef.current = false;
     isBufferingRef.current = true;
-    nextPlayTimeRef.current = 0;
 
     setState("listening");
   }, []);
