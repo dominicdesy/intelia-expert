@@ -318,10 +318,10 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
       return;
     }
 
-    console.log("🔊 Creating new playback AudioContext at 24kHz");
-    playbackAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
-      sampleRate: 24000, // Match OpenAI output sample rate
-    });
+    console.log("🔊 Creating new playback AudioContext (using system sample rate)");
+    playbackAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // Don't force 24kHz - let it use system default (usually 48kHz)
+    // We'll create the AudioBuffer at 24kHz which will be resampled automatically
 
     console.log("🔊 Playback AudioContext created, state:", playbackAudioContextRef.current.state);
 
