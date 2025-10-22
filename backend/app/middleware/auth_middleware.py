@@ -35,6 +35,8 @@ PUBLIC_ENDPOINTS = {
     # === VOICE REALTIME HEALTH (public pour vérification) ===
     "/api/v1/voice/health",
     "/api/v1/voice/stats",
+    "/v1/voice/health",
+    "/v1/voice/stats",
     # === ENDPOINTS BILLING PUBLICS ===
     "/api/v1/billing/plans",
     # === ENDPOINTS AUTH PUBLICS ===
@@ -132,6 +134,7 @@ AUTHENTICATED_USER_PATTERNS = [
     "/api/v1/invitations/",
     # === VOICE REALTIME WEBSOCKET (authentification requise, admin vérifié dans l'endpoint) ===
     "/api/v1/ws/voice",
+    "/v1/ws/voice",
 ]
 
 # PATTERNS PUBLICS ÉTENDUS (pour les vérifications par pattern)
