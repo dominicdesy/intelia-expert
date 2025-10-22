@@ -378,6 +378,12 @@ function LoginPageContent() {
       };
 
       console.log("[Signup] Langue envoyée au backend:", currentLanguage);
+      console.log("[Signup] Profiling data:", {
+        productionType: signupData.productionType,
+        category: signupData.category,
+        categoryOther: signupData.categoryOther
+      });
+      console.log("[Signup] userData complet:", userData);
 
       await register(signupData.email, signupData.password, userData);
 
