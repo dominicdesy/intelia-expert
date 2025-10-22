@@ -492,11 +492,13 @@ MÉTRIQUES CLÉS BROILERS:
         language: Optional[str] = None,
         intent_result=None,
         detected_domain: str = None,
+        user_id: Optional[str] = None,
     ) -> str:
         """
         Génère une réponse enrichie avec cache externe + ton affirmatif expert
 
         VERSION 3.4: Support détection de domaine pour sélection de prompt spécialisé
+        VERSION 3.5: Support personnalisation profil utilisateur
         """
 
         lang = language or self.language
@@ -561,6 +563,7 @@ MÉTRIQUES CLÉS BROILERS:
                 conversation_context,
                 lang,
                 detected_domain,
+                user_id,
             )
 
             # 🧠 DEBUG: Log CoT instruction to verify it's being sent
@@ -680,12 +683,15 @@ MÉTRIQUES CLÉS BROILERS:
         conversation_context: str,
         language: str,
         detected_domain: str = None,
+        user_id: Optional[str] = None,
     ) -> Tuple[str, str]:
         """
         Construit un prompt enrichi avec instructions de langue renforcées
 
         VERSION 3.4: Support détection domaine pour prompts spécialisés
+        VERSION 3.5: Support personnalisation profil utilisateur (production_type, category, country)
         ✅ NEW: Utilise detected_domain pour sélectionner nutrition_query, health_diagnosis, etc.
+        ✅ NEW: Personnalise selon profil utilisateur (measurement system, expertise level, production focus)
         """
 
         # 🔍 DEBUG CRITIQUE - Validation conversation_context
@@ -1012,6 +1018,21 @@ MÉTRIQUES PRIORITAIRES:
         else:
             system_prompt = self._get_fallback_system_prompt(enrichment, language)
 
+        # 🆕 USER PROFILING PERSONALIZATION
+        if user_id:
+            try:
+                from llm.core.user_profiling import get_user_profile, build_personalized_system_prompt
+
+                user_profile = get_user_profile(user_id)
+                if user_profile:
+                    system_prompt = build_personalized_system_prompt(system_prompt, user_profile)
+                    logger.info(f"✅ System prompt personalized for user {user_id[:8]}... (country={user_profile.get('country')}, production={user_profile.get('production_type')}, category={user_profile.get('category')})")
+                else:
+                    logger.info(f"ℹ️ No profile found for user {user_id[:8]}..., using base prompt")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to personalize prompt for user {user_id[:8] if user_id else 'unknown'}: {e}")
+                # Continue with base prompt if personalization fails
+
         # ✅ Validation simple du contexte conversationnel (déplacé ici)
         limited_context = conversation_context if conversation_context else ""
 
@@ -1294,6 +1315,7 @@ Style professionnel et structuré avec recommandations actionnables.""",
         language: Optional[str] = None,
         intent_result=None,
         detected_domain: str = None,
+        user_id: Optional[str] = None,
     ) -> Dict[str, any]:
         """
         Generate response with Claude Extended Thinking (CoT) for debugging anomalies.
@@ -1308,6 +1330,7 @@ Style professionnel et structuré avec recommandations actionnables.""",
             language: Target language
             intent_result: Intent detection result
             detected_domain: Detected domain
+            user_id: Optional user ID for profile personalization
 
         Returns:
             Dict with keys:
@@ -1342,6 +1365,7 @@ Style professionnel et structuré avec recommandations actionnables.""",
             conversation_context,
             lang,
             detected_domain,
+            user_id,
         )
 
         # Combine prompts for Claude (it prefers single user message)
