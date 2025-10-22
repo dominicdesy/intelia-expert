@@ -52,7 +52,6 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
   const [stats, setStats] = useState<{
     total_problematic: number;
     problematic_rate: number;
-    avg_quality_score: number;
   } | null>(null);
 
   // Batch analysis
@@ -90,7 +89,6 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
       setStats({
         total_problematic: statsData.total_problematic,
         problematic_rate: statsData.problematic_rate,
-        avg_quality_score: statsData.avg_quality_score,
       });
     } catch (err: any) {
       secureLog.error("Error loading QA quality data:", err);
@@ -261,7 +259,7 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
         </div>
 
         {stats && (
-          <div className="grid grid-cols-3 gap-4 p-4">
+          <div className="grid grid-cols-2 gap-4 p-4">
             <div className="text-center p-3 bg-red-50 border border-red-200 rounded">
               <div className="text-2xl font-bold text-red-600">{stats.total_problematic}</div>
               <div className="text-xs text-red-700">Q&A problématiques</div>
@@ -271,12 +269,6 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
                 {stats.problematic_rate.toFixed(1)}%
               </div>
               <div className="text-xs text-yellow-700">Taux de problèmes</div>
-            </div>
-            <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded">
-              <div className="text-2xl font-bold text-blue-600">
-                {stats.avg_quality_score.toFixed(1)}/10
-              </div>
-              <div className="text-xs text-blue-700">Score qualité moyen</div>
             </div>
           </div>
         )}
