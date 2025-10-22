@@ -215,9 +215,10 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
 
       case "error":
         console.error("❌ Server error received:", data);
+        const errorMessage = data.error?.message || data.message || "Server error";
         setError({
           type: "unknown",
-          message: data.message || data.error || "Server error",
+          message: errorMessage,
         });
         break;
 
