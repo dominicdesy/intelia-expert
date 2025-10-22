@@ -7,6 +7,9 @@ including adaptive thresholds, language adjustments, fallback terms, and
 pattern matching rules.
 """
 
+import json
+import os
+from pathlib import Path
 from utils.types import Dict, List
 
 # ===== ADAPTIVE THRESHOLDS =====
@@ -178,24 +181,81 @@ to the final score. The weighted score formula is:
 
 # ===== ACRONYM EXPANSIONS =====
 
-ACRONYM_EXPANSIONS: Dict[str, str] = {
-    "ic": "indice conversion",
-    "fcr": "feed conversion ratio",
-    "pv": "poids vif",
-    "gmq": "gain moyen quotidien",
-}
+def _load_acronym_expansions() -> Dict[str, str]:
+    """
+    Load acronym expansions from poultry_terminology.json.
+
+    Returns a dictionary mapping acronyms (lowercase) to their full forms
+    in French and English for query normalization.
+
+    Falls back to hardcoded acronyms if JSON file is unavailable.
+    """
+    try:
+        # Get path to poultry_terminology.json (relative to this config file)
+        config_dir = Path(__file__).parent.parent.parent / "config"
+        terminology_file = config_dir / "poultry_terminology.json"
+
+        if not terminology_file.exists():
+            raise FileNotFoundError(f"Terminology file not found: {terminology_file}")
+
+        with open(terminology_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        expansions = {}
+        acronyms = data.get("acronyms", {})
+
+        for key, value in acronyms.items():
+            if key.startswith("_"):  # Skip comment fields
+                continue
+
+            # Get all acronym variants
+            acronym_variants = value.get("acronym", [])
+            full_forms = value.get("full_form", {})
+
+            # Get French and English full forms
+            fr_form = full_forms.get("fr", "")
+            en_form = full_forms.get("en", "")
+
+            # Map each acronym variant to both French and English forms
+            for variant in acronym_variants:
+                variant_lower = variant.lower()
+                # Prefer French form, fallback to English
+                if fr_form:
+                    expansions[variant_lower] = fr_form.lower()
+                elif en_form:
+                    expansions[variant_lower] = en_form.lower()
+
+        return expansions
+
+    except Exception as e:
+        # Fallback to hardcoded acronyms if loading fails
+        print(f"Warning: Could not load acronyms from JSON ({e}). Using fallback acronyms.")
+        return {
+            "ic": "indice conversion",
+            "fcr": "feed conversion ratio",
+            "pv": "poids vif",
+            "gmq": "gain moyen quotidien",
+        }
+
+# Load acronym expansions at module initialization
+ACRONYM_EXPANSIONS: Dict[str, str] = _load_acronym_expansions()
 """
 Acronym to full-text expansions for query normalization.
 
+Loaded from llm/config/poultry_terminology.json "acronyms" section.
 Common poultry industry acronyms are expanded to their full forms
 during query normalization to improve matching against the domain
 vocabulary. This helps recognize queries that use abbreviated terms.
 
 Examples:
-- "IC" → "indice conversion" (conversion index)
+- "IC" → "indice de consommation" (conversion index)
 - "FCR" → "feed conversion ratio"
 - "PV" → "poids vif" (live weight)
 - "GMQ" → "gain moyen quotidien" (average daily gain)
+- "ADG" → "average daily gain"
+- "EPEF" → "european production efficiency factor"
+
+Falls back to hardcoded acronyms if JSON file is unavailable.
 """
 
 # ===== GENERIC QUERY WORDS =====

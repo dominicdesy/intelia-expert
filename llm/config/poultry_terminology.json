@@ -206,9 +206,624 @@
       "vi": "tỷ lệ tử vong"
     }
   },
+  "acronyms": {
+    "_comment": "Common poultry industry acronyms with their full forms and synonyms across multiple languages",
+    "FCR": {
+      "acronym": ["FCR", "IC", "ICA", "F:G"],
+      "description": "Feed Conversion Ratio - efficiency of feed utilization",
+      "full_form": {
+        "en": "Feed Conversion Ratio",
+        "fr": "Indice de Consommation",
+        "es": "Índice de Conversión Alimenticia",
+        "de": "Futterverwertung",
+        "it": "Indice di Conversione Alimentare",
+        "pt": "Conversão Alimentar"
+      },
+      "synonyms": {
+        "en": ["Feed efficiency", "Feed to gain ratio", "Conversion index"],
+        "fr": ["Taux de conversion alimentaire", "Efficacité alimentaire", "Indice de conversion"],
+        "es": ["Eficiencia alimenticia", "Conversión de alimento"]
+      }
+    },
+    "ADG": {
+      "acronym": ["ADG", "GMQ", "DWG"],
+      "description": "Average Daily Gain - average weight gain per day",
+      "full_form": {
+        "en": "Average Daily Gain",
+        "fr": "Gain Moyen Quotidien",
+        "es": "Ganancia Media Diaria",
+        "de": "Tägliche Gewichtszunahme",
+        "it": "Incremento Medio Giornaliero",
+        "pt": "Ganho Médio Diário"
+      },
+      "synonyms": {
+        "en": ["Daily weight gain", "Weight gain per day", "Growth rate"],
+        "fr": ["Croissance journalière", "Gain de poids quotidien", "Prise de poids quotidienne"],
+        "es": ["Crecimiento diario", "Aumento de peso diario"]
+      }
+    },
+    "BW": {
+      "acronym": ["BW", "PV", "LW"],
+      "description": "Body Weight - average live weight of birds",
+      "full_form": {
+        "en": "Body Weight",
+        "fr": "Poids Vif",
+        "es": "Peso Vivo",
+        "de": "Lebendgewicht",
+        "it": "Peso Vivo",
+        "pt": "Peso Vivo"
+      },
+      "synonyms": {
+        "en": ["Live weight", "Average weight", "Live mass", "Mean body weight"],
+        "fr": ["Poids corporel", "Masse corporelle", "Poids moyen"],
+        "es": ["Peso corporal", "Masa corporal"]
+      }
+    },
+    "EPEF": {
+      "acronym": ["EPEF", "EEF", "EU", "EPI"],
+      "description": "European Production Efficiency Factor - global performance index",
+      "full_form": {
+        "en": "European Production Efficiency Factor",
+        "fr": "Indice de Performance Européen",
+        "es": "Factor de Eficiencia Productiva Europea",
+        "de": "Europäischer Produktionseffizienzfaktor",
+        "it": "Fattore di Efficienza Produttiva Europea",
+        "pt": "Fator de Eficiência de Produção Europeia"
+      },
+      "synonyms": {
+        "en": ["Production index", "European index", "Performance index"],
+        "fr": ["Indice de production", "Facteur de productivité"],
+        "es": ["Índice de producción", "Eficiencia productiva"]
+      }
+    },
+    "ME": {
+      "acronym": ["ME", "EM", "AME", "TME"],
+      "description": "Metabolizable Energy - usable energy from feed",
+      "full_form": {
+        "en": "Metabolizable Energy",
+        "fr": "Énergie Métabolisable",
+        "es": "Energía Metabolizable",
+        "de": "Umsetzbare Energie",
+        "it": "Energia Metabolizzabile",
+        "pt": "Energia Metabolizável"
+      },
+      "synonyms": {
+        "en": ["AME (Apparent Metabolizable Energy)", "TME (True Metabolizable Energy)", "Energy value"],
+        "fr": ["Valeur énergétique", "Énergie disponible"],
+        "es": ["Valor energético", "Energía disponible"]
+      }
+    },
+    "CP": {
+      "acronym": ["CP", "PB", "TP"],
+      "description": "Crude Protein - total protein content in feed",
+      "full_form": {
+        "en": "Crude Protein",
+        "fr": "Protéine Brute",
+        "es": "Proteína Bruta",
+        "de": "Rohprotein",
+        "it": "Proteina Grezza",
+        "pt": "Proteína Bruta"
+      },
+      "synonyms": {
+        "en": ["Total protein", "Protein content"],
+        "fr": ["Protéines totales", "Teneur en protéines"],
+        "es": ["Proteína total", "Contenido proteico"]
+      }
+    },
+    "AA": {
+      "acronym": ["AA", "EAA", "NEAA"],
+      "description": "Amino Acids - building blocks of proteins",
+      "full_form": {
+        "en": "Amino Acids",
+        "fr": "Acides Aminés",
+        "es": "Aminoácidos",
+        "de": "Aminosäuren",
+        "it": "Amminoacidi",
+        "pt": "Aminoácidos"
+      },
+      "synonyms": {
+        "en": ["EAA (Essential Amino Acids)", "NEAA (Non-Essential Amino Acids)"],
+        "fr": ["AA essentiels", "AA non essentiels"],
+        "es": ["AA esenciales", "AA no esenciales"]
+      }
+    },
+    "CV": {
+      "acronym": ["CV", "CoV"],
+      "description": "Coefficient of Variation - indicator of flock uniformity",
+      "full_form": {
+        "en": "Coefficient of Variation",
+        "fr": "Coefficient de Variation",
+        "es": "Coeficiente de Variación",
+        "de": "Variationskoeffizient",
+        "it": "Coefficiente di Variazione",
+        "pt": "Coeficiente de Variação"
+      },
+      "synonyms": {
+        "en": ["Weight uniformity", "Variability index", "Flock uniformity"],
+        "fr": ["Uniformité du lot", "Homogénéité", "Indice d'uniformité"],
+        "es": ["Uniformidad del lote", "Homogeneidad"]
+      }
+    },
+    "HD": {
+      "acronym": ["HD", "HDP", "HH", "HW"],
+      "description": "Hen-Day Production - daily egg production per live hen",
+      "full_form": {
+        "en": "Hen-Day Production",
+        "fr": "Production Poule-Jour",
+        "es": "Producción Gallina-Día",
+        "de": "Hennen-Tag-Produktion",
+        "it": "Produzione Gallina-Giorno",
+        "pt": "Produção Galinha-Dia"
+      },
+      "synonyms": {
+        "en": ["Hen-day %", "Eggs per hen per day", "Daily egg production", "Hen-housed production"],
+        "fr": ["% ponte", "Œufs par poule par jour", "Taux de ponte quotidien"],
+        "es": ["% postura", "Huevos por gallina por día"]
+      }
+    },
+    "EM": {
+      "acronym": ["EM", "EW", "EggMass"],
+      "description": "Egg Mass - total egg production in grams per hen per day",
+      "full_form": {
+        "en": "Egg Mass",
+        "fr": "Masse d'Œufs",
+        "es": "Masa de Huevos",
+        "de": "Eimasse",
+        "it": "Massa d'Uova",
+        "pt": "Massa de Ovos"
+      },
+      "synonyms": {
+        "en": ["Egg weight production", "g of egg per hen per day"],
+        "fr": ["Production en grammes d'œufs", "g d'œufs par poule par jour"],
+        "es": ["Producción en gramos de huevos"]
+      }
+    },
+    "ND": {
+      "acronym": ["ND", "NDV"],
+      "description": "Newcastle Disease - viral poultry disease",
+      "full_form": {
+        "en": "Newcastle Disease",
+        "fr": "Maladie de Newcastle",
+        "es": "Enfermedad de Newcastle",
+        "de": "Newcastle-Krankheit",
+        "it": "Malattia di Newcastle",
+        "pt": "Doença de Newcastle"
+      },
+      "synonyms": {
+        "en": ["Pseudo-fowl pest", "Avian distemper", "NDV (Newcastle Disease Virus)"],
+        "fr": ["Pseudo-peste aviaire", "Virus de Newcastle"],
+        "es": ["Pseudo-peste aviar"]
+      }
+    },
+    "AI": {
+      "acronym": ["AI", "H5N1", "H7N9", "HPAI", "LPAI"],
+      "description": "Avian Influenza - bird flu",
+      "full_form": {
+        "en": "Avian Influenza",
+        "fr": "Influenza Aviaire",
+        "es": "Influenza Aviar",
+        "de": "Vogelgrippe",
+        "it": "Influenza Aviaria",
+        "pt": "Influenza Aviária"
+      },
+      "synonyms": {
+        "en": ["Bird flu", "Avian flu", "HPAI (Highly Pathogenic)", "LPAI (Low Pathogenic)"],
+        "fr": ["Grippe aviaire", "Peste aviaire"],
+        "es": ["Gripe aviar", "Gripe del pollo"]
+      }
+    },
+    "IBD": {
+      "acronym": ["IBD", "Gumboro"],
+      "description": "Infectious Bursal Disease - Gumboro disease",
+      "full_form": {
+        "en": "Infectious Bursal Disease",
+        "fr": "Maladie de Gumboro",
+        "es": "Enfermedad de Gumboro",
+        "de": "Gumboro-Krankheit",
+        "it": "Malattia di Gumboro",
+        "pt": "Doença de Gumboro"
+      },
+      "synonyms": {
+        "en": ["Gumboro disease", "Bursal disease"],
+        "fr": ["Bursite infectieuse", "Gumboro"],
+        "es": ["Bursitis infecciosa", "Gumboro"]
+      }
+    },
+    "IB": {
+      "acronym": ["IB", "IBV"],
+      "description": "Infectious Bronchitis - viral respiratory disease",
+      "full_form": {
+        "en": "Infectious Bronchitis",
+        "fr": "Bronchite Infectieuse",
+        "es": "Bronquitis Infecciosa",
+        "de": "Infektiöse Bronchitis",
+        "it": "Bronchite Infettiva",
+        "pt": "Bronquite Infecciosa"
+      },
+      "synonyms": {
+        "en": ["IBV (Infectious Bronchitis Virus)", "Avian bronchitis"],
+        "fr": ["Virus de la bronchite infectieuse"],
+        "es": ["Virus de la bronquitis infecciosa"]
+      }
+    },
+    "CFU": {
+      "acronym": ["CFU"],
+      "description": "Colony Forming Unit - measure of viable bacteria",
+      "full_form": {
+        "en": "Colony Forming Unit",
+        "fr": "Unité Formant Colonie",
+        "es": "Unidad Formadora de Colonias",
+        "de": "Koloniebildende Einheit",
+        "it": "Unità Formante Colonie",
+        "pt": "Unidade Formadora de Colônia"
+      },
+      "synonyms": {
+        "en": ["Bacterial count", "Microbial load", "Viable count"],
+        "fr": ["Compte bactérien", "Charge microbienne"],
+        "es": ["Recuento bacteriano", "Carga microbiana"]
+      }
+    },
+    "ST": {
+      "acronym": ["ST", "SD"],
+      "description": "Stocking Density - number of birds per unit area",
+      "full_form": {
+        "en": "Stocking Density",
+        "fr": "Densité d'Élevage",
+        "es": "Densidad de Crianza",
+        "de": "Besatzdichte",
+        "it": "Densità di Allevamento",
+        "pt": "Densidade de Criação"
+      },
+      "synonyms": {
+        "en": ["Bird density", "Housing density", "Placement density", "kg/m²", "birds/m²"],
+        "fr": ["Densité de peuplement", "kg/m²", "nombre de sujets/m²"],
+        "es": ["Densidad poblacional", "kg/m²"]
+      }
+    },
+    "TDS": {
+      "acronym": ["TDS"],
+      "description": "Total Dissolved Solids - water quality measure",
+      "full_form": {
+        "en": "Total Dissolved Solids",
+        "fr": "Solides Dissous Totaux",
+        "es": "Sólidos Disueltos Totales",
+        "de": "Gesamtgelöste Feststoffe",
+        "it": "Solidi Disciolti Totali",
+        "pt": "Sólidos Dissolvidos Totais"
+      },
+      "synonyms": {
+        "en": ["TDS ppm", "Dissolved solids", "Water quality index"],
+        "fr": ["TDS ppm", "Qualité de l'eau", "Minéralisation"],
+        "es": ["TDS ppm", "Calidad del agua"]
+      }
+    },
+    "FF": {
+      "acronym": ["FF"],
+      "description": "Feed Form - type of feed presentation",
+      "full_form": {
+        "en": "Feed Form",
+        "fr": "Forme d'Aliment",
+        "es": "Forma de Alimento",
+        "de": "Futterform",
+        "it": "Forma del Mangime",
+        "pt": "Forma de Ração"
+      },
+      "synonyms": {
+        "en": ["Feed type", "Feed presentation", "Mash", "Pellet", "Crumble"],
+        "fr": ["Type d'aliment", "Présentation", "Farine", "Granulé", "Miette"],
+        "es": ["Tipo de alimento", "Harina", "Pellet", "Migaja"]
+      }
+    },
+    "GR": {
+      "acronym": ["GR"],
+      "description": "Growth Rate - rate of body weight increase",
+      "full_form": {
+        "en": "Growth Rate",
+        "fr": "Taux de Croissance",
+        "es": "Tasa de Crecimiento",
+        "de": "Wachstumsrate",
+        "it": "Tasso di Crescita",
+        "pt": "Taxa de Crescimento"
+      },
+      "synonyms": {
+        "en": ["Weight gain", "Daily gain", "ADG (Average Daily Gain)"],
+        "fr": ["Gain de poids", "GMQ (Gain Moyen Quotidien)", "Croissance"],
+        "es": ["Ganancia de peso", "GMD (Ganancia Media Diaria)"]
+      }
+    },
+    "HE": {
+      "acronym": ["HE"],
+      "description": "Hatchability of Eggs - percentage of fertile eggs hatched",
+      "full_form": {
+        "en": "Hatchability of Eggs",
+        "fr": "Taux d'Éclosion",
+        "es": "Tasa de Eclosión",
+        "de": "Schlupfrate",
+        "it": "Tasso di Schiusa",
+        "pt": "Taxa de Eclosão"
+      },
+      "synonyms": {
+        "en": ["Hatch rate", "Hatchability", "% hatch", "Fertility"],
+        "fr": ["Éclosabilité", "% éclosion", "Fertilité"],
+        "es": ["Eclosionabilidad", "% eclosión"]
+      }
+    },
+    "MJ": {
+      "acronym": ["MJ", "kJ", "kcal"],
+      "description": "Megajoule - energy unit for feed value",
+      "full_form": {
+        "en": "Megajoule",
+        "fr": "Mégajoule",
+        "es": "Megajulio",
+        "de": "Megajoule",
+        "it": "Megajoule",
+        "pt": "Megajoule"
+      },
+      "synonyms": {
+        "en": ["MJ ME", "MJ/kg", "Kilocalorie (kcal)", "Kilojoule (kJ)"],
+        "fr": ["MJ EM", "MJ/kg", "Kilocalorie (kcal)", "Kilojoule (kJ)"],
+        "es": ["MJ EM", "MJ/kg", "Kilocaloría (kcal)"]
+      }
+    },
+    "EDS": {
+      "acronym": ["EDS"],
+      "description": "Egg Drop Syndrome - viral disease causing sudden drop in egg production",
+      "full_form": {
+        "en": "Egg Drop Syndrome",
+        "fr": "Syndrome de Chute de Ponte",
+        "es": "Síndrome de Caída de la Puesta",
+        "de": "Legeabfall-Syndrom",
+        "it": "Sindrome della Caduta della Deposizione",
+        "pt": "Síndrome de Queda de Postura"
+      },
+      "synonyms": {
+        "en": ["EDS-76", "Egg drop disease"],
+        "fr": ["SCP", "Chute de ponte"],
+        "es": ["Caída de postura"]
+      }
+    },
+    "CRD": {
+      "acronym": ["CRD"],
+      "description": "Chronic Respiratory Disease - mycoplasma infection",
+      "full_form": {
+        "en": "Chronic Respiratory Disease",
+        "fr": "Maladie Respiratoire Chronique",
+        "es": "Enfermedad Respiratoria Crónica",
+        "de": "Chronische Atemwegserkrankung",
+        "it": "Malattia Respiratoria Cronica",
+        "pt": "Doença Respiratória Crônica"
+      },
+      "synonyms": {
+        "en": ["Mycoplasma infection", "Air sac disease"],
+        "fr": ["Mycoplasmose", "Maladie des sacs aériens"],
+        "es": ["Micoplasmosis", "Enfermedad de sacos aéreos"]
+      }
+    },
+    "DHV": {
+      "acronym": ["DHV"],
+      "description": "Duck Hepatitis Virus - viral disease in ducks",
+      "full_form": {
+        "en": "Duck Hepatitis Virus",
+        "fr": "Virus de l'Hépatite du Canard",
+        "es": "Virus de la Hepatitis del Pato",
+        "de": "Entenhepatitis-Virus",
+        "it": "Virus dell'Epatite dell'Anatra",
+        "pt": "Vírus da Hepatite do Pato"
+      },
+      "synonyms": {
+        "en": ["Duck viral hepatitis", "DVH"],
+        "fr": ["Hépatite virale du canard"],
+        "es": ["Hepatitis viral del pato"]
+      }
+    },
+    "SHS": {
+      "acronym": ["SHS"],
+      "description": "Swollen Head Syndrome - viral disease in poultry",
+      "full_form": {
+        "en": "Swollen Head Syndrome",
+        "fr": "Syndrome de la Grosse Tête",
+        "es": "Síndrome de Cabeza Hinchada",
+        "de": "Dickkopf-Syndrom",
+        "it": "Sindrome della Testa Gonfia",
+        "pt": "Síndrome da Cabeça Inchada"
+      },
+      "synonyms": {
+        "en": ["Big head disease", "Facial cellulitis"],
+        "fr": ["Maladie de la grosse tête", "Cellulite faciale"],
+        "es": ["Enfermedad de cabeza grande"]
+      }
+    },
+    "TRT": {
+      "acronym": ["TRT", "TRTV"],
+      "description": "Turkey Rhinotracheitis - respiratory disease in turkeys",
+      "full_form": {
+        "en": "Turkey Rhinotracheitis",
+        "fr": "Rhinotrachéite de la Dinde",
+        "es": "Rinotraqueítis del Pavo",
+        "de": "Puten-Rhinotracheitis",
+        "it": "Rinotracheite del Tacchino",
+        "pt": "Rinotraqueíte do Peru"
+      },
+      "synonyms": {
+        "en": ["TRT virus", "Turkey cold", "Swollen head syndrome in turkeys"],
+        "fr": ["Syndrome infectieux de la tête enflée"],
+        "es": ["Resfriado del pavo"]
+      }
+    },
+    "ADF": {
+      "acronym": ["ADF"],
+      "description": "Acid Detergent Fiber - feed fiber content measurement",
+      "full_form": {
+        "en": "Acid Detergent Fiber",
+        "fr": "Fibres Détergent Acide",
+        "es": "Fibra Detergente Ácida",
+        "de": "Säuredetergentien-Faser",
+        "it": "Fibra Detergente Acida",
+        "pt": "Fibra em Detergente Ácido"
+      },
+      "synonyms": {
+        "en": ["ADF%", "Cellulose content", "Fiber analysis"],
+        "fr": ["Teneur en cellulose", "Analyse de fibres"],
+        "es": ["Contenido de celulosa"]
+      }
+    },
+    "NDF": {
+      "acronym": ["NDF"],
+      "description": "Neutral Detergent Fiber - total fiber content in feed",
+      "full_form": {
+        "en": "Neutral Detergent Fiber",
+        "fr": "Fibres Détergent Neutre",
+        "es": "Fibra Detergente Neutro",
+        "de": "Neutraldetergentien-Faser",
+        "it": "Fibra Detergente Neutro",
+        "pt": "Fibra em Detergente Neutro"
+      },
+      "synonyms": {
+        "en": ["NDF%", "Total fiber", "Cell wall content"],
+        "fr": ["Teneur en fibres totales", "Parois cellulaires"],
+        "es": ["Fibra total"]
+      }
+    },
+    "TDN": {
+      "acronym": ["TDN"],
+      "description": "Total Digestible Nutrients - feed energy value",
+      "full_form": {
+        "en": "Total Digestible Nutrients",
+        "fr": "Nutriments Digestibles Totaux",
+        "es": "Nutrientes Digestibles Totales",
+        "de": "Gesamtverdauliche Nährstoffe",
+        "it": "Nutrienti Digeribili Totali",
+        "pt": "Nutrientes Digestíveis Totais"
+      },
+      "synonyms": {
+        "en": ["TDN%", "Digestible energy", "Feed value"],
+        "fr": ["Énergie digestible", "Valeur alimentaire"],
+        "es": ["Energía digestible", "Valor alimenticio"]
+      }
+    },
+    "EPG": {
+      "acronym": ["EPG"],
+      "description": "Eggs Per Gram - parasite egg count in feces",
+      "full_form": {
+        "en": "Eggs Per Gram",
+        "fr": "Œufs Par Gramme",
+        "es": "Huevos Por Gramo",
+        "de": "Eier Pro Gramm",
+        "it": "Uova Per Grammo",
+        "pt": "Ovos Por Grama"
+      },
+      "synonyms": {
+        "en": ["Fecal egg count", "Parasite load", "Worm burden"],
+        "fr": ["Comptage d'œufs fécaux", "Charge parasitaire"],
+        "es": ["Recuento de huevos fecales", "Carga parasitaria"]
+      }
+    },
+    "ELISA": {
+      "acronym": ["ELISA"],
+      "description": "Enzyme-Linked Immunosorbent Assay - diagnostic test",
+      "full_form": {
+        "en": "Enzyme-Linked Immunosorbent Assay",
+        "fr": "Test Immuno-Enzymatique",
+        "es": "Ensayo por Inmunoabsorción Ligado a Enzimas",
+        "de": "Enzyme-linked Immunosorbent Assay",
+        "it": "Saggio Immunoenzimatico",
+        "pt": "Ensaio Imunoenzimático"
+      },
+      "synonyms": {
+        "en": ["Immunoassay", "Antibody test", "Serological test"],
+        "fr": ["Dosage immuno-enzymatique", "Test sérologique"],
+        "es": ["Inmunoensayo", "Prueba serológica"]
+      }
+    },
+    "CBC": {
+      "acronym": ["CBC"],
+      "description": "Complete Blood Count - blood analysis test",
+      "full_form": {
+        "en": "Complete Blood Count",
+        "fr": "Numération Formule Sanguine",
+        "es": "Hemograma Completo",
+        "de": "Blutbild",
+        "it": "Emocromo Completo",
+        "pt": "Hemograma Completo"
+      },
+      "synonyms": {
+        "en": ["Blood count", "Full blood count", "Hemogram"],
+        "fr": ["NFS", "Hémogramme", "Analyse sanguine"],
+        "es": ["Recuento sanguíneo", "Análisis de sangre"]
+      }
+    },
+    "PO": {
+      "acronym": ["PO", "p.o."],
+      "description": "Per Os - oral administration route",
+      "full_form": {
+        "en": "Per Os",
+        "fr": "Per Os",
+        "es": "Por Vía Oral",
+        "de": "Per Os",
+        "it": "Per Os",
+        "pt": "Via Oral"
+      },
+      "synonyms": {
+        "en": ["Orally", "By mouth", "Oral route"],
+        "fr": ["Voie orale", "Par la bouche"],
+        "es": ["Vía oral", "Por boca"]
+      }
+    },
+    "IM": {
+      "acronym": ["IM", "i.m."],
+      "description": "Intramuscular - injection route into muscle",
+      "full_form": {
+        "en": "Intramuscular",
+        "fr": "Intramusculaire",
+        "es": "Intramuscular",
+        "de": "Intramuskulär",
+        "it": "Intramuscolare",
+        "pt": "Intramuscular"
+      },
+      "synonyms": {
+        "en": ["IM injection", "Into muscle"],
+        "fr": ["Injection IM", "Dans le muscle"],
+        "es": ["Inyección IM", "En el músculo"]
+      }
+    },
+    "SC": {
+      "acronym": ["SC", "s.c.", "SubQ"],
+      "description": "Subcutaneous - injection route under the skin",
+      "full_form": {
+        "en": "Subcutaneous",
+        "fr": "Sous-Cutané",
+        "es": "Subcutáneo",
+        "de": "Subkutan",
+        "it": "Sottocutaneo",
+        "pt": "Subcutâneo"
+      },
+      "synonyms": {
+        "en": ["SC injection", "SubQ", "Under the skin"],
+        "fr": ["Injection SC", "Sous la peau"],
+        "es": ["Inyección SC", "Bajo la piel"]
+      }
+    },
+    "IV": {
+      "acronym": ["IV", "i.v."],
+      "description": "Intravenous - injection route into vein",
+      "full_form": {
+        "en": "Intravenous",
+        "fr": "Intraveineux",
+        "es": "Intravenoso",
+        "de": "Intravenös",
+        "it": "Endovenoso",
+        "pt": "Intravenoso"
+      },
+      "synonyms": {
+        "en": ["IV injection", "Into vein"],
+        "fr": ["Injection IV", "Dans la veine"],
+        "es": ["Inyección IV", "En la vena"]
+      }
+    }
+  },
   "usage_instructions": {
-    "en": "Always use the correct technical terminology for the target language. Avoid literal translations that may sound unnatural or unprofessional.",
-    "fr": "Toujours utiliser la terminologie technique correcte pour la langue cible. Éviter les traductions littérales qui peuvent sembler non naturelles ou non professionnelles.",
-    "es": "Siempre use la terminología técnica correcta para el idioma de destino. Evite traducciones literales que puedan sonar no naturales o poco profesionales."
+    "en": "Always use the correct technical terminology for the target language. Avoid literal translations that may sound unnatural or unprofessional. Acronyms are automatically expanded during query processing to improve understanding.",
+    "fr": "Toujours utiliser la terminologie technique correcte pour la langue cible. Éviter les traductions littérales qui peuvent sembler non naturelles ou non professionnelles. Les acronymes sont automatiquement développés lors du traitement des requêtes pour améliorer la compréhension.",
+    "es": "Siempre use la terminología técnica correcta para el idioma de destino. Evite traducciones literales que puedan sonar no naturales o poco profesionales. Los acrónimos se expanden automáticamente durante el procesamiento de consultas para mejorar la comprensión."
   }
 }
