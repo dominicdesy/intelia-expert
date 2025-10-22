@@ -1213,35 +1213,15 @@ Style professionnel et structuré avec recommandations actionnables.""",
         """
         response = response.strip()
 
-        # 🧠 CRITICAL: Parse CoT structure BEFORE any text cleaning
-        # Text cleaning regex can break XML tags, so we extract the answer first
+        # CoT parsing removed - system no longer uses Chain-of-Thought
         logger.debug(f"🔍 Raw response (first 500 chars): {response[:500]}")
 
-        parsed_response = parse_cot_response(response)
-
-        if parsed_response["has_structure"]:
-            logger.info(
-                f"🧠 CoT structure detected in generator - "
-                f"thinking: {len(parsed_response['thinking'] or '')} chars, "
-                f"analysis: {len(parsed_response['analysis'] or '')} chars, "
-                f"answer (before cleaning): {len(parsed_response['answer'])} chars"
-            )
-            # Extract the clean answer content (without XML tags)
-            response = parsed_response["answer"]
-
-            # 🧠 Store CoT sections in instance variables for later retrieval
-            self.last_cot_thinking = parsed_response['thinking']
-            self.last_cot_analysis = parsed_response['analysis']
-            self.last_has_cot_structure = True
-        else:
-            logger.warning(f"⚠️ No CoT structure found despite prompt requesting it")
-            # Reset CoT sections
-            self.last_cot_thinking = None
-            self.last_cot_analysis = None
-            self.last_has_cot_structure = False
+        # Reset CoT sections (kept for backward compatibility)
+        self.last_cot_thinking = None
+        self.last_cot_analysis = None
+        self.last_has_cot_structure = False
 
         # ✅ NETTOYAGE AMÉLIORÉ DU FORMATAGE
-        # Apply text cleaning to the extracted answer (or full response if no CoT)
 
         # 0. NEW: Supprimer les citations de sources (Source: ..., Link: ...)
         # Enlève "Source: Lean IJ et al. (2016)" et "Link: https://..." des réponses
