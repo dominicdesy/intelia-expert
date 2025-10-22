@@ -2379,6 +2379,27 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
                         profile_data = response.data
                         logger.debug(f"[/auth/me] Profil complet récupéré pour {current_user.get('email')}")
 
+                        # Récupérer le plan depuis user_billing_info (pas dans users)
+                        user_plan = "essential"  # Default
+                        try:
+                            import psycopg2
+                            from psycopg2.extras import RealDictCursor
+
+                            with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+                                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                                    cur.execute("""
+                                        SELECT plan_name
+                                        FROM user_billing_info
+                                        WHERE user_email = %s
+                                    """, (current_user.get("email"),))
+
+                                    billing_row = cur.fetchone()
+                                    if billing_row:
+                                        user_plan = billing_row["plan_name"]
+                                        logger.debug(f"[/auth/me] Plan récupéré: {user_plan} pour {current_user.get('email')}")
+                        except Exception as e:
+                            logger.warning(f"[/auth/me] Erreur récupération plan: {e}")
+
                         # Retourner les données complètes incluant first_name, last_name, country
                         return {
                             "user_id": current_user.get("user_id"),
@@ -2404,7 +2425,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
                             "preferences": current_user.get("preferences", {}),
                             "profile_id": current_user.get("profile_id"),
                             "jwt_secret_used": current_user.get("jwt_secret_used"),
-                            "plan": profile_data.get("plan"),
+                            "plan": user_plan,  # 🎯 Plan depuis user_billing_info
                             "avatar_url": profile_data.get("avatar_url"),
                             "consent_given": profile_data.get("consent_given"),
                             "consent_date": profile_data.get("consent_date"),
