@@ -537,61 +537,6 @@ Use proper technical terminology, NOT literal word-for-word translations:
         return instructions
 
     # ================================================================
-    # CHAIN-OF-THOUGHT (CoT) PROMPT METHODS
-    # ================================================================
-
-    def get_cot_prompt(
-        self, language: str = "fr", use_simple: bool = False
-    ) -> str:
-        """
-        🆕 Récupère le prompt Chain-of-Thought (avec injection de langue)
-
-        Cette méthode fournit les instructions CoT pour structurer la réponse
-        du LLM avec des balises XML <thinking>, <analysis>, <answer>.
-
-        Args:
-            language: Langue cible (fr, en, es, de, it, pt, nl, pl, hi, id, th, zh)
-            use_simple: Si True, utilise les instructions simplifiées
-
-        Returns:
-            Instructions CoT formatées avec le nom de la langue injecté
-
-        Examples:
-            >>> manager = SystemPromptsManager()
-            >>> cot_prompt = manager.get_cot_prompt("fr", use_simple=False)
-            >>> "<thinking>" in cot_prompt
-            True
-            >>> "French" in cot_prompt
-            True
-
-        Notes:
-            - Le template est en anglais mais inclut "CRITICAL: Respond EXCLUSIVELY in {language_name}"
-            - use_simple=True: Version courte pour questions simples
-            - use_simple=False: Version complète avec exemples (défaut)
-        """
-        cot_prompts = self.prompts.get("cot_prompts", {})
-        language_name = LANGUAGE_DISPLAY_NAMES.get(language, language.upper())
-
-        if use_simple:
-            # Instructions CoT simplifiées
-            template = cot_prompts.get("cot_simple_instructions")
-            if not template:
-                # Fallback si template manquant
-                template = "\n\n🧠 APPROACH: Analyze this question step by step before answering.\n\nCRITICAL: Respond EXCLUSIVELY in {language_name}."
-        else:
-            # Instructions CoT complètes avec exemples
-            template = cot_prompts.get("cot_system_instructions")
-            if not template:
-                # Fallback si template manquant
-                template = "\n\n🧠 CHAIN-OF-THOUGHT REASONING - STRUCTURE YOUR RESPONSE:\n\nStructure your response with XML tags: <thinking>, <analysis>, <answer>\n\nCRITICAL: Respond EXCLUSIVELY in {language_name}."
-
-        try:
-            # Injecter le nom de la langue
-            return template.format(language_name=language_name)
-        except KeyError as e:
-            logger.error(f"Missing placeholder in CoT template: {e}")
-            return template
-
     # ================================================================
 
     def build_complete_prompt(

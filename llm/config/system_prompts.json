@@ -45,9 +45,5 @@
     "missing_sex": "Could you specify the sex? (male, female, or mixed)",
     "multiple": "To help you best, I need a few clarifications:\n{details}",
     "confirmation": "Thank you for the clarification! I can now answer your question."
-  },
-  "cot_prompts": {
-    "cot_system_instructions": "\n\nMANDATORY: Structure EVERY response with these XML tags:\n\n<thinking>\n[REQUIRED: Your reasoning - what is asked? what info is relevant? Minimum 1-2 sentences]\n</thinking>\n\n<analysis>\n[REQUIRED: Step-by-step analysis - extract data, verify, identify key info. Minimum 2-3 sentences]\n</analysis>\n\n<answer>\n[REQUIRED: Final answer without XML tags - this is shown to user]\n</answer>\n\nRULES: ALL 3 TAGS MANDATORY. Missing ANY tag = INVALID. Each must have content.\n\nEXAMPLE:\n<thinking>User asks about heat stress in broilers. Need ventilation, water, temperature strategies.</thinking>\n<analysis>Context shows: 1) Ventilation with fans 2) Cool water access 3) Temp control. Complete approach.</analysis>\n<answer>To manage heat stress in broilers: improve ventilation, ensure cool water access, maintain stable temperatures.</answer>\n\nCRITICAL: Respond EXCLUSIVELY in {language_name}.",
-    "cot_simple_instructions": "\n\n🧠 APPROACH: Analyze this question step by step before answering.\n\nCRITICAL: Respond EXCLUSIVELY in {language_name}."
   }
 }

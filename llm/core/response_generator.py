@@ -7,7 +7,6 @@ import logging
 from utils.types import Dict, Any
 
 from .data_models import RAGResult, RAGSource
-from utils.cot_parser import parse_cot_response
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ except ImportError:
 
 
 class RAGResponseGenerator:
-    """Generates LLM responses from retrieved documents with CoT support"""
+    """Generates LLM responses from retrieved documents"""
 
     def __init__(self, llm_generator, enable_proactive: bool = True):
         """
@@ -134,11 +133,7 @@ class RAGResponseGenerator:
                             intent_result=None,
                         )
 
-                        # Parse CoT structure to separate thinking/analysis from answer
-                        parsed_response = parse_cot_response(generated_answer)
-
-                        # Only send the answer to the user (not thinking/analysis)
-                        result.answer = parsed_response["answer"]
+                        result.answer = generated_answer
 
                         # Ensure metadata exists before updating
                         if not result.metadata:
@@ -152,31 +147,6 @@ class RAGResponseGenerator:
                         result.metadata["conversation_context_length"] = len(
                             conversation_context
                         )
-
-                        # Store thinking/analysis for database (not sent to user)
-                        if parsed_response["has_structure"]:
-                            # 🧠 Store in BOTH metadata AND direct attributes
-                            result.cot_thinking = parsed_response["thinking"]
-                            result.cot_analysis = parsed_response["analysis"]
-                            result.has_cot_structure = True
-                            result.metadata["cot_thinking"] = parsed_response["thinking"]
-                            result.metadata["cot_analysis"] = parsed_response["analysis"]
-                            result.metadata["cot_structure_used"] = True
-                            logger.info(
-                                f"🧠 CoT structure parsed - thinking: {len(parsed_response['thinking'] or '')} chars, "
-                                f"analysis: {len(parsed_response['analysis'] or '')} chars, "
-                                f"answer: {len(result.answer)} chars"
-                            )
-                            # 🔍 DEBUG: Verify attributes were actually set
-                            logger.info(
-                                f"🔍 VERIFY attributes after assignment - "
-                                f"result.cot_thinking: {len(result.cot_thinking or '')} chars, "
-                                f"result.cot_analysis: {len(result.cot_analysis or '')} chars, "
-                                f"result.has_cot_structure: {result.has_cot_structure}"
-                            )
-                        else:
-                            result.has_cot_structure = False
-                            result.metadata["cot_structure_used"] = False
 
                         logger.info(
                             f"LLM response generated ({len(result.answer)} characters)"
@@ -209,11 +179,7 @@ class RAGResponseGenerator:
                             domain=result.metadata.get("detected_domain", "poultry"),
                         )
 
-                        # Parse CoT structure to separate thinking/analysis from answer
-                        parsed_response = parse_cot_response(ensemble_result["final_answer"])
-
-                        # Only send the answer to the user (not thinking/analysis)
-                        result.answer = parsed_response["answer"]
+                        result.answer = ensemble_result["final_answer"]
                         result.source = RAGSource.FALLBACK_NEEDED
 
                         if not result.metadata:
@@ -224,31 +190,6 @@ class RAGResponseGenerator:
                         result.metadata["ensemble_provider"] = ensemble_result.get("provider")
                         result.metadata["ensemble_confidence"] = ensemble_result.get("confidence")
                         result.metadata["no_documents_reason"] = "LOW_CONFIDENCE"
-
-                        # Store thinking/analysis for database (not sent to user)
-                        if parsed_response["has_structure"]:
-                            # 🧠 Store in BOTH metadata AND direct attributes
-                            result.cot_thinking = parsed_response["thinking"]
-                            result.cot_analysis = parsed_response["analysis"]
-                            result.has_cot_structure = True
-                            result.metadata["cot_thinking"] = parsed_response["thinking"]
-                            result.metadata["cot_analysis"] = parsed_response["analysis"]
-                            result.metadata["cot_structure_used"] = True
-                            logger.info(
-                                f"🧠 CoT structure parsed (ensemble) - thinking: {len(parsed_response['thinking'] or '')} chars, "
-                                f"analysis: {len(parsed_response['analysis'] or '')} chars, "
-                                f"answer: {len(result.answer)} chars"
-                            )
-                            # 🔍 DEBUG: Verify attributes were actually set
-                            logger.info(
-                                f"🔍 VERIFY ensemble attributes after assignment - "
-                                f"result.cot_thinking: {len(result.cot_thinking or '')} chars, "
-                                f"result.cot_analysis: {len(result.cot_analysis or '')} chars, "
-                                f"result.has_cot_structure: {result.has_cot_structure}"
-                            )
-                        else:
-                            result.has_cot_structure = False
-                            result.metadata["cot_structure_used"] = False
 
                         logger.info(
                             f"LLM Ensemble fallback response generated ({len(result.answer)} characters) "
@@ -312,15 +253,6 @@ class RAGResponseGenerator:
                 "🔒 Skipping proactive follow-up for clarification (waiting for user input)"
             )
 
-        # 🔍 CRITICAL DEBUG: Final state check before returning result
-        logger.info(
-            f"🔍 FINAL RESULT STATE before return - "
-            f"result.cot_thinking: {len(result.cot_thinking or '')} chars, "
-            f"result.cot_analysis: {len(result.cot_analysis or '')} chars, "
-            f"result.has_cot_structure: {result.has_cot_structure}, "
-            f"metadata.cot_structure_used: {result.metadata.get('cot_structure_used', False)}"
-        )
-
         return result
 
     async def _fallback_single_llm(
@@ -343,11 +275,7 @@ class RAGResponseGenerator:
                 conversation_context="",
             )
 
-            # Parse CoT structure to separate thinking/analysis from answer
-            parsed_response = parse_cot_response(generated_answer)
-
-            # Only send the answer to the user (not thinking/analysis)
-            result.answer = parsed_response["answer"]
+            result.answer = generated_answer
             result.source = RAGSource.FALLBACK_NEEDED
 
             if not result.metadata:
@@ -356,31 +284,6 @@ class RAGResponseGenerator:
             result.metadata["llm_fallback_used"] = True
             result.metadata["llm_ensemble_used"] = False
             result.metadata["no_documents_reason"] = "LOW_CONFIDENCE"
-
-            # Store thinking/analysis for database (not sent to user)
-            if parsed_response["has_structure"]:
-                # 🧠 Store in BOTH metadata AND direct attributes
-                result.cot_thinking = parsed_response["thinking"]
-                result.cot_analysis = parsed_response["analysis"]
-                result.has_cot_structure = True
-                result.metadata["cot_thinking"] = parsed_response["thinking"]
-                result.metadata["cot_analysis"] = parsed_response["analysis"]
-                result.metadata["cot_structure_used"] = True
-                logger.info(
-                    f"🧠 CoT structure parsed (fallback) - thinking: {len(parsed_response['thinking'] or '')} chars, "
-                    f"analysis: {len(parsed_response['analysis'] or '')} chars, "
-                    f"answer: {len(result.answer)} chars"
-                )
-                # 🔍 DEBUG: Verify attributes were actually set
-                logger.info(
-                    f"🔍 VERIFY fallback attributes after assignment - "
-                    f"result.cot_thinking: {len(result.cot_thinking or '')} chars, "
-                    f"result.cot_analysis: {len(result.cot_analysis or '')} chars, "
-                    f"result.has_cot_structure: {result.has_cot_structure}"
-                )
-            else:
-                result.has_cot_structure = False
-                result.metadata["cot_structure_used"] = False
 
             logger.info(
                 f"Single LLM fallback response generated ({len(result.answer)} characters)"

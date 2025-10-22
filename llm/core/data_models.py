@@ -103,10 +103,6 @@ class RAGResult:
     verification_status: Optional[Dict] = None
     intent_result: Optional[Any] = None  # IntentResult
     timestamp: float = field(default_factory=time.time)
-    # 🧠 Chain-of-Thought sections (populated by generator if model supports CoT)
-    cot_thinking: Optional[str] = None
-    cot_analysis: Optional[str] = None
-    has_cot_structure: bool = False
 
     def __post_init__(self):
         """Post-initialisation avec validation"""
