@@ -288,6 +288,7 @@ function LoginPageContent() {
 
   // Gestion des changements du formulaire signup
   const handleSignupChange = (field: string, value: string | string[]) => {
+    console.log('[handleSignupChange]', field, '=', value);
     setSignupData((prev) => ({ ...prev, [field]: value }));
   };
 
