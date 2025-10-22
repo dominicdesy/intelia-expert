@@ -2,7 +2,6 @@
 Service de gestion des conversations et messages
 
 Architecture: conversations + messages séparés
-Includes Chain-of-Thought parsing and storage for assistant messages
 """
 
 import logging
@@ -14,7 +13,6 @@ from datetime import datetime
 from psycopg2.extras import RealDictCursor
 
 from app.core.database import get_pg_connection
-from app.utils.cot_parser import parse_cot_response
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +29,7 @@ class ConversationService:
         language: str = "fr",
         response_source: str = "rag",
         response_confidence: float = 0.85,
-        processing_time_ms: int = None,
-        # 🧠 Optional CoT sections (if already parsed by frontend/backend)
-        cot_thinking: str = None,
-        cot_analysis: str = None,
-        has_cot_structure: bool = False
+        processing_time_ms: int = None
     ) -> Dict[str, Any]:
         """
         Crée une nouvelle conversation avec le premier échange Q&R
@@ -48,30 +42,6 @@ class ConversationService:
             }
         """
         try:
-            # 🧠 Use provided CoT sections if available, otherwise parse
-            if has_cot_structure and cot_thinking is not None:
-                # Use provided CoT sections (from SSE metadata)
-                final_answer = assistant_response  # Already clean
-                logger.info(
-                    f"🧠 Using provided CoT sections - "
-                    f"thinking: {len(cot_thinking or '')} chars, "
-                    f"analysis: {len(cot_analysis or '')} chars"
-                )
-            else:
-                # Parse CoT structure from assistant response (legacy behavior)
-                parsed = parse_cot_response(assistant_response)
-                cot_thinking = parsed['thinking']
-                cot_analysis = parsed['analysis']
-                has_cot_structure = parsed['has_structure']
-                final_answer = parsed['answer']  # Only save answer in content field
-
-                if has_cot_structure:
-                    logger.info(
-                        f"🧠 CoT parsed from content - "
-                        f"thinking: {len(cot_thinking or '')} chars, "
-                        f"analysis: {len(cot_analysis or '')} chars"
-                    )
-
             with get_pg_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     # Create conversation with user message first
@@ -95,34 +65,29 @@ class ConversationService:
                         (conversation_id, user_message)
                     )
 
-                    # Add assistant message with CoT parsing (sequence 2)
+                    # Add assistant message (sequence 2)
                     cur.execute(
                         """
                         INSERT INTO messages (
                             conversation_id, role, content, sequence_number,
-                            response_source, response_confidence, processing_time_ms,
-                            cot_thinking, cot_analysis, has_cot_structure
+                            response_source, response_confidence, processing_time_ms
                         ) VALUES (
                             %s, 'assistant', %s, 2,
-                            %s, %s, %s,
                             %s, %s, %s
                         )
                         """,
                         (
                             conversation_id,
-                            final_answer,  # Only save final answer
+                            assistant_response,
                             response_source,
                             response_confidence,
-                            processing_time_ms,
-                            cot_thinking,
-                            cot_analysis,
-                            has_cot_structure
+                            processing_time_ms
                         )
                     )
 
                     logger.info(
                         f"Conversation créée: {conversation_id} "
-                        f"(session: {session_id}, user: {user_id}, CoT: {has_cot_structure})"
+                        f"(session: {session_id}, user: {user_id})"
                     )
 
                     return {
@@ -142,110 +107,64 @@ class ConversationService:
         content: str,
         response_source: str = None,
         response_confidence: float = None,
-        processing_time_ms: int = None,
-        # 🧠 Optional CoT sections (if already parsed by frontend/backend)
-        cot_thinking_override: str = None,
-        cot_analysis_override: str = None,
-        has_cot_structure_override: bool = None
+        processing_time_ms: int = None
     ) -> Dict[str, Any]:
         """
         Ajoute un message à une conversation existante
 
-        For assistant messages: Parses Chain-of-Thought structure and saves
-        thinking/analysis to database for analytics while displaying only
-        the final answer to users.
-
         Args:
             conversation_id: UUID de la conversation
             role: 'user' ou 'assistant'
-            content: Contenu du message (avec ou sans structure CoT)
-            cot_thinking_override: Override thinking section (from frontend metadata)
-            cot_analysis_override: Override analysis section (from frontend metadata)
-            has_cot_structure_override: Override has_cot flag (from frontend metadata)
+            content: Contenu du message
 
         Returns:
             {
                 "message_id": UUID,
-                "sequence_number": int,
-                "has_cot_structure": bool (for assistant messages)
+                "sequence_number": int
             }
         """
         try:
-            # Parse CoT structure for assistant messages
-            cot_thinking = None
-            cot_analysis = None
-            has_cot_structure = False
-            final_content = content
-
-            if role == 'assistant':
-                # 🧠 Use override values if provided (from SSE metadata)
-                if has_cot_structure_override is not None:
-                    cot_thinking = cot_thinking_override
-                    cot_analysis = cot_analysis_override
-                    has_cot_structure = has_cot_structure_override
-                    # Content is already the clean answer (no CoT tags)
-                    final_content = content
-                else:
-                    # Fallback: try parsing from content (legacy behavior)
-                    parsed = parse_cot_response(content)
-                    cot_thinking = parsed['thinking']
-                    cot_analysis = parsed['analysis']
-                    has_cot_structure = parsed['has_structure']
-                    final_content = parsed['answer']  # Only save answer in content field
-
-                if has_cot_structure:
-                    logger.info(
-                        f"🧠 CoT detected in assistant message - "
-                        f"thinking: {len(cot_thinking or '')} chars, "
-                        f"analysis: {len(cot_analysis or '')} chars"
-                    )
-
             with get_pg_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Utiliser la fonction SQL helper avec paramètres CoT
+                    # Insert message directly
                     cur.execute(
                         """
-                        SELECT add_message_to_conversation(
-                            %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s
-                        ) as message_id
+                        INSERT INTO messages (
+                            conversation_id, role, content,
+                            response_source, response_confidence, processing_time_ms,
+                            sequence_number
+                        )
+                        VALUES (
+                            %s::uuid, %s, %s, %s, %s, %s,
+                            (SELECT COALESCE(MAX(sequence_number), 0) + 1
+                             FROM messages
+                             WHERE conversation_id = %s::uuid)
+                        )
+                        RETURNING id, sequence_number
                         """,
                         (
                             conversation_id,
                             role,
-                            final_content,  # Only answer for assistant, full content for user
+                            content,
                             response_source,
                             response_confidence,
                             processing_time_ms,
-                            cot_thinking,
-                            cot_analysis,
-                            has_cot_structure
+                            conversation_id
                         )
                     )
 
                     result = cur.fetchone()
-                    message_id = result["message_id"]
-
-                    # Récupérer le sequence_number
-                    cur.execute(
-                        """
-                        SELECT sequence_number
-                        FROM messages
-                        WHERE id = %s
-                        """,
-                        (message_id,)
-                    )
-
-                    sequence = cur.fetchone()["sequence_number"]
+                    message_id = result["id"]
+                    sequence = result["sequence_number"]
 
                     logger.info(
                         f"Message ajouté: {message_id} "
-                        f"(conversation: {conversation_id}, sequence: {sequence}, CoT: {has_cot_structure})"
+                        f"(conversation: {conversation_id}, sequence: {sequence})"
                     )
 
                     return {
                         "message_id": str(message_id),
-                        "sequence_number": sequence,
-                        "has_cot_structure": has_cot_structure
+                        "sequence_number": sequence
                     }
 
         except Exception as e:
