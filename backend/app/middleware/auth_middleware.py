@@ -100,7 +100,11 @@ PROTECTED_PATTERNS = [
     # === ENDPOINTS SYSTEM PROTÉGÉS (admin only) ===
     "/api/v1/system/metrics",  # 🔒 NOUVEAU: Métriques système
     # === ENDPOINTS QA QUALITY (admin only) ===
-    "/api/v1/qa-quality/",  # 🔒 NOUVEAU: Monitoring de qualité Q&A
+    "/api/v1/qa-quality/problematic",  # 🔒 Liste des Q&A problématiques
+    "/api/v1/qa-quality/stats",  # 🔒 Statistiques de qualité
+    "/api/v1/qa-quality/analyze-batch",  # 🔒 Analyse batch
+    "/api/v1/qa-quality/analyze-cot",  # 🔒 Analyse CoT (Extended Thinking)
+    "/api/v1/qa-quality/",  # 🔒 Autres endpoints qa-quality (review, etc.)
 ]
 
 # PATTERNS POUR UTILISATEURS AUTHENTIFIÉS (niveau intermédiaire)
