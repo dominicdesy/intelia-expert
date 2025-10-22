@@ -385,6 +385,26 @@ export interface TranslationKeys {
   "profile.phoneNumber": string;
   "profile.jobTitle": string;
 
+  // User Profiling - Production Type & Category
+  "profile.productionType.label": string;
+  "profile.productionType.description": string;
+  "profile.productionType.broiler": string;
+  "profile.productionType.layer": string;
+  "profile.productionType.both": string;
+  "profile.productionType.why": string;
+  "profile.category.label": string;
+  "profile.category.description": string;
+  "profile.category.why": string;
+  "profile.category.breedingHatchery": string;
+  "profile.category.feedNutrition": string;
+  "profile.category.farmOperations": string;
+  "profile.category.healthVeterinary": string;
+  "profile.category.processing": string;
+  "profile.category.managementOversight": string;
+  "profile.category.equipmentTechnology": string;
+  "profile.category.other": string;
+  "profile.category.otherPlaceholder": string;
+
   // ===========================================
   // LANGUAGE SETTINGS
   // ===========================================
