@@ -316,19 +316,34 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const playAudioQueue = async () => {
     if (!audioContextRef.current || audioQueueRef.current.length === 0) return;
 
-    const audioBuffer = audioQueueRef.current.shift()!;
+    const pcm16Buffer = audioQueueRef.current.shift()!;
 
     try {
-      // Convertir en AudioBuffer
-      const decodedBuffer = await audioContextRef.current.decodeAudioData(audioBuffer);
+      // Convert PCM16 (Int16) → Float32 for Web Audio API
+      const pcm16 = new Int16Array(pcm16Buffer);
+      const float32 = new Float32Array(pcm16.length);
 
-      // Créer source et jouer
+      for (let i = 0; i < pcm16.length; i++) {
+        // Convert Int16 to Float32 (-1.0 to 1.0)
+        float32[i] = pcm16[i] / (pcm16[i] < 0 ? 0x8000 : 0x7FFF);
+      }
+
+      // Create AudioBuffer manually (OpenAI sends PCM16 at 24kHz mono)
+      const audioBuffer = audioContextRef.current.createBuffer(
+        1, // mono
+        float32.length,
+        24000 // OpenAI sample rate
+      );
+
+      audioBuffer.getChannelData(0).set(float32);
+
+      // Create source and play
       const source = audioContextRef.current.createBufferSource();
-      source.buffer = decodedBuffer;
+      source.buffer = audioBuffer;
       source.connect(audioContextRef.current.destination);
 
       source.onended = () => {
-        // Jouer prochain chunk
+        // Play next chunk
         if (audioQueueRef.current.length > 0) {
           playAudioQueue();
         } else {
