@@ -10,7 +10,8 @@
  * - Indicateur volume microphone
  * - Gestion erreurs
  * - Feedback haptique mobile
- * - Position fixe en bas à droite (pour super admin seulement)
+ * - Position fixe en bas à droite
+ * - Accès: Super admins + utilisateurs avec plan Intelia
  *
  * Usage:
  * <VoiceRealtimeButton />
@@ -45,8 +46,8 @@ export function VoiceRealtimeButton() {
   // PERMISSIONS
   // ============================================================
 
-  // Si pas super admin, ne rien afficher
-  if (!isSuperAdmin || !canUseVoiceRealtime) {
+  // Afficher uniquement si l'utilisateur a accès (admin ou plan Intelia)
+  if (!canUseVoiceRealtime) {
     return null;
   }
 

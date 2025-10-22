@@ -83,20 +83,22 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const reconnectAttemptsRef = useRef(0);
 
   // ============================================================
-  // VÉRIFICATION ADMIN
+  // VÉRIFICATION ACCÈS
   // ============================================================
 
   const isSuperAdmin = user?.is_admin === true;
+  const hasInteliaPlan = user?.plan === "intelia";
+  const canUseVoiceRealtime = isSuperAdmin || hasInteliaPlan;
 
   // ============================================================
   // WEBSOCKET
   // ============================================================
 
   const connectWebSocket = useCallback(async () => {
-    if (!isAuthenticated || !isSuperAdmin) {
+    if (!isAuthenticated || !canUseVoiceRealtime) {
       setError({
         type: "auth",
-        message: "Super admin access required",
+        message: "Voice Realtime access requires Intelia plan or admin privileges",
       });
       return false;
     }
@@ -617,7 +619,8 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
 
     // Permissions
     isSuperAdmin,
-    canUseVoiceRealtime: isSuperAdmin && isAuthenticated,
+    hasInteliaPlan,
+    canUseVoiceRealtime: canUseVoiceRealtime && isAuthenticated,
 
     // Actions
     startConversation,
