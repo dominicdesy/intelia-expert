@@ -427,6 +427,61 @@ async def review_qa(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/{check_id}")
+async def delete_qa_check(
+    check_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Supprimer définitivement une entrée de qa_quality_checks
+
+    Args:
+        check_id: ID de la vérification à supprimer
+
+    Returns:
+        Message de confirmation de suppression
+    """
+    verify_admin_access(current_user)
+
+    try:
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Vérifier que l'entrée existe avant de la supprimer
+                cur.execute(
+                    "SELECT id FROM qa_quality_checks WHERE id = %s",
+                    (check_id,)
+                )
+
+                result = cur.fetchone()
+
+                if not result:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"QA check {check_id} not found"
+                    )
+
+                # Supprimer l'entrée
+                cur.execute(
+                    "DELETE FROM qa_quality_checks WHERE id = %s",
+                    (check_id,)
+                )
+
+                conn.commit()
+
+                logger.info(f"[QA_QUALITY] Admin {current_user.get('email')} deleted check_id={check_id}")
+
+                return {
+                    "id": check_id,
+                    "message": "QA check deleted successfully"
+                }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[QA_QUALITY] Delete error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # STATISTICS
 # ============================================================================

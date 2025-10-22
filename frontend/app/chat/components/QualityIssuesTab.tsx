@@ -13,6 +13,7 @@ import {
   reviewQA,
   getQualityStats,
   analyzeCoT,
+  deleteQA,
 } from "../../../lib/services/qaQualityService";
 import type { CoTAnalysisResponse } from "../../../types/qa-quality";
 import { secureLog } from "@/lib/utils/secureLogger";
@@ -185,6 +186,20 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
       setCotError(err.message || "Erreur lors de l'analyse CoT");
     } finally {
       setIsAnalyzingCoT(false);
+    }
+  };
+
+  const handleDelete = async (qa: ProblematicQA) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer définitivement cette anomalie ?")) {
+      return;
+    }
+
+    try {
+      await deleteQA(qa.id);
+      setSelectedQA(null);
+      loadData(); // Recharger les données
+    } catch (err: any) {
+      alert(`Erreur lors de la suppression: ${err.message}`);
     }
   };
 
@@ -605,13 +620,13 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
                     {!selectedQA.reviewed && (
                       <>
                         <button
-                          onClick={() => {
-                            handleReview(selectedQA, true);
-                            setSelectedQA(null);
-                          }}
-                          className="px-4 py-2 border border-gray-300 text-sm rounded hover:bg-gray-50"
+                          onClick={() => handleDelete(selectedQA)}
+                          className="px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 flex items-center space-x-2"
                         >
-                          Marquer comme faux positif
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <span>Effacer</span>
                         </button>
                         <button
                           onClick={() => {

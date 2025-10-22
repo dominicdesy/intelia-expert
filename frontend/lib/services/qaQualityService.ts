@@ -122,3 +122,19 @@ export async function analyzeCoT(checkId: number): Promise<CoTAnalysisResponse> 
 
   return response.data!;
 }
+
+/**
+ * Delete a QA quality check permanently
+ * Admin-only feature to remove false positives or irrelevant anomalies
+ */
+export async function deleteQA(checkId: string): Promise<{ id: string; message: string }> {
+  const response = await apiClient.deleteSecure<{ id: string; message: string }>(
+    `qa-quality/${checkId}`
+  );
+
+  if (!response.success) {
+    throw new Error(response.error?.message || "Error deleting QA check");
+  }
+
+  return response.data!;
+}
