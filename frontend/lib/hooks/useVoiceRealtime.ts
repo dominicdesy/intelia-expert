@@ -190,11 +190,43 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
 
     switch (type) {
       case "audio.output":
-        // Chunk audio reçu du backend
+        // Chunk audio reçu du backend (legacy)
         handleAudioOutput(data.audio);
         if (state !== "speaking") {
           setState("speaking");
         }
+        break;
+
+      case "response.audio.delta":
+        // OpenAI audio response chunk
+        if (data.delta) {
+          handleAudioOutput(data.delta);
+          if (state !== "speaking") {
+            setState("speaking");
+          }
+        }
+        break;
+
+      case "response.audio.done":
+        console.log("✅ OpenAI finished speaking");
+        setState("listening");
+        break;
+
+      case "input_audio_buffer.speech_started":
+        console.log("🎤 Speech detected");
+        break;
+
+      case "input_audio_buffer.speech_stopped":
+        console.log("🎤 Speech stopped");
+        break;
+
+      case "conversation.item.input_audio_transcription.completed":
+        console.log("📝 Transcription:", data.transcript);
+        break;
+
+      case "response.audio_transcript.delta":
+        // Optionally log what AI is saying
+        // console.log("🗣️", data.delta);
         break;
 
       case "session.created":
@@ -224,6 +256,16 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
 
       case "connection.ready":
         console.log("✅ Backend ready");
+        break;
+
+      // Ignore other OpenAI protocol messages
+      case "input_audio_buffer.committed":
+      case "conversation.item.created":
+      case "response.created":
+      case "response.output_item.added":
+      case "response.content_part.added":
+      case "conversation.item.input_audio_transcription.delta":
+        // Silently ignore these informational messages
         break;
 
       default:
