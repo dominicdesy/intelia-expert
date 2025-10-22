@@ -342,7 +342,8 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
         }
 
         // Convert to base64
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
+        const bytes = new Uint8Array(pcm16.buffer);
+        const base64 = btoa(String.fromCharCode.apply(null, Array.from(bytes)));
 
         // Send to backend
         wsRef.current.send(
