@@ -885,54 +885,14 @@ function PageContent() {
                     </div>
                   </div>
 
-                  {/* Section Mot de passe */}
-                  <div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t.password}{" "}
-                        <span className="text-red-500">{t.required}</span>
-                      </label>
-                      <div className="mt-1">
-                        <PasswordInput
-                          value={signupData.password}
-                          onChange={(e) =>
-                            handleSignupChange("password", e.target.value)
-                          }
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700">
-                        {t.confirmPassword}{" "}
-                        <span className="text-red-500">{t.required}</span>
-                      </label>
-                      <div className="mt-1">
-                        <PasswordInput
-                          value={signupData.confirmPassword}
-                          onChange={(e) =>
-                            handleSignupChange(
-                              "confirmPassword",
-                              e.target.value,
-                            )
-                          }
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Indicateur de correspondance des mots de passe */}
-                    <PasswordMatchIndicator
-                      password={signupData.password}
-                      confirmPassword={signupData.confirmPassword}
-                    />
-                  </div>
-
                   {/* Section User Profiling */}
-                  <div className="space-y-4 mt-6 pt-6 border-t border-gray-200">
+                  <div className="border-b border-gray-200 pb-6">
+                    <h4 className="text-md font-medium text-gray-900 mb-4">
+                      Profil de production {t.optional}
+                    </h4>
+
                     {/* Production Type */}
-                    <div>
+                    <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t("profile.productionType.label")}
                       </label>
@@ -1012,6 +972,50 @@ function PageContent() {
                         />
                       )}
                     </div>
+                  </div>
+
+                  {/* Section Mot de passe */}
+                  <div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        {t.password}{" "}
+                        <span className="text-red-500">{t.required}</span>
+                      </label>
+                      <div className="mt-1">
+                        <PasswordInput
+                          value={signupData.password}
+                          onChange={(e) =>
+                            handleSignupChange("password", e.target.value)
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700">
+                        {t.confirmPassword}{" "}
+                        <span className="text-red-500">{t.required}</span>
+                      </label>
+                      <div className="mt-1">
+                        <PasswordInput
+                          value={signupData.confirmPassword}
+                          onChange={(e) =>
+                            handleSignupChange(
+                              "confirmPassword",
+                              e.target.value,
+                            )
+                          }
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Indicateur de correspondance des mots de passe */}
+                    <PasswordMatchIndicator
+                      password={signupData.password}
+                      confirmPassword={signupData.confirmPassword}
+                    />
                   </div>
                 </div>
               </form>
