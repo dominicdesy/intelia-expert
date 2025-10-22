@@ -149,7 +149,19 @@ export function VoiceRealtimeButton() {
   // ============================================================
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+    <div
+      className="flex flex-col items-end gap-2"
+      style={{
+        position: 'fixed',
+        bottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))',
+        right: 'max(1.5rem, env(safe-area-inset-right, 1.5rem))',
+        zIndex: 9999,
+        pointerEvents: 'auto',
+        // Empêcher le bouton de disparaître lors du zoom
+        transform: 'translate3d(0, 0, 0)',
+        willChange: 'transform',
+      }}
+    >
       {/* Indicateur audio level (pendant listening) */}
       {isListening && audioLevel > 0 && (
         <div className="bg-gray-800 rounded-lg px-3 py-2 shadow-lg">
