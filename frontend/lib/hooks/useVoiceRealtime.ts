@@ -75,6 +75,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const reconnectAttemptsRef = useRef(0);
 
@@ -317,35 +318,42 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
 
       mediaStreamRef.current = stream;
 
-      // MediaRecorder pour capturer audio
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm",
+      // AudioContext pour capturer en PCM16 (format OpenAI)
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+        sampleRate: 24000, // OpenAI requires 24kHz
       });
+      audioContextRef.current = audioContext;
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
-          // Convertir Blob → Base64
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64 = (reader.result as string).split(",")[1];
+      const microphone = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      audioProcessorRef.current = processor;
 
-            // Envoyer au backend
-            wsRef.current!.send(
-              JSON.stringify({
-                type: "audio.input",
-                audio: base64,
-                format: finalConfig.audioFormat,
-                sample_rate: finalConfig.sampleRate,
-              })
-            );
-          };
-          reader.readAsDataURL(event.data);
+      processor.onaudioprocess = (event) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+        const inputData = event.inputBuffer.getChannelData(0);
+
+        // Convert Float32 → PCM16
+        const pcm16 = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          const s = Math.max(-1, Math.min(1, inputData[i]));
+          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
+
+        // Convert to base64
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
+
+        // Send to backend
+        wsRef.current.send(
+          JSON.stringify({
+            type: "audio.input",
+            audio: base64,
+          })
+        );
       };
 
-      // Démarrer capture (chunks de 100ms)
-      mediaRecorder.start(100);
-      mediaRecorderRef.current = mediaRecorder;
+      microphone.connect(processor);
+      processor.connect(audioContext.destination);
 
       // Audio level (pour UI feedback)
       startAudioLevelMonitoring(stream);
@@ -366,9 +374,9 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
   }, [finalConfig]);
 
   const stopMicrophone = useCallback(() => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current = null;
+    if (audioProcessorRef.current) {
+      audioProcessorRef.current.disconnect();
+      audioProcessorRef.current = null;
     }
 
     if (mediaStreamRef.current) {
