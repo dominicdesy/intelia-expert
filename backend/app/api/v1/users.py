@@ -157,6 +157,9 @@ class UserProfileData(BaseModel):
     user_type: Optional[str] = None
     language: Optional[str] = None
     ad_history: Optional[list] = None  # 🎯 Ad rotation history (last 10 ads shown)
+    production_type: Optional[list] = None  # 🆕 Production type: broiler, layer, or both
+    category: Optional[str] = None  # 🆕 Value chain category
+    category_other: Optional[str] = None  # 🆕 Description if category = "other"
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -245,6 +248,9 @@ async def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_us
             user_type=profile_data.get("user_type", "producer"),
             language=profile_data.get("language", "fr"),
             ad_history=profile_data.get("ad_history", []),  # 🎯 Ad rotation history
+            production_type=profile_data.get("production_type"),  # 🆕 User profiling
+            category=profile_data.get("category"),  # 🆕 User profiling
+            category_other=profile_data.get("category_other"),  # 🆕 User profiling
         )
 
     except HTTPException:

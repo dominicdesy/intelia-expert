@@ -1260,9 +1260,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t("profile.productionType.label")}
                       </label>
-                      <p className="text-xs text-gray-500 mb-3">
-                        {t("profile.productionType.why")}
-                      </p>
                       <div className="space-y-2">
                         <label className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
                           <input
@@ -1304,9 +1301,6 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t("profile.category.label")}
                       </label>
-                      <p className="text-xs text-gray-500 mb-3">
-                        {t("profile.category.why")}
-                      </p>
                       <select
                         value={formData.category}
                         onChange={(e) => handleFormDataChange('category', e.target.value)}

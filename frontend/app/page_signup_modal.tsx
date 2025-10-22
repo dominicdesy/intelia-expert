@@ -727,9 +727,6 @@ export function SignupModal({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {t("profile.productionType.label" as any)}
                 </label>
-                <p className="text-xs text-gray-500 mb-3">
-                  {t("profile.productionType.why" as any)}
-                </p>
                 <div className="space-y-2">
                   <label className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
                     <input
@@ -775,9 +772,6 @@ export function SignupModal({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {t("profile.category.label" as any)}
                 </label>
-                <p className="text-xs text-gray-500 mb-3">
-                  {t("profile.category.why" as any)}
-                </p>
                 <select
                   value={signupData.category || ""}
                   onChange={(e) => handleSignupChange('category', e.target.value)}
