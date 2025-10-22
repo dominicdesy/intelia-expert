@@ -2,13 +2,11 @@
  * TypewriterMessage.tsx - Message component with typewriter effect
  *
  * Displays LLM response with smooth typing animation
- * CoT reasoning is parsed backend-side and saved to DB (not displayed to user)
  */
 
 import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useTypewriter } from '../hooks/useTypewriter';
-import { parseCotResponse } from '@/lib/utils/cotParser';
 
 interface TypewriterMessageProps {
   content: string;
@@ -23,14 +21,11 @@ export const TypewriterMessage: React.FC<TypewriterMessageProps> = ({
   speed,  // Speed can be overridden, but we calculate adaptive by default
   onTypingComplete
 }) => {
-  // Parse CoT sections to extract answer only (thinking/analysis saved backend-side)
-  const cotSections = useMemo(() => parseCotResponse(content || ''), [content]);
-
   // Adaptive speed: slower for short answers, faster for long ones
   const adaptiveSpeed = useMemo(() => {
     if (speed !== undefined) return speed; // Use override if provided
 
-    const textLength = cotSections.answer.length;
+    const textLength = content?.length || 0;
 
     // Short answers (< 150 chars): Very slow (30ms per char) - ~4.5s for 150 chars
     if (textLength < 150) return 30;
@@ -40,13 +35,13 @@ export const TypewriterMessage: React.FC<TypewriterMessageProps> = ({
 
     // Long answers (500+ chars): Normal speed (15ms per char)
     return 15;
-  }, [cotSections.answer.length, speed]);
+  }, [content, speed]);
 
-  // Apply typewriter effect only to final answer
+  // Apply typewriter effect
   const { displayedText, isTyping } = useTypewriter({
-    text: cotSections.answer,
+    text: content || '',
     speed: adaptiveSpeed,
-    enabled: !isStreaming && cotSections.answer.length > 0,
+    enabled: !isStreaming && (content?.length || 0) > 0,
     onComplete: onTypingComplete
   });
 

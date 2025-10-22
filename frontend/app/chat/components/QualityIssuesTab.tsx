@@ -512,36 +512,6 @@ export const QualityIssuesTab: React.FC<QualityIssuesTabProps> = ({ token }) => 
                   </div>
                 </div>
 
-                {/* Chain-of-Thought sections */}
-                {selectedQA.has_cot_structure && (selectedQA.cot_thinking || selectedQA.cot_analysis) && (
-                  <div className="space-y-3 bg-blue-50 p-4 rounded border border-blue-200">
-                    <div className="flex items-center space-x-2">
-                      <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
-                      <p className="text-sm font-bold text-blue-900">Raisonnement de l'IA (Chain-of-Thought)</p>
-                    </div>
-
-                    {selectedQA.cot_thinking && (
-                      <div>
-                        <p className="text-xs font-medium text-blue-700 mb-1">💭 Thinking (Raisonnement initial):</p>
-                        <div className="bg-white p-3 rounded border border-blue-200">
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{selectedQA.cot_thinking}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedQA.cot_analysis && (
-                      <div>
-                        <p className="text-xs font-medium text-blue-700 mb-1">🔍 Analysis (Analyse détaillée):</p>
-                        <div className="bg-white p-3 rounded border border-blue-200">
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{selectedQA.cot_analysis}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-2">Problèmes détectés:</p>
                   <ul className="space-y-2">

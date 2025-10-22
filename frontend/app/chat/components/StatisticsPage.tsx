@@ -214,9 +214,6 @@ interface QuestionLog {
   session_id: string;
   feedback: number | null;
   feedback_comment: string | null;
-  cot_thinking?: string | null;
-  cot_analysis?: string | null;
-  has_cot_structure?: boolean;
 }
 
 export const StatisticsPage: React.FC = () => {
@@ -610,9 +607,6 @@ export const StatisticsPage: React.FC = () => {
         session_id: q.session_id,
         feedback: q.feedback,
         feedback_comment: q.feedback_comment,
-        cot_thinking: q.cot_thinking,
-        cot_analysis: q.cot_analysis,
-        has_cot_structure: q.has_cot_structure,
       }));
 
       setQuestionLogs(adaptedQuestions);
@@ -1183,35 +1177,6 @@ export const StatisticsPage: React.FC = () => {
                       {selectedQuestion.response}
                     </div>
                   </div>
-
-                  {/* Affichage des balises CoT */}
-                  {(selectedQuestion.cot_thinking || selectedQuestion.cot_analysis) && (
-                    <>
-                      {selectedQuestion.cot_thinking && (
-                        <div className="bg-blue-50 p-4 border border-blue-200">
-                          <h4 className="font-medium text-blue-900 mb-2 flex items-center space-x-2">
-                            <span>🧠</span>
-                            <span>Thinking (CoT):</span>
-                          </h4>
-                          <div className="text-blue-800 whitespace-pre-wrap text-sm">
-                            {selectedQuestion.cot_thinking}
-                          </div>
-                        </div>
-                      )}
-
-                      {selectedQuestion.cot_analysis && (
-                        <div className="bg-purple-50 p-4 border border-purple-200">
-                          <h4 className="font-medium text-purple-900 mb-2 flex items-center space-x-2">
-                            <span>🔍</span>
-                            <span>Analysis (CoT):</span>
-                          </h4>
-                          <div className="text-purple-800 whitespace-pre-wrap text-sm">
-                            {selectedQuestion.cot_analysis}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div className="bg-white p-4 border border-gray-200">

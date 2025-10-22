@@ -25,10 +25,6 @@ export interface ProblematicQA {
   reviewed_at: string | null;
   reviewed_by: string | null;
   reviewer_notes: string | null;
-  // Chain-of-Thought fields
-  cot_thinking: string | null;
-  cot_analysis: string | null;
-  has_cot_structure: boolean;
 }
 
 export type ProblemCategory =

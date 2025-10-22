@@ -416,10 +416,6 @@ export interface AgentMetadata {
   processing_time?: number;
   decisions?: string[];
   response_source?: string; // 🆕 Source réelle de la réponse (PostgreSQL/Weaviate/External LLM)
-  // 🧠 Chain-of-Thought sections
-  cot_thinking?: string | null;
-  cot_analysis?: string | null;
-  has_cot_structure?: boolean;
 }
 
 export interface StreamCallbacks {
