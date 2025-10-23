@@ -1240,9 +1240,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
 
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Numéro WhatsApp
+                      {t("profile.whatsappNumber")}
                       <span className="text-gray-500 text-sm ml-1">
-                        (optionnel)
+                        ({t("common.optional")})
                       </span>
                     </label>
                     <input
@@ -1256,7 +1256,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
                       data-debug="whatsapp-input"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      📱 Utilisez WhatsApp pour discuter avec l'assistant IA
+                      📱 {t("profile.whatsappDescription")}
                     </p>
                   </div>
 

@@ -576,6 +576,8 @@
   "profile.personalInfo": "Kişisel bilgiler",
   "profile.phone": "Telefon",
   "profile.phoneNumber": "Telefon numarası",
+  "profile.whatsappNumber": "Número WhatsApp",
+  "profile.whatsappDescription": "Use WhatsApp para chatear con el asistente de IA",
   "profile.privacy.cancel": "Cancel",
   "profile.privacy.confirmDelete": "Are you really sure? This action cannot be undone.",
   "profile.privacy.dataManagement": "Data management",

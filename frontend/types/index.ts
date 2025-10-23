@@ -1233,6 +1233,7 @@ export interface User {
   country_code?: string;
   area_code?: string;
   phone_number?: string;
+  whatsapp_number?: string;
 
   full_name?: string;
   avatar_url?: string;

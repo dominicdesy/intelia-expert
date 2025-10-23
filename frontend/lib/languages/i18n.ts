@@ -383,6 +383,8 @@ export interface TranslationKeys {
   "profile.linkedinCorporate": string;
   "profile.email": string;
   "profile.phone": string;
+  "profile.whatsappNumber": string;
+  "profile.whatsappDescription": string;
   "profile.country": string;
   "profile.companyName": string;
   "profile.companyWebsite": string;

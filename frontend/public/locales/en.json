@@ -562,6 +562,8 @@
   "profile.personalInfo": "Personal information",
   "profile.phone": "Phone",
   "profile.phoneNumber": "Phone number",
+  "profile.whatsappNumber": "WhatsApp Number",
+  "profile.whatsappDescription": "Use WhatsApp to chat with the AI assistant",
   "profile.privacy.cancel": "Cancel",
   "profile.privacy.confirmDelete": "Are you really sure? This action cannot be undone.",
   "profile.privacy.dataManagement": "Data management",

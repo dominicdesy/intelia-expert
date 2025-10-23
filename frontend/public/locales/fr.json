@@ -576,6 +576,8 @@
   "profile.personalInfo": "Informations personnelles",
   "profile.phone": "Téléphone",
   "profile.phoneNumber": "Numéro de téléphone",
+  "profile.whatsappNumber": "Numéro WhatsApp",
+  "profile.whatsappDescription": "Utilisez WhatsApp pour discuter avec l'assistant IA",
   "profile.privacy.cancel": "Annuler",
   "profile.privacy.confirmDelete": "Êtes-vous vraiment sûr ? Cette action ne peut pas être annulée.",
   "profile.privacy.dataManagement": "Gestion des données",
