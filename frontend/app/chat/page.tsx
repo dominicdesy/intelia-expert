@@ -40,6 +40,7 @@ import { ZohoSalesIQ } from "./components/ZohoSalesIQ";
 import { FeedbackModal } from "./components/modals/FeedbackModal";
 import { LoadingMessage } from "./components/LoadingMessage";
 import ShareConversationButton from "./components/ShareConversationButton";
+import ExportPDFButton from "./components/ExportPDFButton";
 import { HelpButton, HelpTour } from "./components/HelpTour";
 import { secureLog } from "@/lib/utils/secureLogger";
 import { VoiceInput } from "./components/VoiceInput";
@@ -1676,6 +1677,15 @@ function ChatInterface() {
 
             {/* Right side - Toujours visible sur mobile */}
             <div className="flex items-center space-x-1 sm:space-x-2">
+              {/* Export PDF button - Visible uniquement desktop quand conversation active */}
+              {currentConversation &&
+               currentConversation.id !== "welcome" &&
+               !currentConversation.id.startsWith("temp-") && (
+                <div className={isMobileDevice ? 'hidden' : 'block'}>
+                  <ExportPDFButton conversationId={currentConversation.id} />
+                </div>
+              )}
+
               {/* Share button - Visible uniquement desktop quand conversation active */}
               {currentConversation &&
                currentConversation.id !== "welcome" &&
