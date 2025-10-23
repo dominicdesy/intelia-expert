@@ -19,6 +19,7 @@ interface BackendUserData {
   last_name?: string;   // NOUVEAU: champs séparés depuis Supabase
   phone?: string;
   phone_number?: string;
+  whatsapp_number?: string;  // 📱 WhatsApp number for chat integration
   country?: string;
   country_code?: string;
   area_code?: string;
@@ -309,6 +310,10 @@ export const useAuthStore = create<AuthState>()(
               lastName: userData.last_name || userData.full_name?.split(" ").slice(1).join(" ") || "",
               phone: userData.phone || userData.phone_number || "",
               country: userData.country || "",
+              country_code: userData.country_code,
+              area_code: userData.area_code,
+              phone_number: userData.phone_number,
+              whatsapp_number: userData.whatsapp_number,  // 📱 WhatsApp number
               linkedinProfile: userData.linkedin_profile || "",
               facebookProfile: userData.facebook_profile,
               companyName: userData.company_name || "",
