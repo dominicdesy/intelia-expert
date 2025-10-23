@@ -45,8 +45,10 @@ import { secureLog } from "@/lib/utils/secureLogger";
 import { VoiceInput } from "./components/VoiceInput";
 import { TypewriterMessage } from "./components/TypewriterMessage";
 import { VoiceRealtimeButton } from "@/components/VoiceRealtimeButton";
+import { LoadingMessage as LoadingDots } from "./components/LoadingDots";
+import "./mobile-styles.css";
 
-// Composant ChatInput optimisé avec React.memo
+// Composant ChatInput optimisé avec React.memo - Mobile First Design
 const ChatInput = React.memo(
   ({
     inputMessage,
@@ -146,7 +148,7 @@ const ChatInput = React.memo(
       <div className="w-full space-y-2">
         {/* Images Preview Grid */}
         {selectedImages.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             {selectedImages.map((image, index) => (
               <div key={index} className="relative group">
                 {previewUrls[index] && !imageErrors[index] ? (
@@ -161,13 +163,13 @@ const ChatInput = React.memo(
                     }}
                   />
                 ) : (
-                  <div className="w-full h-24 bg-gray-200 rounded flex items-center justify-center">
-                    <CameraIcon className="w-8 h-8 text-gray-400" />
+                  <div className="w-full h-24 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
+                    <CameraIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                   </div>
                 )}
                 <button
                   onClick={() => onImageRemove(index)}
-                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 active:scale-95"
                   title="Retirer l'image"
                 >
                   <XMarkIcon className="w-4 h-4" />
@@ -180,13 +182,41 @@ const ChatInput = React.memo(
           </div>
         )}
 
-        {/* Input Area */}
-        <div
-          className={`flex items-center min-h-[48px] w-full ${isMobileDevice ? "mobile-input-container" : "space-x-2"}`}
-        >
-          <div
-            className={`flex-1 ${isMobileDevice ? "mobile-input-wrapper" : ""}`}
-          >
+        {/* Input Area - New Mobile Layout: 📷🎤 | [texte] | ➤ */}
+        <div className="flex items-center gap-2 w-full">
+          {/* Left Group: Camera + Mic Icons (Mobile Only) */}
+          {isMobileDevice && (
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {/* Camera Button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoadingChat}
+                className={`h-11 w-11 flex items-center justify-center text-[var(--color-primary)] disabled:text-gray-300 dark:disabled:text-gray-600 transition-all rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-95 ${selectedImages.length > 0 ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
+                title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+                aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+                style={{
+                  minWidth: "44px",
+                  minHeight: "44px",
+                }}
+              >
+                <CameraIcon className="w-5 h-5" />
+                {selectedImages.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[var(--color-primary)] text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                    {selectedImages.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Voice Input Button */}
+              <VoiceInput
+                onTranscript={handleVoiceTranscript}
+                disabled={isLoadingChat}
+              />
+            </div>
+          )}
+
+          {/* Center: Text Input */}
+          <div className="flex-1 min-w-0">
             <input
               ref={inputRef}
               type="text"
@@ -202,65 +232,63 @@ const ChatInput = React.memo(
                       ? t("chat.placeholderMobile")
                       : t("chat.placeholder")
               }
-              className={`w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm flex items-center ${isMobileDevice ? "ios-input-fix" : ""}`}
+              className="w-full min-h-[44px] px-4 bg-[var(--input-bg)] dark:bg-[var(--input-bg-dark)] border-0 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:bg-white dark:focus:bg-gray-800 outline-none text-[15px] transition-all"
               disabled={isLoadingChat}
               aria-label={t("chat.placeholder")}
               style={{
-                fontSize: isMobileDevice ? "16px" : "14px",
+                fontSize: isMobileDevice ? "16px" : "15px",
                 WebkitAppearance: "none",
-                borderRadius: isMobileDevice ? "25px" : "9999px",
               }}
             />
           </div>
 
-          {/* Send/Stop Button - Change dynamiquement selon l'état */}
+          {/* Right: Send/Stop Button */}
           <button
             onClick={isLoadingChat ? onStopGeneration : handleButtonClick}
             disabled={!isLoadingChat && (!inputMessage.trim() && selectedImages.length === 0)}
-            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center ${
+            className={`flex-shrink-0 h-11 w-11 flex items-center justify-center rounded-full transition-all active:scale-95 ${
               isLoadingChat
-                ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                : "text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:text-gray-300"
-            } transition-colors rounded-full ${isMobileDevice ? "mobile-send-button" : ""}`}
+                ? "bg-red-500 text-white hover:bg-red-600"
+                : "bg-[var(--color-primary)] text-white hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500"
+            }`}
             title={isLoadingChat ? t("chat.stop") || "Arrêter" : t("chat.send")}
             aria-label={isLoadingChat ? t("chat.stop") || "Arrêter" : t("chat.send")}
             style={{
-              minWidth: "48px",
-              width: "48px",
-              height: "48px",
+              minWidth: "44px",
+              minHeight: "44px",
             }}
           >
-            {isLoadingChat ? <StopIcon /> : <PaperAirplaneIcon />}
+            {isLoadingChat ? <StopIcon className="w-5 h-5" /> : <PaperAirplaneIcon className="w-5 h-5" />}
           </button>
 
-          {/* Camera Button - Visible uniquement sur desktop */}
+          {/* Desktop: Camera + Voice on the right (original layout) */}
           {!isMobileDevice && (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoadingChat}
-              className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
-              title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
-              aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
-              style={{
-                minWidth: "48px",
-                width: "48px",
-                height: "48px",
-              }}
-            >
-              <CameraIcon />
-              {selectedImages.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                  {selectedImages.length}
-                </span>
-              )}
-            </button>
-          )}
+            <>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoadingChat}
+                className={`flex-shrink-0 h-11 w-11 flex items-center justify-center text-[var(--color-primary)] hover:text-blue-700 disabled:text-gray-300 transition-all rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 active:scale-95 ${selectedImages.length > 0 ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
+                title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+                aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+                style={{
+                  minWidth: "44px",
+                  minHeight: "44px",
+                }}
+              >
+                <CameraIcon className="w-5 h-5" />
+                {selectedImages.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[var(--color-primary)] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                    {selectedImages.length}
+                  </span>
+                )}
+              </button>
 
-          {/* Voice Input Button */}
-          <VoiceInput
-            onTranscript={handleVoiceTranscript}
-            disabled={isLoadingChat}
-          />
+              <VoiceInput
+                onTranscript={handleVoiceTranscript}
+                disabled={isLoadingChat}
+              />
+            </>
+          )}
         </div>
       </div>
     );
@@ -269,7 +297,7 @@ const ChatInput = React.memo(
 
 ChatInput.displayName = "ChatInput";
 
-// Composant MessageList optimisé avec React.memo
+// Composant MessageList optimisé avec React.memo et groupement de messages
 const MessageList = React.memo(
   ({
     processedMessages,
@@ -294,20 +322,45 @@ const MessageList = React.memo(
     currentLanguage: string;
   }) => {
     const messageComponents = useMemo(() => {
-      return processedMessages.map((message, index) => (
-        <div key={`${message.id}-${index}`}>
-          <div
-            className={`flex items-start space-x-3 min-w-0 ${message.isUser ? "justify-end" : "justify-start"}`}
-          >
-            {!message.isUser && (
-              <div className="flex-shrink-0 w-10 h-10 grid place-items-center">
-                <InteliaLogo className="h-8 w-auto" />
-              </div>
-            )}
+      return processedMessages.map((message, index) => {
+        // Déterminer si on affiche l'avatar (premier message du groupe)
+        const prevMessage = index > 0 ? processedMessages[index - 1] : null;
+        const isGroupStart = !prevMessage || prevMessage.isUser !== message.isUser;
 
+        // Calculer le temps entre messages (pour groupement temporel)
+        const timeSinceLastMessage = prevMessage
+          ? new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime()
+          : Infinity;
+        const isTemporalGroup = timeSinceLastMessage < 120000; // 2 minutes
+
+        // Décider si on groupe
+        const shouldGroup = !isGroupStart && isTemporalGroup;
+
+        return (
+          <div
+            key={`${message.id}-${index}`}
+            className={`message-bubble ${shouldGroup ? 'msg-group-continue' : 'msg-group-first'}`}
+          >
             <div
-              className={`px-3 sm:px-4 py-2 rounded-2xl max-w-[85%] sm:max-w-none break-words ${message.isUser ? "bg-blue-600 text-white ml-auto" : "bg-white border border-gray-200 text-gray-900"}`}
+              className={`flex items-start space-x-3 min-w-0 ${message.isUser ? "justify-end" : "justify-start"}`}
             >
+              {!message.isUser && (
+                <div className={`flex-shrink-0 w-10 h-10 grid place-items-center ${shouldGroup ? 'invisible' : ''}`}>
+                  <InteliaLogo className="h-8 w-auto" />
+                </div>
+              )}
+
+              <div
+                className={`px-3 sm:px-4 py-2 max-w-[85%] sm:max-w-none break-words ${
+                  message.isUser
+                    ? "bg-[var(--color-primary)] text-white ml-auto rounded-[var(--msg-radius)]"
+                    : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 rounded-[var(--msg-radius)]"
+                }`}
+                style={{
+                  borderTopLeftRadius: !message.isUser && !shouldGroup ? '4px' : undefined,
+                  borderTopRightRadius: message.isUser && !shouldGroup ? '4px' : undefined,
+                }}
+              >
               {message.isUser ? (
                 <div className="space-y-2">
                   {/* Support multiple images */}
@@ -401,7 +454,7 @@ const MessageList = React.memo(
             </div>
 
             {message.isUser && (
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+              <div className={`w-8 h-8 bg-[var(--color-primary)] rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${shouldGroup ? 'invisible' : ''}`}>
                 <span className="text-white text-sm font-medium">
                   {getUserInitials(user)}
                 </span>
@@ -409,7 +462,8 @@ const MessageList = React.memo(
             )}
           </div>
         </div>
-      ));
+        );
+      });
     }, [processedMessages, handleFeedbackClick, handleTypingComplete, getUserInitials, user, t]);
 
     return (
@@ -422,16 +476,7 @@ const MessageList = React.memo(
           messageComponents
         )}
 
-        {isLoadingChat && (
-          <div className="flex items-start space-x-3">
-            <div className="w-10 h-10 grid place-items-center flex-shrink-0">
-              <InteliaLogo className="h-8 w-auto" />
-            </div>
-            <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3 max-w-[85%] sm:max-w-none break-words">
-              <LoadingMessage language={currentLanguage} />
-            </div>
-          </div>
-        )}
+        {isLoadingChat && <LoadingDots />}
       </>
     );
   },
@@ -1522,8 +1567,13 @@ function ChatInterface() {
         className={`bg-gray-50 flex flex-col relative z-0 ${isMobileDevice ? "chat-main-container" : "min-h-dvh h-screen"}`}
         style={containerStyle}
       >
-        <header className="bg-white border-b border-gray-100 px-2 sm:px-4 py-3 flex-shrink-0">
-          <div className="flex items-center justify-between">
+        <header
+          className={`bg-white dark:bg-[var(--header-bg)] border-b border-gray-100 dark:border-[var(--border-light)] px-2 sm:px-4 flex-shrink-0 ${isMobileDevice ? 'header-blur mobile-header sticky top-0 z-50' : 'py-3'}`}
+          style={{
+            height: isMobileDevice ? 'var(--header-height)' : 'auto',
+          }}
+        >
+          <div className="flex items-center justify-between h-full">
             {/* Left side - Adaptatif mobile/desktop */}
             <div className={`flex items-center ${isMobileDevice ? 'space-x-1' : 'space-x-2'}`}>
               <button
@@ -1630,7 +1680,7 @@ function ChatInterface() {
           )}
 
           <div
-            className={`px-2 sm:px-4 py-2 bg-white border-t border-gray-100 z-20 ${isMobileDevice ? "chat-input-fixed" : "sticky bottom-0"}`}
+            className={`px-2 sm:px-4 py-2 bg-[var(--footer-bg)] dark:bg-[var(--footer-bg)] border-t border-[var(--border-light)] z-20 transition-all ${isMobileDevice ? "chat-input-fixed mobile-footer" : "sticky bottom-0"}`}
             style={{
               paddingBottom: isMobileDevice
                 ? `calc(env(safe-area-inset-bottom) + 8px)`
@@ -1639,10 +1689,8 @@ function ChatInterface() {
               bottom: 0,
               left: 0,
               right: 0,
-              backgroundColor: "white",
-              borderTop: "1px solid rgb(243 244 246)",
               zIndex: 1000,
-              minHeight: isMobileDevice ? "70px" : "auto",
+              minHeight: isMobileDevice ? "var(--footer-min-height)" : "auto",
               display: "flex",
               alignItems: "center",
             }}
