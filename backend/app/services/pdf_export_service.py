@@ -194,17 +194,6 @@ class PDFExportService:
         # Liste des éléments du PDF
         story = []
 
-        # === EN-TÊTE AVEC LOGO ===
-        logo_path = self._get_logo_path()
-        if logo_path:
-            try:
-                logo = RLImage(logo_path, width=2*inch, height=0.5*inch)
-                logo.hAlign = 'CENTER'
-                story.append(logo)
-                story.append(Spacer(1, 0.3*inch))
-            except Exception as e:
-                logger.warning(f"Erreur chargement logo: {e}")
-
         # === TITRE PRINCIPAL ===
         main_title = "Intelia Cognito"
         story.append(Paragraph(main_title, self.styles['InteliaTitle']))
