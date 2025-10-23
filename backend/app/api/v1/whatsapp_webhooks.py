@@ -310,30 +310,118 @@ async def handle_audio_message(from_number: str, media_url: str, user_info: Dict
         return "Désolé, je n'ai pas pu traiter votre message vocal."
 
 
-async def handle_image_message(from_number: str, media_url: str, user_info: Dict[str, Any]) -> str:
+async def handle_image_message(from_number: str, media_url: str, user_info: Dict[str, Any], message_text: Optional[str] = None) -> str:
     """
-    Traite une image WhatsApp
+    Traite une image WhatsApp avec analyse GPT-4 Vision
 
     Args:
         from_number: Numéro WhatsApp de l'expéditeur
-        media_url: URL de l'image
+        media_url: URL de l'image (Twilio)
         user_info: Informations de l'utilisateur
+        message_text: Texte accompagnant l'image (optionnel)
 
     Returns:
-        Réponse à envoyer
+        Analyse de l'image par GPT-4 Vision
     """
     try:
         user_email = user_info.get("user_email")
         logger.info(f"🖼️ Image message from {user_email}: {media_url}")
 
-        # TODO: Intégrer avec votre système de vision multimodale
-        # Pour l'instant, réponse simple
-        response = "Image reçue. Analyse en cours avec notre système de vision..."
+        # Créer un JWT token pour l'authentification
+        auth_token = create_whatsapp_user_token(user_info)
+        if not auth_token:
+            logger.error("❌ Failed to create auth token for image analysis")
+            return "Désolé, impossible de vous authentifier pour l'analyse d'image."
 
-        return response
+        # Étape 1: Télécharger l'image depuis Twilio
+        logger.info(f"📥 Downloading image from Twilio: {media_url}")
+
+        # Twilio nécessite l'authentification pour télécharger les médias
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Télécharger l'image avec auth Twilio
+            image_response = await client.get(
+                media_url,
+                auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            )
+
+            if image_response.status_code != 200:
+                logger.error(f"❌ Failed to download image: {image_response.status_code}")
+                return "Désolé, je n'ai pas pu télécharger votre image."
+
+            image_data = image_response.content
+            content_type = image_response.headers.get("Content-Type", "image/jpeg")
+
+            logger.info(f"✅ Image downloaded: {len(image_data)} bytes, type: {content_type}")
+
+        # Étape 2: Préparer la requête pour le service LLM Vision
+        tenant_id = from_number.replace("whatsapp:", "").strip()
+
+        # Message par défaut si pas de texte
+        if not message_text:
+            message_text = "Qu'est-ce que vous voyez dans cette image liée à l'aviculture ?"
+
+        # Créer FormData (équivalent HTTP de FormData JavaScript)
+        from httpx import AsyncClient
+
+        # Préparer les fichiers et données
+        files = {
+            'files': ('whatsapp_image.jpg', image_data, content_type)
+        }
+
+        data = {
+            'message': message_text,
+            'tenant_id': tenant_id,
+            'language': 'fr',
+            'use_rag_context': 'true'
+        }
+
+        headers = {
+            "Authorization": f"Bearer {auth_token}",
+        }
+
+        # Étape 3: Appeler l'endpoint vision du LLM
+        llm_vision_endpoint = f"{LLM_SERVICE_URL}/chat-with-image"
+        logger.info(f"🔧 Calling LLM Vision service: {llm_vision_endpoint}")
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            vision_response = await client.post(
+                llm_vision_endpoint,
+                files=files,
+                data=data,
+                headers=headers
+            )
+
+            if vision_response.status_code != 200:
+                logger.error(f"❌ LLM Vision error: {vision_response.status_code}")
+                error_detail = vision_response.text[:200]
+                logger.error(f"Error details: {error_detail}")
+                return "Désolé, je n'ai pas pu analyser votre image. Veuillez réessayer."
+
+            vision_data = vision_response.json()
+
+            if not vision_data.get("success") or not vision_data.get("analysis"):
+                logger.error("❌ Vision API returned unsuccessful response")
+                return "Désolé, l'analyse de l'image a échoué. Veuillez réessayer."
+
+            analysis = vision_data["analysis"]
+            model = vision_data.get("metadata", {}).get("model", "unknown")
+
+            logger.info(
+                f"✅ Vision analysis received for {user_email} | "
+                f"model={model}, length={len(analysis)} chars"
+            )
+
+            return analysis
+
+    except httpx.TimeoutException:
+        logger.error("❌ LLM Vision service timeout")
+        return "Désolé, l'analyse de votre image prend trop de temps. Veuillez réessayer."
+    except httpx.RequestError as e:
+        logger.error(f"❌ LLM Vision request error: {e}")
+        return "Désolé, impossible de contacter le service d'analyse d'images. Veuillez réessayer plus tard."
     except Exception as e:
-        logger.error(f"❌ Error handling image message: {e}")
-        return "Désolé, je n'ai pas pu analyser votre image."
+        logger.error(f"❌ Error handling image message: {e}", exc_info=True)
+        return "Désolé, une erreur s'est produite lors de l'analyse de votre image. Veuillez réessayer."
 
 
 async def handle_unknown_user(from_number: str) -> str:
@@ -463,7 +551,8 @@ async def whatsapp_webhook(
                 response_text = await handle_audio_message(From, MediaUrl0, user_info)
             elif MediaContentType0 and MediaContentType0.startswith("image/"):
                 message_type = "image"
-                response_text = await handle_image_message(From, MediaUrl0, user_info)
+                # Passer le texte du message s'il y en a un avec l'image
+                response_text = await handle_image_message(From, MediaUrl0, user_info, Body)
             else:
                 message_type = "media"
                 response_text = "Type de fichier non supporté pour le moment."
