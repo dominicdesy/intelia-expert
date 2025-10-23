@@ -141,26 +141,28 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         >
           {/* Essential */}
           <article
-            className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
+            className="relative rounded-2xl bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md border"
+            style={{ borderColor: '#e5e7eb' }}
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold uppercase text-gray-700 shadow-sm">
+              <span className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase shadow-sm" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
                 {t("billing.free")}
               </span>
             </div>
 
             <header className="mb-6 mt-1 text-center">
-              <h3 className="mb-1 text-2xl font-bold text-gray-900">Essential</h3>
+              <h3 className="mb-1 text-2xl font-bold" style={{ color: '#374151' }}>Essential</h3>
               <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-bold text-gray-900">0</span>
-                <span className="text-xl text-gray-600">$</span>
-                <span className="text-sm text-gray-500">/ mois</span>
+                <span className="text-4xl font-bold" style={{ color: '#111827' }}>0</span>
+                <span className="text-xl" style={{ color: '#6b7280' }}>$</span>
+                <span className="text-sm" style={{ color: '#6b7280' }}>/ mois</span>
               </div>
             </header>
 
             <button
               disabled
-              className="w-full rounded-lg bg-gray-100 py-3 font-semibold text-gray-700"
+              className="w-full rounded-lg py-3 font-semibold"
+              style={{ backgroundColor: '#6b7280', color: '#ffffff' }}
             >
               {currentPlan === "essential" ? t("billing.currentPlan") : t("billing.freePlan")}
             </button>
@@ -168,36 +170,43 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
           {/* Pro (featured) */}
           <article
-            className="relative rounded-2xl border-2 border-blue-500 bg-gradient-to-b from-blue-50 to-white p-6 shadow-[0_8px_24px_rgba(37,99,235,.12)] transition-all hover:-translate-y-1"
+            className="relative rounded-2xl p-6 shadow-[0_8px_24px_rgba(34,106,228,.12)] transition-all hover:-translate-y-1 border-2"
+            style={{
+              background: 'linear-gradient(to bottom, rgba(34,106,228,0.06), #ffffff)',
+              borderColor: '#226ae4'
+            }}
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <span className="rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-3 py-1 text-[11px] font-semibold uppercase text-white shadow">
+              <span className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase text-white shadow" style={{ backgroundColor: '#226ae4' }}>
                 {t("billing.popular")}
               </span>
             </div>
 
             <header className="mb-6 mt-1 text-center">
-              <h3 className="mb-1 text-2xl font-bold text-blue-700">Pro</h3>
+              <h3 className="mb-1 text-2xl font-bold" style={{ color: '#1240a4' }}>Pro</h3>
               <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-bold text-gray-900">
+                <span className="text-4xl font-bold" style={{ color: '#111827' }}>
                   {billingCycle === "monthly" ? prices.pro.toFixed(2) : (prices.pro / 12).toFixed(2)}
                 </span>
-                <span className="text-xl text-gray-600">$</span>
-                <span className="text-sm text-gray-500">/ {billingCycle === "monthly" ? "mois" : "an"}</span>
+                <span className="text-xl" style={{ color: '#6b7280' }}>$</span>
+                <span className="text-sm" style={{ color: '#6b7280' }}>/ {billingCycle === "monthly" ? "mois" : "an"}</span>
               </div>
               {billingCycle === "yearly" && (
-                <p className="mt-1 text-xs text-emerald-600">
+                <p className="mt-1 text-xs" style={{ color: '#1240a4' }}>
                   Soit {(prices.pro / 12).toFixed(2)} $/mois
                 </p>
               )}
-              <p className="mt-2 text-xs font-medium text-blue-700">{t("billing.trial14days")}</p>
+              <p className="mt-2 text-xs font-medium" style={{ color: '#1240a4' }}>{t("billing.trial14days")}</p>
             </header>
 
             {currentPlan === "pro" ? (
               <button
                 onClick={handleManageSubscription}
                 disabled={isManaging}
-                className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-lg py-3 font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: '#226ae4' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1240a4'}
+                onMouseLeave={(e) => !isManaging && (e.currentTarget.style.backgroundColor = '#226ae4')}
               >
                 {isManaging ? t("billing.loading") : t("billing.manageSubscription")}
               </button>
@@ -205,7 +214,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <button
                 onClick={() => handleUpgrade("pro")}
                 disabled={isLoading}
-                className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white shadow-md transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-lg py-3 font-semibold text-white shadow-md transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: '#226ae4' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1240a4'}
+                onMouseLeave={(e) => !isLoading && (e.currentTarget.style.backgroundColor = '#226ae4')}
               >
                 {isLoading && selectedPlan === "pro" ? t("billing.redirecting") : t("billing.startFreeTrial")}
               </button>
@@ -214,36 +226,43 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
           {/* Elite */}
           <article
-            className="relative rounded-2xl border-2 border-amber-400 bg-gradient-to-b from-amber-50 to-white p-6 shadow-[0_8px_24px_rgba(245,158,11,.15)] transition-all hover:-translate-y-1"
+            className="relative rounded-2xl p-6 shadow-[0_8px_24px_rgba(228,126,58,.15)] transition-all hover:-translate-y-1 border-2"
+            style={{
+              background: 'linear-gradient(to bottom, rgba(228,126,58,0.06), #ffffff)',
+              borderColor: '#e47e3a'
+            }}
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <span className="rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-3 py-1 text-[11px] font-semibold uppercase text-white shadow">
+              <span className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase text-white shadow" style={{ backgroundColor: '#e47e3a' }}>
                 {t("billing.recommended")}
               </span>
             </div>
 
             <header className="mb-6 mt-1 text-center">
-              <h3 className="mb-1 text-2xl font-bold text-amber-700">Elite</h3>
+              <h3 className="mb-1 text-2xl font-bold" style={{ color: '#e47e3a' }}>Elite</h3>
               <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-bold text-gray-900">
+                <span className="text-4xl font-bold" style={{ color: '#111827' }}>
                   {billingCycle === "monthly" ? prices.elite.toFixed(2) : (prices.elite / 12).toFixed(2)}
                 </span>
-                <span className="text-xl text-gray-600">$</span>
-                <span className="text-sm text-gray-500">/ {billingCycle === "monthly" ? "mois" : "an"}</span>
+                <span className="text-xl" style={{ color: '#6b7280' }}>$</span>
+                <span className="text-sm" style={{ color: '#6b7280' }}>/ {billingCycle === "monthly" ? "mois" : "an"}</span>
               </div>
               {billingCycle === "yearly" && (
-                <p className="mt-1 text-xs text-emerald-600">
+                <p className="mt-1 text-xs" style={{ color: '#e47e3a' }}>
                   Soit {(prices.elite / 12).toFixed(2)} $/mois
                 </p>
               )}
-              <p className="mt-2 text-xs font-medium text-blue-700">{t("billing.trial14days")}</p>
+              <p className="mt-2 text-xs font-medium" style={{ color: '#e47e3a' }}>{t("billing.trial14days")}</p>
             </header>
 
             {currentPlan === "elite" ? (
               <button
                 onClick={handleManageSubscription}
                 disabled={isManaging}
-                className="w-full rounded-lg bg-amber-500 py-3 font-semibold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-lg py-3 font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: '#e47e3a' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#cc6f33'}
+                onMouseLeave={(e) => !isManaging && (e.currentTarget.style.backgroundColor = '#e47e3a')}
               >
                 {isManaging ? t("billing.loading") : t("billing.manageSubscription")}
               </button>
@@ -251,7 +270,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <button
                 onClick={() => handleUpgrade("elite")}
                 disabled={isLoading}
-                className="w-full rounded-lg bg-amber-500 py-3 font-semibold text-white shadow-md transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-lg py-3 font-semibold text-white shadow-md transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: '#e47e3a' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#cc6f33'}
+                onMouseLeave={(e) => !isLoading && (e.currentTarget.style.backgroundColor = '#e47e3a')}
               >
                 {isLoading && selectedPlan === "elite" ? t("billing.redirecting") : t("billing.startFreeTrial")}
               </button>
@@ -270,9 +292,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">{t("subscription.comparison.feature")}</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">{t("subscription.comparison.essential")}</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50">{t("subscription.comparison.pro")}</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50">{t("subscription.comparison.elite")}</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#374151' }}>{t("subscription.comparison.essential")}</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.06)' }}>{t("subscription.comparison.pro")}</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#e47e3a', backgroundColor: 'rgba(228,126,58,0.06)' }}>{t("subscription.comparison.elite")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -287,21 +309,21 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
-                        <Check className="h-4 w-4 text-emerald-600" />
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
-                        <Check className="h-4 w-4 text-emerald-600" />
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
-                        <Check className="h-4 w-4 text-emerald-600" />
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
@@ -311,21 +333,21 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
-                        <Check className="h-4 w-4 text-emerald-600" />
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
-                        <Check className="h-4 w-4 text-emerald-600" />
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
-                        <Check className="h-4 w-4 text-emerald-600" />
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
@@ -339,15 +361,15 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 </tr>
                 <tr className="border-b border-gray-100">
                   <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.queries")}</td>
-                  <td className="px-4 py-3 text-center text-sm text-gray-600">{t("subscription.comparison.value.100")}</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">{t("subscription.comparison.value.unlimitedStar")}</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">{t("subscription.comparison.value.unlimitedStar")}</td>
+                  <td className="px-4 py-3 text-center text-sm" style={{ color: '#374151' }}>{t("subscription.comparison.value.100")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.06)' }}>{t("subscription.comparison.value.unlimitedStar")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#e47e3a', backgroundColor: 'rgba(228,126,58,0.06)' }}>{t("subscription.comparison.value.unlimitedStar")}</td>
                 </tr>
                 <tr className="border-b border-gray-100">
                   <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.history")}</td>
-                  <td className="px-4 py-3 text-center text-sm text-gray-600">{t("subscription.comparison.value.30days")}</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">{t("subscription.comparison.value.unlimited")}</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">{t("subscription.comparison.value.unlimited")}</td>
+                  <td className="px-4 py-3 text-center text-sm" style={{ color: '#374151' }}>{t("subscription.comparison.value.30days")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.06)' }}>{t("subscription.comparison.value.unlimited")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#e47e3a', backgroundColor: 'rgba(228,126,58,0.06)' }}>{t("subscription.comparison.value.unlimited")}</td>
                 </tr>
                 <tr className="border-b border-gray-100">
                   <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.pdfExport")}</td>
@@ -358,14 +380,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
                         <Check className="h-4 w-4 text-blue-700" />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
                         <Check className="h-4 w-4 text-amber-700" />
@@ -389,8 +411,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">{t("subscription.comparison.value.25perMonth")}</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">{t("subscription.comparison.value.unlimitedStar")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.06)' }}>{t("subscription.comparison.value.25perMonth")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#e47e3a', backgroundColor: 'rgba(228,126,58,0.06)' }}>{t("subscription.comparison.value.unlimitedStar")}</td>
                 </tr>
                 <tr className="border-b border-gray-100">
                   <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.voiceInput")}</td>
@@ -401,14 +423,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
                         <Check className="h-4 w-4 text-blue-700" />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
                         <Check className="h-4 w-4 text-amber-700" />
@@ -425,14 +447,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
                         <Check className="h-4 w-4 text-blue-700" />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
                         <Check className="h-4 w-4 text-amber-700" />
@@ -456,14 +478,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
                         <X className="h-4 w-4 text-gray-400" />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
                         <Check className="h-4 w-4 text-amber-700" />

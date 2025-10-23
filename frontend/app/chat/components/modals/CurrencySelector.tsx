@@ -146,12 +146,13 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
   const currentCurrencyName = currencyInfo.currency_names[currentCurrency];
 
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+    <div className="border rounded-lg p-4 mb-6" style={{ backgroundColor: 'rgba(18,64,164,0.08)', borderColor: '#1240a4' }}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center mb-2">
             <svg
-              className="w-5 h-5 text-blue-600 mr-2"
+              className="w-5 h-5 mr-2"
+              style={{ color: '#226ae4' }}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -163,12 +164,12 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
                 d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <h3 className="text-sm font-semibold text-blue-900">
+            <h3 className="text-sm font-semibold" style={{ color: '#1240a4' }}>
               {t("billing.billingCurrency")}
             </h3>
           </div>
 
-          <p className="text-sm text-blue-800 mb-1">
+          <p className="text-sm mb-1" style={{ color: '#1240a4' }}>
             {currencyInfo.is_set ? (
               <span>
                 <span className="font-medium">{t("billing.current")}:</span>{" "}
@@ -178,7 +179,7 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
               <span>
                 <span className="font-medium">{t("billing.suggested")}:</span>{" "}
                 {currentCurrencyName}
-                <span className="text-blue-600 text-xs ml-2">
+                <span className="text-xs ml-2" style={{ color: '#226ae4' }}>
                   ({t("billing.notSetYet")})
                 </span>
               </span>
@@ -186,7 +187,7 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
           </p>
 
           {!currencyInfo.is_set && (
-            <p className="text-xs text-blue-700 mt-1">
+            <p className="text-xs mt-1" style={{ color: '#226ae4' }}>
               {t("billing.currencyRequiredForUpgrade")}
             </p>
           )}
@@ -196,7 +197,10 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             disabled={isChanging}
-            className="px-3 py-2 bg-white border border-blue-300 rounded-lg text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="px-3 py-2 bg-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center border hover:bg-opacity-8"
+            style={{ borderColor: '#1240a4', color: '#1240a4' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(18,64,164,0.08)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
           >
             {isChanging ? (
               <>
@@ -266,23 +270,21 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({ user }) => {
                       <button
                         key={currency}
                         onClick={() => handleCurrencyChange(currency)}
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                          isSelected
-                            ? "bg-blue-100 text-blue-900 font-medium"
-                            : "text-gray-700 hover:bg-gray-100"
-                        }`}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm transition-colors text-gray-700 hover:bg-gray-100"
+                        style={isSelected ? { backgroundColor: 'rgba(18,64,164,0.08)', color: '#1240a4', fontWeight: '500' } : {}}
                       >
                         <div className="flex items-center justify-between">
                           <span>{currencyInfo.currency_names[currency]}</span>
                           <div className="flex items-center">
                             {isSuggested && !isSelected && (
-                              <span className="text-xs text-blue-600 mr-2">
+                              <span className="text-xs mr-2" style={{ color: '#226ae4' }}>
                                 {t("billing.suggested")}
                               </span>
                             )}
                             {isSelected && (
                               <svg
-                                className="w-4 h-4 text-blue-600"
+                                className="w-4 h-4"
+                                style={{ color: '#2cc780' }}
                                 fill="currentColor"
                                 viewBox="0 0 20 20"
                               >

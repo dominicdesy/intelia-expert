@@ -885,16 +885,22 @@ async def export_conversation_pdf(
 
         # Vérifier le plan de l'utilisateur
         user_email = current_user.get("email")
+
+        logger.info(f"[PDF Export] Checking plan for user: {user_email}")
         plan_name, _, _ = get_user_plan_and_quota(user_email)
         plan_lower = plan_name.lower() if plan_name else "essential"
+        logger.info(f"[PDF Export] User plan: {plan_name} (normalized: {plan_lower})")
 
         # Restriction: Export PDF disponible pour Pro, Elite et Intelia uniquement
         if plan_lower not in ["pro", "elite", "intelia"]:
+            logger.warning(f"[PDF Export] Access denied for plan: {plan_lower}")
             raise HTTPException(
                 status_code=403,
                 detail="L'exportation PDF est réservée aux plans Pro et Elite. "
                        "Veuillez mettre à niveau votre abonnement."
             )
+
+        logger.info(f"[PDF Export] Access granted for plan: {plan_lower}")
 
         from app.core.database import get_pg_connection
         from psycopg2.extras import RealDictCursor
