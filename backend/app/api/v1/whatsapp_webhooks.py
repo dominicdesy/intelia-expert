@@ -309,7 +309,7 @@ async def handle_audio_message(from_number: str, media_url: str, user_info: Dict
         # Étape 1: Télécharger l'audio depuis Twilio
         logger.info(f"📥 Downloading audio from Twilio: {media_url}")
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             # Télécharger l'audio avec auth Twilio
             audio_response = await client.get(
                 media_url,
@@ -422,7 +422,7 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
         logger.info(f"📥 Downloading image from Twilio: {media_url}")
 
         # Twilio nécessite l'authentification pour télécharger les médias
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             # Télécharger l'image avec auth Twilio
             image_response = await client.get(
                 media_url,
