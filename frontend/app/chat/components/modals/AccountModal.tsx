@@ -26,7 +26,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [isManaging, setIsManaging] = useState(false);
 
-  // Map "free" to "essential" for backwards compatibility
+  // Map free plan to essential for backwards compatibility
   const currentPlan = user?.plan === "free" ? "essential" : (user?.plan || "essential");
 
   // Prix mensuels
