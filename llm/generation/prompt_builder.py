@@ -269,7 +269,7 @@ MÉTRIQUES PRIORITAIRES:
         # 🆕 USER PROFILING PERSONALIZATION - Apply profile-based customizations
         if user_id:
             try:
-                from llm.core.user_profiling import get_user_profile, build_personalized_system_prompt
+                from core.user_profiling import get_user_profile, build_personalized_system_prompt
                 user_profile = get_user_profile(user_id)
                 if user_profile:
                     system_prompt = build_personalized_system_prompt(system_prompt, user_profile)
