@@ -887,6 +887,8 @@ export const useAuthStore = create<AuthState>()(
           if (data.area_code !== undefined) apiData.area_code = data.area_code;
           if (data.phone_number !== undefined)
             apiData.phone_number = data.phone_number;
+          if (data.whatsapp_number !== undefined)
+            apiData.whatsapp_number = data.whatsapp_number;
           if (data.country !== undefined) apiData.country = data.country;
           if (data.linkedinProfile !== undefined)
             apiData.linkedin_profile = data.linkedinProfile;
