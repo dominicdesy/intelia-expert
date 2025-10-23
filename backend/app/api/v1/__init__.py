@@ -666,6 +666,27 @@ if VOICE_REALTIME_AVAILABLE and voice_realtime_router:
 else:
     logger.warning("Voice Realtime router non monté (module non disponible)")
 
+# Satisfaction Surveys (sondages de satisfaction globale)
+SATISFACTION_AVAILABLE = False
+try:
+    from .satisfaction import router as satisfaction_router
+    SATISFACTION_AVAILABLE = True
+    logger.debug("Satisfaction router importé avec %d routes", len(satisfaction_router.routes))
+except ImportError as e:
+    logger.warning(f"Satisfaction router import failed: {e}")
+    satisfaction_router = None
+except Exception as e:
+    logger.error(f"ERREUR import satisfaction router: {e}")
+    satisfaction_router = None
+
+if SATISFACTION_AVAILABLE and satisfaction_router:
+    router.include_router(satisfaction_router, prefix="/satisfaction", tags=["Satisfaction"])
+    logger.debug("Satisfaction router monté")
+    logger.debug("Satisfaction router maintenant disponible sur /v1/satisfaction/*")
+    logger.info("Satisfaction surveys activé (statistiques + feedback)!")
+else:
+    logger.warning("Satisfaction router non monté (module non disponible)")
+
 # Résumé final
 total_routes = len(router.routes)
 logger.info("Router v1 créé avec %d routes au total", total_routes)
