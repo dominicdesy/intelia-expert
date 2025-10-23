@@ -4,6 +4,7 @@ Router pour la gestion des conversations avec nouvelle architecture.
 Architecture: conversations (metadata) + messages (individual messages)
 """
 from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi.responses import StreamingResponse
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 import logging
@@ -12,6 +13,12 @@ from uuid import uuid4
 
 # Import conversation service
 from app.services.conversation_service import conversation_service
+
+# Import PDF export service
+from app.services.pdf_export_service import get_pdf_export_service
+
+# Import usage limiter pour vérifier le plan
+from app.services.usage_limiter import get_user_plan_and_quota
 
 # Import authentification
 from app.api.v1.auth import get_current_user
@@ -291,12 +298,20 @@ async def get_user_conversations_endpoint(
                 detail="Vous ne pouvez accéder qu'à vos propres conversations",
             )
 
+        # Vérifier le plan de l'utilisateur pour appliquer filtre 30 jours si Essentiel
+        user_email = current_user.get("email")
+        plan_name, _, _ = get_user_plan_and_quota(user_email)
+
+        # Filtre historique: 30 jours pour plan Essentiel, illimité pour Pro/Elite
+        days_back = 30 if plan_name == "Essential" else None
+
         # Récupérer les conversations via le service
         result = conversation_service.get_user_conversations(
             user_id=user_id,
             limit=limit,
             offset=offset,
-            status=status
+            status=status,
+            days_back=days_back
         )
 
         logger.info(f"Conversations trouvées pour {user_id}: {result['total']}")
@@ -847,6 +862,130 @@ async def revoke_share(
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors de la révocation: {str(e)}",
+        )
+
+
+# ===== ENDPOINT EXPORT =====
+
+@router.get("/{conversation_id}/export/pdf")
+async def export_conversation_pdf(
+    conversation_id: str,
+    current_user: dict = Depends(get_current_user)
+) -> StreamingResponse:
+    """
+    Exporte une conversation en PDF avec logo et mise en page professionnelle.
+
+    Restriction: Plans Pro et Elite uniquement
+    """
+    try:
+        logger.info(
+            f"export_conversation_pdf: conversation_id={conversation_id}, "
+            f"user={current_user.get('email')}"
+        )
+
+        # Vérifier le plan de l'utilisateur
+        user_email = current_user.get("email")
+        plan_name, _, _ = get_user_plan_and_quota(user_email)
+
+        # Restriction: Export PDF disponible pour Pro et Elite uniquement
+        if plan_name not in ["Pro", "Elite"]:
+            raise HTTPException(
+                status_code=403,
+                detail="L'exportation PDF est réservée aux plans Pro et Elite. "
+                       "Veuillez mettre à niveau votre abonnement."
+            )
+
+        from app.core.database import get_pg_connection
+        from psycopg2.extras import RealDictCursor
+
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Récupérer la conversation
+                cur.execute(
+                    """
+                    SELECT
+                        id::text as id,
+                        session_id::text as session_id,
+                        user_id,
+                        title,
+                        language,
+                        message_count,
+                        created_at,
+                        updated_at
+                    FROM conversations
+                    WHERE id = %s::uuid
+                    """,
+                    (conversation_id,)
+                )
+
+                conversation = cur.fetchone()
+
+                if not conversation:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Conversation {conversation_id} introuvable"
+                    )
+
+                # Vérifier que l'utilisateur est propriétaire
+                if conversation['user_id'] != current_user.get('user_id'):
+                    is_admin = current_user.get("user_type") == "admin" or current_user.get("is_admin", False)
+                    if not is_admin:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Vous ne pouvez exporter que vos propres conversations"
+                        )
+
+        # Récupérer les messages
+        messages = conversation_service.get_conversation_messages(conversation_id)
+
+        if not messages:
+            raise HTTPException(
+                status_code=404,
+                detail="Aucun message trouvé dans cette conversation"
+            )
+
+        # Préparer les infos utilisateur
+        user_info = {
+            "email": user_email,
+            "name": current_user.get("name", user_email)
+        }
+
+        # Générer le PDF
+        pdf_service = get_pdf_export_service()
+        pdf_buffer = pdf_service.export_conversation(
+            conversation_data=dict(conversation),
+            messages=messages,
+            user_info=user_info
+        )
+
+        # Générer un nom de fichier
+        title = conversation.get('title', 'conversation')
+        # Nettoyer le titre pour nom de fichier
+        safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_title = safe_title[:50]  # Limiter longueur
+        filename = f"intelia_{safe_title}_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+        logger.info(
+            f"✅ PDF généré: {conversation_id}, {len(messages)} messages, "
+            f"plan={plan_name}, fichier={filename}"
+        )
+
+        # Retourner le PDF
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Erreur export PDF conversation {conversation_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'export PDF: {str(e)}"
         )
 
 

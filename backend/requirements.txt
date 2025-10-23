@@ -42,3 +42,7 @@ stripe>=7.0.0
 
 # WebAuthn (pour authentification biométrique - Face ID, Touch ID, Fingerprint)
 webauthn>=2.0.0
+
+# PDF Generation (pour exportation conversations)
+reportlab>=4.0.0
+Pillow>=10.0.0  # Image processing for logo in PDF

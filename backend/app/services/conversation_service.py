@@ -219,10 +219,14 @@ class ConversationService:
         user_id: str,
         limit: int = 50,
         offset: int = 0,
-        status: str = "active"
+        status: str = "active",
+        days_back: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Récupère les conversations d'un utilisateur
+
+        Args:
+            days_back: Si spécifié, ne retourne que les conversations des X derniers jours (pour plan Essentiel)
 
         Returns:
             {
@@ -235,21 +239,30 @@ class ConversationService:
         try:
             with get_pg_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Construire la clause WHERE avec filtre de date si nécessaire
+                    where_clause = "WHERE user_id = %s AND status = %s"
+                    params = [user_id, status]
+
+                    if days_back is not None:
+                        where_clause += " AND created_at >= NOW() - INTERVAL '%s days'"
+                        params.append(days_back)
+
                     # Compter le total
                     cur.execute(
-                        """
+                        f"""
                         SELECT COUNT(*) as total
                         FROM conversations
-                        WHERE user_id = %s AND status = %s
+                        {where_clause}
                         """,
-                        (user_id, status)
+                        tuple(params)
                     )
 
                     total = cur.fetchone()["total"]
 
                     # Récupérer les conversations
+                    params.extend([limit, offset])
                     cur.execute(
-                        """
+                        f"""
                         SELECT
                             id::text as id,
                             session_id::text as session_id,
@@ -264,11 +277,11 @@ class ConversationService:
                             updated_at,
                             last_activity_at
                         FROM conversations
-                        WHERE user_id = %s AND status = %s
+                        {where_clause}
                         ORDER BY last_activity_at DESC
                         LIMIT %s OFFSET %s
                         """,
-                        (user_id, status, limit, offset)
+                        tuple(params)
                     )
 
                     conversations = []
