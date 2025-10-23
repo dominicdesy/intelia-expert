@@ -17,7 +17,7 @@ All methods support both Document objects and dictionary representations of docu
 """
 
 import logging
-from typing import List, Tuple, Dict, Union
+from typing import List, Tuple, Dict, Union, Optional
 
 from config.config import SUPPORTED_LANGUAGES, FALLBACK_LANGUAGE
 from core.data_models import Document
