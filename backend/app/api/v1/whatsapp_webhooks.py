@@ -9,6 +9,7 @@ Version: 2.2 - HTTP integration with LLM service + authentication
 import os
 import logging
 import httpx
+import time
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 
@@ -704,7 +705,7 @@ async def handle_unknown_user(from_number: str) -> str:
 def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> bool:
     """
     Envoie un message WhatsApp via Twilio
-    Divise automatiquement les longs messages en plusieurs parties (max 1600 chars)
+    Divise automatiquement les longs messages en plusieurs parties (max 4000 chars)
 
     Args:
         to_number: Numéro destinataire (format: whatsapp:+1234567890)
@@ -719,8 +720,9 @@ def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> b
             logger.error("❌ Twilio client not initialized")
             return False
 
-        # Limite WhatsApp: 1600 caractères
-        MAX_LENGTH = 1600
+        # Limite WhatsApp: 4000 caractères (max officiel: 4096)
+        # Augmenté pour éviter la division en plusieurs messages
+        MAX_LENGTH = 4000
 
         # Si le message est court, l'envoyer directement
         if len(body) <= MAX_LENGTH:
@@ -771,7 +773,6 @@ def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> b
             remaining = remaining[cut_point:].strip()
 
         # Envoyer chaque partie avec un petit délai
-        import time
         for i, part in enumerate(parts, 1):
             # Ajouter un indicateur de partie si plusieurs messages
             if len(parts) > 1:
@@ -910,6 +911,9 @@ async def whatsapp_webhook(
 
         # Envoyer la réponse
         if response_text:
+            # Attendre 10 secondes après l'accusé de réception (limite Meta: 1 msg/6s par utilisateur)
+            # On attend 10s pour être sûr de respecter la limite
+            time.sleep(10)
             send_whatsapp_message(From, response_text)
 
         logger.info(f"✅ WhatsApp message processed: {MessageSid}")
