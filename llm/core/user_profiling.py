@@ -53,20 +53,23 @@ def get_user_profile(user_id: str) -> Dict[str, Any]:
     Récupère le profil utilisateur depuis Supabase/PostgreSQL
 
     Args:
-        user_id: Auth user ID (UUID format)
+        user_id: Auth user ID (UUID format, may have "user_" prefix)
 
     Returns:
         Dict with production_type (list), category (str), category_other (str), country (str)
         Returns empty dict if user not found or error occurs
     """
     try:
+        # Remove "user_" prefix if present (tenant_id format -> auth_user_id format)
+        clean_user_id = user_id.replace("user_", "") if user_id.startswith("user_") else user_id
+
         with _get_pg_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT production_type, category, category_other, country
-                    FROM users
+                    FROM public.users
                     WHERE auth_user_id = %s
-                """, (user_id,))
+                """, (clean_user_id,))
                 result = cur.fetchone()
 
                 if result:
