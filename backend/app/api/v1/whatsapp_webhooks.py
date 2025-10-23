@@ -721,8 +721,8 @@ def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> b
             return False
 
         # Limite Twilio-WhatsApp: 1600 caractères
-        # Note: WhatsApp supporte 4096, mais Twilio impose 1600
-        MAX_LENGTH = 1600
+        # Note: Emojis comptent plusieurs caractères, donc on utilise une marge de sécurité
+        MAX_LENGTH = 1300  # Marge pour les emojis/caractères spéciaux
 
         # Tronquer le message si nécessaire
         if len(body) > MAX_LENGTH:
