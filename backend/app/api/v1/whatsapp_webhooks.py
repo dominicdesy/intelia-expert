@@ -10,6 +10,7 @@ import os
 import logging
 import httpx
 import time
+import re
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 
@@ -723,6 +724,17 @@ def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> b
         # Limite Twilio-WhatsApp: 1600 caractères
         # Note: Emojis comptent plusieurs caractères, donc on utilise une marge de sécurité
         MAX_LENGTH = 1300  # Marge pour les emojis/caractères spéciaux
+
+        # Supprimer les emojis (Meta peut les bloquer)
+        emoji_pattern = re.compile("["
+            u"\U0001F600-\U0001F64F"  # emoticons
+            u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+            u"\U0001F680-\U0001F6FF"  # transport & map symbols
+            u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+            u"\U00002702-\U000027B0"
+            u"\U000024C2-\U0001F251"
+            "]+", flags=re.UNICODE)
+        body = emoji_pattern.sub('', body)
 
         # Tronquer le message si nécessaire
         if len(body) > MAX_LENGTH:
