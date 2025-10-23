@@ -17,6 +17,14 @@ from fastapi import APIRouter, Request, HTTPException, Form
 from twilio.rest import Client
 from twilio.request_validator import RequestValidator
 
+# Supabase client for user lookup
+try:
+    from supabase import create_client, Client as SupabaseClient
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    logger.warning("Supabase not available for WhatsApp user lookup")
+
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp-webhooks"])
 logger = logging.getLogger(__name__)
 
@@ -25,6 +33,10 @@ TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+15075195932")
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Configuration Supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 # Initialiser le client Twilio
 twilio_client = None
@@ -88,7 +100,7 @@ def log_whatsapp_message(
 
 def get_user_by_whatsapp_number(whatsapp_number: str) -> Optional[Dict[str, Any]]:
     """
-    Récupère l'utilisateur associé à un numéro WhatsApp
+    Récupère l'utilisateur associé à un numéro WhatsApp depuis Supabase
 
     Args:
         whatsapp_number: Numéro WhatsApp (format: whatsapp:+1234567890)
@@ -97,68 +109,44 @@ def get_user_by_whatsapp_number(whatsapp_number: str) -> Optional[Dict[str, Any]
         Dict avec les infos utilisateur ou None si non trouvé
     """
     try:
+        if not SUPABASE_AVAILABLE or not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+            logger.error("❌ Supabase not configured for WhatsApp user lookup")
+            return None
+
         # Normaliser le numéro (enlever le préfixe whatsapp:)
         clean_number = whatsapp_number.replace("whatsapp:", "").strip()
 
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    """
-                    SELECT user_email, whatsapp_number, whatsapp_verified,
-                           verified_at, plan_name
-                    FROM user_whatsapp_info
-                    WHERE whatsapp_number = %s AND whatsapp_verified = TRUE
-                    """,
-                    (clean_number,)
-                )
-                result = cur.fetchone()
+        # Créer client Supabase
+        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-                if result:
-                    logger.info(f"✅ User found for WhatsApp: {result['user_email']}")
-                    return dict(result)
-                else:
-                    logger.warning(f"⚠️ No verified user for WhatsApp: {clean_number}")
-                    return None
+        # Chercher l'utilisateur par numéro WhatsApp
+        response = supabase.table("users").select(
+            "email, whatsapp_number, first_name, last_name, plan, user_type"
+        ).eq("whatsapp_number", clean_number).execute()
+
+        if response.data and len(response.data) > 0:
+            user = response.data[0]
+            logger.info(f"✅ User found for WhatsApp: {user.get('email')}")
+            return {
+                "user_email": user.get("email"),
+                "whatsapp_number": user.get("whatsapp_number"),
+                "first_name": user.get("first_name"),
+                "last_name": user.get("last_name"),
+                "plan_name": user.get("plan", "essential"),
+                "user_type": user.get("user_type"),
+                "whatsapp_verified": True  # Si le numéro est dans la DB, il est considéré vérifié
+            }
+        else:
+            logger.warning(f"⚠️ No user found for WhatsApp: {clean_number}")
+            return None
+
     except Exception as e:
-        logger.error(f"❌ Error getting user by WhatsApp: {e}")
+        logger.error(f"❌ Error getting user by WhatsApp from Supabase: {e}")
         return None
 
 
-def link_whatsapp_to_user(user_email: str, whatsapp_number: str) -> bool:
-    """
-    Associe un numéro WhatsApp à un compte utilisateur
-
-    Args:
-        user_email: Email de l'utilisateur
-        whatsapp_number: Numéro WhatsApp à lier
-
-    Returns:
-        True si succès, False sinon
-    """
-    try:
-        clean_number = whatsapp_number.replace("whatsapp:", "").strip()
-
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO user_whatsapp_info (
-                        user_email, whatsapp_number, whatsapp_verified, verified_at
-                    ) VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (user_email) DO UPDATE SET
-                        whatsapp_number = EXCLUDED.whatsapp_number,
-                        whatsapp_verified = EXCLUDED.whatsapp_verified,
-                        verified_at = EXCLUDED.verified_at,
-                        updated_at = CURRENT_TIMESTAMP
-                    """,
-                    (user_email, clean_number, True, datetime.utcnow())
-                )
-                conn.commit()
-                logger.info(f"✅ WhatsApp linked to user: {user_email}")
-                return True
-    except Exception as e:
-        logger.error(f"❌ Error linking WhatsApp: {e}")
-        return False
+# NOTE: link_whatsapp_to_user function removed - WhatsApp numbers are now
+# managed directly in the Supabase users table via the user profile update endpoint
 
 
 # ==================== MESSAGE HANDLERS ====================
