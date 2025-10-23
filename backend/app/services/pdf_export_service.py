@@ -129,10 +129,9 @@ class PDFExportService:
 
     def _get_logo_path(self) -> str:
         """Retourne le chemin vers le logo Intelia"""
-        # Le logo est dans frontend/public/images/logo.png
-        # Depuis le backend, on doit remonter puis descendre dans frontend
-        backend_dir = Path(__file__).parent.parent.parent  # Remonter à backend/
-        logo_path = backend_dir.parent / "frontend" / "public" / "images" / "logo.png"
+        # Le logo est dans backend/app/static/images/logo.png
+        app_dir = Path(__file__).parent.parent  # Remonter à app/
+        logo_path = app_dir / "static" / "images" / "logo.png"
 
         if logo_path.exists():
             return str(logo_path)
@@ -206,9 +205,20 @@ class PDFExportService:
             except Exception as e:
                 logger.warning(f"Erreur chargement logo: {e}")
 
-        # === TITRE ===
+        # === TITRE PRINCIPAL ===
+        main_title = "Intelia Cognito"
+        story.append(Paragraph(main_title, self.styles['InteliaTitle']))
+
+        # === TITRE CONVERSATION ===
         title = conversation_data.get('title', 'Conversation sans titre')
-        story.append(Paragraph(title, self.styles['InteliaTitle']))
+        # Créer un style pour le titre de conversation (plus petit)
+        conv_title_style = ParagraphStyle(
+            name='ConversationTitle',
+            parent=self.styles['InteliaTitle'],
+            fontSize=16,
+            spaceAfter=6
+        )
+        story.append(Paragraph(title, conv_title_style))
 
         # === SOUS-TITRE ===
         subtitle = f"Export de conversation - {messages[0].get('created_at', 'Date inconnue')[:10] if messages else 'N/A'}"
