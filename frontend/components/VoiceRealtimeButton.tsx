@@ -150,13 +150,16 @@ export function VoiceRealtimeButton() {
   // RENDER
   // ============================================================
 
+  // Détection mobile pour position adaptative
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   return (
     <div
       className="flex flex-col items-end gap-2"
       style={{
         position: 'fixed',
-        bottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))',
-        right: 'max(1.5rem, env(safe-area-inset-right, 1.5rem))',
+        bottom: isMobile ? 'max(8rem, calc(env(safe-area-inset-bottom, 0px) + 8rem))' : 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))',
+        right: isMobile ? 'max(2rem, env(safe-area-inset-right, 2rem))' : 'max(1.5rem, env(safe-area-inset-right, 1.5rem))',
         zIndex: 9999,
         pointerEvents: 'auto',
         // Empêcher le bouton de disparaître lors du zoom

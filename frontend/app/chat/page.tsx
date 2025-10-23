@@ -148,7 +148,7 @@ const ChatInput = React.memo(
       <div className="w-full space-y-2">
         {/* Images Preview Grid */}
         {selectedImages.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
             {selectedImages.map((image, index) => (
               <div key={index} className="relative group">
                 {previewUrls[index] && !imageErrors[index] ? (
@@ -163,8 +163,8 @@ const ChatInput = React.memo(
                     }}
                   />
                 ) : (
-                  <div className="w-full h-24 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
-                    <CameraIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                  <div className="w-full h-24 bg-gray-200 rounded flex items-center justify-center">
+                    <CameraIcon className="w-8 h-8 text-gray-400" />
                   </div>
                 )}
                 <button
@@ -191,17 +191,18 @@ const ChatInput = React.memo(
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoadingChat}
-                className={`h-11 w-11 flex items-center justify-center text-[var(--color-primary)] disabled:text-gray-300 dark:disabled:text-gray-600 transition-all rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-95 ${selectedImages.length > 0 ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
+                className={`h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
                 title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
                 aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
                 style={{
-                  minWidth: "44px",
-                  minHeight: "44px",
+                  minWidth: "48px",
+                  width: "48px",
+                  height: "48px",
                 }}
               >
                 <CameraIcon className="w-5 h-5" />
                 {selectedImages.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[var(--color-primary)] text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                  <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
                     {selectedImages.length}
                   </span>
                 )}
@@ -232,12 +233,13 @@ const ChatInput = React.memo(
                       ? t("chat.placeholderMobile")
                       : t("chat.placeholder")
               }
-              className="w-full min-h-[44px] px-4 bg-[var(--input-bg)] dark:bg-[var(--input-bg-dark)] border-0 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:bg-white dark:focus:bg-gray-800 outline-none text-[15px] transition-all"
+              className="w-full h-12 px-4 bg-gray-100 border-0 rounded-full focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none text-sm"
               disabled={isLoadingChat}
               aria-label={t("chat.placeholder")}
               style={{
-                fontSize: isMobileDevice ? "16px" : "15px",
+                fontSize: isMobileDevice ? "16px" : "14px",
                 WebkitAppearance: "none",
+                borderRadius: isMobileDevice ? "25px" : "9999px",
               }}
             />
           </div>
@@ -246,19 +248,20 @@ const ChatInput = React.memo(
           <button
             onClick={isLoadingChat ? onStopGeneration : handleButtonClick}
             disabled={!isLoadingChat && (!inputMessage.trim() && selectedImages.length === 0)}
-            className={`flex-shrink-0 h-11 w-11 flex items-center justify-center rounded-full transition-all active:scale-95 ${
+            className={`flex-shrink-0 h-12 w-12 flex items-center justify-center rounded-full transition-colors ${
               isLoadingChat
-                ? "bg-red-500 text-white hover:bg-red-600"
-                : "bg-[var(--color-primary)] text-white hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500"
+                ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                : "text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:text-gray-300"
             }`}
             title={isLoadingChat ? t("chat.stop") || "Arrêter" : t("chat.send")}
             aria-label={isLoadingChat ? t("chat.stop") || "Arrêter" : t("chat.send")}
             style={{
-              minWidth: "44px",
-              minHeight: "44px",
+              minWidth: "48px",
+              width: "48px",
+              height: "48px",
             }}
           >
-            {isLoadingChat ? <StopIcon className="w-5 h-5" /> : <PaperAirplaneIcon className="w-5 h-5" />}
+            {isLoadingChat ? <StopIcon /> : <PaperAirplaneIcon />}
           </button>
 
           {/* Desktop: Camera + Voice on the right (original layout) */}
@@ -267,17 +270,18 @@ const ChatInput = React.memo(
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoadingChat}
-                className={`flex-shrink-0 h-11 w-11 flex items-center justify-center text-[var(--color-primary)] hover:text-blue-700 disabled:text-gray-300 transition-all rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 active:scale-95 ${selectedImages.length > 0 ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
+                className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
                 title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
                 aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
                 style={{
-                  minWidth: "44px",
-                  minHeight: "44px",
+                  minWidth: "48px",
+                  width: "48px",
+                  height: "48px",
                 }}
               >
-                <CameraIcon className="w-5 h-5" />
+                <CameraIcon />
                 {selectedImages.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[var(--color-primary)] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                     {selectedImages.length}
                   </span>
                 )}
@@ -353,8 +357,8 @@ const MessageList = React.memo(
               <div
                 className={`px-3 sm:px-4 py-2 max-w-[85%] sm:max-w-none break-words ${
                   message.isUser
-                    ? "bg-[var(--color-primary)] text-white ml-auto rounded-[var(--msg-radius)]"
-                    : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 rounded-[var(--msg-radius)]"
+                    ? "bg-blue-600 text-white ml-auto rounded-2xl"
+                    : "bg-white border border-gray-200 text-gray-900 rounded-2xl"
                 }`}
                 style={{
                   borderTopLeftRadius: !message.isUser && !shouldGroup ? '4px' : undefined,
@@ -1568,10 +1572,7 @@ function ChatInterface() {
         style={containerStyle}
       >
         <header
-          className={`bg-white dark:bg-[var(--header-bg)] border-b border-gray-100 dark:border-[var(--border-light)] px-2 sm:px-4 flex-shrink-0 ${isMobileDevice ? 'header-blur mobile-header sticky top-0 z-50' : 'py-3'}`}
-          style={{
-            height: isMobileDevice ? 'var(--header-height)' : 'auto',
-          }}
+          className={`bg-white border-b border-gray-100 px-2 sm:px-4 flex-shrink-0 ${isMobileDevice ? 'sticky top-0 z-50' : ''} py-3`}
         >
           <div className="flex items-center justify-between h-full">
             {/* Left side - Adaptatif mobile/desktop */}
@@ -1680,7 +1681,7 @@ function ChatInterface() {
           )}
 
           <div
-            className={`px-2 sm:px-4 py-2 bg-[var(--footer-bg)] dark:bg-[var(--footer-bg)] border-t border-[var(--border-light)] z-20 transition-all ${isMobileDevice ? "chat-input-fixed mobile-footer" : "sticky bottom-0"}`}
+            className={`px-2 sm:px-4 py-2 bg-white border-t border-gray-100 z-20 ${isMobileDevice ? "chat-input-fixed" : "sticky bottom-0"}`}
             style={{
               paddingBottom: isMobileDevice
                 ? `calc(env(safe-area-inset-bottom) + 8px)`
@@ -1689,8 +1690,10 @@ function ChatInterface() {
               bottom: 0,
               left: 0,
               right: 0,
+              backgroundColor: "white",
+              borderTop: "1px solid rgb(243 244 246)",
               zIndex: 1000,
-              minHeight: isMobileDevice ? "var(--footer-min-height)" : "auto",
+              minHeight: isMobileDevice ? "70px" : "auto",
               display: "flex",
               alignItems: "center",
             }}
