@@ -165,6 +165,7 @@ interface UserProfileUpdate {
   company_website?: string;
   user_type?: string;
   language?: string;
+  whatsapp_number?: string;
 }
 
 const useCountries = () => {
@@ -629,6 +630,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
         productionType: [] as string[],
         category: "",
         categoryOther: "",
+        whatsappNumber: "",
       };
     }
 
@@ -642,6 +644,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       productionType: user.production_type || [],
       category: user.category || "",
       categoryOther: user.category_other || "",
+      whatsappNumber: (user as any).whatsapp_number || "",
     };
 
     debugLog("DATA", "User data memo updated", memo);
@@ -657,6 +660,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     user?.production_type,
     user?.category,
     user?.category_other,
+    user?.whatsapp_number,
   ]);
 
   // States - Initialize with stable data
@@ -678,6 +682,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
         productionType: [] as string[],
         category: "",
         categoryOther: "",
+        whatsappNumber: "",
       };
     }
 
@@ -692,6 +697,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       productionType: user.production_type || [],
       category: user.category || "",
       categoryOther: user.category_other || "",
+      whatsappNumber: (user as any).whatsapp_number || "",
     };
   });
 
@@ -772,6 +778,39 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     [t],
   );
 
+  const validateWhatsAppNumber = useCallback(
+    (phoneNumber: string): string[] => {
+      const errors: string[] = [];
+
+      if (!phoneNumber.trim()) {
+        return errors; // Optional field
+      }
+
+      // Remove all non-digit characters except +
+      const cleaned = phoneNumber.replace(/[^\d+]/g, '');
+
+      // Must start with +
+      if (!cleaned.startsWith('+')) {
+        errors.push("Le numéro WhatsApp doit commencer par + (ex: +1 234 567 8900)");
+        return errors;
+      }
+
+      // Must have at least 8 digits (+ country code)
+      const digitsOnly = cleaned.replace(/\+/g, '');
+      if (digitsOnly.length < 8) {
+        errors.push("Le numéro WhatsApp est trop court (minimum 8 chiffres)");
+      }
+
+      if (digitsOnly.length > 15) {
+        errors.push("Le numéro WhatsApp est trop long (maximum 15 chiffres)");
+      }
+
+      debugLog("VALIDATION", "WhatsApp number validation", { phoneNumber, cleaned, errors });
+      return errors;
+    },
+    [],
+  );
+
   // Event handlers
   const handleClose = useCallback(() => {
     debugLog("INTERACTION", "Close button clicked", { isLoading });
@@ -844,6 +883,11 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
         errors.push(t("error.companyNameTooLong"));
       }
 
+      if (formData.whatsappNumber) {
+        const whatsappErrors = validateWhatsAppNumber(formData.whatsappNumber);
+        errors.push(...whatsappErrors);
+      }
+
       if (errors.length > 0) {
         if (isMountedRef.current) setFormErrors(errors);
         return;
@@ -862,6 +906,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
         production_type: formData.productionType.length > 0 ? formData.productionType : null,
         category: formData.category || null,
         category_other: formData.category === 'other' ? formData.categoryOther : null,
+        whatsapp_number: formData.whatsappNumber?.trim() || null,
       };
 
       await updateProfile(updateData);
@@ -908,6 +953,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     formData,
     validateEmail,
     validateUrl,
+    validateWhatsAppNumber,
     updateProfile,
     handleClose,
     t,
@@ -1190,6 +1236,28 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
                       required
                       data-debug="email-input"
                     />
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Numéro WhatsApp
+                      <span className="text-gray-500 text-sm ml-1">
+                        (optionnel)
+                      </span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.whatsappNumber || ""}
+                      onChange={(e) =>
+                        handleFormDataChange("whatsappNumber", e.target.value)
+                      }
+                      placeholder="+1 234 567 8900"
+                      className="input-primary"
+                      data-debug="whatsapp-input"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      📱 Utilisez WhatsApp pour discuter avec l'assistant IA
+                    </p>
                   </div>
 
                   <div>
