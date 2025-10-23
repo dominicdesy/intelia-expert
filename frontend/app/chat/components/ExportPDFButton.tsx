@@ -2,8 +2,6 @@
 
 import React, { useState } from "react";
 import { Download } from "lucide-react";
-import { useTranslation } from "@/lib/languages/i18n";
-import { apiClient } from "@/lib/api/client";
 import { secureLog } from "@/lib/utils/secureLogger";
 
 interface ExportPDFButtonProps {
@@ -13,7 +11,6 @@ interface ExportPDFButtonProps {
 const ExportPDFButton: React.FC<ExportPDFButtonProps> = ({
   conversationId,
 }) => {
-  const { t } = useTranslation();
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,20 +61,18 @@ const ExportPDFButton: React.FC<ExportPDFButtonProps> = ({
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      secureLog.info("PDF exporté avec succès");
+      secureLog.log("PDF exporté avec succès");
     } catch (err: any) {
       secureLog.error("Erreur export PDF:", err);
 
       // Gérer les erreurs spécifiques
       if (err.message === "PLAN_RESTRICTION") {
         setError(
-          t("export.planRestriction") ||
-            "L'exportation PDF est réservée aux plans Pro et Elite"
+          "L'exportation PDF est réservée aux plans Pro et Elite. Veuillez mettre à niveau votre abonnement."
         );
       } else {
         setError(
-          t("export.error") ||
-            "Erreur lors de l'exportation. Veuillez réessayer."
+          "Erreur lors de l'exportation. Veuillez réessayer."
         );
       }
     } finally {
@@ -91,13 +86,11 @@ const ExportPDFButton: React.FC<ExportPDFButtonProps> = ({
         onClick={handleExport}
         disabled={isExporting}
         className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        title={t("export.tooltip") || "Exporter en PDF"}
+        title="Exporter en PDF"
       >
         <Download size={16} className={isExporting ? "animate-pulse" : ""} />
         <span>
-          {isExporting
-            ? t("export.exporting") || "Export en cours..."
-            : t("export.button") || "Exporter PDF"}
+          {isExporting ? "Export en cours..." : "Exporter PDF"}
         </span>
       </button>
 
