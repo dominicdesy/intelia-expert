@@ -74,45 +74,8 @@ def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
 
-def log_whatsapp_message(
-    from_number: str,
-    to_number: str,
-    message_sid: str,
-    message_type: str,
-    body: str = None,
-    media_url: str = None,
-    status: str = "received",
-    user_email: str = None
-):
-    """
-    Log tous les messages WhatsApp reçus pour audit et debugging
-    """
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO whatsapp_message_logs (
-                        from_number, to_number, message_sid, message_type,
-                        body, media_url, status, user_email, created_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        from_number,
-                        to_number,
-                        message_sid,
-                        message_type,
-                        body,
-                        media_url,
-                        status,
-                        user_email,
-                        datetime.utcnow()
-                    )
-                )
-                conn.commit()
-                logger.info(f"✅ WhatsApp message logged: {message_sid}")
-    except Exception as e:
-        logger.error(f"❌ Error logging WhatsApp message: {e}")
+# NOTE: log_whatsapp_message removed - we're not logging to PostgreSQL anymore
+# Messages are tracked in Supabase conversations instead
 
 
 def get_user_by_whatsapp_number(whatsapp_number: str) -> Optional[Dict[str, Any]]:
@@ -229,7 +192,7 @@ Si tu n'es pas certain d'une réponse, dis-le clairement et recommande de consul
             model=OPENAI_MODEL,
             messages=messages,
             temperature=0.7,
-            max_tokens=500,  # Limité pour WhatsApp
+            max_completion_tokens=500,  # Limité pour WhatsApp (max_completion_tokens pour GPT-4o)
             timeout=30
         )
 
@@ -240,7 +203,7 @@ Si tu n'es pas certain d'une réponse, dis-le clairement et recommande de consul
         return ai_response
 
     except Exception as e:
-        logger.error(f"❌ Error getting AI response: {e}")
+        logger.error(f"❌ Error getting AI response: {e}", exc_info=True)
         return "Désolé, une erreur s'est produite lors du traitement de votre question. Veuillez réessayer."
 
 
@@ -380,17 +343,6 @@ def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> b
 
         logger.info(f"✅ WhatsApp message sent: {message.sid}")
 
-        # Log l'envoi
-        log_whatsapp_message(
-            from_number=TWILIO_WHATSAPP_NUMBER,
-            to_number=to_number,
-            message_sid=message.sid,
-            message_type="outbound",
-            body=body,
-            media_url=media_url,
-            status="sent"
-        )
-
         return True
     except Exception as e:
         logger.error(f"❌ Error sending WhatsApp message: {e}")
@@ -451,16 +403,6 @@ async def whatsapp_webhook(
         response_text = await handle_unknown_user(From)
         send_whatsapp_message(From, response_text)
 
-        # Log le message
-        log_whatsapp_message(
-            from_number=From,
-            to_number=To,
-            message_sid=MessageSid,
-            message_type="unknown_user",
-            body=Body,
-            status="rejected"
-        )
-
         return {"status": "unknown_user", "message": "User not recognized"}
 
     # Déterminer le type de message
@@ -490,41 +432,18 @@ async def whatsapp_webhook(
         if response_text:
             send_whatsapp_message(From, response_text)
 
-        # Log le message
-        log_whatsapp_message(
-            from_number=From,
-            to_number=To,
-            message_sid=MessageSid,
-            message_type=message_type,
-            body=Body,
-            media_url=MediaUrl0,
-            status="processed",
-            user_email=user_info.get("user_email")
-        )
-
         logger.info(f"✅ WhatsApp message processed: {MessageSid}")
 
         return {"status": "success", "message_type": message_type}
 
     except Exception as e:
-        logger.error(f"❌ Error processing WhatsApp message: {e}")
+        logger.error(f"❌ Error processing WhatsApp message: {e}", exc_info=True)
 
         # Envoyer message d'erreur à l'utilisateur
         send_whatsapp_message(
             From,
             "Désolé, une erreur s'est produite lors du traitement de votre message. "
             "Veuillez réessayer dans quelques instants."
-        )
-
-        # Log l'erreur
-        log_whatsapp_message(
-            from_number=From,
-            to_number=To,
-            message_sid=MessageSid,
-            message_type=message_type,
-            body=Body,
-            status="error",
-            user_email=user_info.get("user_email")
         )
 
         return {"status": "error", "message": str(e)}
