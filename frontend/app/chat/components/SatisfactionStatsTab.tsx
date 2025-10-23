@@ -36,6 +36,12 @@ interface SatisfactionStats {
   satisfaction_rate: number;
 }
 
+interface SatisfactionStatsResponse {
+  status: string;
+  days_analyzed: number;
+  stats: SatisfactionStats[];
+}
+
 interface SatisfactionStatsTabProps {
   timeRange: "day" | "week" | "month" | "year";
 }
@@ -72,12 +78,12 @@ export const SatisfactionStatsTab: React.FC<SatisfactionStatsTabProps> = ({
       setError(null);
 
       const daysBack = getDaysBack();
-      const response = await apiClient.getSecure<SatisfactionStats[]>(
+      const response = await apiClient.getSecure<SatisfactionStatsResponse>(
         `satisfaction/stats?days=${daysBack}`
       );
 
-      if (response.data) {
-        setStats(response.data);
+      if (response.data && response.data.stats) {
+        setStats(response.data.stats);
       } else {
         setError("Erreur lors du chargement des statistiques");
       }
