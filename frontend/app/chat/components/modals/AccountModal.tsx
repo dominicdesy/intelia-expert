@@ -265,142 +265,214 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             Comparaison des fonctionnalités
           </h3>
 
-          {/* Base */}
-          <div className="mb-5">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-600">
-              Fonctionnalités de base
-            </h4>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="flex items-start gap-3 rounded-lg bg-gray-50 p-3">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
-                  <Check className="h-4 w-4 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">16 langues supportées</p>
-                  <p className="text-xs text-gray-600">Tous les plans</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 rounded-lg bg-white p-3 ring-1 ring-gray-100">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
-                  <Check className="h-4 w-4 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">Adaptation au rôle</p>
-                  <p className="text-xs text-gray-600">Tous les plans</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Fonctionnalité</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Essential</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50">Pro</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50">Elite</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Base features */}
+                <tr>
+                  <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 bg-gray-50">
+                    Fonctionnalités de base
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-3 text-sm text-gray-900">16 langues supportées</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-3 text-sm text-gray-900">Adaptation au rôle</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
 
-          {/* Capacités */}
-          <div className="mb-5">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-600">
-              Capacités et performances
-            </h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
-                <span className="font-medium text-gray-900">Requêtes / mois</span>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-gray-600">Essential: 100</span>
-                  <span className="font-semibold text-blue-700">Pro: Illimitées*</span>
-                  <span className="font-semibold text-amber-700">Elite: Illimitées*</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-white p-3 ring-1 ring-gray-100">
-                <span className="font-medium text-gray-900">Historique</span>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-gray-600">Essential: 30 jours</span>
-                  <span className="font-semibold text-blue-700">Pro: Illimité</span>
-                  <span className="font-semibold text-amber-700">Elite: Illimité</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
-                <span className="font-medium text-gray-900">Export PDF</span>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
-                    <X className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
-                    <Check className="h-4 w-4 text-blue-700" />
-                  </div>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
-                    <Check className="h-4 w-4 text-amber-700" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+                {/* Capacités */}
+                <tr>
+                  <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 bg-gray-50">
+                    Capacités et performances
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-3 text-sm text-gray-900">Requêtes / mois</td>
+                  <td className="px-4 py-3 text-center text-sm text-gray-600">100</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">Illimitées*</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">Illimitées*</td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-3 text-sm text-gray-900">Historique</td>
+                  <td className="px-4 py-3 text-center text-sm text-gray-600">30 jours</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">Illimité</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">Illimité</td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-3 text-sm text-gray-900">Export PDF</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
+                        <X className="h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
+                        <Check className="h-4 w-4 text-blue-700" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
+                        <Check className="h-4 w-4 text-amber-700" />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
 
-          {/* IA */}
-          <div className="mb-5">
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-600">
-              Fonctionnalités IA
-            </h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-lg bg-white p-3 ring-1 ring-gray-100">
-                <span className="font-medium text-gray-900">Analyse d’images</span>
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
-                    <X className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <span className="font-semibold text-blue-700">Pro: 25/mois</span>
-                  <span className="font-semibold text-amber-700">Elite: Illimité*</span>
-                </div>
-              </div>
+                {/* IA */}
+                <tr>
+                  <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 bg-gray-50">
+                    Fonctionnalités IA
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-3 text-sm text-gray-900">Analyse d'images</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
+                        <X className="h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">25/mois</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">Illimité*</td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-3 text-sm text-gray-900">Saisie vocale</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
+                        <X className="h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
+                        <Check className="h-4 w-4 text-blue-700" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
+                        <Check className="h-4 w-4 text-amber-700" />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-3 text-sm text-gray-900">Assistant vocal</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
+                        <X className="h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
+                        <Check className="h-4 w-4 text-blue-700" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
+                        <Check className="h-4 w-4 text-amber-700" />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
 
-              <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
-                <span className="font-medium text-gray-900">Saisie vocale</span>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
-                    <X className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
-                    <Check className="h-4 w-4 text-blue-700" />
-                  </div>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
-                    <Check className="h-4 w-4 text-amber-700" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg bg-white p-3 ring-1 ring-gray-100">
-                <span className="font-medium text-gray-900">Assistant vocal</span>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
-                    <X className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
-                    <Check className="h-4 w-4 text-blue-700" />
-                  </div>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
-                    <Check className="h-4 w-4 text-amber-700" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Expérience */}
-          <div>
-            <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-600">
-              Expérience
-            </h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
-                <span className="font-medium text-gray-900">Sans publicité</span>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
-                    <X className="h-4 w-4 text-gray-400" />
-                  </div>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
-                    <Check className="h-4 w-4 text-blue-700" />
-                  </div>
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
-                    <Check className="h-4 w-4 text-amber-700" />
-                  </div>
-                </div>
-              </div>
-            </div>
+                {/* Expérience */}
+                <tr>
+                  <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 bg-gray-50">
+                    Expérience
+                  </td>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-3 text-sm text-gray-900">Sans publicité</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
+                        <X className="h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-blue-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
+                        <X className="h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center bg-amber-50/30">
+                    <div className="flex justify-center">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
+                        <Check className="h-4 w-4 text-amber-700" />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           {/* Notes */}
