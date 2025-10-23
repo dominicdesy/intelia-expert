@@ -476,7 +476,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </div>
 
           {/* Notes */}
-          <div className="mt-6 grid gap-3 text-xs text-gray-500 md:grid-cols-3">
+          <div className="mt-6 grid gap-3 text-xs text-gray-500 md:grid-cols-2">
             <div className="rounded-lg bg-gray-50 p-3">
               <span className="font-semibold text-gray-700">Essai gratuit 14 jours</span>
               <div className="mt-1">Annule à tout moment sans frais.</div>
@@ -485,14 +485,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <span className="font-semibold text-gray-700">Paiement sécurisé</span>
               <div className="mt-1">Transactions protégées par Stripe.</div>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3">
-              <span className="font-semibold text-gray-700">Support prioritaire</span>
-              <div className="mt-1">Inclus avec Pro et Elite.</div>
-            </div>
           </div>
 
-          <p className="mt-4 text-[11px] leading-5 text-gray-500">
-            * “Illimité” signifie usage illimité dans le cadre d’une utilisation normale et raisonnable. Nous nous
+          <p className="mt-4 text-xs leading-5 text-gray-500">
+            * "Illimité" signifie usage illimité dans le cadre d'une utilisation normale et raisonnable. Nous nous
             réservons le droit de limiter les abus manifestes.
           </p>
         </section>
