@@ -154,10 +154,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         {/* Plans Grid - Fixed Width Cards */}
         <div className="flex justify-center gap-8 flex-wrap">
           {/* Plan Essential */}
-          <div className="relative bg-white rounded-2xl shadow-sm border-2 border-gray-200 p-6 transition-all hover:shadow-md" style={{ flex: '1 1 340px', maxWidth: '360px', minWidth: '300px' }}>
+          <div className="relative rounded-2xl border border-gray-300 p-6 transition-all duration-200 hover:-translate-y-1" style={{ flex: '1 1 340px', maxWidth: '360px', minWidth: '300px', background: '#f8f9fa', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <span className="inline-flex items-center rounded-full bg-gray-100 px-4 py-1 text-xs font-semibold text-gray-700">
-                GRATUIT
+              <span className="inline-flex items-center rounded-full bg-gray-200 px-4 py-1 text-xs font-semibold text-gray-700 uppercase" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                Gratuit
               </span>
             </div>
 
@@ -179,10 +179,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </div>
 
           {/* Plan Pro */}
-          <div className="relative bg-white rounded-2xl shadow-md border-2 border-blue-500 p-6 transition-all hover:shadow-lg hover:scale-[1.02]" style={{ flex: '1 1 340px', maxWidth: '380px', minWidth: '300px' }}>
+          <div className="relative rounded-2xl border-2 border-blue-500 p-6 transition-all duration-200 hover:-translate-y-1" style={{ flex: '1 1 340px', maxWidth: '380px', minWidth: '300px', background: '#eff6ff', boxShadow: '0 4px 12px rgba(37,99,235,0.15)' }}>
             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <span className="inline-flex items-center rounded-full bg-blue-500 px-4 py-1 text-xs font-semibold text-white">
-                POPULAIRE
+              <span className="inline-flex items-center rounded-full px-4 py-1 text-xs font-semibold text-white uppercase" style={{ background: 'linear-gradient(90deg, #2563eb, #3b82f6)', boxShadow: '0 2px 6px rgba(37,99,235,0.3)' }}>
+                Populaire
               </span>
             </div>
 
@@ -219,7 +219,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <button
                 onClick={() => handleUpgrade("pro")}
                 disabled={isLoading}
-                className="w-full py-3 px-6 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-6 rounded-lg text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: '#2563eb', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#1d4ed8'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#2563eb'}
               >
                 {isLoading && selectedPlan === "pro" ? "Redirection..." : "🎁 Commencer l'essai gratuit"}
               </button>
@@ -227,10 +230,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </div>
 
           {/* Plan Elite */}
-          <div className="relative bg-white rounded-2xl shadow-md border-2 border-yellow-500 p-6 transition-all hover:shadow-lg hover:scale-[1.02]" style={{ flex: '1 1 340px', maxWidth: '360px', minWidth: '300px', borderWidth: '2px', borderColor: '#EAB308' }}>
+          <div className="relative rounded-2xl border-2 p-6 transition-all duration-200 hover:-translate-y-1 animate-pulse-subtle" style={{ flex: '1 1 340px', maxWidth: '360px', minWidth: '300px', background: '#fffbeb', borderColor: '#facc15', boxShadow: '0 4px 12px rgba(250,204,21,0.2)' }}>
             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <span className="inline-flex items-center rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-1 text-xs font-semibold text-white">
-                ⭐ RECOMMANDÉ
+              <span className="inline-flex items-center rounded-full px-4 py-1 text-xs font-semibold text-white uppercase" style={{ background: 'linear-gradient(90deg, #facc15, #eab308)', boxShadow: '0 2px 6px rgba(250,204,21,0.4)' }}>
+                ⭐ Recommandé
               </span>
             </div>
 
@@ -267,7 +270,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <button
                 onClick={() => handleUpgrade("elite")}
                 disabled={isLoading}
-                className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold hover:from-yellow-600 hover:to-yellow-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-6 rounded-lg text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'linear-gradient(90deg, #facc15, #eab308)', boxShadow: '0 3px 10px rgba(250,204,21,0.3)' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(90deg, #eab308, #ca8a04)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(90deg, #facc15, #eab308)'}
               >
                 {isLoading && selectedPlan === "elite" ? "Redirection..." : "🎁 Commencer l'essai gratuit"}
               </button>
@@ -276,7 +282,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         </div>
 
         {/* Feature Comparison Grid */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-6" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
           <h3 className="text-xl font-bold text-gray-900 text-center mb-6">
             Comparaison des fonctionnalités
           </h3>
@@ -284,19 +290,23 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           <div className="space-y-6">
             {/* 🧩 Fonctionnalités de base */}
             <div>
-              <h4 className="text-sm font-bold text-gray-700 uppercase mb-3 flex items-center gap-2">
+              <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2" style={{ fontWeight: 600 }}>
                 <span>🧩</span> Fonctionnalités de base
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                  <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:bg-gray-100" style={{ background: '#f9fafb' }}>
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                    <Check className="w-4 h-4 text-green-600" />
+                  </div>
                   <div>
                     <p className="font-medium text-gray-900">16 langues supportées</p>
                     <p className="text-xs text-gray-600">Tous les plans</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                  <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:bg-gray-100" style={{ background: '#fff' }}>
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                    <Check className="w-4 h-4 text-green-600" />
+                  </div>
                   <div>
                     <p className="font-medium text-gray-900">Adaptation au rôle</p>
                     <p className="text-xs text-gray-600">Tous les plans</p>
@@ -307,11 +317,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
             {/* ⚙️ Capacités et performances */}
             <div>
-              <h4 className="text-sm font-bold text-gray-700 uppercase mb-3 flex items-center gap-2">
+              <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2" style={{ fontWeight: 600 }}>
                 <span>⚙️</span> Capacités et performances
               </h4>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-gray-100" style={{ background: '#f9fafb' }}>
                   <span className="font-medium text-gray-900">Requêtes / mois</span>
                   <div className="flex items-center gap-4 text-sm">
                     <span className="text-gray-600">Essential: 100</span>
@@ -319,7 +329,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     <span className="font-semibold text-yellow-600">Elite: Illimitées*</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-gray-100" style={{ background: '#fff' }}>
                   <span className="font-medium text-gray-900">Historique</span>
                   <div className="flex items-center gap-4 text-sm">
                     <span className="text-gray-600">Essential: 30 jours</span>
@@ -327,12 +337,18 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     <span className="font-semibold text-yellow-600">Elite: Illimité</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-gray-100" style={{ background: '#f9fafb' }}>
                   <span className="font-medium text-gray-900">Export PDF</span>
                   <div className="flex items-center gap-4">
-                    <X className="w-5 h-5 text-gray-400" />
-                    <Check className="w-5 h-5 text-blue-600" />
-                    <Check className="w-5 h-5 text-yellow-600" />
+                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                      <X className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                      <Check className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center">
+                      <Check className="w-4 h-4 text-yellow-600" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -340,32 +356,46 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
             {/* 💬 Fonctionnalités IA */}
             <div>
-              <h4 className="text-sm font-bold text-gray-700 uppercase mb-3 flex items-center gap-2">
+              <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2" style={{ fontWeight: 600 }}>
                 <span>💬</span> Fonctionnalités IA
               </h4>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-gray-100" style={{ background: '#fff' }}>
                   <span className="font-medium text-gray-900">Analyse d'images</span>
                   <div className="flex items-center gap-4 text-sm">
-                    <X className="w-5 h-5 text-gray-400" />
+                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                      <X className="w-4 h-4 text-gray-400" />
+                    </div>
                     <span className="font-semibold text-blue-600">Pro: 25/mois</span>
                     <span className="font-semibold text-yellow-600">Elite: Illimité*</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-gray-100" style={{ background: '#f9fafb' }}>
                   <span className="font-medium text-gray-900">Saisie vocale</span>
                   <div className="flex items-center gap-4">
-                    <X className="w-5 h-5 text-gray-400" />
-                    <Check className="w-5 h-5 text-blue-600" />
-                    <Check className="w-5 h-5 text-yellow-600" />
+                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                      <X className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                      <Check className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center">
+                      <Check className="w-4 h-4 text-yellow-600" />
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-gray-100" style={{ background: '#fff' }}>
                   <span className="font-medium text-gray-900">Assistant vocal</span>
                   <div className="flex items-center gap-4">
-                    <X className="w-5 h-5 text-gray-400" />
-                    <X className="w-5 h-5 text-gray-400" />
-                    <Check className="w-5 h-5 text-yellow-600" />
+                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                      <X className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                      <X className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center">
+                      <Check className="w-4 h-4 text-yellow-600" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -373,15 +403,21 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
             {/* 📊 Expérience */}
             <div>
-              <h4 className="text-sm font-bold text-gray-700 uppercase mb-3 flex items-center gap-2">
+              <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2" style={{ fontWeight: 600 }}>
                 <span>📊</span> Expérience
               </h4>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-gray-100" style={{ background: '#f9fafb' }}>
                 <span className="font-medium text-gray-900">Sans publicité</span>
                 <div className="flex items-center gap-4">
-                  <X className="w-5 h-5 text-gray-400" />
-                  <X className="w-5 h-5 text-gray-400" />
-                  <Check className="w-5 h-5 text-yellow-600" />
+                  <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                    <X className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                    <X className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <Check className="w-4 h-4 text-yellow-600" />
+                  </div>
                 </div>
               </div>
             </div>
