@@ -762,10 +762,14 @@ Réponds directement en {language}, sans préambule."""
 
         # 🆕 Use PromptBuilder if available for consistent prompts with user profiling
         if self.prompt_builder and PROMPT_BUILDER_AVAILABLE:
-            # Build enrichment from entities
+            # Build enrichment from entities (provide all required fields)
             enrichment = ContextEnrichment(
-                entity_context=str(entities) if entities else None,
-                species_focus="broilers" if domain == "poultry" else None,
+                entity_context=str(entities) if entities else "",
+                metric_focus="",  # Default empty for fallback (no specific metric focus)
+                temporal_context="",  # Default empty for fallback (no temporal context)
+                species_focus="broilers" if domain == "poultry" else "",
+                performance_indicators=[],  # Default empty list for fallback
+                confidence_boosters=[],  # Default empty list for fallback
             )
 
             # Use PromptBuilder to build enhanced prompts (includes user profiling!)
