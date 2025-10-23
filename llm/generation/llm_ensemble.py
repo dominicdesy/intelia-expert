@@ -31,6 +31,17 @@ except ImportError as e:
     logger.warning(f"⚠️ SystemPromptsManager not available: {e}")
     PROMPTS_AVAILABLE = False
 
+# Import PromptBuilder for consistent prompt construction
+try:
+    from generation.prompt_builder import PromptBuilder
+    from generation.models import ContextEnrichment
+    PROMPT_BUILDER_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"⚠️ PromptBuilder not available: {e}")
+    PROMPT_BUILDER_AVAILABLE = False
+    PromptBuilder = None
+    ContextEnrichment = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -158,6 +169,14 @@ class LLMEnsemble:
         # Initialize adaptive length calculator
         self.adaptive_length = get_adaptive_length()
 
+        # Initialize PromptBuilder for consistent prompt construction with profiling support
+        if PROMPT_BUILDER_AVAILABLE:
+            self.prompt_builder = PromptBuilder(self.prompts_manager)
+            logger.info("✅ PromptBuilder initialized in LLM Ensemble")
+        else:
+            self.prompt_builder = None
+            logger.warning("⚠️ PromptBuilder not available - falling back to manual prompts")
+
         logger.info(
             f"✅ LLM Ensemble initialized (mode={mode.value}, enabled={self.enabled}, judge={judge_model})"
         )
@@ -207,6 +226,7 @@ class LLMEnsemble:
         entities: Optional[Dict] = None,
         query_type: Optional[str] = None,
         domain: Optional[str] = None,
+        user_id: Optional[str] = None,  # 🆕 User profiling
     ) -> Dict[str, Any]:
         """
         Generate response using multi-LLM ensemble
@@ -219,6 +239,7 @@ class LLMEnsemble:
             entities: Extracted entities (for adaptive length)
             query_type: Type of query (for adaptive length)
             domain: Query domain (for adaptive length)
+            user_id: Optional user ID for profile-based personalization
 
         Returns:
             {
@@ -238,7 +259,7 @@ class LLMEnsemble:
         if not self.enabled:
             logger.debug("🔀 Ensemble disabled, falling back to single LLM")
             return await self._fallback_single_llm(
-                query, context_docs, language, system_prompt, entities, query_type, domain
+                query, context_docs, language, system_prompt, entities, query_type, domain, user_id
             )
 
         # Calculate adaptive max_tokens
@@ -725,6 +746,7 @@ Réponds directement en {language}, sans préambule."""
         entities: Optional[Dict],
         query_type: Optional[str],
         domain: Optional[str],
+        user_id: Optional[str] = None,  # 🆕 User profiling
     ) -> Dict[str, Any]:
         """Fallback to single LLM when ensemble is disabled"""
 
@@ -738,20 +760,40 @@ Réponds directement en {language}, sans préambule."""
         )
         logger.info(f"📏 Adaptive max_tokens for fallback: {max_tokens}")
 
-        # Build system prompt with fallback instructions
-        fallback_instructions = self._get_fallback_instructions(language)
-        if system_prompt:
-            enhanced_system_prompt = f"{system_prompt}\n\n{fallback_instructions}"
-        else:
-            enhanced_system_prompt = fallback_instructions
+        # 🆕 Use PromptBuilder if available for consistent prompts with user profiling
+        if self.prompt_builder and PROMPT_BUILDER_AVAILABLE:
+            # Build enrichment from entities
+            enrichment = ContextEnrichment(
+                entity_context=str(entities) if entities else None,
+                species_focus="broilers" if domain == "poultry" else None,
+            )
 
-        context_text = self._format_context(context_docs)
-        user_message = f"""Contexte:
+            # Use PromptBuilder to build enhanced prompts (includes user profiling!)
+            enhanced_system_prompt, user_message = self.prompt_builder._build_enhanced_prompt(
+                query=query,
+                context_docs=context_docs,
+                enrichment=enrichment,
+                conversation_context="",
+                language=language,
+                user_id=user_id,  # 🆕 Pass user_id for profiling
+            )
+            logger.info("✅ Using PromptBuilder for fallback (with user profiling support)")
+        else:
+            # Fallback to manual prompt construction (legacy)
+            fallback_instructions = self._get_fallback_instructions(language)
+            if system_prompt:
+                enhanced_system_prompt = f"{system_prompt}\n\n{fallback_instructions}"
+            else:
+                enhanced_system_prompt = fallback_instructions
+
+            context_text = self._format_context(context_docs)
+            user_message = f"""Contexte:
 {context_text}
 
 Question: {query}
 
 Réponds en {language}."""
+            logger.warning("⚠️ Using legacy manual prompts (no PromptBuilder available)")
 
         # Use Claude if available, else GPT-4o
         if self.claude_client:

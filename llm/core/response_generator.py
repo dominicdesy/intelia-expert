@@ -171,7 +171,7 @@ class RAGResponseGenerator:
                         # Get ensemble instance (uses Claude + OpenAI + DeepSeek in parallel)
                         ensemble = get_llm_ensemble(mode=EnsembleMode.BEST_OF_N)
 
-                        # Generate ensemble response with empty context
+                        # Generate ensemble response with empty context (with user profiling)
                         ensemble_result = await ensemble.generate_ensemble_response(
                             query=original_query,
                             context_docs=[],  # Empty context - use LLM general knowledge
@@ -179,6 +179,7 @@ class RAGResponseGenerator:
                             entities=result.metadata.get("entities", {}),
                             query_type=result.metadata.get("query_type", "standard"),
                             domain=result.metadata.get("detected_domain", "poultry"),
+                            user_id=user_id,  # 🆕 Pass user_id for profiling
                         )
 
                         result.answer = ensemble_result["final_answer"]
