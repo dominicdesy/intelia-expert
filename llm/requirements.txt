@@ -36,6 +36,10 @@ psycopg2-binary==2.9.9
 sqlalchemy[asyncio]==2.0.23
 alembic==1.13.1
 
+# === SUPABASE CLIENT ===
+# Supabase Python client for user profiling
+supabase>=2.0.0
+
 # === VALIDATION ET SCHÉMAS JSON ===
 # Validation avancée de documents JSON avicoles
 jsonschema==4.20.0

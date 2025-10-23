@@ -10,47 +10,55 @@ Retrieves and applies user profiling information to personalize LLM responses:
 import logging
 import os
 from typing import Dict, Any, Optional
-from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
+# Supabase client singleton
+_supabase_client = None
 
-@contextmanager
-def _get_pg_connection():
+
+def _get_supabase_client():
     """
-    Create a PostgreSQL connection using environment variables.
-    This is a lightweight connection manager for user_profiling only.
+    Get or initialize Supabase client for querying user profiles.
+    Uses SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.
 
-    Yields:
-        psycopg2 connection object
+    Returns:
+        Supabase client instance
     """
-    import psycopg2
+    global _supabase_client
 
-    conn = None
+    if _supabase_client is not None:
+        return _supabase_client
+
     try:
-        conn = psycopg2.connect(
-            user=os.getenv("DB_USER", "doadmin"),
-            password=os.getenv("DB_PASSWORD", ""),
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", 25060)),
-            database=os.getenv("DB_NAME", "defaultdb"),
-            sslmode=os.getenv("DB_SSL", "require"),
+        from supabase import create_client
+
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = (
+            os.getenv("SUPABASE_SERVICE_KEY") or
+            os.getenv("SUPABASE_SERVICE_ROLE_KEY") or
+            os.getenv("SUPABASE_KEY") or
+            os.getenv("SUPABASE_ANON_KEY")
         )
-        yield conn
-        conn.commit()
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"PostgreSQL connection error: {e}")
+
+        if not supabase_url or not supabase_key:
+            raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) must be set")
+
+        _supabase_client = create_client(supabase_url, supabase_key)
+        logger.info("✅ Supabase client initialized for user profiling")
+        return _supabase_client
+
+    except ImportError:
+        logger.error("❌ supabase-py library not installed. Run: pip install supabase")
         raise
-    finally:
-        if conn:
-            conn.close()
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize Supabase client: {e}")
+        raise
 
 
 def get_user_profile(user_id: str) -> Dict[str, Any]:
     """
-    Récupère le profil utilisateur depuis Supabase/PostgreSQL
+    Récupère le profil utilisateur depuis Supabase
 
     Args:
         user_id: Auth user ID (UUID format, may have "user_" prefix)
@@ -63,24 +71,21 @@ def get_user_profile(user_id: str) -> Dict[str, Any]:
         # Remove "user_" prefix if present (tenant_id format -> auth_user_id format)
         clean_user_id = user_id.replace("user_", "") if user_id.startswith("user_") else user_id
 
-        with _get_pg_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT production_type, category, category_other, country
-                    FROM public.users
-                    WHERE auth_user_id = %s
-                """, (clean_user_id,))
-                result = cur.fetchone()
+        supabase = _get_supabase_client()
 
-                if result:
-                    profile = {
-                        'production_type': result[0] or [],
-                        'category': result[1],
-                        'category_other': result[2],
-                        'country': result[3]
-                    }
-                    logger.info(f"✅ User profile loaded: production_type={profile['production_type']}, category={profile['category']}, country={profile['country']}")
-                    return profile
+        # Query users table by auth_user_id
+        response = supabase.table("users").select("production_type, category, category_other, country").eq("auth_user_id", clean_user_id).execute()
+
+        if response.data and len(response.data) > 0:
+            user_data = response.data[0]
+            profile = {
+                'production_type': user_data.get('production_type') or [],
+                'category': user_data.get('category'),
+                'category_other': user_data.get('category_other'),
+                'country': user_data.get('country')
+            }
+            logger.info(f"✅ User profile loaded: production_type={profile['production_type']}, category={profile['category']}, country={profile['country']}")
+            return profile
 
         logger.info(f"ℹ️ No profile found for user {user_id}")
         return {}
