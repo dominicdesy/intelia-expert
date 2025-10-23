@@ -45,7 +45,9 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 # Configuration LLM service (microservices architecture)
-LLM_SERVICE_URL = os.getenv("LLM_SERVICE_URL", "https://expert.intelia.com/llm")
+# Use internal URL if available (for service-to-service communication)
+# Otherwise fall back to public URL
+LLM_SERVICE_URL = os.getenv("LLM_INTERNAL_URL") or os.getenv("LLM_SERVICE_URL", "https://expert.intelia.com/llm")
 LLM_CHAT_ENDPOINT = f"{LLM_SERVICE_URL}/chat"
 
 # Initialiser le client Twilio
