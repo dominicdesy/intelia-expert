@@ -8,9 +8,44 @@ Retrieves and applies user profiling information to personalize LLM responses:
 """
 
 import logging
+import os
 from typing import Dict, Any, Optional
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _get_pg_connection():
+    """
+    Create a PostgreSQL connection using environment variables.
+    This is a lightweight connection manager for user_profiling only.
+
+    Yields:
+        psycopg2 connection object
+    """
+    import psycopg2
+
+    conn = None
+    try:
+        conn = psycopg2.connect(
+            user=os.getenv("DB_USER", "doadmin"),
+            password=os.getenv("DB_PASSWORD", ""),
+            host=os.getenv("DB_HOST", "localhost"),
+            port=int(os.getenv("DB_PORT", 25060)),
+            database=os.getenv("DB_NAME", "defaultdb"),
+            sslmode=os.getenv("DB_SSL", "require"),
+        )
+        yield conn
+        conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"PostgreSQL connection error: {e}")
+        raise
+    finally:
+        if conn:
+            conn.close()
 
 
 def get_user_profile(user_id: str) -> Dict[str, Any]:
@@ -25,9 +60,7 @@ def get_user_profile(user_id: str) -> Dict[str, Any]:
         Returns empty dict if user not found or error occurs
     """
     try:
-        from backend.app.core.database import get_pg_connection
-
-        with get_pg_connection() as conn:
+        with _get_pg_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT production_type, category, category_other, country
