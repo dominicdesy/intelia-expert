@@ -55,6 +55,11 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/stripe/webhook/",
     "/api/v1/stripe/webhook/test",
     "/api/v1/stripe/webhook/test/",
+    # === ENDPOINTS WHATSAPP WEBHOOKS PUBLICS ===
+    "/api/v1/whatsapp/webhook",
+    "/api/v1/whatsapp/webhook/",
+    "/api/v1/whatsapp/webhook/test",
+    "/api/v1/whatsapp/status",
     # === ENDPOINTS CACHE PUBLICS ===
     "/api/v1/stats-fast/health",
     # === SYSTEM ENDPOINTS (health et status publics uniquement) ===

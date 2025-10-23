@@ -398,6 +398,40 @@ except Exception as e:
     stripe_webhooks_router = None
     logger.error("ERREUR import stripe_webhooks router: %s", e)
 
+# WhatsApp Webhooks router (messages WhatsApp via Twilio)
+WHATSAPP_WEBHOOKS_AVAILABLE = False
+try:
+    from .whatsapp_webhooks import router as whatsapp_webhooks_router
+
+    WHATSAPP_WEBHOOKS_AVAILABLE = True
+    logger.debug("WhatsApp Webhooks router importé avec %d routes", len(whatsapp_webhooks_router.routes)
+    )
+except ImportError:
+    WHATSAPP_WEBHOOKS_AVAILABLE = False
+    whatsapp_webhooks_router = None
+    logger.warning("WhatsApp Webhooks router non disponible (normal si pas encore créé)")
+except Exception as e:
+    WHATSAPP_WEBHOOKS_AVAILABLE = False
+    whatsapp_webhooks_router = None
+    logger.error("ERREUR import whatsapp_webhooks router: %s", e)
+
+# WhatsApp Users router (gestion numéros WhatsApp)
+WHATSAPP_USERS_AVAILABLE = False
+try:
+    from .whatsapp_users import router as whatsapp_users_router
+
+    WHATSAPP_USERS_AVAILABLE = True
+    logger.debug("WhatsApp Users router importé avec %d routes", len(whatsapp_users_router.routes)
+    )
+except ImportError:
+    WHATSAPP_USERS_AVAILABLE = False
+    whatsapp_users_router = None
+    logger.warning("WhatsApp Users router non disponible (normal si pas encore créé)")
+except Exception as e:
+    WHATSAPP_USERS_AVAILABLE = False
+    whatsapp_users_router = None
+    logger.error("ERREUR import whatsapp_users router: %s", e)
+
 # Usage router (quotas et limites mensuelles)
 USAGE_AVAILABLE = False
 try:
@@ -629,6 +663,24 @@ if STRIPE_WEBHOOKS_AVAILABLE and stripe_webhooks_router:
     logger.debug("Stripe Webhooks router maintenant disponible sur /v1/stripe/webhook")
 else:
     logger.warning("Stripe Webhooks router non monté (module non disponible)")
+
+# WhatsApp Webhooks (messages WhatsApp via Twilio)
+if WHATSAPP_WEBHOOKS_AVAILABLE and whatsapp_webhooks_router:
+    router.include_router(whatsapp_webhooks_router, tags=["WhatsApp-Webhooks"])
+    logger.debug("WhatsApp Webhooks router monté")
+    logger.debug("WhatsApp Webhooks router maintenant disponible sur /v1/whatsapp/webhook")
+    logger.info("Intégration WhatsApp activée via Twilio!")
+else:
+    logger.warning("WhatsApp Webhooks router non monté (module non disponible)")
+
+# WhatsApp Users (gestion numéros WhatsApp)
+if WHATSAPP_USERS_AVAILABLE and whatsapp_users_router:
+    router.include_router(whatsapp_users_router, tags=["WhatsApp-Users"])
+    logger.debug("WhatsApp Users router monté")
+    logger.debug("WhatsApp Users router maintenant disponible sur /v1/whatsapp/user/*")
+    logger.info("Gestion numéros WhatsApp activée!")
+else:
+    logger.warning("WhatsApp Users router non monté (module non disponible)")
 
 # Usage (quotas et limites mensuelles)
 if USAGE_AVAILABLE and usage_router:
