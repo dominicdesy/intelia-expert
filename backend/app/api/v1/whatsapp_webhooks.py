@@ -793,9 +793,9 @@ def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> b
             message = twilio_client.messages.create(**message_params)
             logger.info(f"✅ WhatsApp message sent (part {i}/{len(parts)}): {message.sid}")
 
-            # Petit délai entre les messages pour garantir l'ordre
+            # Délai de 6 secondes entre les messages (limite Meta: 1 msg/6s par utilisateur)
             if i < len(parts):
-                time.sleep(1)
+                time.sleep(6)
 
         logger.info(f"✅ All {len(parts)} message parts sent successfully")
         return True
