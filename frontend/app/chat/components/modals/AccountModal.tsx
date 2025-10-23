@@ -119,9 +119,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       onClose={onClose}
       title={t("subscription.title")}
       description=""
-      maxWidth="max-w-6xl"
+      maxWidth="max-w-4xl"
     >
-      <div className="space-y-6 max-h-[80vh] overflow-y-auto">
+      <div className="space-y-4 max-h-[80vh] overflow-y-auto">
         {/* Currency Selector */}
         {user && <CurrencySelector user={user} />}
 
@@ -152,9 +152,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         </div>
 
         {/* Plans Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Plan Essential */}
-          <div className="relative bg-white rounded-xl shadow-sm border-2 border-gray-200 p-6">
+          <div className="relative bg-white rounded-xl shadow-sm border-2 border-gray-200 p-4">
             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
               <span className="inline-flex items-center rounded-full bg-gray-100 px-4 py-1 text-xs font-semibold text-gray-700">
                 GRATUIT
@@ -172,14 +172,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
             <button
               disabled
-              className="w-full py-3 px-6 rounded-lg bg-gray-100 text-gray-700 font-semibold mb-6 cursor-not-allowed"
+              className="w-full py-2 px-4 rounded-lg bg-gray-100 text-gray-700 font-semibold mb-4 cursor-not-allowed text-sm"
             >
               {currentPlan === "essential" ? "Plan actuel" : "Plan gratuit"}
             </button>
           </div>
 
           {/* Plan Pro */}
-          <div className="relative bg-white rounded-xl shadow-md border-2 border-blue-500 p-6">
+          <div className="relative bg-white rounded-xl shadow-md border-2 border-blue-500 p-4">
             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
               <span className="inline-flex items-center rounded-full bg-blue-500 px-4 py-1 text-xs font-semibold text-white">
                 POPULAIRE
@@ -211,23 +211,23 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <button
                 onClick={handleManageSubscription}
                 disabled={isManaging}
-                className="w-full py-3 px-6 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+                className="w-full py-2 px-4 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-4 text-sm"
               >
                 {isManaging ? "Chargement..." : "⚙️ Gérer mon abonnement"}
               </button>
             ) : (
-              <div className="space-y-2 mb-6">
+              <div className="space-y-2 mb-4">
                 <button
                   onClick={() => handleUpgrade("pro")}
                   disabled={isLoading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="w-full py-2 px-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                 >
                   {isLoading && selectedPlan === "pro" ? "Redirection..." : "🎁 Essai gratuit 14 jours"}
                 </button>
                 <button
                   onClick={() => handleUpgrade("pro")}
                   disabled={isLoading}
-                  className="w-full py-2 px-4 rounded-lg border-2 border-blue-600 text-blue-600 font-medium hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="w-full py-1.5 px-3 rounded-lg border-2 border-blue-600 text-blue-600 font-medium hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                 >
                   Choisir ce plan
                 </button>
@@ -236,7 +236,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </div>
 
           {/* Plan Elite */}
-          <div className="relative bg-white rounded-xl shadow-lg border-2 border-yellow-500 p-6 transform scale-105">
+          <div className="relative bg-white rounded-xl shadow-lg border-2 border-yellow-500 p-4">
             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
               <span className="inline-flex items-center rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 px-4 py-1 text-xs font-semibold text-white">
                 ⭐ RECOMMANDÉ
@@ -268,23 +268,23 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <button
                 onClick={handleManageSubscription}
                 disabled={isManaging}
-                className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold hover:from-yellow-600 hover:to-yellow-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-6 shadow-md"
+                className="w-full py-2 px-4 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold hover:from-yellow-600 hover:to-yellow-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-4 shadow-md text-sm"
               >
                 {isManaging ? "Chargement..." : "⚙️ Gérer mon abonnement"}
               </button>
             ) : (
-              <div className="space-y-2 mb-6">
+              <div className="space-y-2 mb-4">
                 <button
                   onClick={() => handleUpgrade("elite")}
                   disabled={isLoading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold hover:from-yellow-600 hover:to-yellow-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-md"
+                  className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold hover:from-yellow-600 hover:to-yellow-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs shadow-md"
                 >
                   {isLoading && selectedPlan === "elite" ? "Redirection..." : "🎁 Essai gratuit 14 jours"}
                 </button>
                 <button
                   onClick={() => handleUpgrade("elite")}
                   disabled={isLoading}
-                  className="w-full py-2 px-4 rounded-lg border-2 border-yellow-600 text-yellow-600 font-medium hover:bg-yellow-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="w-full py-1.5 px-3 rounded-lg border-2 border-yellow-600 text-yellow-600 font-medium hover:bg-yellow-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                 >
                   Choisir ce plan
                 </button>
@@ -343,20 +343,20 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <tr className="hover:bg-gray-50">
                   <td className="px-3 py-2">Requêtes / mois</td>
                   <td className="px-2 py-2 text-center text-xs">100</td>
-                  <td className="px-2 py-2 text-center font-semibold text-blue-600 bg-blue-50/30 text-xs">
+                  <td className="px-2 py-2 text-center font-semibold text-gray-900 bg-blue-50/30 text-xs">
                     Illimitées*
                   </td>
-                  <td className="px-2 py-2 text-center font-semibold text-yellow-600 bg-yellow-50/30 text-xs">
+                  <td className="px-2 py-2 text-center font-semibold text-gray-900 bg-yellow-50/30 text-xs">
                     Illimitées*
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50">
                   <td className="px-3 py-2">Historique</td>
                   <td className="px-2 py-2 text-center text-xs">30 jours</td>
-                  <td className="px-2 py-2 text-center font-semibold text-blue-600 bg-blue-50/30 text-xs">
+                  <td className="px-2 py-2 text-center font-semibold text-gray-900 bg-blue-50/30 text-xs">
                     Illimité
                   </td>
-                  <td className="px-2 py-2 text-center font-semibold text-yellow-600 bg-yellow-50/30 text-xs">
+                  <td className="px-2 py-2 text-center font-semibold text-gray-900 bg-yellow-50/30 text-xs">
                     Illimité
                   </td>
                 </tr>
@@ -377,7 +377,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   <td className="px-3 py-2">Analyse d'images</td>
                   <td className="px-2 py-2 text-center"><X className="w-4 h-4 text-gray-400 mx-auto" /></td>
                   <td className="px-2 py-2 text-center bg-blue-50/30 text-xs">25/mois</td>
-                  <td className="px-2 py-2 text-center font-semibold text-yellow-600 bg-yellow-50/30 text-xs">
+                  <td className="px-2 py-2 text-center font-semibold text-gray-900 bg-yellow-50/30 text-xs">
                     Illimité*
                   </td>
                 </tr>
