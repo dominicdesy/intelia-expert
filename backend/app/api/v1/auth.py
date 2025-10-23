@@ -2429,6 +2429,7 @@ async def get_my_profile(current_user: Dict[str, Any] = Depends(get_current_user
                             "country_code": profile_data.get("country_code"),
                             "area_code": profile_data.get("area_code"),
                             "phone_number": profile_data.get("phone_number"),
+                            "whatsapp_number": profile_data.get("whatsapp_number"),  # 📱 WhatsApp number
                             "phone": profile_data.get("phone"),
                             "linkedin_profile": profile_data.get("linkedin_profile"),
                             "facebook_profile": profile_data.get("facebook_profile"),  # 🎯 Facebook profile URL
