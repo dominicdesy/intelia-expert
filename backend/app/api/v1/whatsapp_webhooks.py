@@ -3,13 +3,12 @@
 """
 WhatsApp Webhook Handler via Twilio
 Traite les messages WhatsApp entrants et envoie les réponses
-Version: 1.0
+Version: 2.0 - Integrated with ChatHandlers (same as frontend)
 """
 
 import os
+import sys
 import logging
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -24,12 +23,22 @@ try:
 except ImportError:
     SUPABASE_AVAILABLE = False
 
-# OpenAI for chat completions
+# Import ChatHandlers from llm module
+# Add llm directory to path if needed
+llm_path = os.path.join(os.path.dirname(__file__), "../../../llm")
+if os.path.exists(llm_path) and llm_path not in sys.path:
+    sys.path.insert(0, llm_path)
+
 try:
-    import openai
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
+    from api.chat_handlers import ChatHandlers
+    from utils.utilities import detect_language_enhanced, safe_get_attribute
+    CHAT_HANDLERS_AVAILABLE = True
+    logger_init = logging.getLogger(__name__)
+    logger_init.info("✅ ChatHandlers imported successfully for WhatsApp integration")
+except ImportError as e:
+    CHAT_HANDLERS_AVAILABLE = False
+    logger_init = logging.getLogger(__name__)
+    logger_init.error(f"❌ Failed to import ChatHandlers: {e}")
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp-webhooks"])
 logger = logging.getLogger(__name__)
@@ -38,22 +47,10 @@ logger = logging.getLogger(__name__)
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+15075195932")
-DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Configuration Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
-# Configuration OpenAI
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("DEFAULT_MODEL", "gpt-4o")
-
-# Initialize OpenAI client
-if OPENAI_AVAILABLE and OPENAI_API_KEY:
-    openai.api_key = OPENAI_API_KEY
-    logger.info("✅ OpenAI configured for WhatsApp responses")
-else:
-    logger.warning("⚠️ OpenAI not configured - WhatsApp will send placeholder responses")
 
 # Initialiser le client Twilio
 twilio_client = None
@@ -66,16 +63,58 @@ if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
 else:
     logger.warning("⚠️ Twilio credentials not configured - WhatsApp disabled")
 
+# Initialize ChatHandlers for RAG integration (same as frontend)
+chat_handlers = None
+health_monitor = None
 
-# ==================== DATABASE HELPERS ====================
+def get_or_create_chat_handlers():
+    """
+    Lazy initialization of ChatHandlers with health_monitor
+    This allows the RAG engine to be initialized after app startup
+    """
+    global chat_handlers, health_monitor
 
-def get_db_connection():
-    """Créer une connexion à la base de données"""
-    return psycopg2.connect(DATABASE_URL)
+    if chat_handlers is not None:
+        return chat_handlers
+
+    if not CHAT_HANDLERS_AVAILABLE:
+        logger.error("❌ ChatHandlers not available (import failed)")
+        return None
+
+    try:
+        # Try to get health_monitor from llm module
+        # The llm module should have a global health_monitor instance
+        try:
+            from core.services import health_monitor as hm
+            health_monitor = hm
+            logger.info("✅ health_monitor imported from core.services")
+        except ImportError:
+            try:
+                # Alternative import path
+                from services import health_monitor as hm
+                health_monitor = hm
+                logger.info("✅ health_monitor imported from services")
+            except ImportError:
+                logger.warning("⚠️ health_monitor not found - ChatHandlers will init without it")
+                health_monitor = None
+
+        # Create services dict with health_monitor (or empty if not available)
+        services_dict = {}
+        if health_monitor:
+            services_dict["health_monitor"] = health_monitor
+
+        # Initialize ChatHandlers
+        chat_handlers = ChatHandlers(services_dict)
+        logger.info("✅ ChatHandlers initialized for WhatsApp RAG integration")
+
+        return chat_handlers
+
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize ChatHandlers: {e}", exc_info=True)
+        return None
 
 
-# NOTE: log_whatsapp_message removed - we're not logging to PostgreSQL anymore
-# Messages are tracked in Supabase conversations instead
+# ==================== HELPERS ====================
 
 
 def get_user_by_whatsapp_number(whatsapp_number: str) -> Optional[Dict[str, Any]]:
@@ -129,112 +168,113 @@ def get_user_by_whatsapp_number(whatsapp_number: str) -> Optional[Dict[str, Any]
 # managed directly in the Supabase users table via the user profile update endpoint
 
 
-# ==================== OPENAI INTEGRATION ====================
+# ==================== RAG INTEGRATION (SAME AS FRONTEND) ====================
 
-def get_ai_response(user_message: str, user_info: Dict[str, Any]) -> str:
+async def handle_text_message(from_number: str, body: str, user_info: Dict[str, Any], conversation_id: Optional[str] = None) -> str:
     """
-    Génère une réponse AI pour un message WhatsApp
+    Traite un message texte WhatsApp avec le système RAG complet (identique au frontend)
 
-    Args:
-        user_message: Message de l'utilisateur
-        user_info: Informations de l'utilisateur (email, plan, etc.)
-
-    Returns:
-        Réponse de l'assistant AI
-    """
-    try:
-        if not OPENAI_AVAILABLE or not OPENAI_API_KEY:
-            return "Désolé, le service AI n'est pas disponible actuellement. Veuillez réessayer plus tard."
-
-        user_name = user_info.get("first_name", "")
-        user_plan = user_info.get("plan_name", "essential")
-
-        # System prompt pour Intelia Cognito
-        system_prompt = """Tu es Intelia Cognito, un assistant IA spécialisé en production avicole.
-
-Ton rôle est d'aider les producteurs et professionnels de la volaille avec:
-- Santé animale et diagnostic de maladies
-- Nutrition et alimentation
-- Gestion de production
-- Biosécurité
-- Performance et rentabilité
-
-Réponds de manière:
-- Précise et factuelle
-- Concise (max 2-3 paragraphes pour WhatsApp)
-- Professionnelle mais accessible
-- En français (sauf si demandé autrement)
-
-Si tu n'es pas certain d'une réponse, dis-le clairement et recommande de consulter un vétérinaire."""
-
-        # Construire les messages pour OpenAI
-        messages = [
-            {"role": "system", "content": system_prompt}
-        ]
-
-        # Ajouter le contexte utilisateur si disponible
-        if user_name:
-            messages.append({
-                "role": "system",
-                "content": f"L'utilisateur s'appelle {user_name}. Plan: {user_plan}."
-            })
-
-        # Ajouter la question de l'utilisateur
-        messages.append({
-            "role": "user",
-            "content": user_message
-        })
-
-        # Appel à OpenAI
-        logger.info(f"🤖 Calling OpenAI for user {user_info.get('user_email')}")
-
-        response = openai.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=messages,
-            temperature=0.7,
-            max_completion_tokens=500,  # Limité pour WhatsApp (max_completion_tokens pour GPT-4o)
-            timeout=30
-        )
-
-        ai_response = response.choices[0].message.content.strip()
-
-        logger.info(f"✅ OpenAI response generated ({len(ai_response)} chars)")
-
-        return ai_response
-
-    except Exception as e:
-        logger.error(f"❌ Error getting AI response: {e}", exc_info=True)
-        return "Désolé, une erreur s'est produite lors du traitement de votre question. Veuillez réessayer."
-
-
-# ==================== MESSAGE HANDLERS ====================
-
-async def handle_text_message(from_number: str, body: str, user_info: Dict[str, Any]) -> str:
-    """
-    Traite un message texte WhatsApp avec l'AI
+    VERSION 2.0:
+    - Utilise ChatHandlers.generate_rag_response() (même que frontend)
+    - Support complet RAG avec QueryRouter
+    - Historique de conversation via ConversationMemory
+    - Chain of Thought (COT) analysis
+    - Extraction d'entités et validation
+    - Messages de clarification intelligents
 
     Args:
         from_number: Numéro WhatsApp de l'expéditeur
         body: Contenu du message
         user_info: Informations de l'utilisateur
+        conversation_id: ID de conversation pour isoler l'historique
 
     Returns:
-        Réponse de l'assistant AI
+        Réponse de l'assistant AI (complète, pas de streaming pour WhatsApp)
     """
     try:
+        # Lazy initialization of chat_handlers
+        handlers = get_or_create_chat_handlers()
+        if not handlers:
+            logger.error("❌ ChatHandlers not available - falling back to simple response")
+            return "Désolé, le service d'assistance n'est pas disponible actuellement. Veuillez réessayer plus tard."
+
         user_email = user_info.get("user_email")
         user_name = user_info.get("first_name", "")
-        logger.info(f"📝 Text message from {user_email} ({user_name}): {body[:100]}...")
 
-        # Générer la réponse AI
-        ai_response = get_ai_response(body, user_info)
+        # Utiliser le numéro WhatsApp comme tenant_id (identifiant utilisateur unique)
+        tenant_id = from_number.replace("whatsapp:", "").strip()
 
-        logger.info(f"✅ AI response generated for {user_email}")
+        # Si pas de conversation_id fourni, créer un basé sur le numéro
+        if not conversation_id:
+            conversation_id = f"whatsapp_{tenant_id}"
 
-        return ai_response
+        logger.info(f"📝 WhatsApp message from {user_email} ({user_name}): {body[:100]}...")
+        logger.info(f"🔧 Using tenant_id={tenant_id}, conversation_id={conversation_id}")
+
+        # Détection automatique de la langue (comme frontend)
+        try:
+            language_result = detect_language_enhanced(body)
+            detected_language = (
+                language_result.language
+                if hasattr(language_result, "language")
+                else str(language_result)
+            )
+            logger.info(f"🌍 Detected language: {detected_language}")
+        except Exception as lang_error:
+            logger.warning(f"⚠️ Language detection failed: {lang_error}, defaulting to 'fr'")
+            detected_language = "fr"
+
+        # APPEL RAG IDENTIQUE AU FRONTEND
+        # Le QueryRouter gère: contexte + extraction + validation + clarification + COT
+        rag_result = await handlers.generate_rag_response(
+            query=body,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            language=detected_language,
+            use_json_search=True,  # Activer recherche JSON comme frontend
+            genetic_line_filter=None,  # Pas de filtre par défaut
+            performance_context=None,
+        )
+
+        # Fallback si RAG indisponible
+        if not rag_result:
+            logger.warning("⚠️ RAG result is None, using fallback")
+            return "Désolé, je ne peux pas traiter votre question pour le moment. Veuillez réessayer dans quelques instants."
+
+        # Extraire la réponse du RAG result
+        answer = safe_get_attribute(rag_result, "answer", "")
+        if not answer:
+            answer = safe_get_attribute(rag_result, "response", "")
+        if not answer:
+            answer = safe_get_attribute(rag_result, "text", "")
+
+        if not answer:
+            logger.error("❌ No answer found in RAG result")
+            return "Désolé, je n'ai pas pu générer une réponse. Veuillez reformuler votre question."
+
+        # Extraire métadonnées pour logging
+        metadata = safe_get_attribute(rag_result, "metadata", {}) or {}
+        source = safe_get_attribute(rag_result, "source", "unknown")
+        confidence = safe_get_attribute(rag_result, "confidence", 0.0)
+
+        # Normaliser source (peut être un enum)
+        if hasattr(source, "value"):
+            source = source.value
+        else:
+            source = str(source)
+
+        logger.info(
+            f"✅ RAG response generated for {user_email} | "
+            f"source={source}, confidence={confidence:.2f}, "
+            f"length={len(answer)} chars"
+        )
+
+        # Pour WhatsApp, retourner la réponse complète (pas de streaming)
+        # Le frontend utilise streaming, mais WhatsApp envoie le message complet
+        return str(answer)
 
     except Exception as e:
-        logger.error(f"❌ Error handling text message: {e}")
+        logger.error(f"❌ Error handling WhatsApp text message: {e}", exc_info=True)
         return "Désolé, une erreur s'est produite lors du traitement de votre message. Veuillez réessayer."
 
 
@@ -468,9 +508,30 @@ async def whatsapp_status():
     """
     Retourne le statut de la configuration WhatsApp
     """
+    # Try to get chat_handlers status
+    handlers = get_or_create_chat_handlers()
+    rag_available = False
+    rag_initialized = False
+
+    if handlers:
+        try:
+            rag_engine = handlers.get_rag_engine()
+            rag_available = rag_engine is not None
+            if rag_engine:
+                rag_initialized = safe_get_attribute(rag_engine, "is_initialized", False)
+        except Exception as e:
+            logger.error(f"Error checking RAG status: {e}")
+
     return {
         "whatsapp_enabled": twilio_client is not None,
         "twilio_account_sid": TWILIO_ACCOUNT_SID[:8] + "..." if TWILIO_ACCOUNT_SID else None,
         "whatsapp_number": TWILIO_WHATSAPP_NUMBER,
-        "signature_validation": request_validator is not None
+        "signature_validation": request_validator is not None,
+        "rag_integration": {
+            "chat_handlers_available": CHAT_HANDLERS_AVAILABLE,
+            "chat_handlers_initialized": handlers is not None,
+            "rag_engine_available": rag_available,
+            "rag_engine_initialized": rag_initialized,
+            "version": "2.0_unified_with_frontend",
+        }
     }
