@@ -5,7 +5,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { LanguageProvider } from "@/components/providers/LanguageProvider";
-import { AdProvider } from "@/components/AdSystem/AdProvider";
 import { MenuProvider } from "@/lib/contexts/MenuContext";
 import { Toaster } from "react-hot-toast";
 // import { VoiceRealtimeProvider } from "@/components/providers/VoiceRealtimeProvider";
@@ -499,18 +498,16 @@ export default function RootLayout({
         <AuthProvider>
           <LanguageProvider>
             <MenuProvider>
-              <AdProvider>
-                {children}
-                <Toaster
-                  position="top-center"
-                  toastOptions={{
-                    style: {
-                      zIndex: 9999,
-                    },
-                  }}
-                />
-                {/* <VoiceRealtimeProvider /> */}
-              </AdProvider>
+              {children}
+              <Toaster
+                position="top-center"
+                toastOptions={{
+                  style: {
+                    zIndex: 9999,
+                  },
+                }}
+              />
+              {/* <VoiceRealtimeProvider /> */}
             </MenuProvider>
           </LanguageProvider>
         </AuthProvider>

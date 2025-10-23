@@ -48,6 +48,7 @@ import { TypewriterMessage } from "./components/TypewriterMessage";
 import { VoiceRealtimeButton } from "@/components/VoiceRealtimeButton";
 import { LoadingMessage as LoadingDots } from "./components/LoadingDots";
 import { SatisfactionSurvey } from "./components/SatisfactionSurvey";
+import { AdProvider } from "@/components/AdSystem/AdProvider";
 import "./mobile-styles.css";
 
 // Composant ChatInput optimisé avec React.memo - Mobile First Design
@@ -1636,7 +1637,7 @@ function ChatInterface() {
   }
 
   return (
-    <>
+    <AdProvider disabled={feedbackModal.isOpen || isHelpOpen}>
       {/* ✅ Styles mobiles maintenant consolidés dans globals.css @layer mobile */}
       <ZohoSalesIQ user={user} />
       <div
@@ -1847,7 +1848,7 @@ function ChatInterface() {
       />
 
       <VoiceRealtimeButton />
-    </>
+    </AdProvider>
   );
 }
 
