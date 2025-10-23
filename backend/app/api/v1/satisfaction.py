@@ -4,13 +4,21 @@ Router pour les sondages de satisfaction globale
 """
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict, Any
 import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
 logger = logging.getLogger("app.api.v1.satisfaction")
 router = APIRouter()
+
+# Import authentication dependency
+try:
+    from app.api.v1.auth import get_current_user
+    AUTH_AVAILABLE = True
+except ImportError:
+    AUTH_AVAILABLE = False
+    logger.warning("Auth module not available, endpoints will be unprotected")
 
 
 # ============================================================================
@@ -147,9 +155,14 @@ async def submit_satisfaction_survey(survey: SatisfactionSurveyCreate):
 
 
 @router.get("/stats")
-async def get_satisfaction_stats(days: int = 30):
+async def get_satisfaction_stats(
+    days: int = 30,
+    current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None,
+) -> Dict[str, Any]:
     """
     Récupère les statistiques de satisfaction
+
+    Requires authentication (admin or user with stats access)
 
     Args:
         days: Nombre de jours à analyser (défaut: 30)
@@ -185,9 +198,14 @@ async def get_satisfaction_stats(days: int = 30):
 
 
 @router.get("/conversation/{conversation_id}")
-async def get_conversation_surveys(conversation_id: str):
+async def get_conversation_surveys(
+    conversation_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user) if AUTH_AVAILABLE else None,
+) -> Dict[str, Any]:
     """
     Récupère tous les sondages d'une conversation
+
+    Requires authentication
 
     Args:
         conversation_id: ID de la conversation
