@@ -3,14 +3,14 @@
 """
 WhatsApp Webhook Handler via Twilio
 Traite les messages WhatsApp entrants et envoie les réponses
-Version: 2.1 - HTTP integration with LLM service (microservices architecture)
+Version: 2.2 - HTTP integration with LLM service + authentication
 """
 
 import os
 import logging
 import httpx
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Request, HTTPException, Form
 from twilio.rest import Client
@@ -22,6 +22,15 @@ try:
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
+
+# Import JWT token creation from auth module
+try:
+    from .auth import create_access_token
+    AUTH_AVAILABLE = True
+except ImportError:
+    logger_init = logging.getLogger(__name__)
+    logger_init.error("❌ Failed to import create_access_token from auth")
+    AUTH_AVAILABLE = False
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp-webhooks"])
 logger = logging.getLogger(__name__)
@@ -54,6 +63,43 @@ logger.info(f"✅ LLM service configured at: {LLM_CHAT_ENDPOINT}")
 
 
 # ==================== HELPERS ====================
+
+def create_whatsapp_user_token(user_info: Dict[str, Any]) -> Optional[str]:
+    """
+    Crée un JWT token pour l'utilisateur WhatsApp afin d'authentifier les appels au service LLM
+
+    Args:
+        user_info: Informations utilisateur depuis Supabase
+
+    Returns:
+        JWT token ou None si erreur
+    """
+    if not AUTH_AVAILABLE:
+        logger.error("❌ Auth module not available - cannot create token")
+        return None
+
+    try:
+        # Créer le payload du token (même format que login normal)
+        token_data = {
+            "sub": user_info.get("user_email"),  # Subject = email
+            "email": user_info.get("user_email"),
+            "user_type": user_info.get("user_type", "user"),
+            "plan": user_info.get("plan_name", "essential"),
+            "whatsapp": True,  # Flag pour identifier les appels WhatsApp
+        }
+
+        # Créer le token avec expiration de 10 minutes (temps de traitement LLM)
+        token = create_access_token(
+            data=token_data,
+            expires_delta=timedelta(minutes=10)
+        )
+
+        logger.info(f"✅ JWT token created for WhatsApp user: {user_info.get('user_email')}")
+        return token
+
+    except Exception as e:
+        logger.error(f"❌ Error creating WhatsApp user token: {e}", exc_info=True)
+        return None
 
 
 def get_user_by_whatsapp_number(whatsapp_number: str) -> Optional[Dict[str, Any]]:
@@ -144,6 +190,12 @@ async def handle_text_message(from_number: str, body: str, user_info: Dict[str, 
         logger.info(f"📝 WhatsApp message from {user_email} ({user_name}): {body[:100]}...")
         logger.info(f"🔧 Calling LLM service: {LLM_CHAT_ENDPOINT}")
 
+        # Créer un JWT token pour l'utilisateur WhatsApp
+        auth_token = create_whatsapp_user_token(user_info)
+        if not auth_token:
+            logger.error("❌ Failed to create auth token for WhatsApp user")
+            return "Désolé, impossible de vous authentifier. Veuillez vérifier votre numéro WhatsApp dans votre profil."
+
         # Préparer la requête pour le service LLM (même format que frontend)
         payload = {
             "message": body,
@@ -153,9 +205,19 @@ async def handle_text_message(from_number: str, body: str, user_info: Dict[str, 
             "user_email": user_email,
         }
 
+        # Headers avec authentification
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+            "Authorization": f"Bearer {auth_token}",  # JWT token pour authentification
+            "Cache-Control": "no-cache",
+        }
+
+        logger.info(f"🔐 Authenticated request to LLM service for {user_email}")
+
         # Appel HTTP au service LLM avec streaming
         async with httpx.AsyncClient(timeout=60.0) as client:
-            async with client.stream("POST", LLM_CHAT_ENDPOINT, json=payload) as response:
+            async with client.stream("POST", LLM_CHAT_ENDPOINT, json=payload, headers=headers) as response:
                 if response.status_code != 200:
                     logger.error(f"❌ LLM service error: {response.status_code}")
                     return "Désolé, le service d'assistance n'est pas disponible actuellement. Veuillez réessayer plus tard."
