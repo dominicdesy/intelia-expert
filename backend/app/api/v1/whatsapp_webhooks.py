@@ -571,6 +571,16 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
         user_email = user_info.get("user_email")
         logger.info(f"🖼️ Image message from {user_email}: {media_url}")
 
+        # Vérifier le plan de l'utilisateur pour l'analyse d'images
+        from app.services.usage_limiter import get_user_plan_and_quota
+        plan_name, _, _ = get_user_plan_and_quota(user_email)
+        plan_lower = plan_name.lower() if plan_name else "essential"
+
+        # Analyse d'images réservée aux plans Pro, Elite et Intelia
+        if plan_lower not in ["pro", "elite", "intelia"]:
+            logger.warning(f"❌ Image analysis denied for {user_email} (plan: {plan_name})")
+            return "🔒 L'analyse d'images est réservée aux plans Pro et Elite. Mettez à niveau votre abonnement sur https://intelia.expert pour accéder à cette fonctionnalité."
+
         # Créer un JWT token pour l'authentification
         auth_token = create_whatsapp_user_token(user_info)
         if not auth_token:

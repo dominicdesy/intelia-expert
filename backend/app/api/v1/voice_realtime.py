@@ -544,6 +544,42 @@ async def voice_realtime_endpoint(
     # Pour l'instant, user_id hardcodé pour tests
     user_id = 1  # TODO: user.id quand auth activée
 
+    # TODO: Quand l'authentification sera activée, récupérer user_email depuis le JWT
+    # Pour l'instant, récupérer depuis la DB avec user_id
+    # VÉRIFICATION DU PLAN POUR L'ASSISTANT VOCAL
+    try:
+        from app.core.database import get_pg_connection
+        from psycopg2.extras import RealDictCursor
+
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Récupérer l'email de l'utilisateur à partir de l'ID
+                cur.execute("SELECT email FROM auth.users WHERE id = %s", (user_id,))
+                user_row = cur.fetchone()
+
+                if user_row:
+                    user_email = user_row['email']
+
+                    # Vérifier le plan
+                    from app.services.usage_limiter import get_user_plan_and_quota
+                    plan_name, _, _ = get_user_plan_and_quota(user_email)
+                    plan_lower = plan_name.lower() if plan_name else "essential"
+
+                    # Assistant vocal réservé aux plans Pro, Elite et Intelia
+                    if plan_lower not in ["pro", "elite", "intelia"]:
+                        logger.warning(f"❌ Voice assistant denied for {user_email} (plan: {plan_name})")
+                        await websocket.close(
+                            code=4003,
+                            reason="🔒 L'assistant vocal est réservé aux plans Pro et Elite. Mettez à niveau votre abonnement."
+                        )
+                        return
+
+                    logger.info(f"✅ Voice access granted for {user_email} (plan: {plan_name})")
+    except Exception as e:
+        logger.error(f"❌ Error checking plan for voice access: {e}")
+        # En cas d'erreur, autoriser par défaut pour ne pas bloquer le service
+        # TODO: En production, mettre await websocket.close() pour refuser par défaut
+
     # Rate limiting - TEMPORARILY DISABLED FOR TESTING
     # if not rate_limiter.check_rate_limit(user_id):
     #     await websocket.close(

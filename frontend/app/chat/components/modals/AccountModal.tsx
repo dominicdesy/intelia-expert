@@ -113,7 +113,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         {/* Billing Toggle */}
         <div className="flex items-center justify-center gap-4 py-1 text-sm">
           <span className={`font-medium ${billingCycle === "monthly" ? "text-gray-900" : "text-gray-500"}`}>
-            Mensuel
+            {t("billing.monthly")}
           </span>
           <button
             aria-label="Basculer le cycle de facturation"
@@ -125,11 +125,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             />
           </button>
           <span className={`font-medium ${billingCycle === "yearly" ? "text-gray-900" : "text-gray-500"}`}>
-            Annuel
+            {t("billing.yearly")}
           </span>
           {billingCycle === "yearly" && (
             <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-              -15%
+              {t("billing.discount15")}
             </span>
           )}
         </div>
@@ -145,7 +145,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
               <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold uppercase text-gray-700 shadow-sm">
-                Gratuit
+                {t("billing.free")}
               </span>
             </div>
 
@@ -162,7 +162,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               disabled
               className="w-full rounded-lg bg-gray-100 py-3 font-semibold text-gray-700"
             >
-              {currentPlan === "essential" ? "Plan actuel" : "Plan gratuit"}
+              {currentPlan === "essential" ? t("billing.currentPlan") : t("billing.freePlan")}
             </button>
           </article>
 
@@ -172,7 +172,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
               <span className="rounded-full bg-gradient-to-r from-blue-600 to-blue-500 px-3 py-1 text-[11px] font-semibold uppercase text-white shadow">
-                Populaire
+                {t("billing.popular")}
               </span>
             </div>
 
@@ -190,7 +190,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   Soit {(prices.pro / 12).toFixed(2)} $/mois
                 </p>
               )}
-              <p className="mt-2 text-xs font-medium text-blue-700">Essai gratuit de 14 jours</p>
+              <p className="mt-2 text-xs font-medium text-blue-700">{t("billing.trial14days")}</p>
             </header>
 
             {currentPlan === "pro" ? (
@@ -199,7 +199,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 disabled={isManaging}
                 className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isManaging ? "Chargement..." : "Gérer mon abonnement"}
+                {isManaging ? t("billing.loading") : t("billing.manageSubscription")}
               </button>
             ) : (
               <button
@@ -207,7 +207,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 disabled={isLoading}
                 className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white shadow-md transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isLoading && selectedPlan === "pro" ? "Redirection..." : "Commencer l’essai gratuit"}
+                {isLoading && selectedPlan === "pro" ? t("billing.redirecting") : t("billing.startFreeTrial")}
               </button>
             )}
           </article>
@@ -218,7 +218,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
               <span className="rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-3 py-1 text-[11px] font-semibold uppercase text-white shadow">
-                Recommandé
+                {t("billing.recommended")}
               </span>
             </div>
 
@@ -236,7 +236,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   Soit {(prices.elite / 12).toFixed(2)} $/mois
                 </p>
               )}
-              <p className="mt-2 text-xs font-medium text-blue-700">Essai gratuit de 14 jours</p>
+              <p className="mt-2 text-xs font-medium text-blue-700">{t("billing.trial14days")}</p>
             </header>
 
             {currentPlan === "elite" ? (
@@ -245,7 +245,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 disabled={isManaging}
                 className="w-full rounded-lg bg-amber-500 py-3 font-semibold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isManaging ? "Chargement..." : "Gérer mon abonnement"}
+                {isManaging ? t("billing.loading") : t("billing.manageSubscription")}
               </button>
             ) : (
               <button
@@ -253,7 +253,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 disabled={isLoading}
                 className="w-full rounded-lg bg-amber-500 py-3 font-semibold text-white shadow-md transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isLoading && selectedPlan === "elite" ? "Redirection..." : "Commencer l’essai gratuit"}
+                {isLoading && selectedPlan === "elite" ? t("billing.redirecting") : t("billing.startFreeTrial")}
               </button>
             )}
           </article>
@@ -262,28 +262,28 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         {/* Comparison */}
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="mb-6 text-center text-xl font-bold text-gray-900">
-            Comparaison des fonctionnalités
+            {t("subscription.comparison.title")}
           </h3>
 
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Fonctionnalité</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Essential</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50">Pro</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50">Elite</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">{t("subscription.comparison.feature")}</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">{t("subscription.comparison.essential")}</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50">{t("subscription.comparison.pro")}</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50">{t("subscription.comparison.elite")}</th>
                 </tr>
               </thead>
               <tbody>
                 {/* Base features */}
                 <tr>
                   <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 bg-gray-50">
-                    Fonctionnalités de base
+                    {t("subscription.comparison.category.base")}
                   </td>
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="px-4 py-3 text-sm text-gray-900">16 langues supportées</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.languages")}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
@@ -307,7 +307,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   </td>
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="px-4 py-3 text-sm text-gray-900">Adaptation au rôle</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.roleAdaptation")}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
@@ -334,23 +334,23 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 {/* Capacités */}
                 <tr>
                   <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 bg-gray-50">
-                    Capacités et performances
+                    {t("subscription.comparison.category.capacity")}
                   </td>
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="px-4 py-3 text-sm text-gray-900">Requêtes / mois</td>
-                  <td className="px-4 py-3 text-center text-sm text-gray-600">100</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">Illimitées*</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">Illimitées*</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.queries")}</td>
+                  <td className="px-4 py-3 text-center text-sm text-gray-600">{t("subscription.comparison.value.100")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">{t("subscription.comparison.value.unlimitedStar")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">{t("subscription.comparison.value.unlimitedStar")}</td>
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="px-4 py-3 text-sm text-gray-900">Historique</td>
-                  <td className="px-4 py-3 text-center text-sm text-gray-600">30 jours</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">Illimité</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">Illimité</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.history")}</td>
+                  <td className="px-4 py-3 text-center text-sm text-gray-600">{t("subscription.comparison.value.30days")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">{t("subscription.comparison.value.unlimited")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">{t("subscription.comparison.value.unlimited")}</td>
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="px-4 py-3 text-sm text-gray-900">Export PDF</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.pdfExport")}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
@@ -377,11 +377,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 {/* IA */}
                 <tr>
                   <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 bg-gray-50">
-                    Fonctionnalités IA
+                    {t("subscription.comparison.category.ai")}
                   </td>
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="px-4 py-3 text-sm text-gray-900">Analyse d'images</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.imageAnalysis")}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
@@ -389,11 +389,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">25/mois</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">Illimité*</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-blue-700 bg-blue-50/30">{t("subscription.comparison.value.25perMonth")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold text-amber-700 bg-amber-50/30">{t("subscription.comparison.value.unlimitedStar")}</td>
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="px-4 py-3 text-sm text-gray-900">Saisie vocale</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.voiceInput")}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
@@ -417,7 +417,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   </td>
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="px-4 py-3 text-sm text-gray-900">Assistant vocal</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.voiceAssistant")}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
@@ -444,11 +444,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 {/* Expérience */}
                 <tr>
                   <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 bg-gray-50">
-                    Expérience
+                    {t("subscription.comparison.category.experience")}
                   </td>
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="px-4 py-3 text-sm text-gray-900">Sans publicité</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.adFree")}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
@@ -478,18 +478,17 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           {/* Notes */}
           <div className="mt-6 grid gap-3 text-xs text-gray-500 md:grid-cols-2">
             <div className="rounded-lg bg-gray-50 p-3">
-              <span className="font-semibold text-gray-700">Essai gratuit 14 jours</span>
-              <div className="mt-1">Annule à tout moment sans frais.</div>
+              <span className="font-semibold text-gray-700">{t("billing.notes.trial")}</span>
+              <div className="mt-1">{t("billing.notes.trialDesc")}</div>
             </div>
             <div className="rounded-lg bg-gray-50 p-3">
-              <span className="font-semibold text-gray-700">Paiement sécurisé</span>
-              <div className="mt-1">Transactions protégées par Stripe.</div>
+              <span className="font-semibold text-gray-700">{t("billing.notes.secure")}</span>
+              <div className="mt-1">{t("billing.notes.secureDesc")}</div>
             </div>
           </div>
 
           <p className="mt-4 text-xs leading-5 text-gray-500">
-            * "Illimité" signifie usage illimité dans le cadre d'une utilisation normale et raisonnable. Nous nous
-            réservons le droit de limiter les abus manifestes.
+            {t("billing.notes.unlimited")}
           </p>
         </section>
       </div>

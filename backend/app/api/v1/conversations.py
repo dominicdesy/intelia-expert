@@ -886,9 +886,10 @@ async def export_conversation_pdf(
         # Vérifier le plan de l'utilisateur
         user_email = current_user.get("email")
         plan_name, _, _ = get_user_plan_and_quota(user_email)
+        plan_lower = plan_name.lower() if plan_name else "essential"
 
-        # Restriction: Export PDF disponible pour Pro et Elite uniquement
-        if plan_name not in ["Pro", "Elite"]:
+        # Restriction: Export PDF disponible pour Pro, Elite et Intelia uniquement
+        if plan_lower not in ["pro", "elite", "intelia"]:
             raise HTTPException(
                 status_code=403,
                 detail="L'exportation PDF est réservée aux plans Pro et Elite. "

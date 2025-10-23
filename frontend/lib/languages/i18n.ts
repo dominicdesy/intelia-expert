@@ -462,6 +462,29 @@ export interface TranslationKeys {
   "subscription.free": string;
   "subscription.premium.price": string;
   "subscription.featuresIncluded": string;
+  "subscription.comparison.title": string;
+  "subscription.comparison.feature": string;
+  "subscription.comparison.essential": string;
+  "subscription.comparison.pro": string;
+  "subscription.comparison.elite": string;
+  "subscription.comparison.category.base": string;
+  "subscription.comparison.category.capacity": string;
+  "subscription.comparison.category.ai": string;
+  "subscription.comparison.category.experience": string;
+  "subscription.comparison.feature.languages": string;
+  "subscription.comparison.feature.roleAdaptation": string;
+  "subscription.comparison.feature.queries": string;
+  "subscription.comparison.feature.history": string;
+  "subscription.comparison.feature.pdfExport": string;
+  "subscription.comparison.feature.imageAnalysis": string;
+  "subscription.comparison.feature.voiceInput": string;
+  "subscription.comparison.feature.voiceAssistant": string;
+  "subscription.comparison.feature.adFree": string;
+  "subscription.comparison.value.100": string;
+  "subscription.comparison.value.unlimited": string;
+  "subscription.comparison.value.unlimitedStar": string;
+  "subscription.comparison.value.30days": string;
+  "subscription.comparison.value.25perMonth": string;
 
   // ===========================================
   // BILLING & CURRENCY
@@ -476,6 +499,24 @@ export interface TranslationKeys {
   "billing.loadingCurrency": string;
   "billing.currencyUpdated": string;
   "billing.currencyUpdateFailed": string;
+  "billing.monthly": string;
+  "billing.yearly": string;
+  "billing.discount15": string;
+  "billing.free": string;
+  "billing.currentPlan": string;
+  "billing.freePlan": string;
+  "billing.popular": string;
+  "billing.recommended": string;
+  "billing.trial14days": string;
+  "billing.startFreeTrial": string;
+  "billing.manageSubscription": string;
+  "billing.loading": string;
+  "billing.redirecting": string;
+  "billing.notes.trial": string;
+  "billing.notes.trialDesc": string;
+  "billing.notes.secure": string;
+  "billing.notes.secureDesc": string;
+  "billing.notes.unlimited": string;
 
   // ===========================================
   // CONTACT & SUPPORT

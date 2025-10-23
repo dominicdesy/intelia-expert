@@ -37,6 +37,13 @@ export const useAdSystem = () => {
     if (!isMountedRef.current) return;
     if (!isAuthenticated || !user) return;
 
+    // VÉRIFICATION PLAN: Pas de publicité pour Elite et Intelia
+    const userPlan = user.plan?.toLowerCase();
+    if (userPlan === 'elite' || userPlan === 'intelia') {
+      secureLog.log(`🎖️ Plan ${user.plan}: pas de publicité`);
+      return;
+    }
+
     try {
       // Utiliser votre API client existant
       const authData = localStorage.getItem("intelia-expert-auth");
