@@ -278,6 +278,18 @@ export interface TranslationKeys {
   "chat.voiceRealtimeClickStart": string;
   "chat.voiceRealtimeDoubleClick": string;
   "chat.voiceRealtimeAdminOnly": string;
+  "chat.satisfactionQuestion": string;
+  "chat.satisfactionSatisfied": string;
+  "chat.satisfactionNeutral": string;
+  "chat.satisfactionUnsatisfied": string;
+  "chat.satisfactionHelpful": string;
+  "chat.satisfactionOkay": string;
+  "chat.satisfactionPoor": string;
+  "chat.satisfactionCommentPrompt": string;
+  "chat.satisfactionCommentPlaceholder": string;
+  "chat.satisfactionSkip": string;
+  "chat.satisfactionThanks": string;
+  "chat.submit": string;
   "chat.noConversations": string;
   "chat.loading": string;
   "chat.errorMessage": string;

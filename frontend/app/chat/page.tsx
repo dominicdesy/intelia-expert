@@ -46,6 +46,7 @@ import { VoiceInput } from "./components/VoiceInput";
 import { TypewriterMessage } from "./components/TypewriterMessage";
 import { VoiceRealtimeButton } from "@/components/VoiceRealtimeButton";
 import { LoadingMessage as LoadingDots } from "./components/LoadingDots";
+import { SatisfactionSurvey } from "./components/SatisfactionSurvey";
 import "./mobile-styles.css";
 
 // Composant ChatInput optimisé avec React.memo - Mobile First Design
@@ -554,6 +555,10 @@ function ChatInterface() {
     feedbackType: null,
   });
 
+  // État pour le sondage de satisfaction
+  const [showSatisfactionSurvey, setShowSatisfactionSurvey] = useState(false);
+  const [surveyCompleted, setSurveyCompleted] = useState(false);
+
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -971,6 +976,73 @@ function ChatInterface() {
     }
   }, [currentLanguage, t, currentConversation, setCurrentConversation]);
 
+  // useEffect pour afficher le sondage de satisfaction
+  useEffect(() => {
+    if (!currentConversation || !user?.id || surveyCompleted) return;
+
+    const messageCount = currentConversation.message_count || messages.length;
+
+    // Ne pas afficher sur la conversation welcome
+    if (currentConversation.id === "welcome") return;
+
+    // Vérifier dans localStorage quand le dernier sondage a été affiché
+    const surveyKey = `satisfaction_survey_${currentConversation.id}`;
+    const lastSurveyData = localStorage.getItem(surveyKey);
+
+    if (!lastSurveyData) {
+      // Première fois - Afficher après ~25 messages (±2 pour variation)
+      if (messageCount >= 23 && messageCount <= 27) {
+        // 30% de chance d'apparaître
+        if (Math.random() < 0.3) {
+          setShowSatisfactionSurvey(true);
+        }
+      }
+    } else {
+      // Sondages suivants - tous les ~40 messages
+      const lastCount = parseInt(lastSurveyData);
+      const delta = messageCount - lastCount;
+
+      if (delta >= 38 && delta <= 42) {
+        // 30% de chance d'apparaître
+        if (Math.random() < 0.3) {
+          setShowSatisfactionSurvey(true);
+        }
+      }
+    }
+  }, [currentConversation?.message_count, messages.length, currentConversation?.id, user?.id, surveyCompleted]);
+
+  // Handlers pour le sondage de satisfaction
+  const handleSurveyComplete = useCallback(() => {
+    if (!currentConversation) return;
+
+    const surveyKey = `satisfaction_survey_${currentConversation.id}`;
+    const messageCount = currentConversation.message_count || messages.length;
+
+    // Enregistrer le nombre de messages actuel
+    localStorage.setItem(surveyKey, messageCount.toString());
+
+    // Masquer le sondage
+    setShowSatisfactionSurvey(false);
+    setSurveyCompleted(true);
+
+    // Réinitialiser après 5 secondes (pour permettre le prochain sondage)
+    setTimeout(() => {
+      setSurveyCompleted(false);
+    }, 5000);
+  }, [currentConversation, messages.length]);
+
+  const handleSurveySkip = useCallback(() => {
+    if (!currentConversation) return;
+
+    const surveyKey = `satisfaction_survey_${currentConversation.id}`;
+    const messageCount = currentConversation.message_count || messages.length;
+
+    // Enregistrer comme si le sondage était complété
+    localStorage.setItem(surveyKey, messageCount.toString());
+
+    // Masquer le sondage
+    setShowSatisfactionSurvey(false);
+  }, [currentConversation, messages.length]);
 
 // Chargement initial unique
   useEffect(() => {
@@ -1715,6 +1787,17 @@ function ChatInterface() {
                 multiple
                 aria-label={t("chat.uploadImages")}
               />
+
+              {/* Sondage de satisfaction - Apparaît juste au-dessus du champ de saisie */}
+              {showSatisfactionSurvey && currentConversation && user && (
+                <SatisfactionSurvey
+                  conversationId={currentConversation.id}
+                  userId={user.id}
+                  messageCount={currentConversation.message_count || messages.length}
+                  onComplete={handleSurveyComplete}
+                  onSkip={handleSurveySkip}
+                />
+              )}
 
               <ChatInput
                 inputMessage={inputMessage}

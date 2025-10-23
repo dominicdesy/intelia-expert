@@ -681,6 +681,7 @@ except ImportError as e:
         ("stats_fast", "", "statistics-fast"),
         ("webhooks", "", "webhooks"),  # 🔧 AJOUT DU ROUTER WEBHOOKS
         ("qa_quality", "", "qa-quality"),  # 🔧 AJOUT DU ROUTER QA QUALITY
+        ("satisfaction", "", "satisfaction"),  # 🌟 AJOUT DU ROUTER SATISFACTION SURVEYS
     ]
 
     if STATS_CACHE_AVAILABLE:
