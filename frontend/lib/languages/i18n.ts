@@ -269,6 +269,15 @@ export interface TranslationKeys {
   "chat.voiceStop": string;
   "chat.voiceStart": string;
   "chat.voiceListening": string;
+  "chat.voiceRealtimeIdle": string;
+  "chat.voiceRealtimeConnecting": string;
+  "chat.voiceRealtimeListening": string;
+  "chat.voiceRealtimeSpeaking": string;
+  "chat.voiceRealtimeError": string;
+  "chat.voiceRealtimeBetaTitle": string;
+  "chat.voiceRealtimeClickStart": string;
+  "chat.voiceRealtimeDoubleClick": string;
+  "chat.voiceRealtimeAdminOnly": string;
   "chat.noConversations": string;
   "chat.loading": string;
   "chat.errorMessage": string;
