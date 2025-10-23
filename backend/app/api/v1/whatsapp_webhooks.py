@@ -535,6 +535,7 @@ async def handle_unknown_user(from_number: str) -> str:
 def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> bool:
     """
     Envoie un message WhatsApp via Twilio
+    Divise automatiquement les longs messages en plusieurs parties (max 1600 chars)
 
     Args:
         to_number: Numéro destinataire (format: whatsapp:+1234567890)
@@ -549,20 +550,87 @@ def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> b
             logger.error("❌ Twilio client not initialized")
             return False
 
-        message_params = {
-            "from_": TWILIO_WHATSAPP_NUMBER,
-            "to": to_number,
-            "body": body
-        }
+        # Limite WhatsApp: 1600 caractères
+        MAX_LENGTH = 1600
 
-        if media_url:
-            message_params["media_url"] = [media_url]
+        # Si le message est court, l'envoyer directement
+        if len(body) <= MAX_LENGTH:
+            message_params = {
+                "from_": TWILIO_WHATSAPP_NUMBER,
+                "to": to_number,
+                "body": body
+            }
 
-        message = twilio_client.messages.create(**message_params)
+            if media_url:
+                message_params["media_url"] = [media_url]
 
-        logger.info(f"✅ WhatsApp message sent: {message.sid}")
+            message = twilio_client.messages.create(**message_params)
+            logger.info(f"✅ WhatsApp message sent: {message.sid}")
+            return True
 
+        # Si le message est long, le diviser en plusieurs parties
+        logger.info(f"📝 Message long ({len(body)} chars), division en plusieurs parties...")
+
+        # Diviser intelligemment (par paragraphes si possible)
+        parts = []
+        remaining = body
+
+        while remaining:
+            if len(remaining) <= MAX_LENGTH:
+                parts.append(remaining)
+                break
+
+            # Chercher un point de coupure naturel (nouvelle ligne, point, espace)
+            cut_point = MAX_LENGTH
+
+            # Essayer de couper à une nouvelle ligne
+            newline_pos = remaining[:MAX_LENGTH].rfind('\n\n')
+            if newline_pos > MAX_LENGTH * 0.7:  # Au moins 70% du max
+                cut_point = newline_pos + 2
+            else:
+                # Sinon, couper à un point
+                period_pos = remaining[:MAX_LENGTH].rfind('. ')
+                if period_pos > MAX_LENGTH * 0.7:
+                    cut_point = period_pos + 2
+                else:
+                    # Sinon, couper à un espace
+                    space_pos = remaining[:MAX_LENGTH].rfind(' ')
+                    if space_pos > MAX_LENGTH * 0.7:
+                        cut_point = space_pos + 1
+
+            parts.append(remaining[:cut_point].strip())
+            remaining = remaining[cut_point:].strip()
+
+        # Envoyer chaque partie avec un petit délai
+        import time
+        for i, part in enumerate(parts, 1):
+            # Ajouter un indicateur de partie si plusieurs messages
+            if len(parts) > 1:
+                part_header = f"[{i}/{len(parts)}]\n\n"
+                message_body = part_header + part
+            else:
+                message_body = part
+
+            message_params = {
+                "from_": TWILIO_WHATSAPP_NUMBER,
+                "to": to_number,
+                "body": message_body
+            }
+
+            # Média seulement sur le premier message
+            if media_url and i == 1:
+                message_params["media_url"] = [media_url]
+
+            message = twilio_client.messages.create(**message_params)
+            logger.info(f"✅ WhatsApp message sent (part {i}/{len(parts)}): {message.sid}")
+
+            # Petit délai entre les messages pour garantir l'ordre
+            if i < len(parts):
+                time.sleep(1)
+
+        logger.info(f"✅ All {len(parts)} message parts sent successfully")
         return True
+
     except Exception as e:
         logger.error(f"❌ Error sending WhatsApp message: {e}")
         return False
@@ -595,22 +663,27 @@ async def whatsapp_webhook(
     # Valider la signature Twilio (sécurité)
     if request_validator:
         try:
-            # Récupérer l'URL complète et la signature
-            url = str(request.url)
+            # Récupérer la signature
             signature = request.headers.get("X-Twilio-Signature", "")
+
+            # Construire l'URL publique que Twilio a appelée
+            # Twilio signe avec l'URL publique, pas l'URL interne du container
+            public_url = "https://expert.intelia.com/api/v1/whatsapp/webhook"
 
             # Récupérer tous les paramètres du formulaire
             form_data = await request.form()
             params = dict(form_data)
 
             # Valider la signature
-            if not request_validator.validate(url, params, signature):
-                logger.error("❌ Invalid Twilio signature")
+            if not request_validator.validate(public_url, params, signature):
+                logger.error(f"❌ Invalid Twilio signature for URL: {public_url}")
                 raise HTTPException(status_code=403, detail="Invalid signature")
 
             logger.info("✅ Twilio signature verified")
+        except HTTPException:
+            raise  # Re-raise validation failures
         except Exception as e:
-            logger.error(f"❌ Signature validation error: {e}")
+            logger.error(f"❌ Signature validation error: {e}", exc_info=True)
             # En développement, on peut continuer sans validation
             logger.warning("⚠️ Continuing without signature validation (dev mode)")
 
