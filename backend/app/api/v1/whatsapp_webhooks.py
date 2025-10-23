@@ -3,7 +3,7 @@
 """
 WhatsApp Webhook Handler via Twilio
 Traite les messages WhatsApp entrants et envoie les réponses
-Version: 2.2 - HTTP integration with LLM service + authentication
+Version: 2.3 - Message truncation + rate limiting fixes
 """
 
 import os
