@@ -217,9 +217,20 @@ class PDFExportService:
         story.append(Spacer(1, 0.2*inch))
 
         # === MÉTADONNÉES ===
+        # Formater la date de création
+        created_at = conversation_data.get('created_at', 'N/A')
+        if hasattr(created_at, 'strftime'):
+            # C'est un objet datetime
+            created_at_str = created_at.strftime('%Y-%m-%d %H:%M:%S')
+        elif isinstance(created_at, str):
+            # C'est déjà une string
+            created_at_str = created_at[:19].replace('T', ' ')
+        else:
+            created_at_str = 'N/A'
+
         metadata_table_data = [
             ['Utilisateur:', user_info.get('email', 'N/A')],
-            ['Date de création:', conversation_data.get('created_at', 'N/A')[:19].replace('T', ' ')],
+            ['Date de création:', created_at_str],
             ['Langue:', conversation_data.get('language', 'fr').upper()],
             ['Nombre de messages:', str(len(messages))],
         ]
