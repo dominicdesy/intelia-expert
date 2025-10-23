@@ -367,6 +367,10 @@ async def update_user_profile(
             f"[update_user_profile] Champs à mettre à jour : {list(update_data.keys())}"
         )
 
+        # 🐛 Debug: Log whatsapp_number if present
+        if "whatsapp_number" in update_data:
+            logger.info(f"[update_user_profile] 📱 WhatsApp number being saved: {update_data['whatsapp_number']}")
+
         # Effectuer la mise à jour
         response = (
             supabase.table("users")
@@ -374,6 +378,10 @@ async def update_user_profile(
             .eq("auth_user_id", current_user["user_id"])
             .execute()
         )
+
+        # 🐛 Debug: Log response data
+        if response.data:
+            logger.info(f"[update_user_profile] 📱 WhatsApp number in response: {response.data[0].get('whatsapp_number')}")
 
         if not response.data:
             # Si pas de données retournées, vérifier si l'utilisateur existe
