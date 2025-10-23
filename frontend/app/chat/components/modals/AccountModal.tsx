@@ -126,7 +126,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         {user && <CurrencySelector user={user} />}
 
         {/* Toggle Mensuel / Annuel */}
-        <div className="flex items-center justify-center gap-3 py-2">
+        <div className="flex items-center justify-center gap-3 py-3">
           <span className={`text-sm font-medium ${billingCycle === "monthly" ? "text-gray-900" : "text-gray-500"}`}>
             Mensuel
           </span>
