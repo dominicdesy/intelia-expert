@@ -151,6 +151,7 @@ class UserProfileData(BaseModel):
     country_code: Optional[str] = None
     area_code: Optional[str] = None
     phone_number: Optional[str] = None
+    whatsapp_number: Optional[str] = None  # 📱 WhatsApp number for chat integration
     country: Optional[str] = None
     linkedin_profile: Optional[str] = None
     company_name: Optional[str] = None
@@ -242,6 +243,7 @@ async def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_us
             country_code=profile_data.get("country_code"),
             area_code=profile_data.get("area_code"),
             phone_number=profile_data.get("phone_number"),
+            whatsapp_number=profile_data.get("whatsapp_number"),  # 📱 WhatsApp number
             country=profile_data.get("country"),
             linkedin_profile=profile_data.get("linkedin_profile"),
             company_name=profile_data.get("company_name"),
