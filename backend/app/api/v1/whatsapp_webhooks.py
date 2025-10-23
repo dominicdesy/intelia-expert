@@ -23,7 +23,13 @@ try:
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
-    logger.warning("Supabase not available for WhatsApp user lookup")
+
+# OpenAI for chat completions
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp-webhooks"])
 logger = logging.getLogger(__name__)
@@ -37,6 +43,17 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # Configuration Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# Configuration OpenAI
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = os.getenv("DEFAULT_MODEL", "gpt-4o")
+
+# Initialize OpenAI client
+if OPENAI_AVAILABLE and OPENAI_API_KEY:
+    openai.api_key = OPENAI_API_KEY
+    logger.info("✅ OpenAI configured for WhatsApp responses")
+else:
+    logger.warning("⚠️ OpenAI not configured - WhatsApp will send placeholder responses")
 
 # Initialiser le client Twilio
 twilio_client = None
@@ -149,11 +166,89 @@ def get_user_by_whatsapp_number(whatsapp_number: str) -> Optional[Dict[str, Any]
 # managed directly in the Supabase users table via the user profile update endpoint
 
 
+# ==================== OPENAI INTEGRATION ====================
+
+def get_ai_response(user_message: str, user_info: Dict[str, Any]) -> str:
+    """
+    Génère une réponse AI pour un message WhatsApp
+
+    Args:
+        user_message: Message de l'utilisateur
+        user_info: Informations de l'utilisateur (email, plan, etc.)
+
+    Returns:
+        Réponse de l'assistant AI
+    """
+    try:
+        if not OPENAI_AVAILABLE or not OPENAI_API_KEY:
+            return "Désolé, le service AI n'est pas disponible actuellement. Veuillez réessayer plus tard."
+
+        user_name = user_info.get("first_name", "")
+        user_plan = user_info.get("plan_name", "essential")
+
+        # System prompt pour Intelia Cognito
+        system_prompt = """Tu es Intelia Cognito, un assistant IA spécialisé en production avicole.
+
+Ton rôle est d'aider les producteurs et professionnels de la volaille avec:
+- Santé animale et diagnostic de maladies
+- Nutrition et alimentation
+- Gestion de production
+- Biosécurité
+- Performance et rentabilité
+
+Réponds de manière:
+- Précise et factuelle
+- Concise (max 2-3 paragraphes pour WhatsApp)
+- Professionnelle mais accessible
+- En français (sauf si demandé autrement)
+
+Si tu n'es pas certain d'une réponse, dis-le clairement et recommande de consulter un vétérinaire."""
+
+        # Construire les messages pour OpenAI
+        messages = [
+            {"role": "system", "content": system_prompt}
+        ]
+
+        # Ajouter le contexte utilisateur si disponible
+        if user_name:
+            messages.append({
+                "role": "system",
+                "content": f"L'utilisateur s'appelle {user_name}. Plan: {user_plan}."
+            })
+
+        # Ajouter la question de l'utilisateur
+        messages.append({
+            "role": "user",
+            "content": user_message
+        })
+
+        # Appel à OpenAI
+        logger.info(f"🤖 Calling OpenAI for user {user_info.get('user_email')}")
+
+        response = openai.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=500,  # Limité pour WhatsApp
+            timeout=30
+        )
+
+        ai_response = response.choices[0].message.content.strip()
+
+        logger.info(f"✅ OpenAI response generated ({len(ai_response)} chars)")
+
+        return ai_response
+
+    except Exception as e:
+        logger.error(f"❌ Error getting AI response: {e}")
+        return "Désolé, une erreur s'est produite lors du traitement de votre question. Veuillez réessayer."
+
+
 # ==================== MESSAGE HANDLERS ====================
 
 async def handle_text_message(from_number: str, body: str, user_info: Dict[str, Any]) -> str:
     """
-    Traite un message texte WhatsApp
+    Traite un message texte WhatsApp avec l'AI
 
     Args:
         from_number: Numéro WhatsApp de l'expéditeur
@@ -161,20 +256,23 @@ async def handle_text_message(from_number: str, body: str, user_info: Dict[str, 
         user_info: Informations de l'utilisateur
 
     Returns:
-        Réponse à envoyer
+        Réponse de l'assistant AI
     """
     try:
         user_email = user_info.get("user_email")
-        logger.info(f"📝 Text message from {user_email}: {body[:50]}...")
+        user_name = user_info.get("first_name", "")
+        logger.info(f"📝 Text message from {user_email} ({user_name}): {body[:100]}...")
 
-        # TODO: Intégrer avec votre système de conversation existant
-        # Pour l'instant, réponse simple
-        response = f"Message reçu: {body}\n\nIntégration avec l'assistant IA en cours..."
+        # Générer la réponse AI
+        ai_response = get_ai_response(body, user_info)
 
-        return response
+        logger.info(f"✅ AI response generated for {user_email}")
+
+        return ai_response
+
     except Exception as e:
         logger.error(f"❌ Error handling text message: {e}")
-        return "Désolé, une erreur s'est produite. Veuillez réessayer."
+        return "Désolé, une erreur s'est produite lors du traitement de votre message. Veuillez réessayer."
 
 
 async def handle_audio_message(from_number: str, media_url: str, user_info: Dict[str, Any]) -> str:
