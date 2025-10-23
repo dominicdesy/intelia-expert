@@ -705,7 +705,7 @@ async def handle_unknown_user(from_number: str) -> str:
 def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> bool:
     """
     Envoie un message WhatsApp via Twilio
-    Divise automatiquement les longs messages en plusieurs parties (max 4000 chars)
+    Divise automatiquement les longs messages en plusieurs parties (max 1600 chars)
 
     Args:
         to_number: Numéro destinataire (format: whatsapp:+1234567890)
@@ -720,9 +720,9 @@ def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> b
             logger.error("❌ Twilio client not initialized")
             return False
 
-        # Limite WhatsApp: 4000 caractères (max officiel: 4096)
-        # Augmenté pour éviter la division en plusieurs messages
-        MAX_LENGTH = 4000
+        # Limite Twilio-WhatsApp: 1600 caractères
+        # Note: WhatsApp supporte 4096, mais Twilio impose 1600
+        MAX_LENGTH = 1600
 
         # Si le message est court, l'envoyer directement
         if len(body) <= MAX_LENGTH:
