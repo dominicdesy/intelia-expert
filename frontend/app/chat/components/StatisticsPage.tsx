@@ -5,6 +5,7 @@ import { StatisticsDashboard } from "./StatisticsDashboard";
 import { QuestionsTab } from "./QuestionsTab";
 import { InvitationStatsComponent } from "./InvitationStats";
 import { QualityIssuesTab } from "./QualityIssuesTab";
+import { SatisfactionStatsTab } from "./SatisfactionStatsTab";
 import { secureLog } from "@/lib/utils/secureLogger";
 
 // ✅ HOOK SIMPLIFIÉ - Plus de fallback localStorage/Supabase
@@ -253,7 +254,7 @@ export const StatisticsPage: React.FC = () => {
     "day" | "week" | "month" | "year"
   >("month");
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "questions" | "invitations" | "quality"
+    "dashboard" | "questions" | "invitations" | "quality" | "satisfaction"
   >("dashboard");
   const [questionFilters, setQuestionFilters] = useState({
     search: "",
@@ -370,7 +371,7 @@ export const StatisticsPage: React.FC = () => {
 
   // Reset des références quand on change d'onglet
   const handleTabChange = (
-    newTab: "dashboard" | "questions" | "invitations" | "quality",
+    newTab: "dashboard" | "questions" | "invitations" | "quality" | "satisfaction",
   ) => {
     if (newTab !== activeTab) {
       secureLog.log(`[StatisticsPage] Changement onglet: ${activeTab} -> ${newTab} `);
@@ -950,6 +951,16 @@ export const StatisticsPage: React.FC = () => {
                 >
                   Invitations
                 </button>
+                <button
+                  onClick={() => handleTabChange("satisfaction")}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    activeTab === "satisfaction"
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Satisfaction
+                </button>
               </div>
             </div>
 
@@ -1113,6 +1124,8 @@ export const StatisticsPage: React.FC = () => {
               />
             )}
           </>
+        ) : activeTab === "satisfaction" ? (
+          <SatisfactionStatsTab timeRange={selectedTimeRange} />
         ) : null}
 
         {/* Modal de détail de question */}
