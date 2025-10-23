@@ -25,7 +25,7 @@ def get_user_profile(user_id: str) -> Dict[str, Any]:
         Returns empty dict if user not found or error occurs
     """
     try:
-        from backend.app.database.connection import get_pg_connection
+        from backend.app.core.database import get_pg_connection
 
         with get_pg_connection() as conn:
             with conn.cursor() as cur:
