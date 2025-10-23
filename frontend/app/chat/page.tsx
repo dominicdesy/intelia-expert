@@ -1590,24 +1590,6 @@ function ChatInterface() {
                 <HistoryMenu />
               </div>
 
-              {/* Camera Button - Visible uniquement sur iPhone */}
-              {isMobileDevice && (
-                <button
-                  onClick={handleCameraClick}
-                  disabled={isLoadingChat}
-                  className={`flex-shrink-0 w-10 h-10 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-lg hover:bg-blue-50 border border-gray-200 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
-                  title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : t("chat.uploadImages")}
-                  aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : t("chat.uploadImages")}
-                >
-                  <CameraIcon className="w-5 h-5" />
-                  {selectedImages.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
-                      {selectedImages.length}
-                    </span>
-                  )}
-                </button>
-              )}
-
               {/* Logo - masqué sur iPhone, visible sur desktop */}
               {!isMobileDevice && (
                 <div className="flex items-center space-x-2 ml-1">
