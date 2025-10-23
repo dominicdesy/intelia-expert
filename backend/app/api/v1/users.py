@@ -42,6 +42,7 @@ class UserProfileUpdate(BaseModel):
     country_code: Optional[str] = None
     area_code: Optional[str] = None
     phone_number: Optional[str] = None
+    whatsapp_number: Optional[str] = None  # 📱 WhatsApp number for chat integration
     country: Optional[str] = None
     linkedin_profile: Optional[str] = None
     company_name: Optional[str] = None
@@ -342,6 +343,7 @@ async def update_user_profile(
             "country_code",
             "area_code",
             "phone_number",
+            "whatsapp_number",  # 📱 WhatsApp number
             "country",
             "linkedin_profile",
             "company_name",
