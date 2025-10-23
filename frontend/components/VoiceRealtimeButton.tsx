@@ -21,6 +21,7 @@
 
 import React, { useEffect } from "react";
 import { useVoiceRealtime } from "@/lib/hooks/useVoiceRealtime";
+import { useTranslation } from "@/lib/languages/i18n";
 import { Mic, MicOff, Volume2, AlertCircle, Loader2 } from "lucide-react";
 
 // ============================================================
@@ -28,6 +29,7 @@ import { Mic, MicOff, Volume2, AlertCircle, Loader2 } from "lucide-react";
 // ============================================================
 
 export function VoiceRealtimeButton() {
+  const { t } = useTranslation();
   const {
     state,
     isConnected,
@@ -236,21 +238,21 @@ export function VoiceRealtimeButton() {
 
       {/* Indicateur état (texte) */}
       <div className="bg-gray-800/90 text-gray-300 rounded-full px-3 py-1 text-xs shadow-lg">
-        {state === "idle" && "Voice AI (Admin)"}
-        {state === "connecting" && "Connecting..."}
-        {state === "listening" && "🎤 Listening"}
-        {state === "speaking" && "🔊 Speaking"}
-        {state === "error" && "⚠️ Error"}
+        {state === "idle" && t("chat.voiceRealtimeIdle")}
+        {state === "connecting" && t("chat.voiceRealtimeConnecting")}
+        {state === "listening" && `🎤 ${t("chat.voiceRealtimeListening")}`}
+        {state === "speaking" && `🔊 ${t("chat.voiceRealtimeSpeaking")}`}
+        {state === "error" && `⚠️ ${t("chat.voiceRealtimeError")}`}
       </div>
 
       {/* Instructions (première utilisation) */}
       {state === "idle" && (
         <div className="absolute bottom-full right-0 mb-3 bg-gray-800 text-gray-200 rounded-lg p-3 shadow-xl text-xs max-w-xs hidden group-hover:block">
-          <div className="font-semibold mb-1">Voice Realtime (BETA)</div>
+          <div className="font-semibold mb-1">{t("chat.voiceRealtimeBetaTitle")}</div>
           <ul className="space-y-1 text-gray-400">
-            <li>• Click to start conversation</li>
-            <li>• Double-click to interrupt</li>
-            <li>• Super admin only</li>
+            <li>• {t("chat.voiceRealtimeClickStart")}</li>
+            <li>• {t("chat.voiceRealtimeDoubleClick")}</li>
+            <li>• {t("chat.voiceRealtimeAdminOnly")}</li>
           </ul>
         </div>
       )}
