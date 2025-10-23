@@ -286,28 +286,113 @@ async def handle_text_message(from_number: str, body: str, user_info: Dict[str, 
 
 async def handle_audio_message(from_number: str, media_url: str, user_info: Dict[str, Any]) -> str:
     """
-    Traite un message vocal WhatsApp
+    Traite un message vocal WhatsApp avec transcription Whisper + RAG
 
     Args:
         from_number: Numéro WhatsApp de l'expéditeur
-        media_url: URL du fichier audio
+        media_url: URL du fichier audio (Twilio)
         user_info: Informations de l'utilisateur
 
     Returns:
-        Réponse à envoyer
+        Réponse de l'assistant AI basée sur la transcription
     """
     try:
         user_email = user_info.get("user_email")
         logger.info(f"🎤 Audio message from {user_email}: {media_url}")
 
-        # TODO: Intégrer avec votre système de transcription existant
-        # Pour l'instant, réponse simple
-        response = "Message vocal reçu. Transcription et traitement en cours..."
+        # Créer un JWT token pour l'authentification
+        auth_token = create_whatsapp_user_token(user_info)
+        if not auth_token:
+            logger.error("❌ Failed to create auth token for audio transcription")
+            return "Désolé, impossible de vous authentifier pour la transcription audio."
 
-        return response
+        # Étape 1: Télécharger l'audio depuis Twilio
+        logger.info(f"📥 Downloading audio from Twilio: {media_url}")
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Télécharger l'audio avec auth Twilio
+            audio_response = await client.get(
+                media_url,
+                auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            )
+
+            if audio_response.status_code != 200:
+                logger.error(f"❌ Failed to download audio: {audio_response.status_code}")
+                return "Désolé, je n'ai pas pu télécharger votre message vocal."
+
+            audio_data = audio_response.content
+            content_type = audio_response.headers.get("Content-Type", "audio/ogg")
+
+            logger.info(f"✅ Audio downloaded: {len(audio_data)} bytes, type: {content_type}")
+
+        # Étape 2: Transcrire avec Whisper API
+        logger.info(f"🔊 Transcribing audio with Whisper API...")
+
+        # Déterminer l'extension du fichier audio
+        # WhatsApp envoie généralement en OGG/Opus
+        file_extension = "ogg"
+        if "mp3" in content_type:
+            file_extension = "mp3"
+        elif "mp4" in content_type or "m4a" in content_type:
+            file_extension = "m4a"
+        elif "wav" in content_type:
+            file_extension = "wav"
+
+        # Appeler Whisper API via OpenAI
+        import openai
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+
+        if not openai_api_key:
+            logger.error("❌ OPENAI_API_KEY not configured")
+            return "Désolé, le service de transcription n'est pas configuré."
+
+        # Créer un fichier temporaire pour Whisper (nécessaire pour l'API)
+        import io
+        audio_file = io.BytesIO(audio_data)
+        audio_file.name = f"whatsapp_audio.{file_extension}"
+
+        # Transcrire avec Whisper
+        client_openai = openai.OpenAI(api_key=openai_api_key)
+        transcription = client_openai.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file,
+            language="fr",  # Forcer le français (peut être détecté automatiquement si omis)
+        )
+
+        transcribed_text = transcription.text.strip()
+
+        if not transcribed_text:
+            logger.error("❌ Whisper returned empty transcription")
+            return "Désolé, je n'ai pas pu comprendre votre message vocal. Pouvez-vous réessayer ?"
+
+        logger.info(f"✅ Transcription completed: '{transcribed_text[:100]}...'")
+
+        # Étape 3: Traiter le texte transcrit avec RAG (comme un message texte normal)
+        logger.info(f"🤖 Processing transcription with RAG...")
+
+        # Réutiliser handle_text_message avec le texte transcrit
+        response = await handle_text_message(
+            from_number=from_number,
+            body=transcribed_text,
+            user_info=user_info
+        )
+
+        # Préfixer la réponse pour indiquer que c'était un message vocal
+        response_with_context = f"🎤 Message vocal transcrit: \"{transcribed_text}\"\n\n{response}"
+
+        logger.info(f"✅ Audio message processed successfully for {user_email}")
+
+        return response_with_context
+
+    except openai.APIError as e:
+        logger.error(f"❌ OpenAI Whisper API error: {e}")
+        return "Désolé, une erreur s'est produite lors de la transcription. Veuillez réessayer."
+    except httpx.TimeoutException:
+        logger.error("❌ Audio download timeout")
+        return "Désolé, le téléchargement de votre message vocal a pris trop de temps. Veuillez réessayer."
     except Exception as e:
-        logger.error(f"❌ Error handling audio message: {e}")
-        return "Désolé, je n'ai pas pu traiter votre message vocal."
+        logger.error(f"❌ Error handling audio message: {e}", exc_info=True)
+        return "Désolé, une erreur s'est produite lors du traitement de votre message vocal. Veuillez réessayer."
 
 
 async def handle_image_message(from_number: str, media_url: str, user_info: Dict[str, Any], message_text: Optional[str] = None) -> str:
