@@ -64,7 +64,166 @@ else:
 logger.info(f"✅ LLM service configured at: {LLM_CHAT_ENDPOINT}")
 
 
+# ==================== ACKNOWLEDGMENT MESSAGES (16 LANGUAGES) ====================
+
+ACKNOWLEDGMENT_MESSAGES = {
+    "en": {
+        "text": "Analyzing your question...",
+        "image": "Analyzing your image...",
+        "audio": "Transcribing and analyzing your voice message..."
+    },
+    "fr": {
+        "text": "Analyse de votre question en cours...",
+        "image": "Analyse de votre image en cours...",
+        "audio": "Transcription et analyse de votre message vocal en cours..."
+    },
+    "es": {
+        "text": "Analizando tu pregunta...",
+        "image": "Analizando tu imagen...",
+        "audio": "Transcribiendo y analizando tu mensaje de voz..."
+    },
+    "de": {
+        "text": "Ihre Frage wird analysiert...",
+        "image": "Ihr Bild wird analysiert...",
+        "audio": "Ihre Sprachnachricht wird transkribiert und analysiert..."
+    },
+    "it": {
+        "text": "Analisi della tua domanda in corso...",
+        "image": "Analisi della tua immagine in corso...",
+        "audio": "Trascrizione e analisi del tuo messaggio vocale in corso..."
+    },
+    "pt": {
+        "text": "Analisando sua pergunta...",
+        "image": "Analisando sua imagem...",
+        "audio": "Transcrevendo e analisando sua mensagem de voz..."
+    },
+    "nl": {
+        "text": "Je vraag wordt geanalyseerd...",
+        "image": "Je afbeelding wordt geanalyseerd...",
+        "audio": "Je spraakbericht wordt getranscribeerd en geanalyseerd..."
+    },
+    "pl": {
+        "text": "Analizuję twoje pytanie...",
+        "image": "Analizuję twój obraz...",
+        "audio": "Transkrybuję i analizuję twoją wiadomość głosową..."
+    },
+    "ja": {
+        "text": "質問を分析しています...",
+        "image": "画像を分析しています...",
+        "audio": "音声メッセージを文字起こしして分析しています..."
+    },
+    "zh": {
+        "text": "正在分析您的问题...",
+        "image": "正在分析您的图片...",
+        "audio": "正在转录和分析您的语音消息..."
+    },
+    "ar": {
+        "text": "جاري تحليل سؤالك...",
+        "image": "جاري تحليل صورتك...",
+        "audio": "جاري نسخ وتحليل رسالتك الصوتية..."
+    },
+    "hi": {
+        "text": "आपके प्रश्न का विश्लेषण किया जा रहा है...",
+        "image": "आपकी छवि का विश्लेषण किया जा रहा है...",
+        "audio": "आपके ध्वनि संदेश को ट्रांसक्राइब और विश्लेषण किया जा रहा है..."
+    },
+    "id": {
+        "text": "Menganalisis pertanyaan Anda...",
+        "image": "Menganalisis gambar Anda...",
+        "audio": "Mentranskripsi dan menganalisis pesan suara Anda..."
+    },
+    "th": {
+        "text": "กำลังวิเคราะห์คำถามของคุณ...",
+        "image": "กำลังวิเคราะห์รูปภาพของคุณ...",
+        "audio": "กำลังถอดเสียงและวิเคราะห์ข้อความเสียงของคุณ..."
+    },
+    "tr": {
+        "text": "Sorunuz analiz ediliyor...",
+        "image": "Resminiz analiz ediliyor...",
+        "audio": "Sesli mesajınız yazıya dönüştürülüyor ve analiz ediliyor..."
+    },
+    "vi": {
+        "text": "Đang phân tích câu hỏi của bạn...",
+        "image": "Đang phân tích hình ảnh của bạn...",
+        "audio": "Đang phiên âm và phân tích tin nhắn thoại của bạn..."
+    }
+}
+
+
 # ==================== HELPERS ====================
+
+def detect_language(text: str) -> str:
+    """
+    Détecte la langue du texte (simple détection basée sur des mots-clés communs)
+    Fallback: français par défaut
+
+    Args:
+        text: Texte à analyser
+
+    Returns:
+        Code langue ISO (en, fr, es, de, etc.)
+    """
+    if not text:
+        return "fr"
+
+    text_lower = text.lower()
+
+    # Dictionnaire de mots-clés pour chaque langue
+    language_keywords = {
+        "en": ["the", "what", "how", "when", "where", "why", "is", "are", "can", "could", "would"],
+        "fr": ["le", "la", "les", "est", "sont", "comment", "quand", "pourquoi", "quel", "quelle"],
+        "es": ["el", "la", "los", "las", "es", "son", "cómo", "cuándo", "por qué", "qué"],
+        "de": ["der", "die", "das", "ist", "sind", "wie", "wann", "warum", "was"],
+        "it": ["il", "la", "gli", "è", "sono", "come", "quando", "perché", "cosa"],
+        "pt": ["o", "a", "os", "as", "é", "são", "como", "quando", "por que", "o que"],
+        "nl": ["de", "het", "is", "zijn", "hoe", "wanneer", "waarom", "wat"],
+        "pl": ["jest", "są", "jak", "kiedy", "dlaczego", "co"],
+        "ar": ["ما", "كيف", "متى", "لماذا", "هل", "هو", "هي"],
+        "hi": ["क्या", "कैसे", "कब", "क्यों", "है", "हैं"],
+        "ja": ["は", "です", "ます", "何", "どう", "いつ", "なぜ"],
+        "zh": ["是", "的", "什么", "怎么", "为什么", "吗"],
+        "id": ["adalah", "apa", "bagaimana", "kapan", "mengapa"],
+        "th": ["คือ", "อะไร", "อย่างไร", "เมื่อไหร่", "ทำไม"],
+        "tr": ["ne", "nasıl", "ne zaman", "neden", "mi", "mı"],
+        "vi": ["là", "gì", "như thế nào", "khi nào", "tại sao"]
+    }
+
+    # Compter les correspondances pour chaque langue
+    scores = {}
+    for lang, keywords in language_keywords.items():
+        score = sum(1 for keyword in keywords if keyword in text_lower)
+        if score > 0:
+            scores[lang] = score
+
+    # Retourner la langue avec le score le plus élevé
+    if scores:
+        return max(scores, key=scores.get)
+
+    # Fallback: français
+    return "fr"
+
+
+def get_acknowledgment_message(message_type: str, text: str = "") -> str:
+    """
+    Obtient le message d'accusé de réception approprié dans la langue détectée
+
+    Args:
+        message_type: Type de message ("text", "image", "audio")
+        text: Texte du message (pour détecter la langue)
+
+    Returns:
+        Message d'accusé de réception dans la langue appropriée
+    """
+    # Détecter la langue
+    lang = detect_language(text) if text else "fr"
+
+    # Fallback sur anglais si langue non supportée
+    if lang not in ACKNOWLEDGMENT_MESSAGES:
+        lang = "en"
+
+    # Retourner le message approprié
+    return ACKNOWLEDGMENT_MESSAGES[lang].get(message_type, ACKNOWLEDGMENT_MESSAGES["fr"][message_type])
+
 
 def create_whatsapp_user_token(user_info: Dict[str, Any]) -> Optional[str]:
     """
@@ -697,18 +856,31 @@ async def whatsapp_webhook(
 
         return {"status": "unknown_user", "message": "User not recognized"}
 
-    # Déterminer le type de message
+    # Déterminer le type de message et envoyer l'accusé de réception immédiat
     response_text = None
     message_type = "text"
 
     try:
+        # 🎯 ENVOI IMMÉDIAT DE L'ACCUSÉ DE RÉCEPTION
+        # Avant de commencer le traitement (qui peut prendre du temps),
+        # on envoie un message immédiat pour informer l'utilisateur
         if NumMedia > 0 and MediaUrl0:
             # Message avec média
             if MediaContentType0 and MediaContentType0.startswith("audio/"):
                 message_type = "audio"
+                # Envoyer immédiatement l'accusé de réception pour audio
+                ack_message = get_acknowledgment_message("audio", Body or "")
+                send_whatsapp_message(From, ack_message)
+                logger.info(f"📤 Acknowledgment sent (audio): {ack_message}")
+
                 response_text = await handle_audio_message(From, MediaUrl0, user_info)
             elif MediaContentType0 and MediaContentType0.startswith("image/"):
                 message_type = "image"
+                # Envoyer immédiatement l'accusé de réception pour image
+                ack_message = get_acknowledgment_message("image", Body or "")
+                send_whatsapp_message(From, ack_message)
+                logger.info(f"📤 Acknowledgment sent (image): {ack_message}")
+
                 # Passer le texte du message s'il y en a un avec l'image
                 response_text = await handle_image_message(From, MediaUrl0, user_info, Body)
             else:
@@ -717,6 +889,11 @@ async def whatsapp_webhook(
         elif Body:
             # Message texte
             message_type = "text"
+            # Envoyer immédiatement l'accusé de réception pour texte
+            ack_message = get_acknowledgment_message("text", Body)
+            send_whatsapp_message(From, ack_message)
+            logger.info(f"📤 Acknowledgment sent (text): {ack_message}")
+
             response_text = await handle_text_message(From, Body, user_info)
         else:
             response_text = "Message vide reçu."
