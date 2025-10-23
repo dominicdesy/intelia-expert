@@ -126,18 +126,18 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         {user && <CurrencySelector user={user} />}
 
         {/* Toggle Mensuel / Annuel */}
-        <div className="flex items-center justify-center gap-4 py-4">
+        <div className="flex items-center justify-center gap-3 py-2">
           <span className={`text-sm font-medium ${billingCycle === "monthly" ? "text-gray-900" : "text-gray-500"}`}>
             Mensuel
           </span>
           <button
             onClick={() => setBillingCycle(billingCycle === "monthly" ? "yearly" : "monthly")}
-            className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            style={{ backgroundColor: billingCycle === "yearly" ? "#3B82F6" : "#D1D5DB" }}
+            className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            style={{ backgroundColor: billingCycle === "yearly" ? "#10B981" : "#D1D5DB" }}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                billingCycle === "yearly" ? "translate-x-6" : "translate-x-1"
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                billingCycle === "yearly" ? "translate-x-5.5" : "translate-x-0.5"
               }`}
             />
           </button>
@@ -190,7 +190,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <h3 className="text-2xl font-bold text-blue-600 mb-2">Pro</h3>
               <div className="flex items-baseline justify-center gap-1">
                 <span className="text-4xl font-bold text-gray-900">
-                  {billingCycle === "monthly" ? prices.pro : Math.round(prices.pro / 12 * 100) / 100}
+                  {billingCycle === "monthly" ? prices.pro.toFixed(2) : (prices.pro / 12).toFixed(2)}
                 </span>
                 <span className="text-xl text-gray-600">$</span>
                 <span className="text-sm text-gray-500">
@@ -199,7 +199,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               </div>
               {billingCycle === "yearly" && (
                 <p className="text-xs text-green-600 mt-1">
-                  Soit {Math.round(prices.pro / 12 * 100) / 100}$/mois
+                  Soit {(prices.pro / 12).toFixed(2)}$/mois
                 </p>
               )}
               <p className="text-xs text-blue-600 mt-2 font-medium">
@@ -207,19 +207,32 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               </p>
             </div>
 
-            <button
-              onClick={() => currentPlan === "pro" ? handleManageSubscription() : handleUpgrade("pro")}
-              disabled={isLoading || isManaging}
-              className="w-full py-3 px-6 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-6"
-            >
-              {isLoading && selectedPlan === "pro"
-                ? "Redirection..."
-                : isManaging && currentPlan === "pro"
-                ? "Chargement..."
-                : currentPlan === "pro"
-                ? "⚙️ Gérer mon abonnement"
-                : "Commencer l'essai"}
-            </button>
+            {currentPlan === "pro" ? (
+              <button
+                onClick={handleManageSubscription}
+                disabled={isManaging}
+                className="w-full py-3 px-6 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+              >
+                {isManaging ? "Chargement..." : "⚙️ Gérer mon abonnement"}
+              </button>
+            ) : (
+              <div className="space-y-2 mb-6">
+                <button
+                  onClick={() => handleUpgrade("pro")}
+                  disabled={isLoading}
+                  className="w-full py-2.5 px-4 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  {isLoading && selectedPlan === "pro" ? "Redirection..." : "🎁 Essai gratuit 14 jours"}
+                </button>
+                <button
+                  onClick={() => handleUpgrade("pro")}
+                  disabled={isLoading}
+                  className="w-full py-2 px-4 rounded-lg border-2 border-blue-600 text-blue-600 font-medium hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  Choisir ce plan
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Plan Elite */}
@@ -234,7 +247,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               <h3 className="text-2xl font-bold text-yellow-600 mb-2">Elite</h3>
               <div className="flex items-baseline justify-center gap-1">
                 <span className="text-4xl font-bold text-gray-900">
-                  {billingCycle === "monthly" ? prices.elite : Math.round(prices.elite / 12 * 100) / 100}
+                  {billingCycle === "monthly" ? prices.elite.toFixed(2) : (prices.elite / 12).toFixed(2)}
                 </span>
                 <span className="text-xl text-gray-600">$</span>
                 <span className="text-sm text-gray-500">
@@ -243,7 +256,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               </div>
               {billingCycle === "yearly" && (
                 <p className="text-xs text-green-600 mt-1">
-                  Soit {Math.round(prices.elite / 12 * 100) / 100}$/mois
+                  Soit {(prices.elite / 12).toFixed(2)}$/mois
                 </p>
               )}
               <p className="text-xs text-blue-600 mt-2 font-medium">
@@ -251,19 +264,32 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               </p>
             </div>
 
-            <button
-              onClick={() => currentPlan === "elite" ? handleManageSubscription() : handleUpgrade("elite")}
-              disabled={isLoading || isManaging}
-              className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold hover:from-yellow-600 hover:to-yellow-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-6 shadow-md"
-            >
-              {isLoading && selectedPlan === "elite"
-                ? "Redirection..."
-                : isManaging && currentPlan === "elite"
-                ? "Chargement..."
-                : currentPlan === "elite"
-                ? "⚙️ Gérer mon abonnement"
-                : "OBTENIR ELITE"}
-            </button>
+            {currentPlan === "elite" ? (
+              <button
+                onClick={handleManageSubscription}
+                disabled={isManaging}
+                className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold hover:from-yellow-600 hover:to-yellow-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-6 shadow-md"
+              >
+                {isManaging ? "Chargement..." : "⚙️ Gérer mon abonnement"}
+              </button>
+            ) : (
+              <div className="space-y-2 mb-6">
+                <button
+                  onClick={() => handleUpgrade("elite")}
+                  disabled={isLoading}
+                  className="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-bold hover:from-yellow-600 hover:to-yellow-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-md"
+                >
+                  {isLoading && selectedPlan === "elite" ? "Redirection..." : "🎁 Essai gratuit 14 jours"}
+                </button>
+                <button
+                  onClick={() => handleUpgrade("elite")}
+                  disabled={isLoading}
+                  className="w-full py-2 px-4 rounded-lg border-2 border-yellow-600 text-yellow-600 font-medium hover:bg-yellow-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  Choisir ce plan
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -279,106 +305,106 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-900">
+                  <th className="px-3 py-2 text-left font-semibold text-gray-900 w-1/2">
                     Fonctionnalités
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-gray-700">Essential</th>
-                  <th className="px-4 py-3 text-center font-semibold text-blue-600 bg-blue-50">Pro</th>
-                  <th className="px-4 py-3 text-center font-semibold text-yellow-600 bg-yellow-50">Elite</th>
+                  <th className="px-2 py-2 text-center font-semibold text-gray-700 w-1/6">Essential</th>
+                  <th className="px-2 py-2 text-center font-semibold text-blue-600 bg-blue-50 w-1/6">Pro</th>
+                  <th className="px-2 py-2 text-center font-semibold text-yellow-600 bg-yellow-50 w-1/6">Elite</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-gray-200">
                 {/* Base features */}
                 <tr className="bg-gray-50">
-                  <td colSpan={4} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                  <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-gray-700 uppercase">
                     Fonctionnalités de base
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-3">Langues supportées</td>
-                  <td className="px-4 py-3 text-center">16</td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30">16</td>
-                  <td className="px-4 py-3 text-center bg-yellow-50/30">16</td>
+                  <td className="px-3 py-2">Langues supportées</td>
+                  <td className="px-2 py-2 text-center">16</td>
+                  <td className="px-2 py-2 text-center bg-blue-50/30">16</td>
+                  <td className="px-2 py-2 text-center bg-yellow-50/30">16</td>
                 </tr>
                 <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-3">Adaptation au rôle</td>
-                  <td className="px-4 py-3 text-center"><Check className="w-5 h-5 text-green-600 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30"><Check className="w-5 h-5 text-green-600 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-yellow-50/30"><Check className="w-5 h-5 text-green-600 mx-auto" /></td>
+                  <td className="px-3 py-2">Adaptation au rôle</td>
+                  <td className="px-2 py-2 text-center"><Check className="w-4 h-4 text-green-600 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-blue-50/30"><Check className="w-4 h-4 text-green-600 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-yellow-50/30"><Check className="w-4 h-4 text-green-600 mx-auto" /></td>
                 </tr>
 
                 {/* Capacities */}
                 <tr className="bg-gray-50">
-                  <td colSpan={4} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                  <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-gray-700 uppercase">
                     Capacités
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-3">Requêtes / mois</td>
-                  <td className="px-4 py-3 text-center">100</td>
-                  <td className="px-4 py-3 text-center font-semibold text-blue-600 bg-blue-50/30">
+                  <td className="px-3 py-2">Requêtes / mois</td>
+                  <td className="px-2 py-2 text-center text-xs">100</td>
+                  <td className="px-2 py-2 text-center font-semibold text-blue-600 bg-blue-50/30 text-xs">
                     Illimitées*
                   </td>
-                  <td className="px-4 py-3 text-center font-semibold text-yellow-600 bg-yellow-50/30">
+                  <td className="px-2 py-2 text-center font-semibold text-yellow-600 bg-yellow-50/30 text-xs">
                     Illimitées*
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-3">Historique</td>
-                  <td className="px-4 py-3 text-center">30 jours</td>
-                  <td className="px-4 py-3 text-center font-semibold text-blue-600 bg-blue-50/30">
+                  <td className="px-3 py-2">Historique</td>
+                  <td className="px-2 py-2 text-center text-xs">30 jours</td>
+                  <td className="px-2 py-2 text-center font-semibold text-blue-600 bg-blue-50/30 text-xs">
                     Illimité
                   </td>
-                  <td className="px-4 py-3 text-center font-semibold text-yellow-600 bg-yellow-50/30">
+                  <td className="px-2 py-2 text-center font-semibold text-yellow-600 bg-yellow-50/30 text-xs">
                     Illimité
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-3">Export PDF</td>
-                  <td className="px-4 py-3 text-center"><X className="w-5 h-5 text-gray-400 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30"><Check className="w-5 h-5 text-green-600 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-yellow-50/30"><Check className="w-5 h-5 text-green-600 mx-auto" /></td>
+                  <td className="px-3 py-2">Export PDF</td>
+                  <td className="px-2 py-2 text-center"><X className="w-4 h-4 text-gray-400 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-blue-50/30"><Check className="w-4 h-4 text-green-600 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-yellow-50/30"><Check className="w-4 h-4 text-green-600 mx-auto" /></td>
                 </tr>
 
                 {/* AI Features */}
                 <tr className="bg-gray-50">
-                  <td colSpan={4} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                  <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-gray-700 uppercase">
                     Fonctionnalités IA
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-3">Analyse d'images</td>
-                  <td className="px-4 py-3 text-center"><X className="w-5 h-5 text-gray-400 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30">25/mois</td>
-                  <td className="px-4 py-3 text-center font-semibold text-yellow-600 bg-yellow-50/30">
+                  <td className="px-3 py-2">Analyse d'images</td>
+                  <td className="px-2 py-2 text-center"><X className="w-4 h-4 text-gray-400 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-blue-50/30 text-xs">25/mois</td>
+                  <td className="px-2 py-2 text-center font-semibold text-yellow-600 bg-yellow-50/30 text-xs">
                     Illimité*
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-3">Saisie vocale</td>
-                  <td className="px-4 py-3 text-center"><X className="w-5 h-5 text-gray-400 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30"><Check className="w-5 h-5 text-green-600 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-yellow-50/30"><Check className="w-5 h-5 text-green-600 mx-auto" /></td>
+                  <td className="px-3 py-2">Saisie vocale</td>
+                  <td className="px-2 py-2 text-center"><X className="w-4 h-4 text-gray-400 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-blue-50/30"><Check className="w-4 h-4 text-green-600 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-yellow-50/30"><Check className="w-4 h-4 text-green-600 mx-auto" /></td>
                 </tr>
                 <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-3">Assistant vocal</td>
-                  <td className="px-4 py-3 text-center"><X className="w-5 h-5 text-gray-400 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30"><X className="w-5 h-5 text-gray-400 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-yellow-50/30"><Check className="w-5 h-5 text-green-600 mx-auto" /></td>
+                  <td className="px-3 py-2">Assistant vocal</td>
+                  <td className="px-2 py-2 text-center"><X className="w-4 h-4 text-gray-400 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-blue-50/30"><X className="w-4 h-4 text-gray-400 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-yellow-50/30"><Check className="w-4 h-4 text-green-600 mx-auto" /></td>
                 </tr>
 
                 {/* Experience */}
                 <tr className="bg-gray-50">
-                  <td colSpan={4} className="px-4 py-2 text-xs font-semibold text-gray-700 uppercase">
+                  <td colSpan={4} className="px-3 py-1.5 text-xs font-semibold text-gray-700 uppercase">
                     Expérience
                   </td>
                 </tr>
                 <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-3">Sans publicité</td>
-                  <td className="px-4 py-3 text-center"><X className="w-5 h-5 text-gray-400 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-blue-50/30"><X className="w-5 h-5 text-gray-400 mx-auto" /></td>
-                  <td className="px-4 py-3 text-center bg-yellow-50/30"><Check className="w-5 h-5 text-green-600 mx-auto" /></td>
+                  <td className="px-3 py-2">Sans publicité</td>
+                  <td className="px-2 py-2 text-center"><X className="w-4 h-4 text-gray-400 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-blue-50/30"><X className="w-4 h-4 text-gray-400 mx-auto" /></td>
+                  <td className="px-2 py-2 text-center bg-yellow-50/30"><Check className="w-4 h-4 text-green-600 mx-auto" /></td>
                 </tr>
               </tbody>
             </table>
