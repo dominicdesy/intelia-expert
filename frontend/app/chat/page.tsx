@@ -182,38 +182,29 @@ const ChatInput = React.memo(
           </div>
         )}
 
-        {/* Input Area - New Mobile Layout: 📷🎤 | [texte] | ➤ */}
-        <div className="flex items-center gap-2 w-full">
-          {/* Left Group: Camera + Mic Icons (Mobile Only) */}
+        {/* Input Area - New Mobile Layout: 📷 | [texte] 🎤 | ➤ */}
+        <div className="flex items-center gap-1 w-full">
+          {/* Camera Button (Mobile Only - Far Left) */}
           {isMobileDevice && (
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {/* Camera Button */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isLoadingChat}
-                className={`h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
-                title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
-                aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
-                style={{
-                  minWidth: "48px",
-                  width: "48px",
-                  height: "48px",
-                }}
-              >
-                <CameraIcon className="w-5 h-5" />
-                {selectedImages.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
-                    {selectedImages.length}
-                  </span>
-                )}
-              </button>
-
-              {/* Voice Input Button */}
-              <VoiceInput
-                onTranscript={handleVoiceTranscript}
-                disabled={isLoadingChat}
-              />
-            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoadingChat}
+              className={`h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 flex-shrink-0 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
+              title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+              aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+              style={{
+                minWidth: "48px",
+                width: "48px",
+                height: "48px",
+              }}
+            >
+              <CameraIcon className="w-5 h-5" />
+              {selectedImages.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                  {selectedImages.length}
+                </span>
+              )}
+            </button>
           )}
 
           {/* Center: Text Input */}
@@ -243,6 +234,14 @@ const ChatInput = React.memo(
               }}
             />
           </div>
+
+          {/* Voice Input Button (Mobile Only - Right of text input) */}
+          {isMobileDevice && (
+            <VoiceInput
+              onTranscript={handleVoiceTranscript}
+              disabled={isLoadingChat}
+            />
+          )}
 
           {/* Right: Send/Stop Button */}
           <button
