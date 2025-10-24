@@ -301,7 +301,7 @@ class PDFExportService:
         canvas_obj.saveState()
 
         # Footer
-        footer_text = f"Intelia Expert - Expert en Aviculture • Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
+        footer_text = f"Intelia Cognito - Expert en Aviculture • Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
         canvas_obj.setFont('Helvetica-Oblique', 8)
         canvas_obj.setFillColor(self.INTELIA_GRAY)
         canvas_obj.drawCentredString(
@@ -423,7 +423,7 @@ class PDFExportService:
                 role_label = "👤 Utilisateur"
                 bg_color = self.USER_BG
             else:
-                role_label = "🤖 Intelia Expert"
+                role_label = "🤖 Intelia Cognito"
                 bg_color = self.ASSISTANT_BG
 
             # Timestamp formaté
@@ -477,8 +477,7 @@ class PDFExportService:
         story.append(Spacer(1, 0.1*inch))
 
         footer_final = Paragraph(
-            "Intelia Expert - Votre assistant intelligent en aviculture<br/>"
-            "📧 support@intelia.com | 🌐 www.intelia.com",
+            "Intelia Cognito - Votre assistant intelligent en aviculture",
             self.styles['Footer']
         )
         story.append(footer_final)
