@@ -328,18 +328,6 @@ const MessageList = React.memo(
   }) => {
     const messageComponents = useMemo(() => {
       return processedMessages.map((message, index) => {
-        // 🖼️ [DEBUG] Log pour tracer les imageUrls
-        if (message.isUser && (message.imageUrls || message.imageUrl)) {
-          console.log("🖼️ [DEBUG MessageList] Message avec images détecté:", {
-            id: message.id,
-            hasImageUrls: !!message.imageUrls,
-            imageUrlsCount: message.imageUrls?.length || 0,
-            hasImageUrl: !!message.imageUrl,
-            imageUrls: message.imageUrls,
-            imageUrl: message.imageUrl
-          });
-        }
-
         // Déterminer si on affiche l'avatar (premier message du groupe)
         const prevMessage = index > 0 ? processedMessages[index - 1] : null;
         const isGroupStart = !prevMessage || prevMessage.isUser !== message.isUser;
@@ -381,14 +369,6 @@ const MessageList = React.memo(
               {message.isUser ? (
                 <div className="space-y-2">
                   {/* Support multiple images */}
-                  {(() => {
-                    console.log("🖼️ [DEBUG Render] Condition imageUrls:", {
-                      hasImageUrls: !!message.imageUrls,
-                      length: message.imageUrls?.length || 0,
-                      willRender: !!(message.imageUrls && message.imageUrls.length > 0)
-                    });
-                    return null;
-                  })()}
                   {message.imageUrls && message.imageUrls.length > 0 ? (
                     message.imageUrls.length === 1 ? (
                       <img
@@ -1115,7 +1095,6 @@ function ChatInterface() {
 	  if (imagesToSend.length > 0) {
 		try {
 		  imageUrls = imagesToSend.map(img => URL.createObjectURL(img));
-		  console.log("🖼️ [DEBUG] URLs blob créées:", imageUrls);
 		} catch (error) {
 		  console.error("Error creating image URLs:", error);
 		}
@@ -1129,13 +1108,6 @@ function ChatInterface() {
 		imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
 		imageUrl: imageUrls.length > 0 ? imageUrls[0] : undefined, // Backward compatibility
 	  };
-
-	  console.log("🖼️ [DEBUG] Message utilisateur créé avec imageUrls:", {
-		id: userMessage.id,
-		hasImageUrls: !!userMessage.imageUrls,
-		imageUrlsCount: userMessage.imageUrls?.length || 0,
-		imageUrls: userMessage.imageUrls
-	  });
 
 	  let conversationIdToSend: string | undefined = undefined;
 
