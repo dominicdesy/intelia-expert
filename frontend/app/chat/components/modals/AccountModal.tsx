@@ -220,7 +220,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1240a4'}
                 onMouseLeave={(e) => !isLoading && (e.currentTarget.style.backgroundColor = '#226ae4')}
               >
-                {isLoading && selectedPlan === "pro" ? t("billing.redirecting") : t("billing.subscribe")}
+                {isLoading && selectedPlan === "pro" ? t("billing.redirecting") : t("billing.startFreeTrial")}
               </button>
             )}
           </article>
@@ -275,7 +275,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1ea866'}
                 onMouseLeave={(e) => !isLoading && (e.currentTarget.style.backgroundColor = '#2cc780')}
               >
-                {isLoading && selectedPlan === "elite" ? t("billing.redirecting") : t("billing.subscribe")}
+                {isLoading && selectedPlan === "elite" ? t("billing.redirecting") : t("billing.startFreeTrial")}
               </button>
             )}
           </article>
