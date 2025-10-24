@@ -509,6 +509,7 @@ export interface TranslationKeys {
   "billing.recommended": string;
   "billing.trial14days": string;
   "billing.startFreeTrial": string;
+  "billing.subscribe": string;
   "billing.manageSubscription": string;
   "billing.loading": string;
   "billing.redirecting": string;

@@ -141,8 +141,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         >
           {/* Essential */}
           <article
-            className="relative rounded-2xl bg-white p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md border"
-            style={{ borderColor: '#e5e7eb' }}
+            className="relative rounded-2xl p-6 shadow-[0_8px_24px_rgba(0,0,0,.08)] transition-all hover:-translate-y-1 border-2"
+            style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
               <span className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase shadow-sm" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
@@ -196,7 +196,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   Soit {(prices.pro / 12).toFixed(2)} $/mois
                 </p>
               )}
-              <p className="mt-2 text-xs font-medium" style={{ color: '#1240a4' }}>{t("billing.trial14days")}</p>
             </header>
 
             {currentPlan === "pro" ? (
@@ -219,7 +218,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1240a4'}
                 onMouseLeave={(e) => !isLoading && (e.currentTarget.style.backgroundColor = '#226ae4')}
               >
-                {isLoading && selectedPlan === "pro" ? t("billing.redirecting") : t("billing.startFreeTrial")}
+                {isLoading && selectedPlan === "pro" ? t("billing.redirecting") : t("billing.subscribe")}
               </button>
             )}
           </article>
@@ -252,7 +251,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   Soit {(prices.elite / 12).toFixed(2)} $/mois
                 </p>
               )}
-              <p className="mt-2 text-xs font-medium" style={{ color: '#2cc780' }}>{t("billing.trial14days")}</p>
             </header>
 
             {currentPlan === "elite" ? (
@@ -275,7 +273,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1ea866'}
                 onMouseLeave={(e) => !isLoading && (e.currentTarget.style.backgroundColor = '#2cc780')}
               >
-                {isLoading && selectedPlan === "elite" ? t("billing.redirecting") : t("billing.startFreeTrial")}
+                {isLoading && selectedPlan === "elite" ? t("billing.redirecting") : t("billing.subscribe")}
               </button>
             )}
           </article>
