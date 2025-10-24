@@ -77,10 +77,10 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
     cursor = conn.cursor()
 
     try:
-        # Temporarily disable FK triggers to allow updating circular dependencies
-        # session_replication_role = 'replica' disables all triggers and FKs
-        cursor.execute("SET session_replication_role = 'replica'")
-        logger.info(f"[anonymize_user_in_postgresql] FK triggers disabled (replication mode)")
+        # Temporarily drop FK constraint to allow updating circular dependencies
+        # stripe_subscriptions has FK to user_billing_info, creating a circular dependency
+        cursor.execute("ALTER TABLE stripe_subscriptions DROP CONSTRAINT IF EXISTS fk_subscription_user")
+        logger.info(f"[anonymize_user_in_postgresql] FK constraint fk_subscription_user temporarily dropped")
 
         # ========================================================================
         # 1. CONVERSATIONS & MESSAGES
@@ -222,19 +222,32 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         total_rows = sum(stats.values())
         logger.info(f"[anonymize_user_in_postgresql] ✅ Total rows anonymized: {total_rows}")
 
-        # Re-enable FK triggers
-        cursor.execute("SET session_replication_role = 'origin'")
-        logger.info(f"[anonymize_user_in_postgresql] FK triggers re-enabled")
+        # Recreate FK constraint
+        cursor.execute("""
+            ALTER TABLE stripe_subscriptions
+            ADD CONSTRAINT fk_subscription_user
+            FOREIGN KEY (user_email)
+            REFERENCES user_billing_info(user_email)
+            ON DELETE CASCADE
+        """)
+        logger.info(f"[anonymize_user_in_postgresql] FK constraint fk_subscription_user recreated")
 
         return stats
 
     except Exception as e:
         logger.error(f"[anonymize_user_in_postgresql] ❌ Error during anonymization: {str(e)}")
-        # Re-enable FK triggers even on error
+        # Recreate FK constraint even on error to maintain DB integrity
         try:
-            cursor.execute("SET session_replication_role = 'origin'")
-        except:
-            pass
+            cursor.execute("""
+                ALTER TABLE stripe_subscriptions
+                ADD CONSTRAINT fk_subscription_user
+                FOREIGN KEY (user_email)
+                REFERENCES user_billing_info(user_email)
+                ON DELETE CASCADE
+            """)
+            logger.info(f"[anonymize_user_in_postgresql] FK constraint fk_subscription_user recreated after error")
+        except Exception as fk_error:
+            logger.error(f"[anonymize_user_in_postgresql] ❌ Failed to recreate FK: {fk_error}")
         raise
 
 
