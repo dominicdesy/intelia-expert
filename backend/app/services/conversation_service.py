@@ -29,10 +29,16 @@ class ConversationService:
         language: str = "fr",
         response_source: str = "rag",
         response_confidence: float = 0.85,
-        processing_time_ms: int = None
+        processing_time_ms: int = None,
+        user_media_url: str = None,
+        user_media_type: str = None
     ) -> Dict[str, Any]:
         """
         Crée une nouvelle conversation avec le premier échange Q&R
+
+        Args:
+            user_media_url: URL du média attaché au message utilisateur (optionnel)
+            user_media_type: Type de média: 'audio', 'image', 'video', 'document' (optionnel)
 
         Returns:
             {
@@ -59,10 +65,13 @@ class ConversationService:
                     # Add user message (sequence 1)
                     cur.execute(
                         """
-                        INSERT INTO messages (conversation_id, role, content, sequence_number)
-                        VALUES (%s, 'user', %s, 1)
+                        INSERT INTO messages (
+                            conversation_id, role, content, sequence_number,
+                            media_url, media_type
+                        )
+                        VALUES (%s, 'user', %s, 1, %s, %s)
                         """,
-                        (conversation_id, user_message)
+                        (conversation_id, user_message, user_media_url, user_media_type)
                     )
 
                     # Add assistant message (sequence 2)
@@ -107,7 +116,9 @@ class ConversationService:
         content: str,
         response_source: str = None,
         response_confidence: float = None,
-        processing_time_ms: int = None
+        processing_time_ms: int = None,
+        media_url: str = None,
+        media_type: str = None
     ) -> Dict[str, Any]:
         """
         Ajoute un message à une conversation existante
@@ -116,6 +127,8 @@ class ConversationService:
             conversation_id: UUID de la conversation
             role: 'user' ou 'assistant'
             content: Contenu du message
+            media_url: URL du média attaché (optionnel)
+            media_type: Type de média: 'audio', 'image', 'video', 'document' (optionnel)
 
         Returns:
             {
@@ -132,10 +145,11 @@ class ConversationService:
                         INSERT INTO messages (
                             conversation_id, role, content,
                             response_source, response_confidence, processing_time_ms,
+                            media_url, media_type,
                             sequence_number
                         )
                         VALUES (
-                            %s::uuid, %s, %s, %s, %s, %s,
+                            %s::uuid, %s, %s, %s, %s, %s, %s, %s,
                             (SELECT COALESCE(MAX(sequence_number), 0) + 1
                              FROM messages
                              WHERE conversation_id = %s::uuid)
@@ -149,6 +163,8 @@ class ConversationService:
                             response_source,
                             response_confidence,
                             processing_time_ms,
+                            media_url,
+                            media_type,
                             conversation_id
                         )
                     )

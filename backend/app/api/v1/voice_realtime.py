@@ -38,6 +38,9 @@ import websockets
 
 logger = logging.getLogger(__name__)
 
+# Import conversation service for database storage
+from app.services.conversation_service import conversation_service
+
 # Imports depuis le projet (réutilisation sans modification)
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'llm'))
@@ -203,6 +206,11 @@ class VoiceRealtimeSession:
         # Langue détectée (pour ajuster vitesse)
         self.detected_language: Optional[str] = None
 
+        # Conversation history for database storage
+        self.conversation_history: list = []
+        self.current_user_message: Optional[str] = None
+        self.current_assistant_response: Optional[str] = None
+
     async def connect_openai(self):
         """Connexion WebSocket à OpenAI Realtime API"""
         logger.info(f"🔌 Connecting to OpenAI Realtime API (session {self.session_id})")
@@ -325,6 +333,16 @@ class VoiceRealtimeSession:
         Injecter contexte RAG si prêt, sinon attendre max 200ms
         """
         logger.info(f"🎤 Speech ended: '{final_transcript}'")
+
+        # Store user message for database save
+        if final_transcript:
+            self.current_user_message = final_transcript
+            # Add to conversation history with placeholder for assistant response
+            self.conversation_history.append({
+                "user": final_transcript,
+                "assistant": "[AUDIO RESPONSE]",  # Will be updated if text response available
+                "timestamp": datetime.now().isoformat()
+            })
 
         # Attendre contexte si pas encore prêt (max 200ms)
         if self.context_task and not self.context_ready:
@@ -486,12 +504,80 @@ class VoiceRealtimeSession:
             "message": "Session terminée (durée maximale atteinte)"
         }))
 
+    async def save_to_database(self):
+        """Save voice conversation to database"""
+        try:
+            if not self.conversation_history:
+                logger.info("No conversation history to save")
+                return
+
+            # Get user UUID from database using user_id
+            from app.core.database import get_pg_connection
+            from psycopg2.extras import RealDictCursor
+
+            with get_pg_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Get user UUID - user_id might be int or UUID string
+                    cur.execute("SELECT id FROM auth.users WHERE id = %s", (str(self.user_id),))
+                    user_row = cur.fetchone()
+
+                    if not user_row:
+                        logger.warning(f"Cannot save voice conversation: user {self.user_id} not found")
+                        return
+
+                    user_uuid = str(user_row['id'])
+
+            # Detect language from first user message
+            first_message = self.conversation_history[0]["user"] if self.conversation_history else ""
+            detected_language = self.detected_language or "en"
+
+            # Create conversation with all Q&A pairs
+            session_id = f"voice_{self.session_id}"
+
+            # Create conversation with first exchange
+            if len(self.conversation_history) > 0:
+                first_exchange = self.conversation_history[0]
+                result = conversation_service.create_conversation(
+                    session_id=session_id,
+                    user_id=user_uuid,
+                    user_message=first_exchange["user"],
+                    assistant_response=first_exchange["assistant"],
+                    language=detected_language,
+                    response_source="voice_realtime",
+                    response_confidence=None
+                )
+                conversation_id = result["conversation_id"]
+                logger.info(f"💾 Voice conversation created: {conversation_id}")
+
+                # Add remaining exchanges
+                for exchange in self.conversation_history[1:]:
+                    conversation_service.add_message(
+                        conversation_id=conversation_id,
+                        role="user",
+                        content=exchange["user"]
+                    )
+                    conversation_service.add_message(
+                        conversation_id=conversation_id,
+                        role="assistant",
+                        content=exchange["assistant"],
+                        response_source="voice_realtime"
+                    )
+
+                logger.info(f"💾 Voice conversation saved: {len(self.conversation_history)} exchanges")
+
+        except Exception as e:
+            # Don't block cleanup if DB save fails
+            logger.error(f"❌ Failed to save voice conversation to database: {e}", exc_info=True)
+
     async def cleanup(self):
         """Nettoyer ressources"""
         self.running = False
 
         if self.openai_ws:
             await self.openai_ws.close()
+
+        # Save conversation to database
+        await self.save_to_database()
 
         # Log métriques finales
         duration = time.time() - self.start_time

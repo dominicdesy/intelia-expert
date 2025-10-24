@@ -13,6 +13,7 @@ import time
 import re
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+from uuid import uuid4
 
 from fastapi import APIRouter, Request, HTTPException, Form
 from twilio.rest import Client
@@ -36,6 +37,9 @@ except ImportError:
 
 # Import i18n system for translations
 from app.utils.i18n import t
+
+# Import conversation service for database storage
+from app.services.conversation_service import conversation_service
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp-webhooks"])
 logger = logging.getLogger(__name__)
@@ -211,13 +215,14 @@ def get_user_by_whatsapp_number(whatsapp_number: str) -> Optional[Dict[str, Any]
 
         # Chercher l'utilisateur par numéro WhatsApp
         response = supabase.table("users").select(
-            "email, whatsapp_number, first_name, last_name, plan, user_type"
+            "id, email, whatsapp_number, first_name, last_name, plan, user_type"
         ).eq("whatsapp_number", clean_number).execute()
 
         if response.data and len(response.data) > 0:
             user = response.data[0]
             logger.info(f"✅ User found for WhatsApp: {user.get('email')}")
             return {
+                "user_id": str(user.get("id")),  # UUID as string for conversation service
                 "user_email": user.get("email"),
                 "whatsapp_number": user.get("whatsapp_number"),
                 "first_name": user.get("first_name"),
@@ -241,7 +246,14 @@ def get_user_by_whatsapp_number(whatsapp_number: str) -> Optional[Dict[str, Any]
 
 # ==================== RAG INTEGRATION VIA HTTP (MICROSERVICES) ====================
 
-async def handle_text_message(from_number: str, body: str, user_info: Dict[str, Any], conversation_id: Optional[str] = None) -> str:
+async def handle_text_message(
+    from_number: str,
+    body: str,
+    user_info: Dict[str, Any],
+    conversation_id: Optional[str] = None,
+    media_url: Optional[str] = None,
+    media_type: Optional[str] = None
+) -> str:
     """
     Traite un message texte WhatsApp via appel HTTP au service LLM
 
@@ -355,6 +367,62 @@ async def handle_text_message(from_number: str, body: str, user_info: Dict[str, 
             f"length={len(full_answer)} chars"
         )
 
+        # ============================================================
+        # 💾 SAVE TO DATABASE - WhatsApp conversations
+        # ============================================================
+        try:
+            user_id = user_info.get("user_id")
+            if user_id:
+                # Detect language from user message
+                detected_language = detect_language(body)
+
+                # Generate session_id from conversation_id (or create new UUID)
+                # conversation_id format: "whatsapp_{phone_number}"
+                # We need a UUID for session_id
+                session_id = str(uuid4())
+
+                # Check if conversation already exists by session_id
+                # For WhatsApp, we use a persistent session per phone number
+                # So we'll use the conversation_id as a lookup key
+                existing_conv = conversation_service.get_conversation_by_session(conversation_id)
+
+                if existing_conv:
+                    # Add messages to existing conversation
+                    conversation_service.add_message(
+                        conversation_id=existing_conv["id"],
+                        role="user",
+                        content=body,
+                        media_url=media_url,
+                        media_type=media_type
+                    )
+                    conversation_service.add_message(
+                        conversation_id=existing_conv["id"],
+                        role="assistant",
+                        content=full_answer,
+                        response_source=source,
+                        response_confidence=confidence
+                    )
+                    logger.info(f"💾 WhatsApp messages saved to existing conversation: {existing_conv['id']}")
+                else:
+                    # Create new conversation with first Q&A
+                    result = conversation_service.create_conversation(
+                        session_id=conversation_id,  # Use conversation_id as session_id for WhatsApp
+                        user_id=user_id,
+                        user_message=body,
+                        assistant_response=full_answer,
+                        language=detected_language,
+                        response_source=source,
+                        response_confidence=confidence,
+                        user_media_url=media_url,
+                        user_media_type=media_type
+                    )
+                    logger.info(f"💾 WhatsApp conversation created: {result['conversation_id']}")
+            else:
+                logger.warning("⚠️ Cannot save WhatsApp conversation: user_id not found in user_info")
+        except Exception as e:
+            # Don't block user response if DB save fails
+            logger.error(f"❌ Failed to save WhatsApp conversation to database: {e}", exc_info=True)
+
         return full_answer
 
     except httpx.TimeoutException:
@@ -455,10 +523,13 @@ async def handle_audio_message(from_number: str, media_url: str, user_info: Dict
         logger.info(f"🤖 Processing transcription with RAG...")
 
         # Réutiliser handle_text_message avec le texte transcrit
+        # Pass media_url to save audio file URL in database
         response = await handle_text_message(
             from_number=from_number,
             body=transcribed_text,
-            user_info=user_info
+            user_info=user_info,
+            media_url=media_url,  # Save Twilio audio URL
+            media_type="audio"
         )
 
         # Préfixer la réponse pour indiquer que c'était un message vocal
@@ -589,6 +660,56 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
                 f"✅ Vision analysis received for {user_email} | "
                 f"model={model}, length={len(analysis)} chars"
             )
+
+            # ============================================================
+            # 💾 SAVE TO DATABASE - WhatsApp image analysis
+            # ============================================================
+            try:
+                user_id = user_info.get("user_id")
+                if user_id:
+                    # Detect language from message_text
+                    detected_language = detect_language(message_text)
+
+                    # Use same session logic as text messages
+                    conversation_id = f"whatsapp_{tenant_id}"
+                    existing_conv = conversation_service.get_conversation_by_session(conversation_id)
+
+                    if existing_conv:
+                        # Add messages to existing conversation
+                        conversation_service.add_message(
+                            conversation_id=existing_conv["id"],
+                            role="user",
+                            content=f"[IMAGE] {message_text}",  # Prefix to indicate image
+                            media_url=media_url,  # Save Twilio image URL
+                            media_type="image"
+                        )
+                        conversation_service.add_message(
+                            conversation_id=existing_conv["id"],
+                            role="assistant",
+                            content=analysis,
+                            response_source="vision",
+                            response_confidence=None  # Vision API doesn't return confidence
+                        )
+                        logger.info(f"💾 WhatsApp image messages saved to existing conversation: {existing_conv['id']}")
+                    else:
+                        # Create new conversation with image Q&A
+                        result = conversation_service.create_conversation(
+                            session_id=conversation_id,
+                            user_id=user_id,
+                            user_message=f"[IMAGE] {message_text}",
+                            assistant_response=analysis,
+                            language=detected_language,
+                            response_source="vision",
+                            response_confidence=None,
+                            user_media_url=media_url,  # Save Twilio image URL
+                            user_media_type="image"
+                        )
+                        logger.info(f"💾 WhatsApp image conversation created: {result['conversation_id']}")
+                else:
+                    logger.warning("⚠️ Cannot save WhatsApp image conversation: user_id not found in user_info")
+            except Exception as e:
+                # Don't block user response if DB save fails
+                logger.error(f"❌ Failed to save WhatsApp image conversation to database: {e}", exc_info=True)
 
             return analysis
 
