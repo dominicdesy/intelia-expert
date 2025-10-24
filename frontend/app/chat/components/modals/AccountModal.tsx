@@ -157,8 +157,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <span className="text-xl" style={{ color: '#6b7280' }}>$</span>
                 <span className="text-sm" style={{ color: '#6b7280' }}>/ mois</span>
               </div>
-              {/* Spacer to match Pro/Elite height */}
-              <div className="mt-1 h-4"></div>
+              {/* Spacer to match Pro/Elite trial text height */}
+              <div className="mt-2 h-[18px]"></div>
             </header>
 
             <button
@@ -198,6 +198,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   Soit {(prices.pro / 12).toFixed(2)} $/mois
                 </p>
               )}
+              <p className="mt-2 text-xs font-medium" style={{ color: '#1240a4' }}>{t("billing.trial14days")}</p>
             </header>
 
             {currentPlan === "pro" ? (
@@ -253,6 +254,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   Soit {(prices.elite / 12).toFixed(2)} $/mois
                 </p>
               )}
+              <p className="mt-2 text-xs font-medium" style={{ color: '#2cc780' }}>{t("billing.trial14days")}</p>
             </header>
 
             {currentPlan === "elite" ? (
