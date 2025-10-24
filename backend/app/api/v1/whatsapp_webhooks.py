@@ -13,7 +13,7 @@ import time
 import re
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
-from uuid import uuid4
+from uuid import uuid4, uuid5, NAMESPACE_DNS
 
 from fastapi import APIRouter, Request, HTTPException, Form
 from twilio.rest import Client
@@ -77,6 +77,33 @@ logger.info(f"✅ LLM service configured at: {LLM_CHAT_ENDPOINT}")
 
 
 # ==================== HELPERS ====================
+
+def generate_whatsapp_session_uuid(phone_number: str) -> str:
+    """
+    Génère un UUID déterministe à partir d'un numéro WhatsApp
+
+    Utilise UUID v5 (name-based SHA-1) pour créer un UUID valide et reproductible
+    à partir du numéro de téléphone. Cela garantit que:
+    - Le même numéro génère toujours le même UUID
+    - L'UUID est valide pour PostgreSQL UUID type
+    - La conversation est continue pour chaque numéro
+
+    Args:
+        phone_number: Numéro WhatsApp (format: whatsapp:+1234567890 ou +1234567890)
+
+    Returns:
+        UUID v5 sous forme de string (ex: "a1b2c3d4-e5f6-5789-abcd-ef0123456789")
+    """
+    # Normaliser le numéro (enlever le préfixe whatsapp: et les espaces)
+    clean_number = phone_number.replace("whatsapp:", "").strip()
+
+    # Générer UUID v5 avec namespace DNS et le numéro de téléphone
+    # On préfixe avec "whatsapp:" pour éviter les collisions avec d'autres systèmes
+    namespace_name = f"whatsapp:{clean_number}"
+    session_uuid = uuid5(NAMESPACE_DNS, namespace_name)
+
+    return str(session_uuid)
+
 
 def detect_language(text: str) -> str:
     """
@@ -284,9 +311,9 @@ async def handle_text_message(
         # Utiliser le numéro WhatsApp comme tenant_id (identifiant utilisateur unique)
         tenant_id = from_number.replace("whatsapp:", "").strip()
 
-        # Si pas de conversation_id fourni, créer un basé sur le numéro
+        # Si pas de conversation_id fourni, générer un UUID déterministe depuis le numéro
         if not conversation_id:
-            conversation_id = f"whatsapp_{tenant_id}"
+            conversation_id = generate_whatsapp_session_uuid(from_number)
 
         logger.info(f"📝 WhatsApp message from {user_email} ({user_name}): {body[:100]}...")
         logger.info(f"🔧 Calling LLM service: {LLM_CHAT_ENDPOINT}")
@@ -379,14 +406,8 @@ async def handle_text_message(
                 # Detect language from user message
                 detected_language = detect_language(body)
 
-                # Generate session_id from conversation_id (or create new UUID)
-                # conversation_id format: "whatsapp_{phone_number}"
-                # We need a UUID for session_id
-                session_id = str(uuid4())
-
-                # Check if conversation already exists by session_id
-                # For WhatsApp, we use a persistent session per phone number
-                # So we'll use the conversation_id as a lookup key
+                # conversation_id is already a deterministic UUID from phone number
+                # Check if conversation already exists for this WhatsApp number
                 existing_conv = conversation_service.get_conversation_by_session(conversation_id)
 
                 if existing_conv:
@@ -707,8 +728,8 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
                     # Detect language from message_text
                     detected_language = detect_language(message_text)
 
-                    # Use same session logic as text messages
-                    conversation_id = f"whatsapp_{tenant_id}"
+                    # Generate deterministic UUID from WhatsApp number (same as text messages)
+                    conversation_id = generate_whatsapp_session_uuid(from_number)
                     existing_conv = conversation_service.get_conversation_by_session(conversation_id)
 
                     if existing_conv:

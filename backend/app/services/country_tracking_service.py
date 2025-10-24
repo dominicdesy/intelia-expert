@@ -342,7 +342,8 @@ class CountryTrackingService:
                         }
 
                     # Determine risk level
-                    risk_score = analysis["calculated_risk_score"]
+                    # Use .get() with default to handle missing or NULL values
+                    risk_score = analysis.get("calculated_risk_score", 0)
                     if risk_score < 30:
                         risk_level = "low"
                     elif risk_score < 60:

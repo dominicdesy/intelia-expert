@@ -31,6 +31,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from collections import defaultdict
+from uuid import uuid4
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
@@ -183,7 +184,8 @@ class VoiceRealtimeSession:
         self.client_ws = websocket
         self.openai_ws: Optional[websockets.WebSocketClientProtocol] = None
 
-        self.session_id = f"{user_id}_{int(time.time())}"
+        # Generate proper UUID for session_id (required by PostgreSQL UUID type)
+        self.session_id = str(uuid4())
         self.start_time = time.time()
         self.running = False
 
@@ -511,28 +513,15 @@ class VoiceRealtimeSession:
                 logger.info("No conversation history to save")
                 return
 
-            # Get user UUID from database using user_id
-            from app.core.database import get_pg_connection
-            from psycopg2.extras import RealDictCursor
-
-            with get_pg_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Get user UUID - user_id might be int or UUID string
-                    cur.execute("SELECT id FROM auth.users WHERE id = %s", (str(self.user_id),))
-                    user_row = cur.fetchone()
-
-                    if not user_row:
-                        logger.warning(f"Cannot save voice conversation: user {self.user_id} not found")
-                        return
-
-                    user_uuid = str(user_row['id'])
+            # Use user_id directly as UUID (already from Supabase auth)
+            user_uuid = str(self.user_id)
 
             # Detect language from first user message
             first_message = self.conversation_history[0]["user"] if self.conversation_history else ""
             detected_language = self.detected_language or "en"
 
-            # Create conversation with all Q&A pairs
-            session_id = f"voice_{self.session_id}"
+            # Use session_id directly (already a UUID)
+            session_id = self.session_id
 
             # Create conversation with first exchange
             if len(self.conversation_history) > 0:
@@ -631,40 +620,27 @@ async def voice_realtime_endpoint(
     user_id = 1  # TODO: user.id quand auth activée
 
     # TODO: Quand l'authentification sera activée, récupérer user_email depuis le JWT
-    # Pour l'instant, récupérer depuis la DB avec user_id
-    # VÉRIFICATION DU PLAN POUR L'ASSISTANT VOCAL
-    try:
-        from app.core.database import get_pg_connection
-        from psycopg2.extras import RealDictCursor
-
-        with get_pg_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Récupérer l'email de l'utilisateur à partir de l'ID
-                cur.execute("SELECT email FROM auth.users WHERE id = %s", (user_id,))
-                user_row = cur.fetchone()
-
-                if user_row:
-                    user_email = user_row['email']
-
-                    # Vérifier le plan
-                    from app.services.usage_limiter import get_user_plan_and_quota
-                    plan_name, _, _ = get_user_plan_and_quota(user_email)
-                    plan_lower = plan_name.lower() if plan_name else "essential"
-
-                    # Assistant vocal réservé aux plans Pro, Elite et Intelia
-                    if plan_lower not in ["pro", "elite", "intelia"]:
-                        logger.warning(f"❌ Voice assistant denied for {user_email} (plan: {plan_name})")
-                        await websocket.close(
-                            code=4003,
-                            reason="🔒 L'assistant vocal est réservé aux plans Pro et Elite. Mettez à niveau votre abonnement."
-                        )
-                        return
-
-                    logger.info(f"✅ Voice access granted for {user_email} (plan: {plan_name})")
-    except Exception as e:
-        logger.error(f"❌ Error checking plan for voice access: {e}")
-        # En cas d'erreur, autoriser par défaut pour ne pas bloquer le service
-        # TODO: En production, mettre await websocket.close() pour refuser par défaut
+    # VÉRIFICATION DU PLAN POUR L'ASSISTANT VOCAL - DISABLED (auth.users not in PostgreSQL)
+    # TODO: When auth is enabled, check plan using Supabase client or users table
+    # try:
+    #     from app.services.usage_limiter import get_user_plan_and_quota
+    #     plan_name, _, _ = get_user_plan_and_quota(user_email)
+    #     plan_lower = plan_name.lower() if plan_name else "essential"
+    #
+    #     # Assistant vocal réservé aux plans Pro, Elite et Intelia
+    #     if plan_lower not in ["pro", "elite", "intelia"]:
+    #         logger.warning(f"❌ Voice assistant denied for {user_email} (plan: {plan_name})")
+    #         await websocket.close(
+    #             code=4003,
+    #             reason="🔒 L'assistant vocal est réservé aux plans Pro et Elite. Mettez à niveau votre abonnement."
+    #         )
+    #         return
+    #
+    #     logger.info(f"✅ Voice access granted for {user_email} (plan: {plan_name})")
+    # except Exception as e:
+    #     logger.error(f"❌ Error checking plan for voice access: {e}")
+    #     # En cas d'erreur, autoriser par défaut pour ne pas bloquer le service
+    logger.info("⚠️ Voice plan check disabled (auth not fully implemented)")
 
     # Rate limiting - TEMPORARILY DISABLED FOR TESTING
     # if not rate_limiter.check_rate_limit(user_id):
