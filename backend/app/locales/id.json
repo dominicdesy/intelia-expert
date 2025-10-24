@@ -10,5 +10,8 @@
   "pdf.userLabel": "Pengguna",
   "pdf.assistantLabel": "Intelia Cognito",
   "pdf.page": "Halaman",
-  "pdf.yourIntelligentAssistant": "Asisten cerdas peternakan unggas Anda"
+  "pdf.yourIntelligentAssistant": "Asisten cerdas peternakan unggas Anda",
+  "whatsapp.analyzingText": "Menganalisis pertanyaan Anda...",
+  "whatsapp.analyzingImage": "Menganalisis gambar Anda...",
+  "whatsapp.analyzingAudio": "Mentranskripsi dan menganalisis pesan suara Anda..."
 }

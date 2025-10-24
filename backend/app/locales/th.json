@@ -10,5 +10,8 @@
   "pdf.userLabel": "ผู้ใช้",
   "pdf.assistantLabel": "Intelia Cognito",
   "pdf.page": "หน้า",
-  "pdf.yourIntelligentAssistant": "ผู้ช่วยอัจฉริยะด้านสัตว์ปีกของคุณ"
+  "pdf.yourIntelligentAssistant": "ผู้ช่วยอัจฉริยะด้านสัตว์ปีกของคุณ",
+  "whatsapp.analyzingText": "กำลังวิเคราะห์คำถามของคุณ...",
+  "whatsapp.analyzingImage": "กำลังวิเคราะห์รูปภาพของคุณ...",
+  "whatsapp.analyzingAudio": "กำลังถอดเสียงและวิเคราะห์ข้อความเสียงของคุณ..."
 }

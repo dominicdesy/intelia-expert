@@ -34,6 +34,9 @@ except ImportError:
     logger_init.error("❌ Failed to import create_access_token from auth")
     AUTH_AVAILABLE = False
 
+# Import i18n system for translations
+from app.utils.i18n import t
+
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp-webhooks"])
 logger = logging.getLogger(__name__)
 
@@ -64,92 +67,6 @@ else:
     logger.warning("⚠️ Twilio credentials not configured - WhatsApp disabled")
 
 logger.info(f"✅ LLM service configured at: {LLM_CHAT_ENDPOINT}")
-
-
-# ==================== ACKNOWLEDGMENT MESSAGES (16 LANGUAGES) ====================
-
-ACKNOWLEDGMENT_MESSAGES = {
-    "en": {
-        "text": "Analyzing your question...",
-        "image": "Analyzing your image...",
-        "audio": "Transcribing and analyzing your voice message..."
-    },
-    "fr": {
-        "text": "Analyse de votre question en cours...",
-        "image": "Analyse de votre image en cours...",
-        "audio": "Transcription et analyse de votre message vocal en cours..."
-    },
-    "es": {
-        "text": "Analizando tu pregunta...",
-        "image": "Analizando tu imagen...",
-        "audio": "Transcribiendo y analizando tu mensaje de voz..."
-    },
-    "de": {
-        "text": "Ihre Frage wird analysiert...",
-        "image": "Ihr Bild wird analysiert...",
-        "audio": "Ihre Sprachnachricht wird transkribiert und analysiert..."
-    },
-    "it": {
-        "text": "Analisi della tua domanda in corso...",
-        "image": "Analisi della tua immagine in corso...",
-        "audio": "Trascrizione e analisi del tuo messaggio vocale in corso..."
-    },
-    "pt": {
-        "text": "Analisando sua pergunta...",
-        "image": "Analisando sua imagem...",
-        "audio": "Transcrevendo e analisando sua mensagem de voz..."
-    },
-    "nl": {
-        "text": "Je vraag wordt geanalyseerd...",
-        "image": "Je afbeelding wordt geanalyseerd...",
-        "audio": "Je spraakbericht wordt getranscribeerd en geanalyseerd..."
-    },
-    "pl": {
-        "text": "Analizuję twoje pytanie...",
-        "image": "Analizuję twój obraz...",
-        "audio": "Transkrybuję i analizuję twoją wiadomość głosową..."
-    },
-    "ja": {
-        "text": "質問を分析しています...",
-        "image": "画像を分析しています...",
-        "audio": "音声メッセージを文字起こしして分析しています..."
-    },
-    "zh": {
-        "text": "正在分析您的问题...",
-        "image": "正在分析您的图片...",
-        "audio": "正在转录和分析您的语音消息..."
-    },
-    "ar": {
-        "text": "جاري تحليل سؤالك...",
-        "image": "جاري تحليل صورتك...",
-        "audio": "جاري نسخ وتحليل رسالتك الصوتية..."
-    },
-    "hi": {
-        "text": "आपके प्रश्न का विश्लेषण किया जा रहा है...",
-        "image": "आपकी छवि का विश्लेषण किया जा रहा है...",
-        "audio": "आपके ध्वनि संदेश को ट्रांसक्राइब और विश्लेषण किया जा रहा है..."
-    },
-    "id": {
-        "text": "Menganalisis pertanyaan Anda...",
-        "image": "Menganalisis gambar Anda...",
-        "audio": "Mentranskripsi dan menganalisis pesan suara Anda..."
-    },
-    "th": {
-        "text": "กำลังวิเคราะห์คำถามของคุณ...",
-        "image": "กำลังวิเคราะห์รูปภาพของคุณ...",
-        "audio": "กำลังถอดเสียงและวิเคราะห์ข้อความเสียงของคุณ..."
-    },
-    "tr": {
-        "text": "Sorunuz analiz ediliyor...",
-        "image": "Resminiz analiz ediliyor...",
-        "audio": "Sesli mesajınız yazıya dönüştürülüyor ve analiz ediliyor..."
-    },
-    "vi": {
-        "text": "Đang phân tích câu hỏi của bạn...",
-        "image": "Đang phân tích hình ảnh của bạn...",
-        "audio": "Đang phiên âm và phân tích tin nhắn thoại của bạn..."
-    }
-}
 
 
 # ==================== HELPERS ====================
@@ -217,14 +134,20 @@ def get_acknowledgment_message(message_type: str, text: str = "") -> str:
         Message d'accusé de réception dans la langue appropriée
     """
     # Détecter la langue
-    lang = detect_language(text) if text else "fr"
+    lang = detect_language(text) if text else "en"
 
-    # Fallback sur anglais si langue non supportée
-    if lang not in ACKNOWLEDGMENT_MESSAGES:
-        lang = "en"
+    # Mapper le type de message vers la clé de traduction
+    translation_keys = {
+        "text": "whatsapp.analyzingText",
+        "image": "whatsapp.analyzingImage",
+        "audio": "whatsapp.analyzingAudio"
+    }
 
-    # Retourner le message approprié
-    return ACKNOWLEDGMENT_MESSAGES[lang].get(message_type, ACKNOWLEDGMENT_MESSAGES["fr"][message_type])
+    # Obtenir la clé de traduction appropriée
+    translation_key = translation_keys.get(message_type, "whatsapp.analyzingText")
+
+    # Retourner la traduction dans la langue détectée
+    return t(translation_key, lang)
 
 
 def create_whatsapp_user_token(user_info: Dict[str, Any]) -> Optional[str]:

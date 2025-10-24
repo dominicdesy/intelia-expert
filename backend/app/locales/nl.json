@@ -10,5 +10,8 @@
   "pdf.userLabel": "Gebruiker",
   "pdf.assistantLabel": "Intelia Cognito",
   "pdf.page": "Pagina",
-  "pdf.yourIntelligentAssistant": "Uw intelligente assistent voor pluimveehouderij"
+  "pdf.yourIntelligentAssistant": "Uw intelligente assistent voor pluimveehouderij",
+  "whatsapp.analyzingText": "Je vraag wordt geanalyseerd...",
+  "whatsapp.analyzingImage": "Je afbeelding wordt geanalyseerd...",
+  "whatsapp.analyzingAudio": "Je spraakbericht wordt getranscribeerd en geanalyseerd..."
 }

@@ -10,5 +10,8 @@
   "pdf.userLabel": "Usuario",
   "pdf.assistantLabel": "Intelia Cognito",
   "pdf.page": "Página",
-  "pdf.yourIntelligentAssistant": "Tu asistente inteligente en avicultura"
+  "pdf.yourIntelligentAssistant": "Tu asistente inteligente en avicultura",
+  "whatsapp.analyzingText": "Analizando tu pregunta...",
+  "whatsapp.analyzingImage": "Analizando tu imagen...",
+  "whatsapp.analyzingAudio": "Transcribiendo y analizando tu mensaje de voz..."
 }

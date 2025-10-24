@@ -10,5 +10,8 @@
   "pdf.userLabel": "Người dùng",
   "pdf.assistantLabel": "Intelia Cognito",
   "pdf.page": "Trang",
-  "pdf.yourIntelligentAssistant": "Trợ lý thông minh về chăn nuôi gia cầm của bạn"
+  "pdf.yourIntelligentAssistant": "Trợ lý thông minh về chăn nuôi gia cầm của bạn",
+  "whatsapp.analyzingText": "Đang phân tích câu hỏi của bạn...",
+  "whatsapp.analyzingImage": "Đang phân tích hình ảnh của bạn...",
+  "whatsapp.analyzingAudio": "Đang phiên âm và phân tích tin nhắn thoại của bạn..."
 }

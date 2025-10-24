@@ -10,5 +10,8 @@
   "pdf.userLabel": "उपयोगकर्ता",
   "pdf.assistantLabel": "Intelia Cognito",
   "pdf.page": "पृष्ठ",
-  "pdf.yourIntelligentAssistant": "आपका बुद्धिमान पोल्ट्री सहायक"
+  "pdf.yourIntelligentAssistant": "आपका बुद्धिमान पोल्ट्री सहायक",
+  "whatsapp.analyzingText": "आपके प्रश्न का विश्लेषण किया जा रहा है...",
+  "whatsapp.analyzingImage": "आपकी छवि का विश्लेषण किया जा रहा है...",
+  "whatsapp.analyzingAudio": "आपके ध्वनि संदेश को ट्रांसक्राइब और विश्लेषण किया जा रहा है..."
 }

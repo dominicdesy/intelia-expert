@@ -10,5 +10,8 @@
   "pdf.userLabel": "Kullanıcı",
   "pdf.assistantLabel": "Intelia Cognito",
   "pdf.page": "Sayfa",
-  "pdf.yourIntelligentAssistant": "Akıllı kümes hayvanları asistanınız"
+  "pdf.yourIntelligentAssistant": "Akıllı kümes hayvanları asistanınız",
+  "whatsapp.analyzingText": "Sorunuz analiz ediliyor...",
+  "whatsapp.analyzingImage": "Resminiz analiz ediliyor...",
+  "whatsapp.analyzingAudio": "Sesli mesajınız yazıya dönüştürülüyor ve analiz ediliyor..."
 }

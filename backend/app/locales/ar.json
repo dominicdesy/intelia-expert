@@ -10,5 +10,8 @@
   "pdf.userLabel": "المستخدم",
   "pdf.assistantLabel": "Intelia Cognito",
   "pdf.page": "صفحة",
-  "pdf.yourIntelligentAssistant": "مساعدك الذكي في تربية الدواجن"
+  "pdf.yourIntelligentAssistant": "مساعدك الذكي في تربية الدواجن",
+  "whatsapp.analyzingText": "جاري تحليل سؤالك...",
+  "whatsapp.analyzingImage": "جاري تحليل صورتك...",
+  "whatsapp.analyzingAudio": "جاري نسخ وتحليل رسالتك الصوتية..."
 }
