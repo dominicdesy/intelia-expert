@@ -172,7 +172,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           <article
             className="relative rounded-2xl p-6 shadow-[0_8px_24px_rgba(34,106,228,.12)] transition-all hover:-translate-y-1 border-2"
             style={{
-              background: 'linear-gradient(to bottom, rgba(34,106,228,0.08), #ffffff)',
+              backgroundColor: 'rgba(34,106,228,0.08)',
               borderColor: '#226ae4'
             }}
           >
@@ -228,7 +228,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           <article
             className="relative rounded-2xl p-6 shadow-[0_8px_24px_rgba(44,199,128,.15)] transition-all hover:-translate-y-1 border-2"
             style={{
-              background: 'linear-gradient(to bottom, rgba(44,199,128,0.08), #ffffff)',
+              backgroundColor: 'rgba(44,199,128,0.08)',
               borderColor: '#2cc780'
             }}
           >
