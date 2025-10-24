@@ -835,23 +835,121 @@ async def handle_unknown_user(from_number: str) -> str:
     )
 
 
-def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> bool:
+def segment_long_message(text: str, max_length: int = 1300, max_segments: int = 3) -> list:
     """
-    Envoie un message WhatsApp via Twilio
-    Tronque automatiquement les longs messages à 1600 caractères (limite Twilio)
+    Segmente un long message en plusieurs parties intelligemment
+
+    Stratégie de segmentation:
+    1. Si message < max_length: retourner tel quel
+    2. Si message > max_length:
+       - Diviser en segments de ~max_length caractères
+       - Essayer de couper sur limites naturelles:
+         * Paragraphes (\n\n) en priorité
+         * Phrases (. ! ? suivi d'espace) ensuite
+         * Mots (espaces) en dernier recours
+       - Ajouter indicateurs au début: (1/3), (2/3), (3/3)
+       - Limiter à max_segments (défaut: 3)
+       - Si encore trop long: tronquer le dernier segment avec "..."
+
+    Args:
+        text: Texte à segmenter
+        max_length: Longueur maximale par segment (défaut: 1300 pour WhatsApp)
+        max_segments: Nombre maximum de segments (défaut: 3)
+
+    Returns:
+        Liste de segments (1 à max_segments éléments)
+    """
+    if len(text) <= max_length:
+        return [text]
+
+    # Calculer nombre de segments nécessaires
+    import math
+    num_segments = min(math.ceil(len(text) / max_length), max_segments)
+
+    # Réserver espace pour l'indicateur "(X/Y) " au début (6 chars max)
+    indicator_length = 6
+    effective_max_length = max_length - indicator_length
+
+    segments = []
+    remaining_text = text
+    segment_index = 1
+
+    while remaining_text and segment_index <= num_segments:
+        # Si c'est le dernier segment autorisé et qu'il reste trop de texte
+        if segment_index == num_segments and len(remaining_text) > effective_max_length:
+            # Tronquer avec "..."
+            segment = remaining_text[:effective_max_length - 3] + "..."
+            remaining_text = ""
+        # Si le reste rentre dans un segment
+        elif len(remaining_text) <= effective_max_length:
+            segment = remaining_text
+            remaining_text = ""
+        else:
+            # Chercher point de coupe optimal
+            cut_position = effective_max_length
+
+            # 1. Essayer de couper sur paragraphe (\n\n)
+            last_paragraph = remaining_text[:cut_position].rfind("\n\n")
+            if last_paragraph > effective_max_length * 0.6:  # Au moins 60% du segment
+                cut_position = last_paragraph + 2  # Inclure le \n\n
+            else:
+                # 2. Essayer de couper sur fin de phrase (. ! ?)
+                # Chercher . ! ? suivi d'espace ou fin de texte
+                for i in range(cut_position - 1, int(cut_position * 0.6), -1):
+                    if remaining_text[i] in '.!?' and (i + 1 >= len(remaining_text) or remaining_text[i + 1] == ' '):
+                        cut_position = i + 1
+                        break
+                else:
+                    # 3. Dernier recours: couper sur espace (mot)
+                    last_space = remaining_text[:cut_position].rfind(' ')
+                    if last_space > effective_max_length * 0.6:
+                        cut_position = last_space + 1  # Inclure l'espace
+
+            segment = remaining_text[:cut_position].strip()
+            remaining_text = remaining_text[cut_position:].strip()
+
+        # Ajouter indicateur au début
+        indicator = f"({segment_index}/{num_segments}) "
+        segments.append(indicator + segment)
+        segment_index += 1
+
+    return segments
+
+
+def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> dict:
+    """
+    Envoie un message WhatsApp via Twilio avec segmentation intelligente pour longs messages
+
+    Si message > 1300 chars:
+    - Segmente en 2-3 parties intelligemment (coupe sur paragraphes/phrases)
+    - Ajoute indicateurs (1/3), (2/3), (3/3) au début de chaque segment
+    - Envoie avec délai de 6 secondes entre chaque segment
+    - Arrête tout si un segment échoue
 
     Args:
         to_number: Numéro destinataire (format: whatsapp:+1234567890)
         body: Contenu du message
-        media_url: URL d'un média (optionnel)
+        media_url: URL d'un média (attaché au 1er segment uniquement)
 
     Returns:
-        True si envoyé avec succès, False sinon
+        dict: {
+            "success": bool,
+            "segments_sent": int,
+            "total_segments": int,
+            "message_sids": list[str],
+            "error": str (si échec)
+        }
     """
     try:
         if not twilio_client:
             logger.error("❌ Twilio client not initialized")
-            return False
+            return {
+                "success": False,
+                "segments_sent": 0,
+                "total_segments": 0,
+                "message_sids": [],
+                "error": "Twilio client not initialized"
+            }
 
         # Limite Twilio-WhatsApp: 1600 caractères
         # Note: Emojis comptent plusieurs caractères, donc on utilise une marge de sécurité
@@ -868,27 +966,64 @@ def send_whatsapp_message(to_number: str, body: str, media_url: str = None) -> b
             "]+", flags=re.UNICODE)
         body = emoji_pattern.sub('', body)
 
-        # Tronquer le message si nécessaire
-        if len(body) > MAX_LENGTH:
-            logger.warning(f"⚠️ Message trop long ({len(body)} chars), troncature à {MAX_LENGTH} chars")
-            body = body[:MAX_LENGTH - 3] + "..."  # -3 pour les "..."
+        # Segmenter le message si nécessaire
+        segments = segment_long_message(body, max_length=MAX_LENGTH, max_segments=3)
 
-        message_params = {
-            "from_": TWILIO_WHATSAPP_NUMBER,
-            "to": to_number,
-            "body": body
+        logger.info(f"📤 Sending {len(segments)} WhatsApp segment(s) to {to_number}")
+
+        # Envoyer chaque segment avec délai
+        message_sids = []
+        for idx, segment in enumerate(segments):
+            try:
+                message_params = {
+                    "from_": TWILIO_WHATSAPP_NUMBER,
+                    "to": to_number,
+                    "body": segment
+                }
+
+                # Attacher média seulement au 1er segment
+                if media_url and idx == 0:
+                    message_params["media_url"] = [media_url]
+
+                message = twilio_client.messages.create(**message_params)
+                message_sids.append(message.sid)
+                logger.info(f"✅ Segment {idx+1}/{len(segments)} sent: {message.sid} ({len(segment)} chars)")
+
+                # Attendre 6 secondes avant le prochain segment (sauf dernier)
+                if idx < len(segments) - 1:
+                    logger.info(f"⏳ Waiting 6s before next segment (Meta rate limit: 1 msg/6s)...")
+                    time.sleep(6)
+
+            except Exception as e:
+                # Arrêter tout si un segment échoue
+                error_msg = f"Failed to send segment {idx+1}/{len(segments)}: {e}"
+                logger.error(f"❌ {error_msg}")
+                return {
+                    "success": False,
+                    "segments_sent": idx,  # Nombre de segments envoyés avant l'erreur
+                    "total_segments": len(segments),
+                    "message_sids": message_sids,
+                    "error": error_msg
+                }
+
+        # Tous les segments envoyés avec succès
+        return {
+            "success": True,
+            "segments_sent": len(segments),
+            "total_segments": len(segments),
+            "message_sids": message_sids,
+            "error": None
         }
 
-        if media_url:
-            message_params["media_url"] = [media_url]
-
-        message = twilio_client.messages.create(**message_params)
-        logger.info(f"✅ WhatsApp message sent: {message.sid}")
-        return True
-
     except Exception as e:
-        logger.error(f"❌ Error sending WhatsApp message: {e}")
-        return False
+        logger.error(f"❌ Error in send_whatsapp_message: {e}")
+        return {
+            "success": False,
+            "segments_sent": 0,
+            "total_segments": 0,
+            "message_sids": [],
+            "error": str(e)
+        }
 
 
 # ==================== WEBHOOK ENDPOINT ====================
@@ -999,7 +1134,29 @@ async def whatsapp_webhook(
             # Attendre 10 secondes après l'accusé de réception (limite Meta: 1 msg/6s par utilisateur)
             # On attend 10s pour être sûr de respecter la limite
             time.sleep(10)
-            send_whatsapp_message(From, response_text)
+
+            # Envoyer la réponse (peut être segmentée si longue)
+            result = send_whatsapp_message(From, response_text)
+
+            if result["success"]:
+                logger.info(
+                    f"✅ WhatsApp response sent successfully: "
+                    f"{result['segments_sent']}/{result['total_segments']} segment(s), "
+                    f"SIDs: {result['message_sids']}"
+                )
+            else:
+                logger.error(
+                    f"❌ Failed to send WhatsApp response: {result['error']} "
+                    f"({result['segments_sent']}/{result['total_segments']} segments sent before failure)"
+                )
+                # Ne pas lever d'exception - l'utilisateur a déjà reçu l'acknowledgment
+                return {
+                    "status": "partial_failure",
+                    "message_type": message_type,
+                    "error": result["error"],
+                    "segments_sent": result["segments_sent"],
+                    "total_segments": result["total_segments"]
+                }
 
         logger.info(f"✅ WhatsApp message processed: {MessageSid}")
 
