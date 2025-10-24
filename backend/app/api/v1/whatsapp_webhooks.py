@@ -41,6 +41,9 @@ from app.utils.i18n import t
 # Import conversation service for database storage
 from app.services.conversation_service import conversation_service
 
+# Import audio storage service for permanent audio storage
+from app.services.audio_storage_service import audio_storage_service
+
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp-webhooks"])
 logger = logging.getLogger(__name__)
 
@@ -477,6 +480,40 @@ async def handle_audio_message(from_number: str, media_url: str, user_info: Dict
 
             logger.info(f"✅ Audio downloaded: {len(audio_data)} bytes, type: {content_type}")
 
+        # Étape 1b: Upload audio vers DigitalOcean Spaces pour stockage permanent
+        permanent_audio_url = media_url  # Fallback to Twilio URL
+        try:
+            user_id = user_info.get("user_id")
+            if user_id:
+                # Déterminer extension
+                extension_map = {
+                    "audio/ogg": "ogg",
+                    "audio/mpeg": "mp3",
+                    "audio/mp4": "m4a",
+                    "audio/x-m4a": "m4a",
+                    "audio/wav": "wav"
+                }
+                extension = extension_map.get(content_type, "ogg")
+
+                # Générer clé et uploader
+                spaces_key = audio_storage_service.generate_audio_key(user_id, "whatsapp", extension)
+                permanent_audio_url = audio_storage_service.upload_audio(
+                    audio_data=audio_data,
+                    spaces_key=spaces_key,
+                    content_type=content_type,
+                    metadata={
+                        "user_email": user_email,
+                        "twilio_url": media_url,
+                        "transcription_pending": "true"
+                    }
+                )
+                logger.info(f"✅ Audio uploaded to Spaces: {permanent_audio_url}")
+            else:
+                logger.warning("⚠️ Cannot upload audio to Spaces: user_id not found")
+        except Exception as e:
+            # Don't block transcription if Spaces upload fails
+            logger.error(f"❌ Failed to upload audio to Spaces (non-blocking): {e}")
+
         # Étape 2: Transcrire avec Whisper API
         logger.info(f"🔊 Transcribing audio with Whisper API...")
 
@@ -523,12 +560,12 @@ async def handle_audio_message(from_number: str, media_url: str, user_info: Dict
         logger.info(f"🤖 Processing transcription with RAG...")
 
         # Réutiliser handle_text_message avec le texte transcrit
-        # Pass media_url to save audio file URL in database
+        # Pass permanent_audio_url (Spaces URL or Twilio fallback)
         response = await handle_text_message(
             from_number=from_number,
             body=transcribed_text,
             user_info=user_info,
-            media_url=media_url,  # Save Twilio audio URL
+            media_url=permanent_audio_url,  # Permanent Spaces URL (or Twilio fallback)
             media_type="audio"
         )
 
