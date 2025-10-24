@@ -77,10 +77,10 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
     cursor = conn.cursor()
 
     try:
-        # Defer FK constraint checks until transaction commit
-        # This allows us to update parent and child tables in any order
-        cursor.execute("SET CONSTRAINTS ALL DEFERRED")
-        logger.info(f"[anonymize_user_in_postgresql] FK constraints deferred")
+        # Temporarily disable FK triggers to allow updating circular dependencies
+        # session_replication_role = 'replica' disables all triggers and FKs
+        cursor.execute("SET session_replication_role = 'replica'")
+        logger.info(f"[anonymize_user_in_postgresql] FK triggers disabled (replication mode)")
 
         # ========================================================================
         # 1. CONVERSATIONS & MESSAGES
@@ -100,14 +100,8 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         # ========================================================================
         # 2. STRIPE / BILLING
         # ========================================================================
-
-        # user_billing_info (FIRST - required by FK in stripe_subscriptions)
-        cursor.execute(
-            "UPDATE user_billing_info SET user_email = %s WHERE user_email = %s",
-            (anonymous_email, user_email)
-        )
-        stats['user_billing_info'] = cursor.rowcount
-        logger.info(f"[anonymize_user_in_postgresql] User billing info anonymized: {cursor.rowcount}")
+        # IMPORTANT: Update children (stripe_subscriptions, stripe_payment_events) BEFORE parent (user_billing_info)
+        # Because stripe_subscriptions has FK to user_billing_info.user_email
 
         # stripe_customers
         cursor.execute(
@@ -119,7 +113,7 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         stats['stripe_customers'] = cursor.rowcount
         logger.info(f"[anonymize_user_in_postgresql] Stripe customers anonymized: {cursor.rowcount}")
 
-        # stripe_subscriptions (AFTER user_billing_info due to FK constraint)
+        # stripe_subscriptions (BEFORE user_billing_info - child table first)
         cursor.execute(
             "UPDATE stripe_subscriptions SET user_email = %s WHERE user_email = %s",
             (anonymous_email, user_email)
@@ -134,6 +128,14 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         )
         stats['stripe_payment_events'] = cursor.rowcount
         logger.info(f"[anonymize_user_in_postgresql] Stripe payment events anonymized: {cursor.rowcount}")
+
+        # user_billing_info (LAST - parent table after all children updated)
+        cursor.execute(
+            "UPDATE user_billing_info SET user_email = %s WHERE user_email = %s",
+            (anonymous_email, user_email)
+        )
+        stats['user_billing_info'] = cursor.rowcount
+        logger.info(f"[anonymize_user_in_postgresql] User billing info anonymized: {cursor.rowcount}")
 
         # ========================================================================
         # 3. WHATSAPP
@@ -220,10 +222,19 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         total_rows = sum(stats.values())
         logger.info(f"[anonymize_user_in_postgresql] ✅ Total rows anonymized: {total_rows}")
 
+        # Re-enable FK triggers
+        cursor.execute("SET session_replication_role = 'origin'")
+        logger.info(f"[anonymize_user_in_postgresql] FK triggers re-enabled")
+
         return stats
 
     except Exception as e:
         logger.error(f"[anonymize_user_in_postgresql] ❌ Error during anonymization: {str(e)}")
+        # Re-enable FK triggers even on error
+        try:
+            cursor.execute("SET session_replication_role = 'origin'")
+        except:
+            pass
         raise
 
 
