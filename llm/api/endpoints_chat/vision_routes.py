@@ -313,7 +313,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     "success": True,
                     "analysis": analysis_result["analysis"],
                     "metadata": {
-                        "model": analysis_result.get("model", "claude-3-5-sonnet-20241022"),
+                        "model": analysis_result.get("model", "claude-sonnet-4-5-20250929"),
                         "language": detected_language,
                         "tenant_id": tenant_id,
                         "images_count": len(images_data),
@@ -639,7 +639,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     "success": True,
                     "analysis": analysis_result["analysis"],
                     "metadata": {
-                        "model": analysis_result.get("model", "claude-3-5-sonnet-20241022"),
+                        "model": analysis_result.get("model", "claude-sonnet-4-5-20250929"),
                         "language": detected_language,
                         "tenant_id": tenant_id,
                         "session_id": session_id,
@@ -715,7 +715,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "status": "healthy",
                         "message": "Claude Vision service disponible",
                         "configured": True,
-                        "model": "claude-3-5-sonnet-20241022",
+                        "model": "claude-sonnet-4-5-20250929",
                     }
                 )
             except ImportError as e:

@@ -30,10 +30,19 @@ async def test_vision_analyzer_initialization():
 
     assert analyzer is not None
     assert analyzer.language == "fr"
-    assert analyzer.model == "claude-3-5-sonnet-20241022"
+    # Le modèle peut être configuré via ANTHROPIC_VISION_MODEL/ANTHROPIC_MODEL ou utilise la valeur par défaut
+    # Claude 4.5 models (current) or Claude 3.x models (legacy/deprecated)
+    valid_models = [
+        "claude-sonnet-4-5-20250929",  # Current default
+        "claude-haiku-4-5-20251001",   # Current budget
+        "claude-opus-4-1-20250805",    # Current premium
+        "claude-3-5-sonnet-20240620",  # Legacy (retired Oct 22, 2025)
+        "claude-3-opus-20240229",      # Legacy
+    ]
+    assert analyzer.model in valid_models
     assert analyzer.api_key is not None
 
-    print("✅ ClaudeVisionAnalyzer initialized successfully")
+    print(f"✅ ClaudeVisionAnalyzer initialized successfully - Model: {analyzer.model}")
 
 
 @pytest.mark.asyncio

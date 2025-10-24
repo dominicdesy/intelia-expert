@@ -41,7 +41,7 @@ class ClaudeVisionAnalyzer:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "claude-3-5-sonnet-20241022",
+        model: Optional[str] = None,
         language: str = "fr",
     ):
         """
@@ -49,7 +49,7 @@ class ClaudeVisionAnalyzer:
 
         Args:
             api_key: Anthropic API key (defaults to ANTHROPIC_API_KEY env var)
-            model: Claude model to use (must support vision)
+            model: Claude model to use (defaults to ANTHROPIC_VISION_MODEL env var or claude-3-5-sonnet-20240620)
             language: Response language (fr, en, es, etc.)
         """
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
@@ -60,10 +60,12 @@ class ClaudeVisionAnalyzer:
             )
 
         self.client = anthropic.Anthropic(api_key=self.api_key)
-        self.model = model
+        # Use dedicated vision model env var, fallback to general model, then default
+        # Default: claude-sonnet-4-5-20250929 (Claude 3.x retired Oct 22, 2025)
+        self.model = model or os.getenv("ANTHROPIC_VISION_MODEL") or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
         self.language = language if language in SUPPORTED_LANGUAGES else FALLBACK_LANGUAGE
 
-        logger.info(f"✅ ClaudeVisionAnalyzer initialized - Model: {model}, Language: {language}")
+        logger.info(f"✅ ClaudeVisionAnalyzer initialized - Model: {self.model}, Language: {language}")
 
     def _image_to_base64(self, image_data: bytes, content_type: str = "image/jpeg") -> tuple[str, str]:
         """
