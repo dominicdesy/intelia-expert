@@ -46,16 +46,14 @@ from app.services.conversation_service import conversation_service
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'llm'))
 
-# Import optionnel - WebSocket auth not yet implemented
-# TODO: Implement get_current_user_from_websocket in quota_check.py
+# Import WebSocket auth dependencies
 try:
     from app.dependencies.quota_check import get_current_user_from_websocket
     from app.core.database import get_db
     AUTH_AVAILABLE = True
     logger.info("✅ Voice Realtime WebSocket auth dependencies available")
 except (ImportError, RuntimeError) as e:
-    # Expected: get_current_user_from_websocket not yet implemented
-    logger.info("ℹ️ Voice Realtime WebSocket auth pending implementation (using hardcoded user_id=1 for now)")
+    logger.error(f"❌ Voice Realtime WebSocket auth dependencies not available: {e}")
     AUTH_AVAILABLE = False
     get_current_user_from_websocket = None
     get_db = None
