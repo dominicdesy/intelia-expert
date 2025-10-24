@@ -36,6 +36,10 @@ psycopg2-binary==2.9.9
 sqlalchemy[asyncio]==2.0.23
 alembic==1.13.1
 
+# === DIGITAL OCEAN SPACES / S3 STORAGE ===
+# boto3 for image storage on Digital Ocean Spaces (S3-compatible)
+boto3>=1.28.0
+
 # === SUPABASE CLIENT ===
 # Supabase Python client for user profiling
 supabase>=2.0.0
