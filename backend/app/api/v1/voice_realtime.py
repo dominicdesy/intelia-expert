@@ -49,14 +49,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..
 # Import WebSocket auth dependencies
 try:
     from app.dependencies.quota_check import get_current_user_from_websocket
-    from app.core.database import get_db
     AUTH_AVAILABLE = True
     logger.info("✅ Voice Realtime WebSocket auth dependencies available")
 except (ImportError, RuntimeError) as e:
     logger.error(f"❌ Voice Realtime WebSocket auth dependencies not available: {e}")
     AUTH_AVAILABLE = False
     get_current_user_from_websocket = None
-    get_db = None
 
 # ============================================================
 # CONFIGURATION & FEATURE FLAG
