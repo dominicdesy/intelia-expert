@@ -142,7 +142,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           {/* Essential */}
           <article
             className="relative rounded-2xl p-6 shadow-[0_8px_24px_rgba(0,0,0,.08)] transition-all hover:-translate-y-1 border-2"
-            style={{ backgroundColor: '#ffffff', borderColor: '#e5e7eb' }}
+            style={{ backgroundColor: '#ffffff', borderColor: '#6b7280' }}
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
               <span className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase shadow-sm" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
