@@ -14,6 +14,8 @@ import os
 import jwt
 import time
 
+from app.utils.i18n import t
+
 # Imports Supabase
 try:
     from supabase import create_client, Client
@@ -495,75 +497,33 @@ class SupabaseInvitationService:
     ) -> Dict[str, str]:
         """Prépare les données pour le template d'email"""
 
-        templates = {
-            "fr": {
-                "subject": f"{inviter_name} vous invite à découvrir Intelia Expert"
-                + (" (Rappel)" if is_resend else ""),
-                "title": "Invitation Intelia Expert"
-                + (" - Rappel" if is_resend else ""),
-                "greeting": f"Bonjour ! {inviter_name} vous invite à découvrir Intelia Expert",
-                "description": "Le premier assistant IA spécialisé en santé et nutrition animale",
-                "cta_text": "Créer mon compte gratuitement",
-                "features_title": "Avec Intelia Expert, vous pouvez :",
-                "features": [
-                    "Poser des questions d'expert en santé animale 24/7",
-                    "Accéder à une base de connaissances spécialisée",
-                    "Obtenir des réponses en français, anglais ou espagnol",
-                    "Utiliser l'interface sur mobile, tablette et ordinateur",
-                ],
-            },
-            "en": {
-                "subject": f"{inviter_name} invites you to discover Intelia Expert"
-                + (" (Reminder)" if is_resend else ""),
-                "title": "Intelia Expert Invitation"
-                + (" - Reminder" if is_resend else ""),
-                "greeting": f"Hello! {inviter_name} invites you to discover Intelia Expert",
-                "description": "The first AI assistant specialized in animal health and nutrition",
-                "cta_text": "Create my free account",
-                "features_title": "With Intelia Expert, you can:",
-                "features": [
-                    "Ask expert questions about animal health 24/7",
-                    "Access a specialized knowledge base",
-                    "Get answers in French, English, or Spanish",
-                    "Use on mobile, tablet, and computer",
-                ],
-            },
-            "es": {
-                "subject": f"{inviter_name} te invita a descubrir Intelia Expert"
-                + (" (Recordatorio)" if is_resend else ""),
-                "title": "Invitación Intelia Expert"
-                + (" - Recordatorio" if is_resend else ""),
-                "greeting": f"¡Hola! {inviter_name} te invita a descubrir Intelia Expert",
-                "description": "El primer asistente IA especializado en salud y nutrición animal",
-                "cta_text": "Crear mi cuenta gratuita",
-                "features_title": "Con Intelia Expert, puedes:",
-                "features": [
-                    "Hacer preguntas expertas sobre salud animal 24/7",
-                    "Acceder a una base de conocimiento especializada",
-                    "Obtener respuestas en francés, inglés o español",
-                    "Usar en móvil, tableta y computadora",
-                ],
-            },
-        }
+        # Utiliser le système i18n pour les traductions
+        subject_key = "invite.subjectReminder" if is_resend else "invite.subject"
+        title_key = "invite.titleReminder" if is_resend else "invite.title"
 
-        template_data = templates.get(language, templates["fr"])
+        template_data = {
+            "subject": t(subject_key, language).format(inviter_name=inviter_name),
+            "title": t(title_key, language),
+            "greeting": t("invite.greeting", language).format(inviter_name=inviter_name),
+            "description": t("invite.description", language),
+            "cta_text": t("invite.ctaText", language),
+            "features_title": t("invite.featuresTitle", language),
+            "features": [
+                t("invite.feature1", language),
+                t("invite.feature2", language),
+                t("invite.feature3", language),
+                t("invite.feature4", language),
+            ],
+        }
 
         # Ajouter le message personnel si présent
         if personal_message.strip():
             template_data["personal_message"] = personal_message
-            template_data["personal_message_title"] = {
-                "fr": f"Message personnel de {inviter_name} :",
-                "en": f"Personal message from {inviter_name}:",
-                "es": f"Mensaje personal de {inviter_name}:",
-            }.get(language, f"Message personnel de {inviter_name} :")
+            template_data["personal_message_title"] = t("invite.personalMessageTitle", language).format(inviter_name=inviter_name)
 
         # Ajouter un message de rappel si c'est un renvoi
         if is_resend:
-            template_data["resend_note"] = {
-                "fr": "Il s'agit d'un rappel de votre invitation précédente.",
-                "en": "This is a reminder of your previous invitation.",
-                "es": "Este es un recordatorio de tu invitación anterior.",
-            }.get(language, "Il s'agit d'un rappel de votre invitation précédente.")
+            template_data["resend_note"] = t("invite.resendNote", language)
 
         return template_data
 

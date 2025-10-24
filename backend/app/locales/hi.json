@@ -13,5 +13,9 @@
   "pdf.yourIntelligentAssistant": "आपका बुद्धिमान पोल्ट्री सहायक",
   "whatsapp.analyzingText": "आपके प्रश्न का विश्लेषण किया जा रहा है...",
   "whatsapp.analyzingImage": "आपकी छवि का विश्लेषण किया जा रहा है...",
-  "whatsapp.analyzingAudio": "आपके ध्वनि संदेश को ट्रांसक्राइब और विश्लेषण किया जा रहा है..."
+  "whatsapp.analyzingAudio": "आपके ध्वनि संदेश को ट्रांसक्राइब और विश्लेषण किया जा रहा है...",
+  "stripe.proPlanName": "प्रो योजना",
+  "stripe.proPlanDescription": "Intelia Expert मासिक सदस्यता - प्रो",
+  "stripe.elitePlanName": "एलीट योजना",
+  "stripe.elitePlanDescription": "Intelia Expert मासिक सदस्यता - एलीट"
 }

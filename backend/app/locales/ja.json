@@ -13,5 +13,9 @@
   "pdf.yourIntelligentAssistant": "あなたのインテリジェントな家禽アシスタント",
   "whatsapp.analyzingText": "質問を分析しています...",
   "whatsapp.analyzingImage": "画像を分析しています...",
-  "whatsapp.analyzingAudio": "音声メッセージを文字起こしして分析しています..."
+  "whatsapp.analyzingAudio": "音声メッセージを文字起こしして分析しています...",
+  "stripe.proPlanName": "プロプラン",
+  "stripe.proPlanDescription": "Intelia Expert 月額サブスクリプション - PRO",
+  "stripe.elitePlanName": "エリートプラン",
+  "stripe.elitePlanDescription": "Intelia Expert 月額サブスクリプション - ELITE"
 }

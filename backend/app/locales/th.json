@@ -13,5 +13,9 @@
   "pdf.yourIntelligentAssistant": "ผู้ช่วยอัจฉริยะด้านสัตว์ปีกของคุณ",
   "whatsapp.analyzingText": "กำลังวิเคราะห์คำถามของคุณ...",
   "whatsapp.analyzingImage": "กำลังวิเคราะห์รูปภาพของคุณ...",
-  "whatsapp.analyzingAudio": "กำลังถอดเสียงและวิเคราะห์ข้อความเสียงของคุณ..."
+  "whatsapp.analyzingAudio": "กำลังถอดเสียงและวิเคราะห์ข้อความเสียงของคุณ...",
+  "stripe.proPlanName": "แผน Pro",
+  "stripe.proPlanDescription": "การสมัครสมาชิกรายเดือน Intelia Expert - PRO",
+  "stripe.elitePlanName": "แผน Elite",
+  "stripe.elitePlanDescription": "การสมัครสมาชิกรายเดือน Intelia Expert - ELITE"
 }

@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Header
 from pydantic import BaseModel, EmailStr
 
 from app.api.v1.auth import get_current_user
+from app.utils.i18n import t
 
 # Import country tracking service for fraud detection
 try:
@@ -355,46 +356,17 @@ async def create_checkout_session(
 
         logger.info(f"Création checkout session pour {user_email}: {plan_name} @ {price} {currency} (Tier {tier_level})")
 
-        # Traductions des noms et descriptions de plans
-        plan_translations = {
-            "fr": {
-                "pro": {
-                    "name": "Plan Pro",
-                    "description": "Abonnement mensuel Intelia Expert - PRO"
-                },
-                "elite": {
-                    "name": "Plan Elite",
-                    "description": "Abonnement mensuel Intelia Expert - ELITE"
-                }
-            },
-            "en": {
-                "pro": {
-                    "name": "Pro Plan",
-                    "description": "Intelia Expert Monthly Subscription - PRO"
-                },
-                "elite": {
-                    "name": "Elite Plan",
-                    "description": "Intelia Expert Monthly Subscription - ELITE"
-                }
-            },
-            "es": {
-                "pro": {
-                    "name": "Plan Pro",
-                    "description": "Suscripción mensual Intelia Expert - PRO"
-                },
-                "elite": {
-                    "name": "Plan Elite",
-                    "description": "Suscripción mensual Intelia Expert - ELITE"
-                }
-            }
-        }
-
         # Récupérer la locale demandée (avant mapping Stripe)
         user_locale = request.locale or "en"
-        plan_info = plan_translations.get(user_locale, plan_translations["en"]).get(plan_name, {
-            "name": f"Plan {plan_name.capitalize()}",
-            "description": f"Intelia Expert - {plan_name.upper()}"
-        })
+
+        # Utiliser le système i18n pour les traductions de plans
+        plan_name_key = f"stripe.{plan_name}PlanName"
+        plan_desc_key = f"stripe.{plan_name}PlanDescription"
+
+        plan_info = {
+            "name": t(plan_name_key, user_locale, fallback=f"Plan {plan_name.capitalize()}"),
+            "description": t(plan_desc_key, user_locale, fallback=f"Intelia Expert - {plan_name.upper()}")
+        }
 
         # Si stripe_price_id existe dans la DB, l'utiliser (produit Stripe configuré)
         # Sinon, créer un paiement dynamique

@@ -13,5 +13,9 @@
   "pdf.yourIntelligentAssistant": "您的智能家禽助手",
   "whatsapp.analyzingText": "正在分析您的问题...",
   "whatsapp.analyzingImage": "正在分析您的图片...",
-  "whatsapp.analyzingAudio": "正在转录和分析您的语音消息..."
+  "whatsapp.analyzingAudio": "正在转录和分析您的语音消息...",
+  "stripe.proPlanName": "专业版套餐",
+  "stripe.proPlanDescription": "Intelia Expert 月度订阅 - 专业版",
+  "stripe.elitePlanName": "精英版套餐",
+  "stripe.elitePlanDescription": "Intelia Expert 月度订阅 - 精英版"
 }

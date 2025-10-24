@@ -13,5 +13,9 @@
   "pdf.yourIntelligentAssistant": "مساعدك الذكي في تربية الدواجن",
   "whatsapp.analyzingText": "جاري تحليل سؤالك...",
   "whatsapp.analyzingImage": "جاري تحليل صورتك...",
-  "whatsapp.analyzingAudio": "جاري نسخ وتحليل رسالتك الصوتية..."
+  "whatsapp.analyzingAudio": "جاري نسخ وتحليل رسالتك الصوتية...",
+  "stripe.proPlanName": "الخطة الاحترافية",
+  "stripe.proPlanDescription": "اشتراك شهري Intelia Expert - احترافي",
+  "stripe.elitePlanName": "الخطة النخبة",
+  "stripe.elitePlanDescription": "اشتراك شهري Intelia Expert - نخبة"
 }

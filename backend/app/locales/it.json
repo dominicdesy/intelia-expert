@@ -13,5 +13,9 @@
   "pdf.yourIntelligentAssistant": "Il tuo assistente intelligente per l'avicoltura",
   "whatsapp.analyzingText": "Analisi della tua domanda in corso...",
   "whatsapp.analyzingImage": "Analisi della tua immagine in corso...",
-  "whatsapp.analyzingAudio": "Trascrizione e analisi del tuo messaggio vocale in corso..."
+  "whatsapp.analyzingAudio": "Trascrizione e analisi del tuo messaggio vocale in corso...",
+  "stripe.proPlanName": "Piano Pro",
+  "stripe.proPlanDescription": "Abbonamento mensile Intelia Expert - PRO",
+  "stripe.elitePlanName": "Piano Elite",
+  "stripe.elitePlanDescription": "Abbonamento mensile Intelia Expert - ELITE"
 }

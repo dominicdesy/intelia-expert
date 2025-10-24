@@ -13,5 +13,9 @@
   "pdf.yourIntelligentAssistant": "Uw intelligente assistent voor pluimveehouderij",
   "whatsapp.analyzingText": "Je vraag wordt geanalyseerd...",
   "whatsapp.analyzingImage": "Je afbeelding wordt geanalyseerd...",
-  "whatsapp.analyzingAudio": "Je spraakbericht wordt getranscribeerd en geanalyseerd..."
+  "whatsapp.analyzingAudio": "Je spraakbericht wordt getranscribeerd en geanalyseerd...",
+  "stripe.proPlanName": "Pro Abonnement",
+  "stripe.proPlanDescription": "Intelia Expert Maandelijks Abonnement - PRO",
+  "stripe.elitePlanName": "Elite Abonnement",
+  "stripe.elitePlanDescription": "Intelia Expert Maandelijks Abonnement - ELITE"
 }

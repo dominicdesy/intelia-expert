@@ -13,5 +13,9 @@
   "pdf.yourIntelligentAssistant": "Akıllı kümes hayvanları asistanınız",
   "whatsapp.analyzingText": "Sorunuz analiz ediliyor...",
   "whatsapp.analyzingImage": "Resminiz analiz ediliyor...",
-  "whatsapp.analyzingAudio": "Sesli mesajınız yazıya dönüştürülüyor ve analiz ediliyor..."
+  "whatsapp.analyzingAudio": "Sesli mesajınız yazıya dönüştürülüyor ve analiz ediliyor...",
+  "stripe.proPlanName": "Pro Planı",
+  "stripe.proPlanDescription": "Intelia Expert Aylık Abonelik - PRO",
+  "stripe.elitePlanName": "Elite Planı",
+  "stripe.elitePlanDescription": "Intelia Expert Aylık Abonelik - ELITE"
 }

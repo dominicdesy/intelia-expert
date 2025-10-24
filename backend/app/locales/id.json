@@ -13,5 +13,9 @@
   "pdf.yourIntelligentAssistant": "Asisten cerdas peternakan unggas Anda",
   "whatsapp.analyzingText": "Menganalisis pertanyaan Anda...",
   "whatsapp.analyzingImage": "Menganalisis gambar Anda...",
-  "whatsapp.analyzingAudio": "Mentranskripsi dan menganalisis pesan suara Anda..."
+  "whatsapp.analyzingAudio": "Mentranskripsi dan menganalisis pesan suara Anda...",
+  "stripe.proPlanName": "Paket Pro",
+  "stripe.proPlanDescription": "Langganan Bulanan Intelia Expert - PRO",
+  "stripe.elitePlanName": "Paket Elite",
+  "stripe.elitePlanDescription": "Langganan Bulanan Intelia Expert - ELITE"
 }

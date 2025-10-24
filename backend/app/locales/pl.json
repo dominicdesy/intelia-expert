@@ -13,5 +13,9 @@
   "pdf.yourIntelligentAssistant": "Twój inteligentny asystent drobiarstwa",
   "whatsapp.analyzingText": "Analizuję twoje pytanie...",
   "whatsapp.analyzingImage": "Analizuję twój obraz...",
-  "whatsapp.analyzingAudio": "Transkrybuję i analizuję twoją wiadomość głosową..."
+  "whatsapp.analyzingAudio": "Transkrybuję i analizuję twoją wiadomość głosową...",
+  "stripe.proPlanName": "Plan Pro",
+  "stripe.proPlanDescription": "Miesięczna subskrypcja Intelia Expert - PRO",
+  "stripe.elitePlanName": "Plan Elite",
+  "stripe.elitePlanDescription": "Miesięczna subskrypcja Intelia Expert - ELITE"
 }
