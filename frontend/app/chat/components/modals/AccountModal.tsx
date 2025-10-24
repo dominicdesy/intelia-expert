@@ -134,9 +134,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           )}
         </div>
 
-        {/* Plans */}
+        {/* Subscription Plans */}
         <section
-          aria-label="Plans d’abonnement"
+          aria-label="Plans d'abonnement"
           className="grid grid-cols-1 gap-6 md:grid-cols-3"
         >
           {/* Essential */}
