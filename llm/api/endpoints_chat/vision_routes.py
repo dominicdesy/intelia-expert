@@ -29,12 +29,7 @@ logger = logging.getLogger(__name__)
 # Import storage service for images (optional - non-blocking if fails)
 STORAGE_SERVICE_AVAILABLE = False
 try:
-    import sys
-    import os
-    backend_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'backend')
-    sys.path.insert(0, backend_path)
-
-    from app.services.audio_storage_service import audio_storage_service
+    from services.image_storage_service import image_storage_service
     STORAGE_SERVICE_AVAILABLE = True
     logger.info("✅ Storage service loaded - images will be saved to Spaces")
 except ImportError as e:
@@ -253,7 +248,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     # Upload each image to Spaces
                     for idx, img_data in enumerate(images_data):
                         try:
-                            upload_result = audio_storage_service.upload_image_direct(
+                            upload_result = image_storage_service.upload_image_direct(
                                 image_data=img_data["data"],
                                 user_id=user_id,
                                 source="frontend",
@@ -571,7 +566,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     # Upload each image to Spaces
                     for idx, img_data in enumerate(images_data):
                         try:
-                            upload_result = audio_storage_service.upload_image_direct(
+                            upload_result = image_storage_service.upload_image_direct(
                                 image_data=img_data["data"],
                                 user_id=user_id,
                                 source="frontend_session",
