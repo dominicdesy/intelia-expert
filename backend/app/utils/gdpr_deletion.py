@@ -138,41 +138,7 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         logger.info(f"[anonymize_user_in_postgresql] User billing info anonymized: {cursor.rowcount}")
 
         # ========================================================================
-        # 3. WHATSAPP
-        # ========================================================================
-
-        # user_whatsapp_info
-        cursor.execute(
-            """UPDATE user_whatsapp_info
-               SET user_email = %s, whatsapp_number = %s
-               WHERE user_email = %s""",
-            (anonymous_email, '***DELETED***', user_email)
-        )
-        stats['user_whatsapp_info'] = cursor.rowcount
-        logger.info(f"[anonymize_user_in_postgresql] WhatsApp info anonymized: {cursor.rowcount}")
-
-        # whatsapp_message_logs
-        cursor.execute(
-            """UPDATE whatsapp_message_logs
-               SET user_email = %s, from_number = %s, to_number = %s
-               WHERE user_email = %s""",
-            (anonymous_email, '***DELETED***', '***DELETED***', user_email)
-        )
-        stats['whatsapp_message_logs'] = cursor.rowcount
-        logger.info(f"[anonymize_user_in_postgresql] WhatsApp message logs anonymized: {cursor.rowcount}")
-
-        # whatsapp_conversations
-        cursor.execute(
-            """UPDATE whatsapp_conversations
-               SET user_email = %s, whatsapp_number = %s
-               WHERE user_email = %s""",
-            (anonymous_email, '***DELETED***', user_email)
-        )
-        stats['whatsapp_conversations'] = cursor.rowcount
-        logger.info(f"[anonymize_user_in_postgresql] WhatsApp conversations anonymized: {cursor.rowcount}")
-
-        # ========================================================================
-        # 4. QA & SATISFACTION
+        # 3. QA & SATISFACTION
         # ========================================================================
 
         # qa_quality_checks
@@ -192,7 +158,7 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         logger.info(f"[anonymize_user_in_postgresql] Satisfaction surveys anonymized: {cursor.rowcount}")
 
         # ========================================================================
-        # 5. MEDICAL IMAGES
+        # 4. MEDICAL IMAGES
         # ========================================================================
 
         # medical_images (métadonnées seulement, les fichiers S3 restent)
@@ -203,17 +169,6 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         stats['medical_images'] = cursor.rowcount
         logger.info(f"[anonymize_user_in_postgresql] Medical images anonymized: {cursor.rowcount}")
 
-        # ========================================================================
-        # 6. INVITATIONS
-        # ========================================================================
-
-        # invitations (anonymiser l'inviteur)
-        cursor.execute(
-            "UPDATE invitations SET inviter_email = %s WHERE inviter_email = %s",
-            (anonymous_email, user_email)
-        )
-        stats['invitations'] = cursor.rowcount
-        logger.info(f"[anonymize_user_in_postgresql] Invitations anonymized: {cursor.rowcount}")
 
         # ========================================================================
         # TOTAL

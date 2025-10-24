@@ -492,6 +492,20 @@ async def delete_user_profile(current_user: Dict[str, Any] = Depends(get_current
 
         supabase = get_supabase_admin_client()
 
+        # Supprimer les invitations envoyées par l'utilisateur
+        try:
+            supabase.table("invitations").delete().eq("inviter_email", user_email).execute()
+            logger.info(f"[delete_user_profile] ✅ Supabase invitations table: deleted")
+        except Exception as e:
+            logger.warning(f"[delete_user_profile] ⚠️ Invitations deletion warning: {e}")
+
+        # Supprimer les passkeys WebAuthn
+        try:
+            supabase.table("webauthn_credentials").delete().eq("user_id", user_id).execute()
+            logger.info(f"[delete_user_profile] ✅ Supabase webauthn_credentials table: deleted")
+        except Exception as e:
+            logger.warning(f"[delete_user_profile] ⚠️ WebAuthn credentials deletion warning: {e}")
+
         # Supprimer le profil utilisateur (table public.users)
         supabase.table("users").delete().eq("auth_user_id", user_id).execute()
         logger.info(f"[delete_user_profile] ✅ Supabase users table: deleted")
