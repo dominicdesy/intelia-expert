@@ -139,6 +139,163 @@ class PDFExportService:
             logger.warning(f"Logo non trouvé à: {logo_path}")
             return None
 
+    def _format_message_content(self, content: str) -> List[Any]:
+        """
+        Formate le contenu d'un message pour améliorer la lisibilité
+        Gère les paragraphes, listes à puces, titres et espacements
+        """
+        from reportlab.platypus import ListFlowable, ListItem
+
+        # Style pour les sous-titres dans les messages
+        if 'MessageSubtitle' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='MessageSubtitle',
+                parent=self.styles['Normal'],
+                fontSize=11,
+                textColor=self.INTELIA_BLUE,
+                fontName='Helvetica-Bold',
+                spaceAfter=6,
+                spaceBefore=8,
+                leading=14
+            ))
+
+        # Style pour les paragraphes normaux avec meilleur espacement
+        if 'MessageParagraph' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='MessageParagraph',
+                parent=self.styles['Normal'],
+                fontSize=11,
+                textColor=colors.black,
+                fontName='Helvetica',
+                leading=15,
+                spaceAfter=8,
+                alignment=TA_LEFT
+            ))
+
+        # Style pour les items de liste
+        if 'ListItem' not in self.styles:
+            self.styles.add(ParagraphStyle(
+                name='ListItem',
+                parent=self.styles['Normal'],
+                fontSize=11,
+                textColor=colors.black,
+                fontName='Helvetica',
+                leading=14,
+                leftIndent=0
+            ))
+
+        elements = []
+
+        # Nettoyer le contenu
+        content = content.strip()
+
+        # Séparer par lignes
+        lines = content.split('\n')
+
+        current_paragraph = []
+        current_list = []
+
+        for line in lines:
+            line_stripped = line.strip()
+
+            # Ligne vide = fin de paragraphe ou liste
+            if not line_stripped:
+                if current_list:
+                    # Créer la liste à puces
+                    list_items = []
+                    for item in current_list:
+                        list_items.append(Paragraph(item, self.styles['ListItem']))
+                    elements.append(ListFlowable(
+                        list_items,
+                        bulletType='bullet',
+                        leftIndent=20,
+                        bulletFontSize=10,
+                        bulletOffsetY=-1,
+                        start='•'
+                    ))
+                    elements.append(Spacer(1, 0.08*inch))
+                    current_list = []
+                elif current_paragraph:
+                    # Créer le paragraphe
+                    para_text = ' '.join(current_paragraph)
+                    # Vérifier si c'est un titre (se termine par :)
+                    if para_text.endswith(':'):
+                        elements.append(Paragraph(para_text, self.styles['MessageSubtitle']))
+                    else:
+                        elements.append(Paragraph(para_text, self.styles['MessageParagraph']))
+                    current_paragraph = []
+                continue
+
+            # Détecter une liste à puces
+            if line_stripped.startswith('- ') or line_stripped.startswith('• '):
+                # Finir le paragraphe en cours si nécessaire
+                if current_paragraph:
+                    para_text = ' '.join(current_paragraph)
+                    if para_text.endswith(':'):
+                        elements.append(Paragraph(para_text, self.styles['MessageSubtitle']))
+                    else:
+                        elements.append(Paragraph(para_text, self.styles['MessageParagraph']))
+                    current_paragraph = []
+
+                # Ajouter à la liste
+                item_text = line_stripped[2:].strip()  # Enlever le tiret
+                current_list.append(item_text)
+            else:
+                # Finir la liste en cours si nécessaire
+                if current_list:
+                    list_items = []
+                    for item in current_list:
+                        list_items.append(Paragraph(item, self.styles['ListItem']))
+                    elements.append(ListFlowable(
+                        list_items,
+                        bulletType='bullet',
+                        leftIndent=20,
+                        bulletFontSize=10,
+                        bulletOffsetY=-1,
+                        start='•'
+                    ))
+                    elements.append(Spacer(1, 0.08*inch))
+                    current_list = []
+
+                # Détecter si c'est une ligne de titre (se termine par :)
+                if line_stripped.endswith(':') and len(line_stripped) < 100:
+                    # Si on a un paragraphe en cours, le terminer d'abord
+                    if current_paragraph:
+                        para_text = ' '.join(current_paragraph)
+                        elements.append(Paragraph(para_text, self.styles['MessageParagraph']))
+                        current_paragraph = []
+                    # Ajouter le titre
+                    elements.append(Paragraph(line_stripped, self.styles['MessageSubtitle']))
+                else:
+                    # Ajouter au paragraphe en cours
+                    current_paragraph.append(line_stripped)
+
+        # Traiter le dernier élément
+        if current_list:
+            list_items = []
+            for item in current_list:
+                list_items.append(Paragraph(item, self.styles['ListItem']))
+            elements.append(ListFlowable(
+                list_items,
+                bulletType='bullet',
+                leftIndent=20,
+                bulletFontSize=10,
+                bulletOffsetY=-1,
+                start='•'
+            ))
+        elif current_paragraph:
+            para_text = ' '.join(current_paragraph)
+            if para_text.endswith(':'):
+                elements.append(Paragraph(para_text, self.styles['MessageSubtitle']))
+            else:
+                elements.append(Paragraph(para_text, self.styles['MessageParagraph']))
+
+        # Si aucun élément n'a été créé (contenu simple), créer un paragraphe unique
+        if not elements:
+            elements.append(Paragraph(content, self.styles['MessageParagraph']))
+
+        return elements
+
     def _add_header_footer(self, canvas_obj, doc):
         """Ajoute header et footer à chaque page"""
         canvas_obj.saveState()
@@ -265,11 +422,9 @@ class PDFExportService:
             if role == 'user':
                 role_label = "👤 Utilisateur"
                 bg_color = self.USER_BG
-                message_style = self.styles['UserMessage']
             else:
                 role_label = "🤖 Intelia Expert"
                 bg_color = self.ASSISTANT_BG
-                message_style = self.styles['AssistantMessage']
 
             # Timestamp formaté
             time_str = ""
@@ -282,12 +437,20 @@ class PDFExportService:
 
             role_text = f"{role_label} {time_str}" if time_str else role_label
 
-            # Créer une table pour le message avec fond coloré
-            message_content = Paragraph(content, message_style)
+            # Formater le contenu avec gestion des paragraphes et listes
+            formatted_content = self._format_message_content(content)
+
+            # Créer la structure du message avec en-tête et contenu
+            message_elements = [
+                [Paragraph(role_text, self.styles['RoleLabel'])],
+            ]
+
+            # Ajouter chaque élément formaté dans une cellule de tableau
+            for element in formatted_content:
+                message_elements.append([element])
 
             message_table = Table(
-                [[Paragraph(role_text, self.styles['RoleLabel'])],
-                 [message_content]],
+                message_elements,
                 colWidths=[6.5*inch]
             )
 
@@ -296,7 +459,8 @@ class PDFExportService:
                 ('ROUNDEDCORNERS', [5, 5, 5, 5]),
                 ('LEFTPADDING', (0, 0), (-1, -1), 12),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 12),
-                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, 0), 10),
+                ('TOPPADDING', (1, 0), (-1, -1), 5),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ]))
