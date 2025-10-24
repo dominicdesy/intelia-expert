@@ -38,3 +38,12 @@ def setup_logging(level: str = "INFO") -> None:
             ),
         ],
     )
+
+    # Suppression des logs verbeux de bibliothèques externes
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("botocore").setLevel(logging.WARNING)
+    logging.getLogger("boto3").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("anthropic").setLevel(logging.INFO)
+    logging.getLogger("openai").setLevel(logging.INFO)

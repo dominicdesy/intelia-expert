@@ -26,6 +26,15 @@ def setup_logging(level: int | str = logging.INFO) -> None:
     else:
         root.setLevel(level)
 
+    # Suppression des logs verbeux de bibliothèques externes
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("botocore").setLevel(logging.WARNING)
+    logging.getLogger("boto3").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("anthropic").setLevel(logging.INFO)
+    logging.getLogger("openai").setLevel(logging.INFO)
+
 
 def load_env(env_file: Optional[str] = None) -> None:
     """Charge les variables d'environnement depuis un .env si présent."""
