@@ -77,6 +77,11 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
     cursor = conn.cursor()
 
     try:
+        # Defer FK constraint checks until transaction commit
+        # This allows us to update parent and child tables in any order
+        cursor.execute("SET CONSTRAINTS ALL DEFERRED")
+        logger.info(f"[anonymize_user_in_postgresql] FK constraints deferred")
+
         # ========================================================================
         # 1. CONVERSATIONS & MESSAGES
         # ========================================================================
