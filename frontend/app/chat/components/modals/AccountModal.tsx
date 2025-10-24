@@ -157,6 +157,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <span className="text-xl" style={{ color: '#6b7280' }}>$</span>
                 <span className="text-sm" style={{ color: '#6b7280' }}>/ mois</span>
               </div>
+              {/* Spacer to match Pro/Elite height */}
+              <div className="mt-1 h-4"></div>
             </header>
 
             <button
