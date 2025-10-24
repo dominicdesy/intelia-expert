@@ -72,7 +72,7 @@ interface AuthState {
     password: string,
     userData: Partial<AppUser>,
   ) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (skipApiCall?: boolean) => Promise<void>;
   updateProfile: (data: Partial<AppUser>) => Promise<void>;
   getAuthToken: () => Promise<string | null>;
   updateConsent: (consentGiven: boolean) => Promise<void>;
@@ -85,7 +85,7 @@ interface AuthState {
 
   // NOUVELLES ACTIONS POUR SESSION TRACKING
   startSessionTracking: () => void;
-  endSessionTracking: () => Promise<void>;
+  endSessionTracking: (skipApiCall?: boolean) => Promise<void>;
   sendHeartbeat: () => Promise<void>;
 
   // NOUVELLE ACTION POUR REFRESH AUTOMATIQUE
@@ -159,14 +159,14 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      endSessionTracking: async () => {
+      endSessionTracking: async (skipApiCall = false) => {
         const { sessionStart, heartbeatInterval } = get();
-        
+
         // Nettoyer l'interval si il existe
         if (heartbeatInterval) {
           clearInterval(heartbeatInterval);
         }
-        
+
         if (sessionStart) {
           const duration = (Date.now() - sessionStart.getTime()) / 1000;
           set({
@@ -180,15 +180,20 @@ export const useAuthStore = create<AuthState>()(
             `[AuthStore] Session ended - duration: ${Math.round(duration)}s`,
           );
 
-          try {
-            const response = await apiClient.postSecure("/auth/logout", {
-              reason: "manual",
-            });
-            if (response.success) {
-              secureLog.log("[AuthStore] Logout tracking sent to backend");
+          // Ne pas appeler l'API si on vient de supprimer le compte
+          if (!skipApiCall) {
+            try {
+              const response = await apiClient.postSecure("/auth/logout", {
+                reason: "manual",
+              });
+              if (response.success) {
+                secureLog.log("[AuthStore] Logout tracking sent to backend");
+              }
+            } catch (error) {
+              secureLog.warn("[AuthStore] Logout tracking error", error);
             }
-          } catch (error) {
-            secureLog.warn("[AuthStore] Logout tracking error", error);
+          } else {
+            secureLog.log("[AuthStore] Session tracking ended (API call skipped)");
           }
         }
       },
@@ -793,12 +798,12 @@ export const useAuthStore = create<AuthState>()(
       },
 
       // LOGOUT : Nettoyage simple + fin de session tracking
-      logout: async () => {
+      logout: async (skipApiCall = false) => {
         secureLog.log("[AuthStore] Logout - localStorage cleanup");
 
         try {
           // NOUVEAU: Terminer le tracking de session avant le logout
-          await get().endSessionTracking();
+          await get().endSessionTracking(skipApiCall);
 
           // Nettoyage localStorage sélectif
           const keysToRemove = [];
@@ -1035,8 +1040,8 @@ export const useAuthStore = create<AuthState>()(
             );
           }
 
-          // Déconnexion automatique après suppression
-          await get().logout();
+          // Déconnexion automatique après suppression (sans appel API car le compte est déjà supprimé)
+          await get().logout(true);
 
           secureLog.log("[AuthStore] Account deletion successful");
         } catch (e: any) {
