@@ -24,20 +24,22 @@ from monitoring.metrics import get_metrics_collector
 # Import vision analyzer
 from generation.claude_vision_analyzer import create_vision_analyzer
 
-# Import storage service for images
-import sys
-import os
-backend_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'backend')
-sys.path.insert(0, backend_path)
+logger = logging.getLogger(__name__)
 
+# Import storage service for images (optional - non-blocking if fails)
+STORAGE_SERVICE_AVAILABLE = False
 try:
+    import sys
+    import os
+    backend_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'backend')
+    sys.path.insert(0, backend_path)
+
     from app.services.audio_storage_service import audio_storage_service
     STORAGE_SERVICE_AVAILABLE = True
-except ImportError:
-    logger.warning("⚠️ Storage service not available - images will not be saved to Spaces")
+    logger.info("✅ Storage service loaded - images will be saved to Spaces")
+except ImportError as e:
+    logger.warning(f"⚠️ Storage service not available - images will not be saved to Spaces: {e}")
     STORAGE_SERVICE_AVAILABLE = False
-
-logger = logging.getLogger(__name__)
 
 
 def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
