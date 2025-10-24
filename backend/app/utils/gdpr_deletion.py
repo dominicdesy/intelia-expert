@@ -140,22 +140,24 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         # ========================================================================
         # 3. QA & SATISFACTION
         # ========================================================================
+        # Note: user_id in these tables is UUID type, cannot be anonymized to TEXT
+        # Since conversations are already anonymized, we delete these records entirely
 
-        # qa_quality_checks
+        # qa_quality_checks (DELETE - user_id is UUID, cannot anonymize)
         cursor.execute(
-            "UPDATE qa_quality_checks SET user_id = %s WHERE user_id = %s",
-            (anonymous_id, user_id)
+            "DELETE FROM qa_quality_checks WHERE user_id = %s",
+            (user_id,)
         )
         stats['qa_quality_checks'] = cursor.rowcount
-        logger.info(f"[anonymize_user_in_postgresql] QA quality checks anonymized: {cursor.rowcount}")
+        logger.info(f"[anonymize_user_in_postgresql] QA quality checks deleted: {cursor.rowcount}")
 
-        # conversation_satisfaction_surveys
+        # conversation_satisfaction_surveys (DELETE - user_id is UUID or TEXT, safer to delete)
         cursor.execute(
-            "UPDATE conversation_satisfaction_surveys SET user_id = %s WHERE user_id = %s",
-            (anonymous_id, user_id)
+            "DELETE FROM conversation_satisfaction_surveys WHERE user_id = %s",
+            (user_id,)
         )
         stats['conversation_satisfaction_surveys'] = cursor.rowcount
-        logger.info(f"[anonymize_user_in_postgresql] Satisfaction surveys anonymized: {cursor.rowcount}")
+        logger.info(f"[anonymize_user_in_postgresql] Satisfaction surveys deleted: {cursor.rowcount}")
 
         # ========================================================================
         # 4. MEDICAL IMAGES
