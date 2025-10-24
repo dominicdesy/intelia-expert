@@ -714,12 +714,15 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
   const [passkeys, setPasskeys] = useState<any[]>([]);
   const [isLoadingPasskeys, setIsLoadingPasskeys] = useState(false);
   const [passkeySuccess, setPasskeySuccess] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const tabs = useMemo(
     () => [
       { id: "profile", label: t("nav.profile"), icon: "👤" },
       { id: "password", label: t("profile.password"), icon: "🔒" },
       { id: "passkey", label: t("passkey.title"), icon: "🔐" },
+      { id: "security", label: "Sécurité", icon: "🛡️" },
     ],
     [t],
   );
@@ -1086,6 +1089,28 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       setFormErrors([err.message || t("passkey.manage.deleteError") || "Failed to delete passkey"]);
     }
   }, [removePasskey, loadPasskeys, t]);
+
+  // Delete account handler
+  const handleDeleteAccount = useCallback(async () => {
+    if (!showDeleteConfirm) {
+      setShowDeleteConfirm(true);
+      return;
+    }
+
+    setIsDeleting(true);
+    setFormErrors([]);
+
+    try {
+      const { deleteUserData } = useAuthStore.getState();
+      await deleteUserData();
+      // La déconnexion est gérée automatiquement par le store
+    } catch (error: any) {
+      setFormErrors([error.message || "Erreur lors de la suppression du compte"]);
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [showDeleteConfirm]);
 
   // Load passkeys when passkey tab is active
   useEffect(() => {
@@ -1558,8 +1583,79 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
               </div>
             )}
 
+            {/* Security Tab */}
+            {activeTab === "security" && (
+              <div className="space-y-6" data-debug="security-tab">
+                <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                  <h3 className="text-lg font-medium text-red-900 mb-2 flex items-center">
+                    <span className="mr-2">⚠️</span>
+                    Supprimer mon compte
+                  </h3>
+                  <p className="text-sm text-red-700 mb-4">
+                    La suppression de votre compte est <strong>irréversible</strong>. Vos données personnelles seront définitivement supprimées ou anonymisées conformément au RGPD.
+                  </p>
+
+                  <div className="bg-white bg-opacity-70 rounded p-3 mb-4 space-y-2 text-sm text-gray-700">
+                    <p className="font-medium text-gray-900">Ce qui sera supprimé :</p>
+                    <ul className="list-disc list-inside space-y-1 ml-2">
+                      <li>Votre compte d'authentification</li>
+                      <li>Toutes vos informations personnelles (nom, email, téléphone)</li>
+                      <li>Vos passkeys d'authentification</li>
+                    </ul>
+
+                    <p className="font-medium text-gray-900 mt-3">Ce qui sera conservé de manière anonyme :</p>
+                    <ul className="list-disc list-inside space-y-1 ml-2">
+                      <li>Vos conversations (anonymisées, sans possibilité de vous identifier)</li>
+                      <li>Votre historique de facturation (anonymisé, obligations légales)</li>
+                      <li>Vos statistiques d'utilisation (anonymisées)</li>
+                    </ul>
+
+                    <p className="text-xs text-gray-600 mt-3 italic">
+                      Cette conservation anonyme nous permet d'améliorer le service tout en respectant votre vie privée (conforme RGPD Article 17).
+                    </p>
+                  </div>
+
+                  {!showDeleteConfirm ? (
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={isDeleting}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
+                    >
+                      Supprimer mon compte
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-red-800 flex items-center">
+                        <span className="mr-2">⚠️</span>
+                        Êtes-vous absolument certain ? Cette action est irréversible.
+                      </p>
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={() => setShowDeleteConfirm(false)}
+                          disabled={isDeleting}
+                          className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors disabled:opacity-50"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          onClick={handleDeleteAccount}
+                          disabled={isDeleting}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center"
+                        >
+                          {isDeleting && (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          )}
+                          {isDeleting ? "Suppression en cours..." : "Oui, supprimer définitivement"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Footer Buttons */}
-            {activeTab !== "passkey" && (
+            {activeTab !== "passkey" && activeTab !== "security" && (
               <div
                 className="flex justify-end space-x-3 pt-4 pb-8"
                 data-debug="footer"

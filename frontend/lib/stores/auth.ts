@@ -1025,7 +1025,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const response = await apiClient.deleteSecure<any>(
-            "/users/delete-account",
+            "/users/profile",
           );
 
           if (!response.success) {
