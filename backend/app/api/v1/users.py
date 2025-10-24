@@ -432,44 +432,101 @@ async def update_user_profile(
 
 @router.delete("/profile", response_model=UserProfileResponse)
 async def delete_user_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """Supprime le profil utilisateur (RGPD)"""
+    """
+    Supprime le profil utilisateur et anonymise toutes les données (RGPD).
+
+    Conformité RGPD:
+    - Article 17: Droit à l'oubli (Right to be forgotten)
+    - Article 20: Portabilité des données
+
+    Stratégie:
+    - ANONYMISATION: Conversations, messages, historique de paiements
+    - SUPPRESSION: Compte d'authentification, profil utilisateur, passkeys
+
+    IMPORTANT: Les conversations sont CONSERVÉES mais rendues anonymes.
+    Cette opération est IRRÉVERSIBLE.
+    """
+    user_id = current_user["user_id"]
+    user_email = current_user["email"]
 
     logger.info(
-        f"[delete_user_profile] Suppression profil pour {current_user.get('email')}"
+        f"[delete_user_profile] Début anonymisation RGPD pour {mask_email(user_email)}"
     )
 
     try:
-        supabase = get_supabase_admin_client()
-
-        # CORRECTION F841: Supprimer la variable response non utilisée
-        # Supprimer le profil utilisateur
-        supabase.table("users").delete().eq(
-            "auth_user_id", current_user["user_id"]
-        ).execute()
-
-        # Supprimer aussi l'utilisateur auth (optionnel - à débattre)
-        try:
-            supabase.auth.admin.delete_user(current_user["user_id"])
-            logger.info(
-                f"[delete_user_profile] Utilisateur auth supprimé pour {current_user['email']}"
-            )
-        except Exception as auth_error:
-            logger.warning(
-                f"[delete_user_profile] Erreur suppression auth : {auth_error}"
-            )
-
-        logger.info(
-            f"[delete_user_profile] Profil supprimé pour {current_user['email']}"
+        from app.core.database import get_pg_connection
+        from app.utils.gdpr_deletion import (
+            anonymize_user_in_postgresql,
+            delete_user_auth_data,
+            log_gdpr_deletion,
+            get_anonymization_summary
         )
 
+        # ========================================================================
+        # ÉTAPE 1: ANONYMISATION POSTGRESQL (transaction atomique)
+        # ========================================================================
+
+        with get_pg_connection() as conn:
+            logger.info(f"[delete_user_profile] Étape 1/3: Anonymisation PostgreSQL...")
+
+            # Anonymiser toutes les données dans PostgreSQL
+            anonymization_stats = anonymize_user_in_postgresql(conn, user_id, user_email)
+            logger.info(f"[delete_user_profile] PostgreSQL anonymization stats: {anonymization_stats}")
+
+            # Supprimer les passkeys (données cryptographiques non-anonymisables)
+            deletion_stats = delete_user_auth_data(conn, user_id)
+            logger.info(f"[delete_user_profile] Auth data deletion stats: {deletion_stats}")
+
+            # Logger pour audit RGPD (conformité légale)
+            log_gdpr_deletion(conn, user_id, user_email, {**anonymization_stats, **deletion_stats})
+
+            # Le commit est automatique si pas d'exception (context manager)
+
+        logger.info(f"[delete_user_profile] ✅ Étape 1/3: PostgreSQL anonymization completed")
+
+        # ========================================================================
+        # ÉTAPE 2: SUPPRESSION SUPABASE (après succès PostgreSQL)
+        # ========================================================================
+
+        logger.info(f"[delete_user_profile] Étape 2/3: Suppression Supabase...")
+
+        supabase = get_supabase_admin_client()
+
+        # Supprimer le profil utilisateur (table public.users)
+        supabase.table("users").delete().eq("auth_user_id", user_id).execute()
+        logger.info(f"[delete_user_profile] ✅ Supabase users table: deleted")
+
+        # Supprimer le compte d'authentification (table auth.users)
+        try:
+            supabase.auth.admin.delete_user(user_id)
+            logger.info(f"[delete_user_profile] ✅ Supabase auth.users: deleted")
+        except Exception as auth_error:
+            logger.warning(
+                f"[delete_user_profile] ⚠️ Auth deletion warning: {auth_error}"
+            )
+
+        logger.info(f"[delete_user_profile] ✅ Étape 2/3: Supabase deletion completed")
+
+        # ========================================================================
+        # ÉTAPE 3: RÉSUMÉ ET CONFIRMATION
+        # ========================================================================
+
+        summary = get_anonymization_summary(user_id, user_email)
+        logger.info(f"[delete_user_profile] ✅ Étape 3/3: Anonymization summary generated")
+        logger.info(f"[delete_user_profile] 🎉 Anonymisation complète pour {mask_email(user_email)}")
+        logger.info(f"[delete_user_profile] Anonymous ID: {summary['anonymous_identifier']}")
+
         return UserProfileResponse(
-            success=True, message="Profil utilisateur supprimé avec succès"
+            success=True,
+            message="Votre compte a été supprimé et vos données anonymisées avec succès (conforme RGPD)"
         )
 
     except Exception as e:
-        logger.error(f"[delete_user_profile] Erreur : {str(e)}")
+        logger.error(f"[delete_user_profile] ❌ Erreur lors de l'anonymisation: {str(e)}")
+        logger.error(f"[delete_user_profile] ❌ Transaction rollback - aucune donnée modifiée")
         raise HTTPException(
-            status_code=500, detail="Erreur suppression profil utilisateur"
+            status_code=500,
+            detail="Erreur lors de la suppression du compte. Veuillez réessayer ou contacter le support."
         )
 
 
