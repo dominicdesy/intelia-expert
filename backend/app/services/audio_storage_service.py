@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Service de stockage audio vers DigitalOcean Spaces
-Télécharge les fichiers audio (WhatsApp/Twilio) et les stocke de façon permanente
+Service de stockage média (audio + images) vers DigitalOcean Spaces
+Télécharge les fichiers audio et images (WhatsApp/Twilio/Frontend) et les stocke de façon permanente
 """
 
 import os
@@ -25,6 +25,7 @@ DO_SPACES_SECRET = os.getenv("DO_SPACES_SECRET")
 
 # Limites
 MAX_AUDIO_SIZE = 25 * 1024 * 1024  # 25 MB (WhatsApp max ~16MB)
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB pour images
 
 
 class AudioStorageService:
@@ -221,6 +222,234 @@ class AudioStorageService:
 
         except Exception as e:
             logger.error(f"❌ Erreur download_and_upload: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    # ============================================================
+    # IMAGE STORAGE METHODS
+    # ============================================================
+
+    def generate_image_key(self, user_id: str, source: str = "whatsapp", extension: str = "jpg") -> str:
+        """
+        Génère une clé Spaces unique pour un fichier image
+        Format: images/{source}/{user_id}/{year}/{month}/{uuid}.{extension}
+
+        Args:
+            user_id: ID utilisateur
+            source: Source de l'image (whatsapp, frontend, etc.)
+            extension: Extension du fichier (jpg, png, webp)
+
+        Returns:
+            Clé Spaces (ex: "images/whatsapp/user123/2025/10/abc-def.jpg")
+        """
+        now = datetime.utcnow()
+        unique_id = str(uuid.uuid4())
+
+        return f"images/{source}/{user_id}/{now.year}/{now.month:02d}/{unique_id}.{extension}"
+
+    def upload_image(
+        self,
+        image_data: bytes,
+        spaces_key: str,
+        content_type: str = "image/jpeg",
+        metadata: Optional[Dict[str, str]] = None
+    ) -> str:
+        """
+        Upload une image vers DigitalOcean Spaces
+
+        Args:
+            image_data: Données image (bytes)
+            spaces_key: Clé Spaces (chemin dans le bucket)
+            content_type: Type MIME (image/jpeg, image/png, etc.)
+            metadata: Métadonnées optionnelles
+
+        Returns:
+            URL publique du fichier
+
+        Raises:
+            ClientError: Si upload échoue
+        """
+        client = self._get_client()
+
+        # Vérifier taille
+        if len(image_data) > MAX_IMAGE_SIZE:
+            raise ValueError(f"Image trop volumineuse: {len(image_data) / 1024 / 1024:.1f}MB (max: {MAX_IMAGE_SIZE / 1024 / 1024}MB)")
+
+        if len(image_data) == 0:
+            raise ValueError("Image vide")
+
+        try:
+            client.put_object(
+                Bucket=self.bucket,
+                Key=spaces_key,
+                Body=image_data,
+                ContentType=content_type,
+                ACL='public-read',  # Rendre accessible publiquement
+                Metadata=metadata or {}
+            )
+
+            # Construire URL publique
+            public_url = f"{self.endpoint}/{self.bucket}/{spaces_key}"
+
+            logger.info(f"✅ Image uploadée vers Spaces: {spaces_key}")
+            return public_url
+
+        except ClientError as e:
+            logger.error(f"❌ Erreur upload image Spaces: {e}")
+            raise
+
+    async def download_and_upload_image(
+        self,
+        source_url: str,
+        user_id: str,
+        source: str = "whatsapp",
+        auth: Optional[tuple] = None,
+        metadata: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Télécharge une image depuis une URL et l'uploade vers Spaces (opération complète)
+
+        Args:
+            source_url: URL source (ex: Twilio)
+            user_id: ID utilisateur
+            source: Source de l'image (whatsapp, frontend)
+            auth: Authentification pour téléchargement
+            metadata: Métadonnées additionnelles
+
+        Returns:
+            {
+                "success": True,
+                "spaces_url": "https://...",
+                "spaces_key": "images/...",
+                "size_bytes": 123456,
+                "content_type": "image/jpeg"
+            }
+        """
+        try:
+            # 1. Télécharger depuis source
+            image_data, content_type = await self.download_from_url(source_url, auth=auth)
+
+            # 2. Vérifier que c'est bien une image
+            if not content_type.startswith("image/"):
+                raise ValueError(f"Type de fichier non-image: {content_type}")
+
+            # 3. Déterminer extension
+            extension_map = {
+                "image/jpeg": "jpg",
+                "image/jpg": "jpg",
+                "image/png": "png",
+                "image/webp": "webp",
+                "image/gif": "gif"
+            }
+            extension = extension_map.get(content_type, "jpg")
+
+            # 4. Générer clé Spaces
+            spaces_key = self.generate_image_key(user_id, source, extension)
+
+            # 5. Préparer métadonnées
+            upload_metadata = {
+                "source": source,
+                "user_id": user_id,
+                "original_url": source_url,
+                "uploaded_at": datetime.utcnow().isoformat()
+            }
+            if metadata:
+                upload_metadata.update(metadata)
+
+            # 6. Upload vers Spaces
+            spaces_url = self.upload_image(image_data, spaces_key, content_type, upload_metadata)
+
+            return {
+                "success": True,
+                "spaces_url": spaces_url,
+                "spaces_key": spaces_key,
+                "size_bytes": len(image_data),
+                "content_type": content_type
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Erreur download_and_upload_image: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def upload_image_direct(
+        self,
+        image_data: bytes,
+        user_id: str,
+        source: str = "frontend",
+        content_type: str = "image/jpeg",
+        original_filename: str = "image.jpg",
+        metadata: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Upload direct d'une image (déjà en mémoire) vers Spaces
+        Utilisé pour les images du frontend qui ne viennent pas d'une URL
+
+        Args:
+            image_data: Données image (bytes)
+            user_id: ID utilisateur
+            source: Source de l'image (frontend, whatsapp, etc.)
+            content_type: Type MIME
+            original_filename: Nom de fichier original (pour extension)
+            metadata: Métadonnées additionnelles
+
+        Returns:
+            {
+                "success": True,
+                "spaces_url": "https://...",
+                "spaces_key": "images/...",
+                "size_bytes": 123456,
+                "content_type": "image/jpeg"
+            }
+        """
+        try:
+            # Déterminer extension depuis filename ou content_type
+            extension_map = {
+                "image/jpeg": "jpg",
+                "image/jpg": "jpg",
+                "image/png": "png",
+                "image/webp": "webp",
+                "image/gif": "gif"
+            }
+
+            # Essayer d'obtenir extension depuis filename
+            import os
+            file_ext = os.path.splitext(original_filename)[1].lower().lstrip('.')
+            if file_ext in ['jpg', 'jpeg', 'png', 'webp', 'gif']:
+                extension = file_ext
+            else:
+                extension = extension_map.get(content_type, "jpg")
+
+            # Générer clé Spaces
+            spaces_key = self.generate_image_key(user_id, source, extension)
+
+            # Préparer métadonnées
+            upload_metadata = {
+                "source": source,
+                "user_id": user_id,
+                "original_filename": original_filename,
+                "uploaded_at": datetime.utcnow().isoformat()
+            }
+            if metadata:
+                upload_metadata.update(metadata)
+
+            # Upload vers Spaces
+            spaces_url = self.upload_image(image_data, spaces_key, content_type, upload_metadata)
+
+            return {
+                "success": True,
+                "spaces_url": spaces_url,
+                "spaces_key": spaces_key,
+                "size_bytes": len(image_data),
+                "content_type": content_type
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Erreur upload_image_direct: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e)

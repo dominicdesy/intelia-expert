@@ -661,6 +661,36 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
 
             logger.info(f"✅ Image downloaded: {len(image_data)} bytes, type: {content_type}")
 
+        # Étape 1b: Upload image vers DigitalOcean Spaces pour stockage permanent
+        permanent_image_url = media_url  # Fallback to Twilio URL
+        try:
+            user_id = user_info.get("user_id")
+            if user_id:
+                # Uploader l'image vers Spaces
+                upload_result = audio_storage_service.upload_image_direct(
+                    image_data=image_data,
+                    user_id=user_id,
+                    source="whatsapp",
+                    content_type=content_type,
+                    original_filename="whatsapp_image.jpg",
+                    metadata={
+                        "user_email": user_email,
+                        "twilio_url": media_url,
+                        "analysis_pending": "true"
+                    }
+                )
+
+                if upload_result.get("success"):
+                    permanent_image_url = upload_result["spaces_url"]
+                    logger.info(f"✅ Image uploaded to Spaces: {permanent_image_url}")
+                else:
+                    logger.warning(f"⚠️ Failed to upload image to Spaces: {upload_result.get('error')}")
+            else:
+                logger.warning("⚠️ Cannot upload image to Spaces: user_id not found")
+        except Exception as e:
+            # Don't block analysis if Spaces upload fails
+            logger.error(f"❌ Failed to upload image to Spaces (non-blocking): {e}")
+
         # Étape 2: Préparer la requête pour le service LLM Vision
         tenant_id = from_number.replace("whatsapp:", "").strip()
 
@@ -738,7 +768,7 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
                             conversation_id=existing_conv["id"],
                             role="user",
                             content=f"[IMAGE] {message_text}",  # Prefix to indicate image
-                            media_url=media_url,  # Save Twilio image URL
+                            media_url=permanent_image_url,  # Save permanent Spaces URL (or Twilio fallback)
                             media_type="image"
                         )
                         conversation_service.add_message(
@@ -759,7 +789,7 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
                             language=detected_language,
                             response_source="vision",
                             response_confidence=None,
-                            user_media_url=media_url,  # Save Twilio image URL
+                            user_media_url=permanent_image_url,  # Save permanent Spaces URL (or Twilio fallback)
                             user_media_type="image"
                         )
                         logger.info(f"💾 WhatsApp image conversation created: {result['conversation_id']}")

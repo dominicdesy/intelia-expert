@@ -24,6 +24,19 @@ from monitoring.metrics import get_metrics_collector
 # Import vision analyzer
 from generation.claude_vision_analyzer import create_vision_analyzer
 
+# Import storage service for images
+import sys
+import os
+backend_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'backend')
+sys.path.insert(0, backend_path)
+
+try:
+    from app.services.audio_storage_service import audio_storage_service
+    STORAGE_SERVICE_AVAILABLE = True
+except ImportError:
+    logger.warning("⚠️ Storage service not available - images will not be saved to Spaces")
+    STORAGE_SERVICE_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -214,6 +227,64 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     detail=f"Erreur d'analyse: {error_msg}"
                 )
 
+            # Upload images to DigitalOcean Spaces (permanent storage)
+            uploaded_images = []
+            if STORAGE_SERVICE_AVAILABLE:
+                try:
+                    # Extract user_id from JWT token (if available)
+                    user_id = None
+                    auth_header = request.headers.get("Authorization", "")
+                    if auth_header.startswith("Bearer "):
+                        try:
+                            import jwt
+                            token = auth_header.replace("Bearer ", "")
+                            # Decode without verification (just to get user info)
+                            decoded = jwt.decode(token, options={"verify_signature": False})
+                            user_id = decoded.get("sub") or decoded.get("email") or tenant_id
+                            logger.info(f"[VISION] Extracted user_id from JWT: {user_id}")
+                        except Exception as e:
+                            logger.warning(f"[VISION] Failed to decode JWT: {e}")
+                            user_id = tenant_id
+                    else:
+                        user_id = tenant_id
+
+                    # Upload each image to Spaces
+                    for idx, img_data in enumerate(images_data):
+                        try:
+                            upload_result = audio_storage_service.upload_image_direct(
+                                image_data=img_data["data"],
+                                user_id=user_id,
+                                source="frontend",
+                                content_type=img_data["content_type"],
+                                original_filename=img_data["filename"] or f"image_{idx+1}.jpg",
+                                metadata={
+                                    "tenant_id": tenant_id,
+                                    "analysis_completed": "true",
+                                    "model": analysis_result.get("model", "claude-3-5-sonnet")
+                                }
+                            )
+
+                            if upload_result.get("success"):
+                                uploaded_images.append({
+                                    "filename": img_data["filename"],
+                                    "spaces_url": upload_result["spaces_url"],
+                                    "spaces_key": upload_result["spaces_key"],
+                                    "size_bytes": upload_result["size_bytes"]
+                                })
+                                logger.info(f"[VISION] Image {idx+1}/{len(images_data)} uploaded to Spaces: {upload_result['spaces_url']}")
+                            else:
+                                logger.warning(f"[VISION] Failed to upload image {idx+1}: {upload_result.get('error')}")
+
+                        except Exception as e:
+                            # Non-blocking: continue even if one image fails
+                            logger.error(f"[VISION] Error uploading image {idx+1} to Spaces: {e}")
+
+                    logger.info(f"[VISION] Uploaded {len(uploaded_images)}/{len(images_data)} images to Spaces")
+
+                except Exception as e:
+                    # Non-blocking: analysis already succeeded
+                    logger.error(f"[VISION] Error during image upload to Spaces: {e}")
+
             # Calculer le temps de traitement
             processing_time = time.time() - start_time
 
@@ -253,6 +324,8 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "usage": analysis_result.get("usage", {}),
                         "rag_context_used": len(context_docs) > 0,
                         "rag_documents_count": len(context_docs),
+                        "uploaded_images": uploaded_images,  # URLs des images dans Spaces
+                        "images_saved_to_spaces": len(uploaded_images)
                     }
                 }
             )
@@ -473,6 +546,62 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     detail=f"Erreur d'analyse: {error_msg}"
                 )
 
+            # Upload images to DigitalOcean Spaces (permanent storage)
+            uploaded_images = []
+            if STORAGE_SERVICE_AVAILABLE:
+                try:
+                    # Extract user_id from JWT token (if available)
+                    user_id = None
+                    auth_header = request.headers.get("Authorization", "")
+                    if auth_header.startswith("Bearer "):
+                        try:
+                            import jwt
+                            token = auth_header.replace("Bearer ", "")
+                            decoded = jwt.decode(token, options={"verify_signature": False})
+                            user_id = decoded.get("sub") or decoded.get("email") or tenant_id
+                            logger.info(f"[VISION_SESSION] Extracted user_id from JWT: {user_id}")
+                        except Exception as e:
+                            logger.warning(f"[VISION_SESSION] Failed to decode JWT: {e}")
+                            user_id = tenant_id
+                    else:
+                        user_id = tenant_id
+
+                    # Upload each image to Spaces
+                    for idx, img_data in enumerate(images_data):
+                        try:
+                            upload_result = audio_storage_service.upload_image_direct(
+                                image_data=img_data["data"],
+                                user_id=user_id,
+                                source="frontend_session",
+                                content_type=img_data["content_type"],
+                                original_filename=img_data["filename"] or f"image_{idx+1}.jpg",
+                                metadata={
+                                    "tenant_id": tenant_id,
+                                    "session_id": session_id,
+                                    "analysis_completed": "true",
+                                    "model": analysis_result.get("model", "claude-3-5-sonnet")
+                                }
+                            )
+
+                            if upload_result.get("success"):
+                                uploaded_images.append({
+                                    "filename": img_data["filename"],
+                                    "spaces_url": upload_result["spaces_url"],
+                                    "spaces_key": upload_result["spaces_key"],
+                                    "size_bytes": upload_result["size_bytes"]
+                                })
+                                logger.info(f"[VISION_SESSION] Image {idx+1}/{len(images_data)} uploaded to Spaces: {upload_result['spaces_url']}")
+                            else:
+                                logger.warning(f"[VISION_SESSION] Failed to upload image {idx+1}: {upload_result.get('error')}")
+
+                        except Exception as e:
+                            logger.error(f"[VISION_SESSION] Error uploading image {idx+1} to Spaces: {e}")
+
+                    logger.info(f"[VISION_SESSION] Uploaded {len(uploaded_images)}/{len(images_data)} images to Spaces")
+
+                except Exception as e:
+                    logger.error(f"[VISION_SESSION] Error during image upload to Spaces: {e}")
+
             # Nettoyer les images temporaires si demandé
             if cleanup_after:
                 try:
@@ -523,6 +652,8 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "rag_context_used": len(context_docs) > 0,
                         "rag_documents_count": len(context_docs),
                         "cleaned_up": cleanup_after,
+                        "uploaded_images": uploaded_images,  # URLs des images dans Spaces
+                        "images_saved_to_spaces": len(uploaded_images)
                     }
                 }
             )
