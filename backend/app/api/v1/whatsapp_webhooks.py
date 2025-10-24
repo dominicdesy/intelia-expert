@@ -44,6 +44,9 @@ from app.services.conversation_service import conversation_service
 # Import audio storage service for permanent audio storage
 from app.services.audio_storage_service import audio_storage_service
 
+# Import TTS service for voice responses
+from app.services.tts_service import tts_service
+
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp-webhooks"])
 logger = logging.getLogger(__name__)
 
@@ -595,7 +598,12 @@ async def handle_audio_message(from_number: str, media_url: str, user_info: Dict
 
         logger.info(f"✅ Audio message processed successfully for {user_email}")
 
-        return response_with_context
+        # Retourner un dict avec le texte à afficher ET le texte pour TTS (sans préfixe)
+        return {
+            "text": response_with_context,  # Texte complet avec préfixe (pour affichage)
+            "tts_text": response,  # Réponse seule (pour audio TTS, sans le préfixe transcription)
+            "is_audio_response": True  # Flag pour indiquer qu'on veut une réponse audio
+        }
 
     except openai.APIError as e:
         logger.error(f"❌ OpenAI Whisper API error: {e}")
@@ -1135,8 +1143,60 @@ async def whatsapp_webhook(
             # On attend 10s pour être sûr de respecter la limite
             time.sleep(10)
 
+            # Vérifier si c'est une réponse audio (dict) ou texte simple (str)
+            audio_url = None
+            if isinstance(response_text, dict) and response_text.get("is_audio_response"):
+                # Réponse audio : générer TTS + uploader sur Spaces
+                logger.info("🔊 Generating TTS audio for voice response...")
+
+                try:
+                    # 1. Générer l'audio TTS
+                    tts_text = response_text.get("tts_text", "")
+                    if tts_text:
+                        audio_data = tts_service.generate_speech(
+                            text=tts_text,
+                            voice="alloy",  # Voix neutre et claire
+                            model="tts-1"  # Plus rapide et économique
+                        )
+
+                        logger.info(f"✅ TTS audio generated: {len(audio_data)} bytes")
+
+                        # 2. Uploader l'audio sur Digital Ocean Spaces
+                        user_id = user_info.get("user_id")
+                        if user_id and audio_data:
+                            spaces_key = audio_storage_service.generate_audio_key(
+                                user_id=user_id,
+                                source="whatsapp_tts",
+                                extension="mp3"
+                            )
+
+                            audio_url = audio_storage_service.upload_audio(
+                                audio_data=audio_data,
+                                spaces_key=spaces_key,
+                                content_type="audio/mpeg",
+                                metadata={
+                                    "user_email": user_info.get("user_email"),
+                                    "tts_voice": "alloy",
+                                    "tts_model": "tts-1",
+                                    "response_type": "whatsapp_voice_response"
+                                }
+                            )
+
+                            logger.info(f"✅ TTS audio uploaded to Spaces: {audio_url}")
+                        else:
+                            logger.warning("⚠️ Cannot upload TTS audio: user_id not found")
+
+                except Exception as e:
+                    # Non-bloquant : si TTS échoue, on envoie quand même le texte
+                    logger.error(f"❌ TTS generation failed (non-blocking): {e}")
+                    audio_url = None
+
+                # Extraire le texte à afficher
+                response_text = response_text.get("text", str(response_text))
+
             # Envoyer la réponse (peut être segmentée si longue)
-            result = send_whatsapp_message(From, response_text)
+            # Si audio_url existe, l'audio sera attaché au message
+            result = send_whatsapp_message(From, response_text, media_url=audio_url)
 
             if result["success"]:
                 logger.info(
