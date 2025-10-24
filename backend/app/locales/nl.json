@@ -1,0 +1,14 @@
+{
+  "pdf.expertInPoultry": "Pluimvee-expert",
+  "pdf.generatedOn": "Gegenereerd op",
+  "pdf.conversationExport": "Gesprek exporteren",
+  "pdf.unknownDate": "Onbekende datum",
+  "pdf.user": "Gebruiker:",
+  "pdf.createdOn": "Aangemaakt op:",
+  "pdf.language": "Taal:",
+  "pdf.messageCount": "Aantal berichten:",
+  "pdf.userLabel": "Gebruiker",
+  "pdf.assistantLabel": "Intelia Cognito",
+  "pdf.page": "Pagina",
+  "pdf.yourIntelligentAssistant": "Uw intelligente assistent voor pluimveehouderij"
+}

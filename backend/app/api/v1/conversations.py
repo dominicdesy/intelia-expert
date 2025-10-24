@@ -957,8 +957,9 @@ async def export_conversation_pdf(
             "name": current_user.get("name", user_email)
         }
 
-        # Générer le PDF
-        pdf_service = get_pdf_export_service()
+        # Générer le PDF dans la langue de la conversation
+        conversation_language = conversation.get('language', 'en')
+        pdf_service = get_pdf_export_service(language=conversation_language)
         pdf_buffer = pdf_service.export_conversation(
             conversation_data=dict(conversation),
             messages=messages,

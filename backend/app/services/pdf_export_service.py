@@ -1,6 +1,7 @@
 """
 Service d'exportation de conversations en PDF
 Génère un PDF professionnel avec logo Intelia et mise en page élégante
+Supporte 16 langues avec traductions et formatage RTL pour l'arabe
 """
 
 import logging
@@ -27,22 +28,47 @@ from reportlab.platypus import (
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
 
+from app.utils.i18n import t
+
 logger = logging.getLogger(__name__)
 
 
 class PDFExportService:
-    """Service pour générer des exports PDF de conversations"""
+    """Service pour générer des exports PDF de conversations avec support multilingue"""
 
-    # Couleurs Intelia (à ajuster selon votre charte graphique)
+    # Couleurs Intelia
     INTELIA_BLUE = HexColor('#1E40AF')  # Bleu principal
     INTELIA_LIGHT_BLUE = HexColor('#3B82F6')  # Bleu clair
     INTELIA_GRAY = HexColor('#6B7280')  # Gris pour texte secondaire
     USER_BG = HexColor('#EFF6FF')  # Fond bleu clair pour messages utilisateur
     ASSISTANT_BG = HexColor('#F9FAFB')  # Fond gris clair pour messages assistant
 
-    def __init__(self):
+    # Langues RTL (Right-to-Left)
+    RTL_LANGUAGES = ['ar']  # Arabe
+
+    def __init__(self, language: str = 'en'):
+        """
+        Initialize PDF export service with language support
+
+        Args:
+            language: Language code (e.g., 'en', 'fr', 'ar')
+        """
+        self.language = language.lower()
+        self.is_rtl = self.language in self.RTL_LANGUAGES
         self.styles = getSampleStyleSheet()
         self._setup_custom_styles()
+
+    def _t(self, key: str) -> str:
+        """
+        Translate a key to the current language
+
+        Args:
+            key: Translation key (e.g., 'pdf.page')
+
+        Returns:
+            Translated string
+        """
+        return t(key, self.language)
 
     def _setup_custom_styles(self):
         """Configure les styles personnalisés pour le PDF"""
@@ -301,7 +327,7 @@ class PDFExportService:
         canvas_obj.saveState()
 
         # Footer
-        footer_text = f"Intelia Cognito - Expert en Aviculture • Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
+        footer_text = f"Intelia Cognito - {self._t('pdf.expertInPoultry')} • {self._t('pdf.generatedOn')} {datetime.now().strftime('%d/%m/%Y %H:%M')}"
         canvas_obj.setFont('Helvetica-Oblique', 8)
         canvas_obj.setFillColor(self.INTELIA_GRAY)
         canvas_obj.drawCentredString(
@@ -314,7 +340,7 @@ class PDFExportService:
         canvas_obj.drawRightString(
             doc.width + doc.leftMargin,
             0.5 * inch,
-            f"Page {canvas_obj.getPageNumber()}"
+            f"{self._t('pdf.page')} {canvas_obj.getPageNumber()}"
         )
 
         canvas_obj.restoreState()
@@ -367,7 +393,7 @@ class PDFExportService:
         story.append(Paragraph(title, conv_title_style))
 
         # === SOUS-TITRE ===
-        subtitle = f"Export de conversation - {messages[0].get('created_at', 'Date inconnue')[:10] if messages else 'N/A'}"
+        subtitle = f"{self._t('pdf.conversationExport')} - {messages[0].get('created_at', self._t('pdf.unknownDate'))[:10] if messages else 'N/A'}"
         story.append(Paragraph(subtitle, self.styles['InteliaSubtitle']))
 
         story.append(Spacer(1, 0.2*inch))
@@ -385,10 +411,10 @@ class PDFExportService:
             created_at_str = 'N/A'
 
         metadata_table_data = [
-            ['Utilisateur:', user_info.get('email', 'N/A')],
-            ['Date de création:', created_at_str],
-            ['Langue:', conversation_data.get('language', 'fr').upper()],
-            ['Nombre de messages:', str(len(messages))],
+            [self._t('pdf.user'), user_info.get('email', 'N/A')],
+            [self._t('pdf.createdOn'), created_at_str],
+            [self._t('pdf.language'), conversation_data.get('language', 'fr').upper()],
+            [self._t('pdf.messageCount'), str(len(messages))],
         ]
 
         metadata_table = Table(metadata_table_data, colWidths=[1.5*inch, 4*inch])
@@ -420,10 +446,10 @@ class PDFExportService:
 
             # Label du rôle avec timestamp
             if role == 'user':
-                role_label = "👤 Utilisateur"
+                role_label = f"👤 {self._t('pdf.userLabel')}"
                 bg_color = self.USER_BG
             else:
-                role_label = "🤖 Intelia Cognito"
+                role_label = f"🤖 {self._t('pdf.assistantLabel')}"
                 bg_color = self.ASSISTANT_BG
 
             # Timestamp formaté
@@ -477,7 +503,7 @@ class PDFExportService:
         story.append(Spacer(1, 0.1*inch))
 
         footer_final = Paragraph(
-            "Intelia Cognito - Votre assistant intelligent en aviculture",
+            f"Intelia Cognito - {self._t('pdf.yourIntelligentAssistant')}",
             self.styles['Footer']
         )
         story.append(footer_final)
@@ -494,13 +520,14 @@ class PDFExportService:
         return buffer
 
 
-# Singleton instance
-_pdf_service = None
+def get_pdf_export_service(language: str = 'en') -> PDFExportService:
+    """
+    Retourne une instance du service PDF configurée pour la langue spécifiée
 
+    Args:
+        language: Code de langue (e.g., 'en', 'fr', 'es', 'ar')
 
-def get_pdf_export_service() -> PDFExportService:
-    """Retourne l'instance singleton du service PDF"""
-    global _pdf_service
-    if _pdf_service is None:
-        _pdf_service = PDFExportService()
-    return _pdf_service
+    Returns:
+        PDFExportService instance
+    """
+    return PDFExportService(language=language)

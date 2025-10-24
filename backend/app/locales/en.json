@@ -1,0 +1,14 @@
+{
+  "pdf.expertInPoultry": "Poultry Expert",
+  "pdf.generatedOn": "Generated on",
+  "pdf.conversationExport": "Conversation Export",
+  "pdf.unknownDate": "Unknown date",
+  "pdf.user": "User:",
+  "pdf.createdOn": "Created on:",
+  "pdf.language": "Language:",
+  "pdf.messageCount": "Number of messages:",
+  "pdf.userLabel": "User",
+  "pdf.assistantLabel": "Intelia Cognito",
+  "pdf.page": "Page",
+  "pdf.yourIntelligentAssistant": "Your intelligent poultry assistant"
+}

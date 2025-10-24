@@ -1,0 +1,14 @@
+{
+  "pdf.expertInPoultry": "Expert en Aviculture",
+  "pdf.generatedOn": "Généré le",
+  "pdf.conversationExport": "Export de conversation",
+  "pdf.unknownDate": "Date inconnue",
+  "pdf.user": "Utilisateur:",
+  "pdf.createdOn": "Date de création:",
+  "pdf.language": "Langue:",
+  "pdf.messageCount": "Nombre de messages:",
+  "pdf.userLabel": "Utilisateur",
+  "pdf.assistantLabel": "Intelia Cognito",
+  "pdf.page": "Page",
+  "pdf.yourIntelligentAssistant": "Votre assistant intelligent en aviculture"
+}
