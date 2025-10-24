@@ -904,6 +904,17 @@ export interface TranslationKeys {
   "share.error": string;
 
   // ===========================================
+  // EXPORT PDF
+  // ===========================================
+  "export.button": string;
+  "export.tooltip": string;
+  "export.exporting": string;
+  "export.error": string;
+  "export.planRestriction": string;
+  "export.notAuthenticated": string;
+  "export.serverError": string;
+
+  // ===========================================
   // ABOUT PAGE
   // ===========================================
   "about.pageTitle": string;

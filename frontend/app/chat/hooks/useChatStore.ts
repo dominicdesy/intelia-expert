@@ -660,6 +660,12 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   // 🛡️ ADDMESSAGE SÉCURISÉ AVEC SYNCHRONISATION
   addMessage: (message: Message) => {
     secureLog.log(`💬 [ChatStore] Ajout message: ${message.id} User: ${message.isUser} `);
+    console.log("🖼️ [DEBUG Store] addMessage reçu avec imageUrls:", {
+      id: message.id,
+      hasImageUrls: !!message.imageUrls,
+      imageUrlsCount: message.imageUrls?.length || 0,
+      imageUrls: message.imageUrls
+    });
 
     const state = get();
 

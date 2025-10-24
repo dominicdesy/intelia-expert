@@ -651,6 +651,8 @@
   "export.exporting": "Exporting...",
   "export.error": "Export error",
   "export.planRestriction": "PDF export is available for Pro and Elite plans only. Please upgrade your subscription.",
+  "export.notAuthenticated": "Not authenticated",
+  "export.serverError": "Server error",
   "status.connected": "Connected",
   "status.connecting": "Connecting...",
   "status.disconnected": "Disconnected",

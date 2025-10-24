@@ -665,6 +665,8 @@
   "export.exporting": "Export en cours...",
   "export.error": "Erreur lors de l'exportation",
   "export.planRestriction": "L'exportation PDF est réservée aux plans Pro et Elite. Veuillez mettre à niveau votre abonnement.",
+  "export.notAuthenticated": "Non authentifié",
+  "export.serverError": "Erreur serveur",
   "status.connected": "Connecté",
   "status.connecting": "Connexion...",
   "status.disconnected": "Déconnecté",

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Download } from "lucide-react";
 import { secureLog } from "@/lib/utils/secureLogger";
+import { useTranslation } from "@/lib/languages/i18n";
 
 interface ExportPDFButtonProps {
   conversationId: string;
@@ -11,6 +12,7 @@ interface ExportPDFButtonProps {
 const ExportPDFButton: React.FC<ExportPDFButtonProps> = ({
   conversationId,
 }) => {
+  const { t } = useTranslation();
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +24,7 @@ const ExportPDFButton: React.FC<ExportPDFButtonProps> = ({
       // Récupérer le token d'auth
       const authData = localStorage.getItem("intelia-expert-auth");
       if (!authData) {
-        throw new Error("Non authentifié");
+        throw new Error(t("export.notAuthenticated"));
       }
       const { access_token } = JSON.parse(authData);
 
@@ -41,7 +43,7 @@ const ExportPDFButton: React.FC<ExportPDFButtonProps> = ({
         if (response.status === 403) {
           throw new Error("PLAN_RESTRICTION");
         }
-        throw new Error("Erreur serveur");
+        throw new Error(t("export.serverError"));
       }
 
       // Récupérer le blob
@@ -67,13 +69,9 @@ const ExportPDFButton: React.FC<ExportPDFButtonProps> = ({
 
       // Gérer les erreurs spécifiques
       if (err.message === "PLAN_RESTRICTION") {
-        setError(
-          "L'exportation PDF est réservée aux plans Pro et Elite. Veuillez mettre à niveau votre abonnement."
-        );
+        setError(t("export.planRestriction"));
       } else {
-        setError(
-          "Erreur lors de l'exportation. Veuillez réessayer."
-        );
+        setError(t("export.error"));
       }
     } finally {
       setIsExporting(false);
@@ -86,11 +84,11 @@ const ExportPDFButton: React.FC<ExportPDFButtonProps> = ({
         onClick={handleExport}
         disabled={isExporting}
         className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        title="Exporter en PDF"
+        title={t("export.tooltip")}
       >
         <Download size={16} className={isExporting ? "animate-pulse" : ""} />
         <span>
-          {isExporting ? "Export en cours..." : "Exporter PDF"}
+          {isExporting ? t("export.exporting") : t("export.button")}
         </span>
       </button>
 

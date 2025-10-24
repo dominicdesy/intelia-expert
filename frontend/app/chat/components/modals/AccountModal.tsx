@@ -172,7 +172,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           <article
             className="relative rounded-2xl p-6 shadow-[0_8px_24px_rgba(34,106,228,.12)] transition-all hover:-translate-y-1 border-2"
             style={{
-              background: 'linear-gradient(to bottom, rgba(34,106,228,0.06), #ffffff)',
+              background: 'linear-gradient(to bottom, rgba(34,106,228,0.08), #ffffff)',
               borderColor: '#226ae4'
             }}
           >
@@ -226,20 +226,20 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
           {/* Elite */}
           <article
-            className="relative rounded-2xl p-6 shadow-[0_8px_24px_rgba(228,126,58,.15)] transition-all hover:-translate-y-1 border-2"
+            className="relative rounded-2xl p-6 shadow-[0_8px_24px_rgba(44,199,128,.15)] transition-all hover:-translate-y-1 border-2"
             style={{
-              background: 'linear-gradient(to bottom, rgba(228,126,58,0.06), #ffffff)',
-              borderColor: '#e47e3a'
+              background: 'linear-gradient(to bottom, rgba(44,199,128,0.08), #ffffff)',
+              borderColor: '#2cc780'
             }}
           >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <span className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase text-white shadow" style={{ backgroundColor: '#e47e3a' }}>
+              <span className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase text-white shadow" style={{ backgroundColor: '#2cc780' }}>
                 {t("billing.recommended")}
               </span>
             </div>
 
             <header className="mb-6 mt-1 text-center">
-              <h3 className="mb-1 text-2xl font-bold" style={{ color: '#e47e3a' }}>Elite</h3>
+              <h3 className="mb-1 text-2xl font-bold" style={{ color: '#2cc780' }}>Elite</h3>
               <div className="flex items-baseline justify-center gap-1">
                 <span className="text-4xl font-bold" style={{ color: '#111827' }}>
                   {billingCycle === "monthly" ? prices.elite.toFixed(2) : (prices.elite / 12).toFixed(2)}
@@ -248,11 +248,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <span className="text-sm" style={{ color: '#6b7280' }}>/ {billingCycle === "monthly" ? "mois" : "an"}</span>
               </div>
               {billingCycle === "yearly" && (
-                <p className="mt-1 text-xs" style={{ color: '#e47e3a' }}>
+                <p className="mt-1 text-xs" style={{ color: '#2cc780' }}>
                   Soit {(prices.elite / 12).toFixed(2)} $/mois
                 </p>
               )}
-              <p className="mt-2 text-xs font-medium" style={{ color: '#e47e3a' }}>{t("billing.trial14days")}</p>
+              <p className="mt-2 text-xs font-medium" style={{ color: '#2cc780' }}>{t("billing.trial14days")}</p>
             </header>
 
             {currentPlan === "elite" ? (
@@ -260,9 +260,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 onClick={handleManageSubscription}
                 disabled={isManaging}
                 className="w-full rounded-lg py-3 font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ backgroundColor: '#e47e3a' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#cc6f33'}
-                onMouseLeave={(e) => !isManaging && (e.currentTarget.style.backgroundColor = '#e47e3a')}
+                style={{ backgroundColor: '#2cc780' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1ea866'}
+                onMouseLeave={(e) => !isManaging && (e.currentTarget.style.backgroundColor = '#2cc780')}
               >
                 {isManaging ? t("billing.loading") : t("billing.manageSubscription")}
               </button>
@@ -271,9 +271,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 onClick={() => handleUpgrade("elite")}
                 disabled={isLoading}
                 className="w-full rounded-lg py-3 font-semibold text-white shadow-md transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ backgroundColor: '#e47e3a' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#cc6f33'}
-                onMouseLeave={(e) => !isLoading && (e.currentTarget.style.backgroundColor = '#e47e3a')}
+                style={{ backgroundColor: '#2cc780' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1ea866'}
+                onMouseLeave={(e) => !isLoading && (e.currentTarget.style.backgroundColor = '#2cc780')}
               >
                 {isLoading && selectedPlan === "elite" ? t("billing.redirecting") : t("billing.startFreeTrial")}
               </button>
@@ -293,8 +293,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <tr className="border-b border-gray-200">
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">{t("subscription.comparison.feature")}</th>
                   <th className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#374151' }}>{t("subscription.comparison.essential")}</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.06)' }}>{t("subscription.comparison.pro")}</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#e47e3a', backgroundColor: 'rgba(228,126,58,0.06)' }}>{t("subscription.comparison.elite")}</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.08)' }}>{t("subscription.comparison.pro")}</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#2cc780', backgroundColor: 'rgba(44,199,128,0.08)' }}>{t("subscription.comparison.elite")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -313,14 +313,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.08)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
                         <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(44,199,128,0.08)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
                         <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
@@ -337,14 +337,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.08)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
                         <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(44,199,128,0.08)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
                         <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
@@ -362,14 +362,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <tr className="border-b border-gray-100">
                   <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.queries")}</td>
                   <td className="px-4 py-3 text-center text-sm" style={{ color: '#374151' }}>{t("subscription.comparison.value.100")}</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.06)' }}>{t("subscription.comparison.value.unlimitedStar")}</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#e47e3a', backgroundColor: 'rgba(228,126,58,0.06)' }}>{t("subscription.comparison.value.unlimitedStar")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.08)' }}>{t("subscription.comparison.value.unlimitedStar")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#2cc780', backgroundColor: 'rgba(44,199,128,0.08)' }}>{t("subscription.comparison.value.unlimitedStar")}</td>
                 </tr>
                 <tr className="border-b border-gray-100">
                   <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.history")}</td>
                   <td className="px-4 py-3 text-center text-sm" style={{ color: '#374151' }}>{t("subscription.comparison.value.30days")}</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.06)' }}>{t("subscription.comparison.value.unlimited")}</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#e47e3a', backgroundColor: 'rgba(228,126,58,0.06)' }}>{t("subscription.comparison.value.unlimited")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.08)' }}>{t("subscription.comparison.value.unlimited")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#2cc780', backgroundColor: 'rgba(44,199,128,0.08)' }}>{t("subscription.comparison.value.unlimited")}</td>
                 </tr>
                 <tr className="border-b border-gray-100">
                   <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.pdfExport")}</td>
@@ -380,17 +380,17 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.08)' }}>
                     <div className="flex justify-center">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
-                        <Check className="h-4 w-4 text-blue-700" />
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(44,199,128,0.08)' }}>
                     <div className="flex justify-center">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
-                        <Check className="h-4 w-4 text-amber-700" />
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
@@ -411,8 +411,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.06)' }}>{t("subscription.comparison.value.25perMonth")}</td>
-                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#e47e3a', backgroundColor: 'rgba(228,126,58,0.06)' }}>{t("subscription.comparison.value.unlimitedStar")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#1240a4', backgroundColor: 'rgba(34,106,228,0.08)' }}>{t("subscription.comparison.value.25perMonth")}</td>
+                  <td className="px-4 py-3 text-center text-sm font-semibold" style={{ color: '#2cc780', backgroundColor: 'rgba(44,199,128,0.08)' }}>{t("subscription.comparison.value.unlimitedStar")}</td>
                 </tr>
                 <tr className="border-b border-gray-100">
                   <td className="px-4 py-3 text-sm text-gray-900">{t("subscription.comparison.feature.voiceInput")}</td>
@@ -423,17 +423,17 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.08)' }}>
                     <div className="flex justify-center">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
-                        <Check className="h-4 w-4 text-blue-700" />
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(44,199,128,0.08)' }}>
                     <div className="flex justify-center">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
-                        <Check className="h-4 w-4 text-amber-700" />
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
@@ -447,17 +447,17 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.08)' }}>
                     <div className="flex justify-center">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
-                        <Check className="h-4 w-4 text-blue-700" />
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(44,199,128,0.08)' }}>
                     <div className="flex justify-center">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
-                        <Check className="h-4 w-4 text-amber-700" />
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
@@ -478,17 +478,17 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(34,106,228,0.08)' }}>
                     <div className="flex justify-center">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100">
                         <X className="h-4 w-4 text-gray-400" />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(228,126,58,0.06)' }}>
+                  <td className="px-4 py-3 text-center" style={{ backgroundColor: 'rgba(44,199,128,0.08)' }}>
                     <div className="flex justify-center">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
-                        <Check className="h-4 w-4 text-amber-700" />
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                        <Check className="h-4 w-4" style={{ color: '#2cc780' }} />
                       </div>
                     </div>
                   </td>
