@@ -5,27 +5,40 @@ Security module - Sécurité et validation des réponses
 
 from .ood_detector import EnhancedOODDetector
 
+# New modular guardrails architecture (recommended)
 try:
-    from .advanced_guardrails import (
-        AdvancedResponseGuardrails,
-        GuardrailResult,
-        VerificationLevel,
-        create_response_guardrails,
-    )
+    from .guardrails.core import GuardrailsOrchestrator
+    from .guardrails.models import GuardrailResult, VerificationLevel
 
     GUARDRAILS_AVAILABLE = True
 except ImportError:
-    AdvancedResponseGuardrails = None
+    GuardrailsOrchestrator = None
     GuardrailResult = None
     VerificationLevel = None
-    create_response_guardrails = None
     GUARDRAILS_AVAILABLE = False
+
+# Legacy compatibility wrapper (deprecated)
+try:
+    from .advanced_guardrails import (
+        AdvancedResponseGuardrails,
+        create_response_guardrails,
+    )
+
+    LEGACY_GUARDRAILS_AVAILABLE = True
+except ImportError:
+    AdvancedResponseGuardrails = None
+    create_response_guardrails = None
+    LEGACY_GUARDRAILS_AVAILABLE = False
 
 __all__ = [
     "EnhancedOODDetector",
-    "AdvancedResponseGuardrails",
+    # New architecture (recommended)
+    "GuardrailsOrchestrator",
     "GuardrailResult",
     "VerificationLevel",
-    "create_response_guardrails",
     "GUARDRAILS_AVAILABLE",
+    # Legacy (deprecated, for backward compatibility)
+    "AdvancedResponseGuardrails",
+    "create_response_guardrails",
+    "LEGACY_GUARDRAILS_AVAILABLE",
 ]

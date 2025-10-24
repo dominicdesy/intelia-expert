@@ -78,9 +78,10 @@ try:
 except ImportError:
     INTENT_PROCESSOR_AVAILABLE = False
 
-# Guardrails
+# Guardrails - Using new modular architecture
 try:
-    from security.advanced_guardrails import create_response_guardrails
+    from security.guardrails.core import GuardrailsOrchestrator
+    from security.guardrails.models import VerificationLevel
 
     GUARDRAILS_AVAILABLE = True
 except ImportError:
@@ -423,13 +424,26 @@ class WeaviateCore(InitializableMixin):
             self.intent_processor = None
 
     async def _initialize_guardrails(self):
-        """Initialise les guardrails"""
+        """Initialise les guardrails avec la nouvelle architecture modulaire"""
 
         try:
-            self.guardrails = create_response_guardrails(
-                self.openai_client, GUARDRAILS_LEVEL
+            # Mapping des niveaux de config vers VerificationLevel
+            level_mapping = {
+                "strict": VerificationLevel.STRICT,
+                "moderate": VerificationLevel.STANDARD,
+                "permissive": VerificationLevel.MINIMAL,
+            }
+            verification_level = level_mapping.get(
+                GUARDRAILS_LEVEL.lower(), VerificationLevel.STANDARD
             )
-            logger.info("✅ Guardrails initialisés")
+
+            self.guardrails = GuardrailsOrchestrator(
+                client=self.openai_client,
+                verification_level=verification_level,
+                enable_cache=True,
+                cache_size=1000,
+            )
+            logger.info(f"✅ Guardrails initialisés (niveau: {verification_level.value})")
         except Exception as e:
             logger.warning(f"Guardrails échoué: {e}")
 

@@ -33,9 +33,18 @@ except ImportError:
 logger = logging.getLogger("app.main")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
-# Désactiver les logs verbeux de bibliothèques externes
+# Désactiver les logs verbeux de bibliothèques externes en production
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("botocore").setLevel(logging.WARNING)
+logging.getLogger("boto3").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("anthropic").setLevel(logging.INFO)
+logging.getLogger("openai").setLevel(logging.INFO)
+
+# Logs multipart (upload fichiers) uniquement en DEBUG si explicitement demandé
+if os.getenv("LOG_LEVEL", "INFO") != "DEBUG":
+    logging.getLogger("multipart").setLevel(logging.WARNING)
 
 # Filtrer les logs d'accès uvicorn pour les endpoints répétitifs
 class SuppressHealthCheckFilter(logging.Filter):
