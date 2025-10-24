@@ -96,6 +96,14 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         # 2. STRIPE / BILLING
         # ========================================================================
 
+        # user_billing_info (FIRST - required by FK in stripe_subscriptions)
+        cursor.execute(
+            "UPDATE user_billing_info SET user_email = %s WHERE user_email = %s",
+            (anonymous_email, user_email)
+        )
+        stats['user_billing_info'] = cursor.rowcount
+        logger.info(f"[anonymize_user_in_postgresql] User billing info anonymized: {cursor.rowcount}")
+
         # stripe_customers
         cursor.execute(
             """UPDATE stripe_customers
@@ -106,7 +114,7 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         stats['stripe_customers'] = cursor.rowcount
         logger.info(f"[anonymize_user_in_postgresql] Stripe customers anonymized: {cursor.rowcount}")
 
-        # stripe_subscriptions
+        # stripe_subscriptions (AFTER user_billing_info due to FK constraint)
         cursor.execute(
             "UPDATE stripe_subscriptions SET user_email = %s WHERE user_email = %s",
             (anonymous_email, user_email)
@@ -121,14 +129,6 @@ def anonymize_user_in_postgresql(conn, user_id: str, user_email: str) -> Dict[st
         )
         stats['stripe_payment_events'] = cursor.rowcount
         logger.info(f"[anonymize_user_in_postgresql] Stripe payment events anonymized: {cursor.rowcount}")
-
-        # user_billing_info
-        cursor.execute(
-            "UPDATE user_billing_info SET user_email = %s WHERE user_email = %s",
-            (anonymous_email, user_email)
-        )
-        stats['user_billing_info'] = cursor.rowcount
-        logger.info(f"[anonymize_user_in_postgresql] User billing info anonymized: {cursor.rowcount}")
 
         # ========================================================================
         # 3. WHATSAPP
