@@ -92,9 +92,9 @@ class RateLimiter:
     """Rate limiter simple en mémoire (TODO: migrer vers Redis)"""
 
     def __init__(self):
-        self.sessions_per_user = defaultdict(list)  # user_id -> [timestamps]
+        self.sessions_per_user = defaultdict(list)  # user_id (UUID string) -> [timestamps]
 
-    def check_rate_limit(self, user_id: int) -> bool:
+    def check_rate_limit(self, user_id: str) -> bool:
         """Vérifie si user peut créer nouvelle session"""
         now = datetime.now()
         cutoff = now - timedelta(seconds=RATE_LIMIT_WINDOW)
@@ -182,8 +182,9 @@ weaviate_service = WeaviateRAGService()
 class VoiceRealtimeSession:
     """Gère une session voice realtime pour un utilisateur"""
 
-    def __init__(self, user_id: int, websocket: WebSocket):
-        self.user_id = user_id
+    def __init__(self, user_id: str, user_email: str, websocket: WebSocket):
+        self.user_id = user_id  # UUID string from JWT
+        self.user_email = user_email
         self.client_ws = websocket
         self.openai_ws: Optional[websockets.WebSocketClientProtocol] = None
 
@@ -586,76 +587,86 @@ class VoiceRealtimeSession:
 
 @router.websocket("/ws/voice")
 async def voice_realtime_endpoint(
-    websocket: WebSocket,
-    # TODO: Décommenter quand get_current_user_from_websocket disponible
-    # user = Depends(get_current_user_from_websocket)
+    websocket: WebSocket
 ):
     """
     WebSocket endpoint pour voice realtime
 
     Security:
         - Feature flag checked
-        - JWT authentication (TODO: décommenter Depends)
+        - JWT authentication via query param ?token=JWT_HERE
+        - Plan verification (Pro, Elite, Intelia only)
         - Rate limiting
         - Session timeout
 
     Flow:
         1. Accept WebSocket connection
         2. Authenticate user (JWT)
-        3. Check rate limit
-        4. Create VoiceRealtimeSession
-        5. Run bidirectional routing
-        6. Cleanup on disconnect
+        3. Verify user plan (Pro/Elite/Intelia)
+        4. Check rate limit
+        5. Create VoiceRealtimeSession
+        6. Run bidirectional routing
+        7. Cleanup on disconnect
     """
 
-    # Feature flag check - TEMPORARILY DISABLED FOR TESTING
-    # if not ENABLE_VOICE_REALTIME:
-    #     await websocket.close(code=1008, reason="Voice realtime feature disabled")
-    #     logger.warning("❌ Voice realtime request rejected: feature disabled")
-    #     return
+    # Feature flag check
+    if not ENABLE_VOICE_REALTIME:
+        await websocket.close(code=1008, reason="Voice realtime feature disabled")
+        logger.warning("❌ Voice realtime request rejected: feature disabled")
+        return
 
-    # Accept connection
+    # Accept connection first (required before authentication)
     await websocket.accept()
     logger.info("✅ WebSocket connection accepted")
 
-    # TODO: Authentification JWT
-    # Pour l'instant, user_id hardcodé pour tests
-    user_id = 1  # TODO: user.id quand auth activée
+    # Authenticate user via JWT (from query param ?token=...)
+    if not AUTH_AVAILABLE:
+        logger.error("❌ Auth not available - cannot start voice session")
+        await websocket.close(code=1011, reason="Authentication system unavailable")
+        return
 
-    # TODO: Quand l'authentification sera activée, récupérer user_email depuis le JWT
-    # VÉRIFICATION DU PLAN POUR L'ASSISTANT VOCAL - DISABLED (auth.users not in PostgreSQL)
-    # TODO: When auth is enabled, check plan using Supabase client or users table
-    # try:
-    #     from app.services.usage_limiter import get_user_plan_and_quota
-    #     plan_name, _, _ = get_user_plan_and_quota(user_email)
-    #     plan_lower = plan_name.lower() if plan_name else "essential"
-    #
-    #     # Assistant vocal réservé aux plans Pro, Elite et Intelia
-    #     if plan_lower not in ["pro", "elite", "intelia"]:
-    #         logger.warning(f"❌ Voice assistant denied for {user_email} (plan: {plan_name})")
-    #         await websocket.close(
-    #             code=4003,
-    #             reason="🔒 L'assistant vocal est réservé aux plans Pro et Elite. Mettez à niveau votre abonnement."
-    #         )
-    #         return
-    #
-    #     logger.info(f"✅ Voice access granted for {user_email} (plan: {plan_name})")
-    # except Exception as e:
-    #     logger.error(f"❌ Error checking plan for voice access: {e}")
-    #     # En cas d'erreur, autoriser par défaut pour ne pas bloquer le service
-    logger.info("⚠️ Voice plan check disabled (auth not fully implemented)")
+    try:
+        user = await get_current_user_from_websocket(websocket)
+        user_id = user.get("user_id")
+        user_email = user.get("email")
+        logger.info(f"✅ User authenticated: {user_email} (id: {user_id})")
+    except Exception as e:
+        logger.error(f"❌ Authentication failed: {e}")
+        return  # WebSocket already closed by get_current_user_from_websocket
 
-    # Rate limiting - TEMPORARILY DISABLED FOR TESTING
-    # if not rate_limiter.check_rate_limit(user_id):
-    #     await websocket.close(
-    #         code=1008,
-    #         reason=f"Rate limit exceeded ({MAX_SESSIONS_PER_USER_PER_HOUR} sessions/hour max)"
-    #     )
-    #     logger.warning(f"❌ Rate limit exceeded for user {user_id}")
-    #     return
+    # VÉRIFICATION DU PLAN - Assistant vocal réservé aux plans Pro, Elite et Intelia
+    try:
+        from app.services.usage_limiter import get_user_plan_and_quota
+        plan_name, _, _ = get_user_plan_and_quota(user_email)
+        plan_lower = plan_name.lower() if plan_name else "essential"
+
+        # Assistant vocal réservé aux plans Pro, Elite et Intelia
+        if plan_lower not in ["pro", "elite", "intelia"]:
+            logger.warning(f"❌ Voice assistant denied for {user_email} (plan: {plan_name})")
+            await websocket.close(
+                code=4003,
+                reason="L'assistant vocal est réservé aux plans Pro, Elite et Intelia. Mettez à niveau votre abonnement."
+            )
+            return
+
+        logger.info(f"✅ Voice access granted for {user_email} (plan: {plan_name})")
+    except Exception as e:
+        logger.error(f"❌ Error checking plan for {user_email}: {e}")
+        # En cas d'erreur, bloquer l'accès par sécurité
+        await websocket.close(code=1011, reason="Plan verification failed")
+        return
+
+    # Rate limiting
+    if not rate_limiter.check_rate_limit(user_id):
+        await websocket.close(
+            code=1008,
+            reason=f"Rate limit exceeded ({MAX_SESSIONS_PER_USER_PER_HOUR} sessions/hour max)"
+        )
+        logger.warning(f"❌ Rate limit exceeded for user {user_id}")
+        return
 
     # Créer session
-    session = VoiceRealtimeSession(user_id, websocket)
+    session = VoiceRealtimeSession(user_id, user_email, websocket)
 
     logger.info(f"🚀 Starting voice realtime session {session.session_id}")
 
