@@ -10,8 +10,8 @@ scrape_configs:
   - job_name: 'intelia-backend'
     scheme: http
     basic_auth:
-      username: 'grafana'
-      password: 'I#kmd9$kuZnO!dZXF9z8ZTF8'
+      username: grafana
+      password: grafanapassword123
     static_configs:
       - targets: ['intelia-expert-backend:8080']
     metrics_path: '/metrics'
