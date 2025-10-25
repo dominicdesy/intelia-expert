@@ -1138,50 +1138,36 @@ export const StatisticsPage: React.FC = () => {
           <SatisfactionStatsTab timeRange={selectedTimeRange} />
         ) : activeTab === "metrics" ? (
           <div className="bg-white border border-gray-200 p-6">
-            <div className="mb-6">
+            <div className="mb-4">
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Métriques Système</h2>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600">
                 Dashboards Grafana pour le monitoring en temps réel des coûts LLM, performances API et métriques système
               </p>
+            </div>
 
+            <div className="border border-gray-300 rounded-lg overflow-hidden bg-gray-50 p-4">
+              <iframe
+                src="https://inteliacognito.grafana.net/d-solo/dorfxct/intelia-llm-monitoring?orgId=1&from=now-6h&to=now&timezone=browser&panelId=panel-1&__feature.dashboardSceneSolo=true&theme=light"
+                width="100%"
+                height="400"
+                frameBorder="0"
+                title="Grafana LLM Metrics"
+                className="w-full"
+              />
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-xs text-gray-500">
+                📊 Métriques mises à jour en temps réel depuis Grafana Cloud
+              </p>
               <a
                 href="https://inteliacognito.grafana.net/d/dorfxct/intelia-llm-monitoring?orgId=1&theme=light"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                className="text-sm text-blue-600 hover:text-blue-700 underline"
               >
-                <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Ouvrir Dashboard Grafana
+                Voir dashboard complet →
               </a>
-
-              <p className="text-xs text-gray-500 mt-3">
-                Le dashboard s'ouvrira dans un nouvel onglet avec vos métriques en temps réel
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h3 className="font-medium text-gray-900 mb-2">💰 Coûts LLM</h3>
-                <p className="text-sm text-gray-600">
-                  Suivez vos dépenses OpenAI par modèle (gpt-4o, gpt-4o-mini) en temps réel
-                </p>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h3 className="font-medium text-gray-900 mb-2">⚡ Performance API</h3>
-                <p className="text-sm text-gray-600">
-                  Latence, taux d'erreur, et throughput de vos endpoints critiques
-                </p>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h3 className="font-medium text-gray-900 mb-2">📊 Métriques Business</h3>
-                <p className="text-sm text-gray-600">
-                  Questions posées, utilisateurs actifs, et revenus par plan
-                </p>
-              </div>
             </div>
           </div>
         ) : null}
