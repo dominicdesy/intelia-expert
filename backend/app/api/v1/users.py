@@ -603,7 +603,7 @@ async def export_user_data(current_user: Dict[str, Any] = Depends(get_current_us
                     c.id,
                     c.user_id,
                     c.title,
-                    c.model,
+                    c.language,
                     c.created_at,
                     c.updated_at,
                     COALESCE(
@@ -612,10 +612,11 @@ async def export_user_data(current_user: Dict[str, Any] = Depends(get_current_us
                                 'id', m.id,
                                 'role', m.role,
                                 'content', m.content,
-                                'timestamp', m.timestamp,
-                                'model', m.model,
-                                'tokens_used', m.tokens_used
-                            ) ORDER BY m.timestamp
+                                'sequence_number', m.sequence_number,
+                                'created_at', m.created_at,
+                                'response_source', m.response_source,
+                                'response_confidence', m.response_confidence
+                            ) ORDER BY m.sequence_number
                         ) FILTER (WHERE m.id IS NOT NULL),
                         '[]'::json
                     ) as messages
@@ -634,7 +635,7 @@ async def export_user_data(current_user: Dict[str, Any] = Depends(get_current_us
                     "id": row[0],
                     "user_id": row[1],
                     "title": row[2],
-                    "model": row[3],
+                    "language": row[3],
                     "created_at": row[4].isoformat() if row[4] else None,
                     "updated_at": row[5].isoformat() if row[5] else None,
                     "messages": row[6] if row[6] else []
