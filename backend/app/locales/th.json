@@ -17,5 +17,11 @@
   "stripe.proPlanName": "แผน Pro",
   "stripe.proPlanDescription": "การสมัครสมาชิกรายเดือน Intelia Expert - PRO",
   "stripe.elitePlanName": "แผน Elite",
-  "stripe.elitePlanDescription": "การสมัครสมาชิกรายเดือน Intelia Expert - ELITE"
+  "stripe.elitePlanDescription": "การสมัครสมาชิกรายเดือน Intelia Expert - ELITE",
+  "voice.alloy.description": "กลางและสมดุล",
+  "voice.echo.description": "เสียงผู้ชายที่ชัดเจน",
+  "voice.fable.description": "สำเนียงอังกฤษที่อบอุ่น",
+  "voice.onyx.description": "เสียงผู้ชายที่ต่ำ",
+  "voice.nova.description": "เสียงผู้หญิงที่มีพลัง",
+  "voice.shimmer.description": "เสียงผู้หญิงที่นุ่มนวล"
 }

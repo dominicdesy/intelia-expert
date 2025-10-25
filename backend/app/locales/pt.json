@@ -17,5 +17,11 @@
   "stripe.proPlanName": "Plano Pro",
   "stripe.proPlanDescription": "Assinatura mensal Intelia Expert - PRO",
   "stripe.elitePlanName": "Plano Elite",
-  "stripe.elitePlanDescription": "Assinatura mensal Intelia Expert - ELITE"
+  "stripe.elitePlanDescription": "Assinatura mensal Intelia Expert - ELITE",
+  "voice.alloy.description": "Neutro e equilibrado",
+  "voice.echo.description": "Voz masculina clara",
+  "voice.fable.description": "Sotaque britânico caloroso",
+  "voice.onyx.description": "Voz masculina grave",
+  "voice.nova.description": "Voz feminina enérgica",
+  "voice.shimmer.description": "Voz feminina suave"
 }

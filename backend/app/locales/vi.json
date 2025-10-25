@@ -17,5 +17,11 @@
   "stripe.proPlanName": "Gói Pro",
   "stripe.proPlanDescription": "Đăng ký hàng tháng Intelia Expert - PRO",
   "stripe.elitePlanName": "Gói Elite",
-  "stripe.elitePlanDescription": "Đăng ký hàng tháng Intelia Expert - ELITE"
+  "stripe.elitePlanDescription": "Đăng ký hàng tháng Intelia Expert - ELITE",
+  "voice.alloy.description": "Trung lập và cân bằng",
+  "voice.echo.description": "Giọng nam rõ ràng",
+  "voice.fable.description": "Giọng Anh ấm áp",
+  "voice.onyx.description": "Giọng nam trầm",
+  "voice.nova.description": "Giọng nữ năng động",
+  "voice.shimmer.description": "Giọng nữ nhẹ nhàng"
 }

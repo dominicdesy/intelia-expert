@@ -17,5 +17,11 @@
   "stripe.proPlanName": "Paket Pro",
   "stripe.proPlanDescription": "Langganan Bulanan Intelia Expert - PRO",
   "stripe.elitePlanName": "Paket Elite",
-  "stripe.elitePlanDescription": "Langganan Bulanan Intelia Expert - ELITE"
+  "stripe.elitePlanDescription": "Langganan Bulanan Intelia Expert - ELITE",
+  "voice.alloy.description": "Netral dan seimbang",
+  "voice.echo.description": "Suara pria yang jelas",
+  "voice.fable.description": "Aksen Inggris yang hangat",
+  "voice.onyx.description": "Suara pria yang dalam",
+  "voice.nova.description": "Suara wanita yang energik",
+  "voice.shimmer.description": "Suara wanita yang lembut"
 }

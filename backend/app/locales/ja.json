@@ -17,5 +17,11 @@
   "stripe.proPlanName": "プロプラン",
   "stripe.proPlanDescription": "Intelia Expert 月額サブスクリプション - PRO",
   "stripe.elitePlanName": "エリートプラン",
-  "stripe.elitePlanDescription": "Intelia Expert 月額サブスクリプション - ELITE"
+  "stripe.elitePlanDescription": "Intelia Expert 月額サブスクリプション - ELITE",
+  "voice.alloy.description": "ニュートラルでバランスが良い",
+  "voice.echo.description": "明瞭な男性の声",
+  "voice.fable.description": "温かいイギリス訛り",
+  "voice.onyx.description": "深い男性の声",
+  "voice.nova.description": "エネルギッシュな女性の声",
+  "voice.shimmer.description": "柔らかい女性の声"
 }

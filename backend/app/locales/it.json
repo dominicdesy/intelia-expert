@@ -17,5 +17,11 @@
   "stripe.proPlanName": "Piano Pro",
   "stripe.proPlanDescription": "Abbonamento mensile Intelia Expert - PRO",
   "stripe.elitePlanName": "Piano Elite",
-  "stripe.elitePlanDescription": "Abbonamento mensile Intelia Expert - ELITE"
+  "stripe.elitePlanDescription": "Abbonamento mensile Intelia Expert - ELITE",
+  "voice.alloy.description": "Neutro ed equilibrato",
+  "voice.echo.description": "Voce maschile chiara",
+  "voice.fable.description": "Accento britannico caloroso",
+  "voice.onyx.description": "Voce maschile profonda",
+  "voice.nova.description": "Voce femminile energica",
+  "voice.shimmer.description": "Voce femminile dolce"
 }

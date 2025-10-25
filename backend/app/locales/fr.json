@@ -31,5 +31,11 @@
   "invite.feature3": "Obtenir des réponses en français, anglais ou espagnol",
   "invite.feature4": "Utiliser l'interface sur mobile, tablette et ordinateur",
   "invite.personalMessageTitle": "Message personnel de {inviter_name} :",
-  "invite.resendNote": "Il s'agit d'un rappel de votre invitation précédente."
+  "invite.resendNote": "Il s'agit d'un rappel de votre invitation précédente.",
+  "voice.alloy.description": "Neutre et équilibré",
+  "voice.echo.description": "Voix masculine claire",
+  "voice.fable.description": "Accent britannique chaleureux",
+  "voice.onyx.description": "Voix grave et masculine",
+  "voice.nova.description": "Voix féminine énergique",
+  "voice.shimmer.description": "Voix féminine douce"
 }

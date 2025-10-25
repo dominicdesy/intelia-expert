@@ -17,5 +17,11 @@
   "stripe.proPlanName": "प्रो योजना",
   "stripe.proPlanDescription": "Intelia Expert मासिक सदस्यता - प्रो",
   "stripe.elitePlanName": "एलीट योजना",
-  "stripe.elitePlanDescription": "Intelia Expert मासिक सदस्यता - एलीट"
+  "stripe.elitePlanDescription": "Intelia Expert मासिक सदस्यता - एलीट",
+  "voice.alloy.description": "तटस्थ और संतुलित",
+  "voice.echo.description": "स्पष्ट पुरुष आवाज",
+  "voice.fable.description": "गर्म ब्रिटिश उच्चारण",
+  "voice.onyx.description": "गहरी पुरुष आवाज",
+  "voice.nova.description": "ऊर्जावान महिला आवाज",
+  "voice.shimmer.description": "कोमल महिला आवाज"
 }

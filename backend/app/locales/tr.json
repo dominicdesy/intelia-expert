@@ -17,5 +17,11 @@
   "stripe.proPlanName": "Pro Planı",
   "stripe.proPlanDescription": "Intelia Expert Aylık Abonelik - PRO",
   "stripe.elitePlanName": "Elite Planı",
-  "stripe.elitePlanDescription": "Intelia Expert Aylık Abonelik - ELITE"
+  "stripe.elitePlanDescription": "Intelia Expert Aylık Abonelik - ELITE",
+  "voice.alloy.description": "Nötr ve dengeli",
+  "voice.echo.description": "Net erkek sesi",
+  "voice.fable.description": "Sıcak İngiliz aksanı",
+  "voice.onyx.description": "Derin erkek sesi",
+  "voice.nova.description": "Enerjik kadın sesi",
+  "voice.shimmer.description": "Yumuşak kadın sesi"
 }

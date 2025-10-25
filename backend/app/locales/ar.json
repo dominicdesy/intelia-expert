@@ -17,5 +17,11 @@
   "stripe.proPlanName": "الخطة الاحترافية",
   "stripe.proPlanDescription": "اشتراك شهري Intelia Expert - احترافي",
   "stripe.elitePlanName": "الخطة النخبة",
-  "stripe.elitePlanDescription": "اشتراك شهري Intelia Expert - نخبة"
+  "stripe.elitePlanDescription": "اشتراك شهري Intelia Expert - نخبة",
+  "voice.alloy.description": "محايد ومتوازن",
+  "voice.echo.description": "صوت ذكوري واضح",
+  "voice.fable.description": "لهجة بريطانية دافئة",
+  "voice.onyx.description": "صوت ذكوري عميق",
+  "voice.nova.description": "صوت أنثوي نشيط",
+  "voice.shimmer.description": "صوت أنثوي ناعم"
 }

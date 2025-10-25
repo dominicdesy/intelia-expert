@@ -17,5 +17,11 @@
   "stripe.proPlanName": "专业版套餐",
   "stripe.proPlanDescription": "Intelia Expert 月度订阅 - 专业版",
   "stripe.elitePlanName": "精英版套餐",
-  "stripe.elitePlanDescription": "Intelia Expert 月度订阅 - 精英版"
+  "stripe.elitePlanDescription": "Intelia Expert 月度订阅 - 精英版",
+  "voice.alloy.description": "中性且平衡",
+  "voice.echo.description": "清晰的男声",
+  "voice.fable.description": "温暖的英国口音",
+  "voice.onyx.description": "深沉的男声",
+  "voice.nova.description": "充满活力的女声",
+  "voice.shimmer.description": "柔和的女声"
 }

@@ -8,13 +8,14 @@ Endpoints pour gérer les préférences vocales utilisateur
 Accès: Plans Elite et Intelia uniquement
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field, validator
 import logging
 
 from app.api.v1.auth import get_current_user
 from app.core.database import get_pg_connection, get_supabase_client
+from app.utils.i18n import t as translate
 from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
@@ -255,57 +256,41 @@ async def update_voice_settings(
 
 
 @router.get("/voices")
-async def get_available_voices() -> Dict[str, Any]:
+async def get_available_voices(lang: Optional[str] = Query('en', description="Language code (e.g., 'fr', 'en', 'es')")
+) -> Dict[str, Any]:
     """
-    Liste des voix disponibles avec descriptions
+    Liste des voix disponibles avec descriptions traduites
 
     Returns:
         Liste des voix OpenAI TTS avec métadonnées
     """
-    voices = [
-        {
-            "id": "alloy",
-            "name": "Alloy",
-            "description": "Neutre et équilibré",
-            "gender": "neutral",
-            "preview_url": "/audio/voice-previews/alloy.mp3"
-        },
-        {
-            "id": "echo",
-            "name": "Echo",
-            "description": "Voix masculine claire",
-            "gender": "male",
-            "preview_url": "/audio/voice-previews/echo.mp3"
-        },
-        {
-            "id": "fable",
-            "name": "Fable",
-            "description": "Accent britannique chaleureux",
-            "gender": "neutral",
-            "preview_url": "/audio/voice-previews/fable.mp3"
-        },
-        {
-            "id": "onyx",
-            "name": "Onyx",
-            "description": "Voix grave et masculine",
-            "gender": "male",
-            "preview_url": "/audio/voice-previews/onyx.mp3"
-        },
-        {
-            "id": "nova",
-            "name": "Nova",
-            "description": "Voix féminine énergique",
-            "gender": "female",
-            "preview_url": "/audio/voice-previews/nova.mp3"
-        },
-        {
-            "id": "shimmer",
-            "name": "Shimmer",
-            "description": "Voix féminine douce",
-            "gender": "female",
-            "preview_url": "/audio/voice-previews/shimmer.mp3"
-        }
-    ]
+    # Normalize language code
+    lang = lang.lower().strip() if lang else 'en'
+
+    # Liste des voix avec descriptions traduites
+    voice_ids = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+    voice_genders = {
+        "alloy": "neutral",
+        "echo": "male",
+        "fable": "neutral",
+        "onyx": "male",
+        "nova": "female",
+        "shimmer": "female"
+    }
+
+    voices = []
+    for voice_id in voice_ids:
+        # Traduire la description depuis le système i18n backend
+        description_key = f"voice.{voice_id}.description"
+        description = translate(description_key, lang, fallback=f"Voice {voice_id}")
+
+        voices.append({
+            "id": voice_id,
+            "name": voice_id.capitalize(),
+            "description": description,
+            "gender": voice_genders[voice_id],
+            "preview_url": f"/audio/voice-previews/{voice_id}.mp3"
+        })
 
     return {
         "voices": voices,

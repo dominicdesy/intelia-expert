@@ -17,5 +17,11 @@
   "stripe.proPlanName": "Pro Abonnement",
   "stripe.proPlanDescription": "Intelia Expert Maandelijks Abonnement - PRO",
   "stripe.elitePlanName": "Elite Abonnement",
-  "stripe.elitePlanDescription": "Intelia Expert Maandelijks Abonnement - ELITE"
+  "stripe.elitePlanDescription": "Intelia Expert Maandelijks Abonnement - ELITE",
+  "voice.alloy.description": "Neutraal en evenwichtig",
+  "voice.echo.description": "Heldere mannelijke stem",
+  "voice.fable.description": "Warm Brits accent",
+  "voice.onyx.description": "Diepe mannelijke stem",
+  "voice.nova.description": "Energieke vrouwelijke stem",
+  "voice.shimmer.description": "Zachte vrouwelijke stem"
 }

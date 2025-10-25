@@ -742,7 +742,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
   // Précharger les voix disponibles quand le modal s'ouvre
   useEffect(() => {
     if (isOpen && preloadedVoices.length === 0) {
-      apiClient.get('/voice-settings/voices').then(response => {
+      const currentLang = getCurrentLanguage();
+      apiClient.get(`/voice-settings/voices?lang=${currentLang}`).then(response => {
         if (response.success && response.data) {
           const voicesData = response.data as any;
           if (voicesData.voices) {
@@ -753,7 +754,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
         secureLog.error('Failed to preload voices:', err);
       });
     }
-  }, [isOpen]);
+  }, [isOpen, getCurrentLanguage]);
 
 
   // Validation functions

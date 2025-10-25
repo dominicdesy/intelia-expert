@@ -17,5 +17,11 @@
   "stripe.proPlanName": "Plan Pro",
   "stripe.proPlanDescription": "Miesięczna subskrypcja Intelia Expert - PRO",
   "stripe.elitePlanName": "Plan Elite",
-  "stripe.elitePlanDescription": "Miesięczna subskrypcja Intelia Expert - ELITE"
+  "stripe.elitePlanDescription": "Miesięczna subskrypcja Intelia Expert - ELITE",
+  "voice.alloy.description": "Neutralny i zrównoważony",
+  "voice.echo.description": "Wyraźny męski głos",
+  "voice.fable.description": "Ciepły brytyjski akcent",
+  "voice.onyx.description": "Głęboki męski głos",
+  "voice.nova.description": "Energiczny kobiecy głos",
+  "voice.shimmer.description": "Miękki kobiecy głos"
 }

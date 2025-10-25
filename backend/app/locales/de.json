@@ -31,5 +31,11 @@
   "invite.feature3": "Antworten auf Französisch, Englisch oder Spanisch erhalten",
   "invite.feature4": "Auf Mobilgerät, Tablet und Computer verwenden",
   "invite.personalMessageTitle": "Persönliche Nachricht von {inviter_name}:",
-  "invite.resendNote": "Dies ist eine Erinnerung an Ihre vorherige Einladung."
+  "invite.resendNote": "Dies ist eine Erinnerung an Ihre vorherige Einladung.",
+  "voice.alloy.description": "Neutral und ausgewogen",
+  "voice.echo.description": "Klare männliche Stimme",
+  "voice.fable.description": "Warmer britischer Akzent",
+  "voice.onyx.description": "Tiefe männliche Stimme",
+  "voice.nova.description": "Energische weibliche Stimme",
+  "voice.shimmer.description": "Sanfte weibliche Stimme"
 }
