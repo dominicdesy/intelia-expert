@@ -149,6 +149,12 @@ const nextConfig = {
   // ✅ CORRECTION PRINCIPALE: Rewrites corrigés pour éviter les conflits
   async rewrites() {
     return [
+      // ✅ SÉCURITÉ: Rewrite /llm/* vers API route proxy interne
+      // Permet de bloquer l'accès public au service LLM
+      {
+        source: "/llm/:path*",
+        destination: "/api/llm/:path*",
+      },
       // ✅ GARDÉ: Rewrite spécifique pour les endpoints expert
       {
         source: "/api/expert/:path*",

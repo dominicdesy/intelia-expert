@@ -12,11 +12,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * CORRECTION: Utilisation de la variable d'environnement LLM_BACKEND_URL
- * qui pointe vers https://expert.intelia.com/llm
- * Construction dynamique de l'URL du streaming endpoint
+ * SÉCURITÉ: Utilisation de l'URL interne pour communication service-à-service
+ * - LLM_INTERNAL_URL (server-only): http://intelia-llm:8080 (internal networking)
+ * - Fallback sur URL publique si non configuré (transition)
+ *
+ * Note: Cette route s'exécute côté serveur Next.js, donc peut appeler l'URL interne
  */
-const LLM_BACKEND_URL = process.env.NEXT_PUBLIC_LLM_BACKEND_URL ?? "https://expert.intelia.com/llm";
+const LLM_BACKEND_URL = process.env.LLM_INTERNAL_URL ?? process.env.NEXT_PUBLIC_LLM_BACKEND_URL ?? "https://expert.intelia.com/llm";
 const LLM_STREAM_URL = `${LLM_BACKEND_URL}/chat`;
 
 /**
