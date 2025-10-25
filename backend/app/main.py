@@ -1,8 +1,8 @@
 #
 # -*- coding: utf-8 -*-
 #
-# app/main.py - VERSION 4.3.1 CORRIGÉE - HTTPS FORCÉ + HEALTH ENDPOINTS PARFAITS
-# Architecture concentrée sur: System, Auth, Users, Stats, Billing, Invitations, Logging
+# app/main.py - VERSION 4.3.2 - HTTPS FORCÉ + HEALTH ENDPOINTS + PROMETHEUS METRICS
+# Architecture concentrée sur: System, Auth, Users, Stats, Billing, Invitations, Logging, Monitoring
 #
 
 from __future__ import annotations
@@ -425,7 +425,7 @@ async def lifespan(app: FastAPI):
 # === FASTAPI APP ===
 app = FastAPI(
     title="Intelia Expert API",
-    version="4.3.1",
+    version="4.3.2",
     root_path="/api",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -909,7 +909,7 @@ async def prometheus_metrics(username: str = Depends(verify_metrics_credentials)
 
     # Set system info
     system_info.info({
-        'version': '4.3.1',
+        'version': '4.3.2',
         'environment': os.getenv('ENV', 'production'),
         'python_version': '3.11'
     })
@@ -928,7 +928,7 @@ async def root():
     if uptime_hours < 2:  # Si moins de 2 heures de uptime
         return {
             "status": "running",
-            "version": "4.3.1",
+            "version": "4.3.2",
             "uptime_hours": round(uptime_hours, 2),
             "environment": os.getenv("ENV", "production"),
             "health": "ready",
@@ -961,7 +961,7 @@ async def root():
             "invitations",
             "logging",
         ],
-        "deployment_version": "v4.3.1-https-fixed-architecture",
+        "deployment_version": "v4.3.2-with-prometheus-metrics",
     }
 
 
