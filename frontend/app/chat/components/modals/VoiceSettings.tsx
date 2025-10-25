@@ -27,7 +27,11 @@ interface VoicesListResponse {
   speed_range: { min: number; max: number };
 }
 
-export const VoiceSettings: React.FC = () => {
+interface VoiceSettingsProps {
+  preloadedVoices?: VoiceOption[];
+}
+
+export const VoiceSettings: React.FC<VoiceSettingsProps> = ({ preloadedVoices }) => {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -39,11 +43,11 @@ export const VoiceSettings: React.FC = () => {
   const [canUseVoice, setCanUseVoice] = useState(false);
   const [plan, setPlan] = useState('essential');
 
-  const [voices, setVoices] = useState<VoiceOption[]>([]);
+  const [voices, setVoices] = useState<VoiceOption[]>(preloadedVoices || []);
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Charger les voix disponibles et les préférences utilisateur
+  // Charger les voix et préférences utilisateur
   useEffect(() => {
     loadData();
   }, []);
@@ -53,12 +57,14 @@ export const VoiceSettings: React.FC = () => {
     setError('');
 
     try {
-      // Charger voix disponibles (endpoint public)
-      const voicesResponse = await apiClient.get('/voice-settings/voices');
-      if (voicesResponse.success && voicesResponse.data) {
-        const voicesData = voicesResponse.data as VoicesListResponse;
-        if (voicesData.voices) {
-          setVoices(voicesData.voices);
+      // Charger voix disponibles si pas déjà préchargées
+      if (!preloadedVoices || preloadedVoices.length === 0) {
+        const voicesResponse = await apiClient.get('/voice-settings/voices');
+        if (voicesResponse.success && voicesResponse.data) {
+          const voicesData = voicesResponse.data as VoicesListResponse;
+          if (voicesData.voices) {
+            setVoices(voicesData.voices);
+          }
         }
       }
 
@@ -245,10 +251,10 @@ export const VoiceSettings: React.FC = () => {
           onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
           className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
         />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>0.8x {t('voiceSettings.slower') || 'Slower'}</span>
-          <span>1.0x {t('voiceSettings.normal') || 'Normal'}</span>
-          <span>1.5x {t('voiceSettings.faster') || 'Faster'}</span>
+        <div className="relative text-xs text-gray-500 mt-1 h-4">
+          <span className="absolute left-0">0.8x {t('voiceSettings.slower') || 'Slower'}</span>
+          <span className="absolute left-[28.6%] -translate-x-1/2">1.0x {t('voiceSettings.normal') || 'Normal'}</span>
+          <span className="absolute right-0">1.5x {t('voiceSettings.faster') || 'Faster'}</span>
         </div>
       </div>
 

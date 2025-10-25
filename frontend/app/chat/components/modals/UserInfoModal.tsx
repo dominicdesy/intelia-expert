@@ -719,6 +719,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportSuccess, setExportSuccess] = useState("");
+  const [preloadedVoices, setPreloadedVoices] = useState<any[]>([]);
 
   const tabs = useMemo(
     () => [
@@ -737,6 +738,22 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       isMountedRef.current = false;
     };
   }, []);
+
+  // Précharger les voix disponibles quand le modal s'ouvre
+  useEffect(() => {
+    if (isOpen && preloadedVoices.length === 0) {
+      apiClient.get('/voice-settings/voices').then(response => {
+        if (response.success && response.data) {
+          const voicesData = response.data as any;
+          if (voicesData.voices) {
+            setPreloadedVoices(voicesData.voices);
+          }
+        }
+      }).catch(err => {
+        secureLog.error('Failed to preload voices:', err);
+      });
+    }
+  }, [isOpen]);
 
 
   // Validation functions
@@ -1532,7 +1549,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
             {/* Voice Settings Tab (ancien Passkey) */}
             {activeTab === "voice" && (
               <div className="space-y-6" data-debug="voice-tab">
-                <VoiceSettings />
+                <VoiceSettings preloadedVoices={preloadedVoices} />
               </div>
             )}
 
