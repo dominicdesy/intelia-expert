@@ -4,15 +4,10 @@ datasources:
   - name: Intelia Backend Metrics
     type: prometheus
     access: proxy
-    # URL to scrape metrics from (backend /metrics endpoint)
-    url: https://expert.intelia.com/api/metrics
+    # URL to Prometheus server (not direct /metrics endpoint)
+    url: https://expert.intelia.com/prometheus
     isDefault: true
     editable: false
-    # Basic Auth credentials for /metrics endpoint
-    basicAuth: true
-    basicAuthUser: grafana
-    secureJsonData:
-      basicAuthPassword: I#kmd9$kuZnO!dZXF9z8ZTF8
     jsonData:
       httpMethod: GET
       timeInterval: 60s

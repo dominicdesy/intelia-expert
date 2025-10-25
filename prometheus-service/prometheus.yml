@@ -1,0 +1,19 @@
+# Prometheus configuration for Intelia Expert
+# Scrapes metrics from backend /api/metrics endpoint
+
+global:
+  scrape_interval: 60s
+  evaluation_interval: 60s
+  scrape_timeout: 30s
+
+scrape_configs:
+  - job_name: 'intelia-backend'
+    scheme: https
+    basic_auth:
+      username: 'grafana'
+      password: 'I#kmd9$kuZnO!dZXF9z8ZTF8'
+    static_configs:
+      - targets: ['expert.intelia.com']
+    metrics_path: '/api/metrics'
+    scrape_interval: 60s
+    scrape_timeout: 30s
