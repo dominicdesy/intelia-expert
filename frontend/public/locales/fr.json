@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "Préférences vocales sauvegardées avec succès !",
   "error.loadVoiceSettings": "Erreur lors du chargement des préférences vocales",
   "error.saveVoiceSettings": "Erreur lors de la sauvegarde des préférences vocales",
-  "passkey.addedOn": "Ajouté le"
+  "passkey.addedOn": "Ajouté le",
+  "voiceSettings.fast": "Rapide",
+  "voiceSettings.veryFast": "Très rapide"
 }

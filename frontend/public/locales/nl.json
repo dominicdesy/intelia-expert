@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "Spraak instellingen succesvol opgeslagen!",
   "error.loadVoiceSettings": "Fout bij het laden van spraak instellingen",
   "error.saveVoiceSettings": "Fout bij het opslaan van spraak instellingen",
-  "passkey.addedOn": "Toegevoegd op"
+  "passkey.addedOn": "Toegevoegd op",
+  "voiceSettings.fast": "Snel",
+  "voiceSettings.veryFast": "Heel snel"
 }

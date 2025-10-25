@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "Voice settings saved successfully!",
   "error.loadVoiceSettings": "Error loading voice settings",
   "error.saveVoiceSettings": "Error saving voice settings",
-  "passkey.addedOn": "Added on"
+  "passkey.addedOn": "Added on",
+  "voiceSettings.fast": "Fast",
+  "voiceSettings.veryFast": "Very fast"
 }

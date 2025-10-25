@@ -1093,7 +1093,9 @@ export interface TranslationKeys {
   "voiceSettings.listen": string;
   "voiceSettings.slower": string;
   "voiceSettings.normal": string;
+  "voiceSettings.fast": string;
   "voiceSettings.faster": string;
+  "voiceSettings.veryFast": string;
   "voiceSettings.upgradeRequired": string;
   "voiceSettings.upgradeMessage": string;
   "voiceSettings.currentPlan": string;

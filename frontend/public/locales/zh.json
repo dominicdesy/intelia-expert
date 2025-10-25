@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "语音设置保存成功！",
   "error.loadVoiceSettings": "加载语音设置时出错",
   "error.saveVoiceSettings": "保存语音设置时出错",
-  "passkey.addedOn": "添加于"
+  "passkey.addedOn": "添加于",
+  "voiceSettings.fast": "快速",
+  "voiceSettings.veryFast": "非常快"
 }

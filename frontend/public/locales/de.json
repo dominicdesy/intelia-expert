@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "Spracheinstellungen erfolgreich gespeichert!",
   "error.loadVoiceSettings": "Fehler beim Laden der Spracheinstellungen",
   "error.saveVoiceSettings": "Fehler beim Speichern der Spracheinstellungen",
-  "passkey.addedOn": "Hinzugefügt am"
+  "passkey.addedOn": "Hinzugefügt am",
+  "voiceSettings.fast": "Schnell",
+  "voiceSettings.veryFast": "Sehr schnell"
 }

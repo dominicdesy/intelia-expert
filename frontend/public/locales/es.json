@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "¡Configuración de voz guardada con éxito!",
   "error.loadVoiceSettings": "Error al cargar la configuración de voz",
   "error.saveVoiceSettings": "Error al guardar la configuración de voz",
-  "passkey.addedOn": "Agregado el"
+  "passkey.addedOn": "Agregado el",
+  "voiceSettings.fast": "Rápido",
+  "voiceSettings.veryFast": "Muy rápido"
 }

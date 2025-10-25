@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "Ustawienia głosu zapisane pomyślnie!",
   "error.loadVoiceSettings": "Błąd ładowania ustawień głosu",
   "error.saveVoiceSettings": "Błąd zapisu ustawień głosu",
-  "passkey.addedOn": "Dodano"
+  "passkey.addedOn": "Dodano",
+  "voiceSettings.fast": "Szybko",
+  "voiceSettings.veryFast": "Bardzo szybko"
 }
