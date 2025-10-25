@@ -1,0 +1,11 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Local files
+.DS_Store
+*.log
