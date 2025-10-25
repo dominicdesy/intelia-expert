@@ -7,14 +7,16 @@ global:
   scrape_timeout: 30s
 
 scrape_configs:
-  - job_name: intelia-backend
-    scheme: http
-    static_configs:
-      - targets:
-        - intelia-expert-backend:8080
-    metrics_path: /metrics
-    scrape_interval: 15s
-    scrape_timeout: 10s
+  # Backend /metrics endpoint requires JWT auth (admin only)
+  # Not suitable for Prometheus scraping - disabled for now
+  # - job_name: intelia-backend
+  #   scheme: http
+  #   static_configs:
+  #     - targets:
+  #       - intelia-expert-backend:8080
+  #   metrics_path: /metrics
+  #   scrape_interval: 15s
+  #   scrape_timeout: 10s
 
   - job_name: intelia-llm
     scheme: http
