@@ -607,6 +607,38 @@ MÉTRIQUES CLÉS BROILERS:
 
             generated_response = response.choices[0].message.content.strip()
 
+            # Track Prometheus metrics for this LLM call
+            try:
+                from monitoring.prometheus_metrics import track_llm_call
+                prompt_tokens = response.usage.prompt_tokens
+                completion_tokens = response.usage.completion_tokens
+                tokens = response.usage.total_tokens
+
+                # Determine cost per 1M tokens based on model
+                if "o1-preview" in self.cot_model:
+                    cost_per_1m = 15.0  # $15/1M for o1-preview
+                elif "o1-mini" in self.cot_model:
+                    cost_per_1m = 3.0  # $3/1M for o1-mini
+                elif "gpt-4o" in self.cot_model:
+                    cost_per_1m = 5.0  # $5/1M for gpt-4o (average of input/output)
+                else:
+                    cost_per_1m = 15.0  # Default fallback
+
+                cost = tokens / 1_000_000 * cost_per_1m
+
+                track_llm_call(
+                    model=self.cot_model,
+                    provider="openai",
+                    feature="chat",
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    cost_usd=cost,
+                    duration=0.0,  # Duration not tracked in generators.py
+                    status="success"
+                )
+            except Exception as e:
+                logger.debug(f"Failed to track Prometheus metrics: {e}")
+
             # 🧠 DEBUG: Log raw LLM response to check for CoT tags
             logger.info(f"🔍 Raw LLM response length: {len(generated_response)} chars")
             logger.info(f"🔍 Has <thinking> tag: {'<thinking>' in generated_response.lower()}")
