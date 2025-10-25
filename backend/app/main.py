@@ -17,9 +17,11 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
 
 # .env (facultatif)
 try:
@@ -865,9 +867,30 @@ async def complete_health_check():
         }
 
 
+# === BASIC AUTH FOR METRICS ===
+security = HTTPBasic()
+
+def verify_metrics_credentials(credentials: HTTPBasicCredentials = Depends(security)):
+    """Verify Basic Auth credentials for /metrics endpoint"""
+    # Get credentials from environment
+    correct_username = os.getenv("METRICS_USERNAME", "grafana")
+    correct_password = os.getenv("METRICS_PASSWORD", "changeme")
+
+    # Constant-time comparison to prevent timing attacks
+    is_username_correct = secrets.compare_digest(credentials.username.encode("utf8"), correct_username.encode("utf8"))
+    is_password_correct = secrets.compare_digest(credentials.password.encode("utf8"), correct_password.encode("utf8"))
+
+    if not (is_username_correct and is_password_correct):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
 # === ENDPOINT PROMETHEUS METRICS ===
 @app.get("/metrics", tags=["Monitoring"])
-async def prometheus_metrics():
+async def prometheus_metrics(username: str = Depends(verify_metrics_credentials)):
     """
     Export Prometheus metrics for Grafana Cloud
 
