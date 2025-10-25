@@ -1146,7 +1146,7 @@ export const StatisticsPage: React.FC = () => {
             </div>
             <div className="border border-gray-300 rounded-lg overflow-hidden">
               <iframe
-                src={process.env.NEXT_PUBLIC_GRAFANA_URL || "https://your-grafana-domain.com/d/dashboard-id?orgId=1&kiosk=tv&theme=light"}
+                src="https://inteliacognito.grafana.net/d/dorfxct/intelia-llm-monitoring?orgId=1&kiosk=tv&theme=light"
                 width="100%"
                 height="800"
                 frameBorder="0"
@@ -1155,7 +1155,7 @@ export const StatisticsPage: React.FC = () => {
               />
             </div>
             <div className="mt-4 text-xs text-gray-500">
-              <p>💡 Configurez NEXT_PUBLIC_GRAFANA_URL dans votre fichier .env.local</p>
+              <p>📊 Dashboard mis à jour en temps réel depuis Grafana Cloud</p>
             </div>
           </div>
         ) : null}
