@@ -4,8 +4,8 @@ datasources:
   - name: Intelia Backend Metrics
     type: prometheus
     access: proxy
-    # URL to Prometheus server (not direct /metrics endpoint)
-    url: https://expert.intelia.com/prometheus
+    # URL to Prometheus via internal networking
+    url: http://prometheus:9090
     isDefault: true
     editable: false
     jsonData:

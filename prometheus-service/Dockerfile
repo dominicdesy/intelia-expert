@@ -10,11 +10,9 @@ COPY prometheus.yml /etc/prometheus/prometheus.yml
 EXPOSE 9090
 
 # Use default Prometheus entrypoint with our config
-# Configure route prefix for /prometheus path
+# Internal networking only - no public routes needed
 CMD ["--config.file=/etc/prometheus/prometheus.yml", \
      "--storage.tsdb.path=/prometheus", \
      "--storage.tsdb.retention.time=30d", \
      "--web.console.libraries=/usr/share/prometheus/console_libraries", \
-     "--web.console.templates=/usr/share/prometheus/consoles", \
-     "--web.external-url=https://expert.intelia.com/prometheus", \
-     "--web.route-prefix=/"]
+     "--web.console.templates=/usr/share/prometheus/consoles"]
