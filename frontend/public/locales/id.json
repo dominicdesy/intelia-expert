@@ -1081,5 +1081,8 @@
   },
   "profile": {
     "security": "Keamanan"
+  },
+  "common": {
+    "save": "Simpan"
   }
 }

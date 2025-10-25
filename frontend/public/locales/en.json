@@ -1081,5 +1081,8 @@
   },
   "profile": {
     "security": "Security"
+  },
+  "common": {
+    "save": "Save"
   }
 }

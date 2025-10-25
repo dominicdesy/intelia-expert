@@ -1081,5 +1081,8 @@
   },
   "profile": {
     "security": "Güvenlik"
+  },
+  "common": {
+    "save": "Kaydet"
   }
 }

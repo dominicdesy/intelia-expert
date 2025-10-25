@@ -1081,5 +1081,8 @@
   },
   "profile": {
     "security": "セキュリティ"
+  },
+  "common": {
+    "save": "保存"
   }
 }

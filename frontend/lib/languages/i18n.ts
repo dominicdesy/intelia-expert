@@ -101,6 +101,7 @@ export interface TranslationKeys {
   "common.unexpectedError": string;
   "common.loading": string;
   "common.saving": string;
+  "common.save": string;
   "common.success": string;
   "common.error": string;
   "common.confirm": string;
@@ -647,6 +648,7 @@ export interface TranslationKeys {
   "success.profileUpdated": string;
   "success.passwordChanged": string;
   "success.languageUpdated": string;
+  "success.voiceSettingsSaved": string;
 
   // ===========================================
   // ERROR MESSAGES
@@ -680,6 +682,8 @@ export interface TranslationKeys {
   "error.serviceUnavailable": string;
   "error.invalidShareToken": string;
   "error.noTokenReceived": string;
+  "error.loadVoiceSettings": string;
+  "error.saveVoiceSettings": string;
 
   // ===========================================
   // AUTH ERROR MESSAGES - NOUVELLES CLÉS
@@ -1078,6 +1082,21 @@ export interface TranslationKeys {
 
   // Devices
   "passkey.devices.supported": string;
+  "passkey.addedOn": string;
+
+  // ===========================================
+  // VOICE SETTINGS (ASSISTANT VOCAL)
+  // ===========================================
+  "voiceSettings.title": string;
+  "voiceSettings.selectVoice": string;
+  "voiceSettings.speed": string;
+  "voiceSettings.listen": string;
+  "voiceSettings.slower": string;
+  "voiceSettings.normal": string;
+  "voiceSettings.faster": string;
+  "voiceSettings.upgradeRequired": string;
+  "voiceSettings.upgradeMessage": string;
+  "voiceSettings.currentPlan": string;
 
   // ===========================================
   // LEGAL & ABOUT PAGES

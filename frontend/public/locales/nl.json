@@ -1081,5 +1081,8 @@
   },
   "profile": {
     "security": "Beveiliging"
+  },
+  "common": {
+    "save": "Opslaan"
   }
 }
