@@ -13,7 +13,7 @@ scrape_configs:
       username: 'grafana'
       password: 'I#kmd9$kuZnO!dZXF9z8ZTF8'
     static_configs:
-      - targets: ['backend:8080']
+      - targets: ['intelia-expert-backend:8080']
     metrics_path: '/metrics'
     scrape_interval: 60s
     scrape_timeout: 30s

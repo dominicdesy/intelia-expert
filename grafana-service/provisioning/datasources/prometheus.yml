@@ -5,7 +5,7 @@ datasources:
     type: prometheus
     access: proxy
     # URL to Prometheus via internal networking
-    url: http://prometheus:9090
+    url: http://intelia-prometheus:9090
     isDefault: true
     editable: false
     jsonData:
