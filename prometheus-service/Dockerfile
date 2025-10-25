@@ -1,5 +1,6 @@
 # Prometheus Service for Digital Ocean App Platform
 # Scrapes metrics from Intelia Expert backend
+# Version: 1.1.0 - Internal networking
 
 FROM prom/prometheus:latest
 
