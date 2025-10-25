@@ -1057,18 +1057,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "voiceSettings": {
-    "title": "आवाज सहायक",
-    "selectVoice": "आवाज चयन",
-    "speed": "बोलने की गति",
-    "listen": "सुनें",
-    "slower": "धीमा",
-    "normal": "सामान्य",
-    "faster": "तेज",
-    "upgradeRequired": "अपग्रेड आवश्यक",
-    "upgradeMessage": "आवाज सहायक केवल Elite और Intelia योजनाओं के लिए उपलब्ध है। इस सुविधा तक पहुंचने के लिए अपनी योजना अपग्रेड करें।",
-    "currentPlan": "आपकी वर्तमान योजना"
-  },
   "success": {
     "voiceSettingsSaved": "आवाज सेटिंग्स सफलतापूर्वक सहेजी गईं!"
   },
@@ -1084,5 +1072,15 @@
   },
   "common": {
     "save": "सहेजें"
-  }
+  },
+  "voiceSettings.title": "आवाज सहायक",
+  "voiceSettings.selectVoice": "आवाज चयन",
+  "voiceSettings.speed": "बोलने की गति",
+  "voiceSettings.listen": "सुनें",
+  "voiceSettings.slower": "धीमा",
+  "voiceSettings.normal": "सामान्य",
+  "voiceSettings.faster": "तेज",
+  "voiceSettings.upgradeRequired": "अपग्रेड आवश्यक",
+  "voiceSettings.upgradeMessage": "आवाज सहायक केवल Elite और Intelia योजनाओं के लिए उपलब्ध है। इस सुविधा तक पहुंचने के लिए अपनी योजना अपग्रेड करें।",
+  "voiceSettings.currentPlan": "आपकी वर्तमान योजना"
 }

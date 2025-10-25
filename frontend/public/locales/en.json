@@ -1057,18 +1057,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "voiceSettings": {
-    "title": "Voice Assistant",
-    "selectVoice": "Voice Selection",
-    "speed": "Speech Speed",
-    "listen": "Listen",
-    "slower": "Slower",
-    "normal": "Normal",
-    "faster": "Faster",
-    "upgradeRequired": "Upgrade Required",
-    "upgradeMessage": "Voice assistant is only available for Elite and Intelia plans. Upgrade your plan to access this feature.",
-    "currentPlan": "Your current plan"
-  },
   "success": {
     "voiceSettingsSaved": "Voice settings saved successfully!"
   },
@@ -1084,5 +1072,15 @@
   },
   "common": {
     "save": "Save"
-  }
+  },
+  "voiceSettings.title": "Voice Assistant",
+  "voiceSettings.selectVoice": "Voice Selection",
+  "voiceSettings.speed": "Speech Speed",
+  "voiceSettings.listen": "Listen",
+  "voiceSettings.slower": "Slower",
+  "voiceSettings.normal": "Normal",
+  "voiceSettings.faster": "Faster",
+  "voiceSettings.upgradeRequired": "Upgrade Required",
+  "voiceSettings.upgradeMessage": "Voice assistant is only available for Elite and Intelia plans. Upgrade your plan to access this feature.",
+  "voiceSettings.currentPlan": "Your current plan"
 }

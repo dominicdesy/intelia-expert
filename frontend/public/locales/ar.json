@@ -1057,18 +1057,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "voiceSettings": {
-    "title": "مساعد صوتي",
-    "selectVoice": "اختيار الصوت",
-    "speed": "سرعة الكلام",
-    "listen": "استمع",
-    "slower": "أبطأ",
-    "normal": "عادي",
-    "faster": "أسرع",
-    "upgradeRequired": "الترقية مطلوبة",
-    "upgradeMessage": "المساعد الصوتي متاح فقط لخطط Elite و Intelia. قم بترقية خطتك للوصول إلى هذه الميزة.",
-    "currentPlan": "خطتك الحالية"
-  },
   "success": {
     "voiceSettingsSaved": "تم حفظ إعدادات الصوت بنجاح!"
   },
@@ -1084,5 +1072,15 @@
   },
   "common": {
     "save": "حفظ"
-  }
+  },
+  "voiceSettings.title": "مساعد صوتي",
+  "voiceSettings.selectVoice": "اختيار الصوت",
+  "voiceSettings.speed": "سرعة الكلام",
+  "voiceSettings.listen": "استمع",
+  "voiceSettings.slower": "أبطأ",
+  "voiceSettings.normal": "عادي",
+  "voiceSettings.faster": "أسرع",
+  "voiceSettings.upgradeRequired": "الترقية مطلوبة",
+  "voiceSettings.upgradeMessage": "المساعد الصوتي متاح فقط لخطط Elite و Intelia. قم بترقية خطتك للوصول إلى هذه الميزة.",
+  "voiceSettings.currentPlan": "خطتك الحالية"
 }

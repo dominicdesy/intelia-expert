@@ -1057,18 +1057,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "voiceSettings": {
-    "title": "Spraakassistent",
-    "selectVoice": "Stem selectie",
-    "speed": "Spreeksnelheid",
-    "listen": "Luisteren",
-    "slower": "Langzamer",
-    "normal": "Normaal",
-    "faster": "Sneller",
-    "upgradeRequired": "Upgrade vereist",
-    "upgradeMessage": "Spraakassistent is alleen beschikbaar voor Elite en Intelia abonnementen. Upgrade uw abonnement om toegang te krijgen tot deze functie.",
-    "currentPlan": "Uw huidige abonnement"
-  },
   "success": {
     "voiceSettingsSaved": "Spraak instellingen succesvol opgeslagen!"
   },
@@ -1084,5 +1072,15 @@
   },
   "common": {
     "save": "Opslaan"
-  }
+  },
+  "voiceSettings.title": "Spraakassistent",
+  "voiceSettings.selectVoice": "Stem selectie",
+  "voiceSettings.speed": "Spreeksnelheid",
+  "voiceSettings.listen": "Luisteren",
+  "voiceSettings.slower": "Langzamer",
+  "voiceSettings.normal": "Normaal",
+  "voiceSettings.faster": "Sneller",
+  "voiceSettings.upgradeRequired": "Upgrade vereist",
+  "voiceSettings.upgradeMessage": "Spraakassistent is alleen beschikbaar voor Elite en Intelia abonnementen. Upgrade uw abonnement om toegang te krijgen tot deze functie.",
+  "voiceSettings.currentPlan": "Uw huidige abonnement"
 }

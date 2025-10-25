@@ -1057,18 +1057,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "voiceSettings": {
-    "title": "Asistente de voz",
-    "selectVoice": "Selección de voz",
-    "speed": "Velocidad del habla",
-    "listen": "Escuchar",
-    "slower": "Más lento",
-    "normal": "Normal",
-    "faster": "Más rápido",
-    "upgradeRequired": "Actualización requerida",
-    "upgradeMessage": "El asistente de voz solo está disponible para los planes Elite e Intelia. Actualice su plan para acceder a esta función.",
-    "currentPlan": "Su plan actual"
-  },
   "success": {
     "voiceSettingsSaved": "¡Configuración de voz guardada con éxito!"
   },
@@ -1084,5 +1072,15 @@
   },
   "common": {
     "save": "Guardar"
-  }
+  },
+  "voiceSettings.title": "Asistente de voz",
+  "voiceSettings.selectVoice": "Selección de voz",
+  "voiceSettings.speed": "Velocidad del habla",
+  "voiceSettings.listen": "Escuchar",
+  "voiceSettings.slower": "Más lento",
+  "voiceSettings.normal": "Normal",
+  "voiceSettings.faster": "Más rápido",
+  "voiceSettings.upgradeRequired": "Actualización requerida",
+  "voiceSettings.upgradeMessage": "El asistente de voz solo está disponible para los planes Elite e Intelia. Actualice su plan para acceder a esta función.",
+  "voiceSettings.currentPlan": "Su plan actual"
 }

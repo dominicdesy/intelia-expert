@@ -1057,18 +1057,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "voiceSettings": {
-    "title": "ผู้ช่วยเสียง",
-    "selectVoice": "การเลือกเสียง",
-    "speed": "ความเร็วในการพูด",
-    "listen": "ฟัง",
-    "slower": "ช้าลง",
-    "normal": "ปกติ",
-    "faster": "เร็วขึ้น",
-    "upgradeRequired": "ต้องอัปเกรด",
-    "upgradeMessage": "ผู้ช่วยเสียงใช้ได้เฉพาะแผน Elite และ Intelia เท่านั้น อัปเกรดแผนของคุณเพื่อเข้าถึงฟีเจอร์นี้",
-    "currentPlan": "แผนปัจจุบันของคุณ"
-  },
   "success": {
     "voiceSettingsSaved": "บันทึกการตั้งค่าเสียงสำเร็จ!"
   },
@@ -1084,5 +1072,15 @@
   },
   "common": {
     "save": "บันทึก"
-  }
+  },
+  "voiceSettings.title": "ผู้ช่วยเสียง",
+  "voiceSettings.selectVoice": "การเลือกเสียง",
+  "voiceSettings.speed": "ความเร็วในการพูด",
+  "voiceSettings.listen": "ฟัง",
+  "voiceSettings.slower": "ช้าลง",
+  "voiceSettings.normal": "ปกติ",
+  "voiceSettings.faster": "เร็วขึ้น",
+  "voiceSettings.upgradeRequired": "ต้องอัปเกรด",
+  "voiceSettings.upgradeMessage": "ผู้ช่วยเสียงใช้ได้เฉพาะแผน Elite และ Intelia เท่านั้น อัปเกรดแผนของคุณเพื่อเข้าถึงฟีเจอร์นี้",
+  "voiceSettings.currentPlan": "แผนปัจจุบันของคุณ"
 }
