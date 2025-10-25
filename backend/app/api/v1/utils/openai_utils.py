@@ -203,6 +203,40 @@ def _get_safe_temperature(requested: Optional[float], model: str) -> Optional[fl
     return max(0.0, min(2.0, t))
 
 
+def _calculate_llm_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
+    """Calculate approximate cost in USD for an LLM API call
+
+    Pricing as of January 2025 (approximate):
+    - gpt-4o: $2.50/1M prompt, $10.00/1M completion
+    - gpt-4o-mini: $0.15/1M prompt, $0.60/1M completion
+    - gpt-4-turbo: $10/1M prompt, $30/1M completion
+    - gpt-3.5-turbo: $0.50/1M prompt, $1.50/1M completion
+    """
+    model_lower = (model or "").lower()
+
+    # Pricing table (per 1M tokens)
+    pricing = {
+        "gpt-4o": (2.50, 10.00),
+        "gpt-4o-mini": (0.15, 0.60),
+        "gpt-4-turbo": (10.00, 30.00),
+        "gpt-4": (30.00, 60.00),
+        "gpt-3.5-turbo": (0.50, 1.50),
+    }
+
+    # Find matching pricing
+    prompt_price, completion_price = (1.00, 2.00)  # default fallback
+    for model_key, prices in pricing.items():
+        if model_key in model_lower:
+            prompt_price, completion_price = prices
+            break
+
+    # Calculate cost
+    prompt_cost = (prompt_tokens / 1_000_000) * prompt_price
+    completion_cost = (completion_tokens / 1_000_000) * completion_price
+
+    return prompt_cost + completion_cost
+
+
 def _detect_poultry_type(text: str) -> str:
     """Detect if question is about broilers or layers (egg-laying hens).
 
@@ -596,6 +630,30 @@ def safe_chat_completion(**kwargs) -> Any:
 
     if not resp or not getattr(resp, "choices", None):
         raise RuntimeError("Réponse OpenAI vide ou malformée")
+
+    # Track metrics for Prometheus/Grafana
+    try:
+        from app.metrics import track_llm_call
+
+        if hasattr(resp, 'usage') and resp.usage:
+            prompt_tokens = getattr(resp.usage, 'prompt_tokens', 0)
+            completion_tokens = getattr(resp.usage, 'completion_tokens', 0)
+
+            # Calculate cost based on model (approximate pricing)
+            cost_usd = _calculate_llm_cost(model, prompt_tokens, completion_tokens)
+
+            track_llm_call(
+                model=model,
+                feature="chat",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cost_usd=cost_usd,
+                duration=elapsed,
+                status="success"
+            )
+    except Exception as e:
+        logger.debug(f"Failed to track LLM metrics: {e}")
+
     return resp
 
 

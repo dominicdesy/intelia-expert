@@ -865,6 +865,37 @@ async def complete_health_check():
         }
 
 
+# === ENDPOINT PROMETHEUS METRICS ===
+@app.get("/metrics", tags=["Monitoring"])
+async def prometheus_metrics():
+    """
+    Export Prometheus metrics for Grafana Cloud
+
+    Returns metrics in Prometheus text format:
+    - LLM costs and token usage
+    - API performance
+    - Database metrics
+    - Business metrics
+    """
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    from app.metrics import update_uptime, system_info
+    from fastapi.responses import Response
+
+    # Update dynamic metrics
+    update_uptime()
+
+    # Set system info
+    system_info.info({
+        'version': '4.3.1',
+        'environment': os.getenv('ENV', 'production'),
+        'python_version': '3.11'
+    })
+
+    # Generate Prometheus format
+    metrics_output = generate_latest()
+    return Response(content=metrics_output, media_type=CONTENT_TYPE_LATEST)
+
+
 # === ENDPOINT RACINE SIMPLIFIE ===
 @app.get("/", tags=["Root"])
 async def root():

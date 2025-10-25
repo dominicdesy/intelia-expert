@@ -29,6 +29,7 @@ user-agents>=2.2.0  # User agent parsing for device detection
 typing-extensions>=4.8.0
 tenacity>=8.2.2
 toml==0.10.2
+prometheus-client>=0.19.0  # Metrics export for Grafana
 
 # Security & Serialization
 msgpack>=1.0.7  # Secure serialization (replaces pickle)
