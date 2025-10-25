@@ -1,5 +1,6 @@
 # Grafana Web Service for Digital Ocean App Platform
 # Configured with allow_embedding for iframe integration
+# Build version: 1.0.0
 
 FROM grafana/grafana:latest
 
