@@ -7,13 +7,20 @@ global:
   scrape_timeout: 30s
 
 scrape_configs:
-  - job_name: 'intelia-backend'
+  - job_name: intelia-backend
     scheme: http
-    basic_auth:
-      username: grafana
-      password: grafanapassword123
     static_configs:
-      - targets: ['intelia-expert-backend:8080']
-    metrics_path: '/metrics'
-    scrape_interval: 60s
-    scrape_timeout: 30s
+      - targets:
+        - intelia-expert-backend:8080
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  - job_name: intelia-llm
+    scheme: http
+    static_configs:
+      - targets:
+        - intelia-llm:8000
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 10s
