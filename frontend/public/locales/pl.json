@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "Bezpieczeństwo"
   },
-  "common": {
-    "save": "Zapisz"
-  },
   "voiceSettings.title": "Asystent głosowy",
   "voiceSettings.selectVoice": "Wybór głosu",
   "voiceSettings.speed": "Prędkość mowy",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "Szybciej",
   "voiceSettings.upgradeRequired": "Wymagana aktualizacja",
   "voiceSettings.upgradeMessage": "Asystent głosowy jest dostępny tylko dla planów Elite i Intelia. Zaktualizuj swój plan, aby uzyskać dostęp do tej funkcji.",
-  "voiceSettings.currentPlan": "Twój obecny plan"
+  "voiceSettings.currentPlan": "Twój obecny plan",
+  "common.save": "Zapisz"
 }

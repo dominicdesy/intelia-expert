@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "ความปลอดภัย"
   },
-  "common": {
-    "save": "บันทึก"
-  },
   "voiceSettings.title": "ผู้ช่วยเสียง",
   "voiceSettings.selectVoice": "การเลือกเสียง",
   "voiceSettings.speed": "ความเร็วในการพูด",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "เร็วขึ้น",
   "voiceSettings.upgradeRequired": "ต้องอัปเกรด",
   "voiceSettings.upgradeMessage": "ผู้ช่วยเสียงใช้ได้เฉพาะแผน Elite และ Intelia เท่านั้น อัปเกรดแผนของคุณเพื่อเข้าถึงฟีเจอร์นี้",
-  "voiceSettings.currentPlan": "แผนปัจจุบันของคุณ"
+  "voiceSettings.currentPlan": "แผนปัจจุบันของคุณ",
+  "common.save": "บันทึก"
 }

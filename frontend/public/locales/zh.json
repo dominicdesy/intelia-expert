@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "安全"
   },
-  "common": {
-    "save": "保存"
-  },
   "voiceSettings.title": "语音助手",
   "voiceSettings.selectVoice": "选择声音",
   "voiceSettings.speed": "语速",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "较快",
   "voiceSettings.upgradeRequired": "需要升级",
   "voiceSettings.upgradeMessage": "语音助手仅适用于Elite和Intelia计划。升级您的计划以访问此功能。",
-  "voiceSettings.currentPlan": "您当前的计划"
+  "voiceSettings.currentPlan": "您当前的计划",
+  "common.save": "保存"
 }

@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "Bảo mật"
   },
-  "common": {
-    "save": "Lưu"
-  },
   "voiceSettings.title": "Trợ lý giọng nói",
   "voiceSettings.selectVoice": "Chọn giọng nói",
   "voiceSettings.speed": "Tốc độ nói",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "Nhanh hơn",
   "voiceSettings.upgradeRequired": "Cần nâng cấp",
   "voiceSettings.upgradeMessage": "Trợ lý giọng nói chỉ khả dụng cho gói Elite và Intelia. Nâng cấp gói của bạn để truy cập tính năng này.",
-  "voiceSettings.currentPlan": "Gói hiện tại của bạn"
+  "voiceSettings.currentPlan": "Gói hiện tại của bạn",
+  "common.save": "Lưu"
 }

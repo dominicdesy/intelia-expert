@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "Sicherheit"
   },
-  "common": {
-    "save": "Speichern"
-  },
   "voiceSettings.title": "Sprachassistent",
   "voiceSettings.selectVoice": "Sprachauswahl",
   "voiceSettings.speed": "Sprechgeschwindigkeit",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "Schneller",
   "voiceSettings.upgradeRequired": "Upgrade erforderlich",
   "voiceSettings.upgradeMessage": "Der Sprachassistent ist nur für Elite- und Intelia-Pläne verfügbar. Aktualisieren Sie Ihren Plan, um auf diese Funktion zuzugreifen.",
-  "voiceSettings.currentPlan": "Ihr aktueller Plan"
+  "voiceSettings.currentPlan": "Ihr aktueller Plan",
+  "common.save": "Speichern"
 }

@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "Beveiliging"
   },
-  "common": {
-    "save": "Opslaan"
-  },
   "voiceSettings.title": "Spraakassistent",
   "voiceSettings.selectVoice": "Stem selectie",
   "voiceSettings.speed": "Spreeksnelheid",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "Sneller",
   "voiceSettings.upgradeRequired": "Upgrade vereist",
   "voiceSettings.upgradeMessage": "Spraakassistent is alleen beschikbaar voor Elite en Intelia abonnementen. Upgrade uw abonnement om toegang te krijgen tot deze functie.",
-  "voiceSettings.currentPlan": "Uw huidige abonnement"
+  "voiceSettings.currentPlan": "Uw huidige abonnement",
+  "common.save": "Opslaan"
 }

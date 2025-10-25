@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "セキュリティ"
   },
-  "common": {
-    "save": "保存"
-  },
   "voiceSettings.title": "音声アシスタント",
   "voiceSettings.selectVoice": "音声の選択",
   "voiceSettings.speed": "話す速度",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "速く",
   "voiceSettings.upgradeRequired": "アップグレードが必要です",
   "voiceSettings.upgradeMessage": "音声アシスタントはEliteとInteliaプランでのみ利用可能です。この機能にアクセスするにはプランをアップグレードしてください。",
-  "voiceSettings.currentPlan": "現在のプラン"
+  "voiceSettings.currentPlan": "現在のプラン",
+  "common.save": "保存"
 }

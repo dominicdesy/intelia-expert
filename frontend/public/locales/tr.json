@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "Güvenlik"
   },
-  "common": {
-    "save": "Kaydet"
-  },
   "voiceSettings.title": "Sesli asistan",
   "voiceSettings.selectVoice": "Ses seçimi",
   "voiceSettings.speed": "Konuşma hızı",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "Daha hızlı",
   "voiceSettings.upgradeRequired": "Yükseltme gerekli",
   "voiceSettings.upgradeMessage": "Sesli asistan yalnızca Elite ve Intelia planları için kullanılabilir. Bu özelliğe erişmek için planınızı yükseltin.",
-  "voiceSettings.currentPlan": "Mevcut planınız"
+  "voiceSettings.currentPlan": "Mevcut planınız",
+  "common.save": "Kaydet"
 }

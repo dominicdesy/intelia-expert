@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "Keamanan"
   },
-  "common": {
-    "save": "Simpan"
-  },
   "voiceSettings.title": "Asisten suara",
   "voiceSettings.selectVoice": "Pemilihan suara",
   "voiceSettings.speed": "Kecepatan bicara",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "Lebih cepat",
   "voiceSettings.upgradeRequired": "Upgrade diperlukan",
   "voiceSettings.upgradeMessage": "Asisten suara hanya tersedia untuk paket Elite dan Intelia. Tingkatkan paket Anda untuk mengakses fitur ini.",
-  "voiceSettings.currentPlan": "Paket Anda saat ini"
+  "voiceSettings.currentPlan": "Paket Anda saat ini",
+  "common.save": "Simpan"
 }

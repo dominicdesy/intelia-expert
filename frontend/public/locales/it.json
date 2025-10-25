@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "Sicurezza"
   },
-  "common": {
-    "save": "Salva"
-  },
   "voiceSettings.title": "Assistente vocale",
   "voiceSettings.selectVoice": "Selezione voce",
   "voiceSettings.speed": "Velocità del parlato",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "Più veloce",
   "voiceSettings.upgradeRequired": "Aggiornamento richiesto",
   "voiceSettings.upgradeMessage": "L'assistente vocale è disponibile solo per i piani Elite e Intelia. Aggiorna il tuo piano per accedere a questa funzione.",
-  "voiceSettings.currentPlan": "Il tuo piano attuale"
+  "voiceSettings.currentPlan": "Il tuo piano attuale",
+  "common.save": "Salva"
 }

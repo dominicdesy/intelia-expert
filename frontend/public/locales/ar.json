@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "الأمان"
   },
-  "common": {
-    "save": "حفظ"
-  },
   "voiceSettings.title": "مساعد صوتي",
   "voiceSettings.selectVoice": "اختيار الصوت",
   "voiceSettings.speed": "سرعة الكلام",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "أسرع",
   "voiceSettings.upgradeRequired": "الترقية مطلوبة",
   "voiceSettings.upgradeMessage": "المساعد الصوتي متاح فقط لخطط Elite و Intelia. قم بترقية خطتك للوصول إلى هذه الميزة.",
-  "voiceSettings.currentPlan": "خطتك الحالية"
+  "voiceSettings.currentPlan": "خطتك الحالية",
+  "common.save": "حفظ"
 }

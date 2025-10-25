@@ -1070,9 +1070,6 @@
   "profile": {
     "security": "Security"
   },
-  "common": {
-    "save": "Save"
-  },
   "voiceSettings.title": "Voice Assistant",
   "voiceSettings.selectVoice": "Voice Selection",
   "voiceSettings.speed": "Speech Speed",
@@ -1082,5 +1079,6 @@
   "voiceSettings.faster": "Faster",
   "voiceSettings.upgradeRequired": "Upgrade Required",
   "voiceSettings.upgradeMessage": "Voice assistant is only available for Elite and Intelia plans. Upgrade your plan to access this feature.",
-  "voiceSettings.currentPlan": "Your current plan"
+  "voiceSettings.currentPlan": "Your current plan",
+  "common.save": "Save"
 }
