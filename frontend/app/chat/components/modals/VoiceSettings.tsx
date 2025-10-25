@@ -46,13 +46,13 @@ export const VoiceSettings: React.FC = () => {
     setError('');
 
     try {
-      // Charger voix disponibles
-      const voicesResponse = await apiClient.getPublic('/voice-settings/voices');
+      // Charger voix disponibles (endpoint public)
+      const voicesResponse = await apiClient.get('/voice-settings/voices');
       if (voicesResponse.success && voicesResponse.data?.voices) {
         setVoices(voicesResponse.data.voices);
       }
 
-      // Charger préférences utilisateur
+      // Charger préférences utilisateur (endpoint authentifié)
       const settingsResponse = await apiClient.getSecure('/voice-settings');
       if (settingsResponse.success && settingsResponse.data) {
         const data: VoiceSettingsData = settingsResponse.data;
