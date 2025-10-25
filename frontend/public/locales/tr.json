@@ -909,15 +909,6 @@
   "profile.productionType.layer": "Yumurtacı (Layer)",
   "profile.productionType.both": "Her ikisi",
   "profile.productionType.why": "Bu bilgi, yanıtları üretim türünüze göre kişiselleştirmemize ve bilgi tabanımızdaki ilgili belgeleri filtrelememize yardımcı olur.",
-  "legal": {
-    "privacyPolicy": "Privacy Policy",
-    "privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
-    "readPrivacyPolicy": "Read Privacy Policy",
-    "termsOfService": "Terms of Service",
-    "termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
-    "readTermsOfService": "Read Terms of Service",
-    "lastUpdated": "Last updated"
-  },
   "chat.addImages": "Add images",
   "chat.removeImage": "Remove image",
   "chat.imagesCount": "{count} image(s)",
@@ -1057,19 +1048,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "success": {
-    "voiceSettingsSaved": "Ses ayarları başarıyla kaydedildi!"
-  },
-  "error": {
-    "loadVoiceSettings": "Ses ayarları yüklenirken hata oluştu",
-    "saveVoiceSettings": "Ses ayarları kaydedilirken hata oluştu"
-  },
-  "passkey": {
-    "addedOn": "Eklenme tarihi"
-  },
-  "profile": {
-    "security": "Güvenlik"
-  },
   "voiceSettings.title": "Sesli asistan",
   "voiceSettings.selectVoice": "Ses seçimi",
   "voiceSettings.speed": "Konuşma hızı",
@@ -1080,5 +1058,16 @@
   "voiceSettings.upgradeRequired": "Yükseltme gerekli",
   "voiceSettings.upgradeMessage": "Sesli asistan yalnızca Elite ve Intelia planları için kullanılabilir. Bu özelliğe erişmek için planınızı yükseltin.",
   "voiceSettings.currentPlan": "Mevcut planınız",
-  "common.save": "Kaydet"
+  "common.save": "Kaydet",
+  "legal.privacyPolicy": "Privacy Policy",
+  "legal.privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
+  "legal.readPrivacyPolicy": "Read Privacy Policy",
+  "legal.termsOfService": "Terms of Service",
+  "legal.termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
+  "legal.readTermsOfService": "Read Terms of Service",
+  "legal.lastUpdated": "Last updated",
+  "success.voiceSettingsSaved": "Ses ayarları başarıyla kaydedildi!",
+  "error.loadVoiceSettings": "Ses ayarları yüklenirken hata oluştu",
+  "error.saveVoiceSettings": "Ses ayarları kaydedilirken hata oluştu",
+  "passkey.addedOn": "Eklenme tarihi"
 }

@@ -909,15 +909,6 @@
   "profile.productionType.layer": "Galinha Poedeira (Layer)",
   "profile.productionType.both": "Ambos",
   "profile.productionType.why": "Esta informação nos permite personalizar as respostas de acordo com seu tipo de produção e filtrar documentos relevantes em nossa base de conhecimento.",
-  "legal": {
-    "privacyPolicy": "Privacy Policy",
-    "privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
-    "readPrivacyPolicy": "Read Privacy Policy",
-    "termsOfService": "Terms of Service",
-    "termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
-    "readTermsOfService": "Read Terms of Service",
-    "lastUpdated": "Last updated"
-  },
   "chat.addImages": "Add images",
   "chat.removeImage": "Remove image",
   "chat.imagesCount": "{count} image(s)",
@@ -1057,19 +1048,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "success": {
-    "voiceSettingsSaved": "Configurações de voz salvas com sucesso!"
-  },
-  "error": {
-    "loadVoiceSettings": "Erro ao carregar configurações de voz",
-    "saveVoiceSettings": "Erro ao salvar configurações de voz"
-  },
-  "passkey": {
-    "addedOn": "Adicionado em"
-  },
-  "profile": {
-    "security": "Segurança"
-  },
   "voiceSettings.title": "Assistente de voz",
   "voiceSettings.selectVoice": "Seleção de voz",
   "voiceSettings.speed": "Velocidade da fala",
@@ -1080,5 +1058,16 @@
   "voiceSettings.upgradeRequired": "Atualização necessária",
   "voiceSettings.upgradeMessage": "O assistente de voz está disponível apenas para planos Elite e Intelia. Atualize seu plano para acessar este recurso.",
   "voiceSettings.currentPlan": "Seu plano atual",
-  "common.save": "Salvar"
+  "common.save": "Salvar",
+  "legal.privacyPolicy": "Privacy Policy",
+  "legal.privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
+  "legal.readPrivacyPolicy": "Read Privacy Policy",
+  "legal.termsOfService": "Terms of Service",
+  "legal.termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
+  "legal.readTermsOfService": "Read Terms of Service",
+  "legal.lastUpdated": "Last updated",
+  "success.voiceSettingsSaved": "Configurações de voz salvas com sucesso!",
+  "error.loadVoiceSettings": "Erro ao carregar configurações de voz",
+  "error.saveVoiceSettings": "Erro ao salvar configurações de voz",
+  "passkey.addedOn": "Adicionado em"
 }

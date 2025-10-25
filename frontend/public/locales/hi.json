@@ -909,15 +909,6 @@
   "profile.productionType.layer": "लेयर (अंडे देने वाली मुर्गी)",
   "profile.productionType.both": "दोनों",
   "profile.productionType.why": "यह जानकारी हमें आपके उत्पादन प्रकार के अनुसार प्रतिक्रियाओं को अनुकूलित करने और हमारे ज्ञान आधार में प्रासंगिक दस्तावेज़ों को फ़िल्टर करने में मदद करती है।",
-  "legal": {
-    "privacyPolicy": "Privacy Policy",
-    "privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
-    "readPrivacyPolicy": "Read Privacy Policy",
-    "termsOfService": "Terms of Service",
-    "termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
-    "readTermsOfService": "Read Terms of Service",
-    "lastUpdated": "Last updated"
-  },
   "chat.addImages": "Add images",
   "chat.removeImage": "Remove image",
   "chat.imagesCount": "{count} image(s)",
@@ -1057,19 +1048,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "success": {
-    "voiceSettingsSaved": "आवाज सेटिंग्स सफलतापूर्वक सहेजी गईं!"
-  },
-  "error": {
-    "loadVoiceSettings": "आवाज सेटिंग्स लोड करने में त्रुटि",
-    "saveVoiceSettings": "आवाज सेटिंग्स सहेजने में त्रुटि"
-  },
-  "passkey": {
-    "addedOn": "जोड़ा गया"
-  },
-  "profile": {
-    "security": "सुरक्षा"
-  },
   "voiceSettings.title": "आवाज सहायक",
   "voiceSettings.selectVoice": "आवाज चयन",
   "voiceSettings.speed": "बोलने की गति",
@@ -1080,5 +1058,16 @@
   "voiceSettings.upgradeRequired": "अपग्रेड आवश्यक",
   "voiceSettings.upgradeMessage": "आवाज सहायक केवल Elite और Intelia योजनाओं के लिए उपलब्ध है। इस सुविधा तक पहुंचने के लिए अपनी योजना अपग्रेड करें।",
   "voiceSettings.currentPlan": "आपकी वर्तमान योजना",
-  "common.save": "सहेजें"
+  "common.save": "सहेजें",
+  "legal.privacyPolicy": "Privacy Policy",
+  "legal.privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
+  "legal.readPrivacyPolicy": "Read Privacy Policy",
+  "legal.termsOfService": "Terms of Service",
+  "legal.termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
+  "legal.readTermsOfService": "Read Terms of Service",
+  "legal.lastUpdated": "Last updated",
+  "success.voiceSettingsSaved": "आवाज सेटिंग्स सफलतापूर्वक सहेजी गईं!",
+  "error.loadVoiceSettings": "आवाज सेटिंग्स लोड करने में त्रुटि",
+  "error.saveVoiceSettings": "आवाज सेटिंग्स सहेजने में त्रुटि",
+  "passkey.addedOn": "जोड़ा गया"
 }

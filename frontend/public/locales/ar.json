@@ -909,15 +909,6 @@
   "profile.productionType.layer": "دجاج البيض (Layer)",
   "profile.productionType.both": "كلاهما",
   "profile.productionType.why": "تساعدنا هذه المعلومات على تخصيص الإجابات وفقًا لنوع إنتاجك وتصفية المستندات ذات الصلة في قاعدة معارفنا.",
-  "legal": {
-    "privacyPolicy": "Privacy Policy",
-    "privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
-    "readPrivacyPolicy": "Read Privacy Policy",
-    "termsOfService": "Terms of Service",
-    "termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
-    "readTermsOfService": "Read Terms of Service",
-    "lastUpdated": "Last updated"
-  },
   "chat.addImages": "Add images",
   "chat.removeImage": "Remove image",
   "chat.imagesCount": "{count} image(s)",
@@ -1057,19 +1048,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "success": {
-    "voiceSettingsSaved": "تم حفظ إعدادات الصوت بنجاح!"
-  },
-  "error": {
-    "loadVoiceSettings": "خطأ في تحميل إعدادات الصوت",
-    "saveVoiceSettings": "خطأ في حفظ إعدادات الصوت"
-  },
-  "passkey": {
-    "addedOn": "أضيف في"
-  },
-  "profile": {
-    "security": "الأمان"
-  },
   "voiceSettings.title": "مساعد صوتي",
   "voiceSettings.selectVoice": "اختيار الصوت",
   "voiceSettings.speed": "سرعة الكلام",
@@ -1080,5 +1058,16 @@
   "voiceSettings.upgradeRequired": "الترقية مطلوبة",
   "voiceSettings.upgradeMessage": "المساعد الصوتي متاح فقط لخطط Elite و Intelia. قم بترقية خطتك للوصول إلى هذه الميزة.",
   "voiceSettings.currentPlan": "خطتك الحالية",
-  "common.save": "حفظ"
+  "common.save": "حفظ",
+  "legal.privacyPolicy": "Privacy Policy",
+  "legal.privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
+  "legal.readPrivacyPolicy": "Read Privacy Policy",
+  "legal.termsOfService": "Terms of Service",
+  "legal.termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
+  "legal.readTermsOfService": "Read Terms of Service",
+  "legal.lastUpdated": "Last updated",
+  "success.voiceSettingsSaved": "تم حفظ إعدادات الصوت بنجاح!",
+  "error.loadVoiceSettings": "خطأ في تحميل إعدادات الصوت",
+  "error.saveVoiceSettings": "خطأ في حفظ إعدادات الصوت",
+  "passkey.addedOn": "أضيف في"
 }

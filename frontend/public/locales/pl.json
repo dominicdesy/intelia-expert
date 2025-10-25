@@ -909,15 +909,6 @@
   "profile.productionType.layer": "Nioski (Kurczęta jajeczne)",
   "profile.productionType.both": "Oba",
   "profile.productionType.why": "Ta informacja pozwala nam personalizować odpowiedzi według typu produkcji i filtrować odpowiednie dokumenty w naszej bazie wiedzy.",
-  "legal": {
-    "privacyPolicy": "Privacy Policy",
-    "privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
-    "readPrivacyPolicy": "Read Privacy Policy",
-    "termsOfService": "Terms of Service",
-    "termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
-    "readTermsOfService": "Read Terms of Service",
-    "lastUpdated": "Last updated"
-  },
   "chat.addImages": "Add images",
   "chat.removeImage": "Remove image",
   "chat.imagesCount": "{count} image(s)",
@@ -1057,19 +1048,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "success": {
-    "voiceSettingsSaved": "Ustawienia głosu zapisane pomyślnie!"
-  },
-  "error": {
-    "loadVoiceSettings": "Błąd ładowania ustawień głosu",
-    "saveVoiceSettings": "Błąd zapisu ustawień głosu"
-  },
-  "passkey": {
-    "addedOn": "Dodano"
-  },
-  "profile": {
-    "security": "Bezpieczeństwo"
-  },
   "voiceSettings.title": "Asystent głosowy",
   "voiceSettings.selectVoice": "Wybór głosu",
   "voiceSettings.speed": "Prędkość mowy",
@@ -1080,5 +1058,16 @@
   "voiceSettings.upgradeRequired": "Wymagana aktualizacja",
   "voiceSettings.upgradeMessage": "Asystent głosowy jest dostępny tylko dla planów Elite i Intelia. Zaktualizuj swój plan, aby uzyskać dostęp do tej funkcji.",
   "voiceSettings.currentPlan": "Twój obecny plan",
-  "common.save": "Zapisz"
+  "common.save": "Zapisz",
+  "legal.privacyPolicy": "Privacy Policy",
+  "legal.privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
+  "legal.readPrivacyPolicy": "Read Privacy Policy",
+  "legal.termsOfService": "Terms of Service",
+  "legal.termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
+  "legal.readTermsOfService": "Read Terms of Service",
+  "legal.lastUpdated": "Last updated",
+  "success.voiceSettingsSaved": "Ustawienia głosu zapisane pomyślnie!",
+  "error.loadVoiceSettings": "Błąd ładowania ustawień głosu",
+  "error.saveVoiceSettings": "Błąd zapisu ustawień głosu",
+  "passkey.addedOn": "Dodano"
 }

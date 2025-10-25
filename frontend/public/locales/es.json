@@ -909,15 +909,6 @@
   "profile.category.equipmentTechnology": "Equipos y Tecnología",
   "profile.category.other": "Otro",
   "profile.category.otherPlaceholder": "Por favor especifique su actividad...",
-  "legal": {
-    "privacyPolicy": "Privacy Policy",
-    "privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
-    "readPrivacyPolicy": "Read Privacy Policy",
-    "termsOfService": "Terms of Service",
-    "termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
-    "readTermsOfService": "Read Terms of Service",
-    "lastUpdated": "Last updated"
-  },
   "chat.addImages": "Add images",
   "chat.removeImage": "Remove image",
   "chat.imagesCount": "{count} image(s)",
@@ -1057,19 +1048,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "success": {
-    "voiceSettingsSaved": "¡Configuración de voz guardada con éxito!"
-  },
-  "error": {
-    "loadVoiceSettings": "Error al cargar la configuración de voz",
-    "saveVoiceSettings": "Error al guardar la configuración de voz"
-  },
-  "passkey": {
-    "addedOn": "Agregado el"
-  },
-  "profile": {
-    "security": "Seguridad"
-  },
   "voiceSettings.title": "Asistente de voz",
   "voiceSettings.selectVoice": "Selección de voz",
   "voiceSettings.speed": "Velocidad del habla",
@@ -1080,5 +1058,16 @@
   "voiceSettings.upgradeRequired": "Actualización requerida",
   "voiceSettings.upgradeMessage": "El asistente de voz solo está disponible para los planes Elite e Intelia. Actualice su plan para acceder a esta función.",
   "voiceSettings.currentPlan": "Su plan actual",
-  "common.save": "Guardar"
+  "common.save": "Guardar",
+  "legal.privacyPolicy": "Privacy Policy",
+  "legal.privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
+  "legal.readPrivacyPolicy": "Read Privacy Policy",
+  "legal.termsOfService": "Terms of Service",
+  "legal.termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
+  "legal.readTermsOfService": "Read Terms of Service",
+  "legal.lastUpdated": "Last updated",
+  "success.voiceSettingsSaved": "¡Configuración de voz guardada con éxito!",
+  "error.loadVoiceSettings": "Error al cargar la configuración de voz",
+  "error.saveVoiceSettings": "Error al guardar la configuración de voz",
+  "passkey.addedOn": "Agregado el"
 }

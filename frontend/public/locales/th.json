@@ -909,15 +909,6 @@
   "profile.productionType.layer": "ไก่ไข่ (Layer)",
   "profile.productionType.both": "ทั้งสองอย่าง",
   "profile.productionType.why": "ข้อมูลนี้ช่วยให้เราปรับแต่งคำตอบตามประเภทการผลิตของคุณและกรองเอกสารที่เกี่ยวข้องในฐานความรู้ของเรา",
-  "legal": {
-    "privacyPolicy": "Privacy Policy",
-    "privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
-    "readPrivacyPolicy": "Read Privacy Policy",
-    "termsOfService": "Terms of Service",
-    "termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
-    "readTermsOfService": "Read Terms of Service",
-    "lastUpdated": "Last updated"
-  },
   "chat.addImages": "Add images",
   "chat.removeImage": "Remove image",
   "chat.imagesCount": "{count} image(s)",
@@ -1057,19 +1048,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "success": {
-    "voiceSettingsSaved": "บันทึกการตั้งค่าเสียงสำเร็จ!"
-  },
-  "error": {
-    "loadVoiceSettings": "เกิดข้อผิดพลาดในการโหลดการตั้งค่าเสียง",
-    "saveVoiceSettings": "เกิดข้อผิดพลาดในการบันทึกการตั้งค่าเสียง"
-  },
-  "passkey": {
-    "addedOn": "เพิ่มเมื่อ"
-  },
-  "profile": {
-    "security": "ความปลอดภัย"
-  },
   "voiceSettings.title": "ผู้ช่วยเสียง",
   "voiceSettings.selectVoice": "การเลือกเสียง",
   "voiceSettings.speed": "ความเร็วในการพูด",
@@ -1080,5 +1058,16 @@
   "voiceSettings.upgradeRequired": "ต้องอัปเกรด",
   "voiceSettings.upgradeMessage": "ผู้ช่วยเสียงใช้ได้เฉพาะแผน Elite และ Intelia เท่านั้น อัปเกรดแผนของคุณเพื่อเข้าถึงฟีเจอร์นี้",
   "voiceSettings.currentPlan": "แผนปัจจุบันของคุณ",
-  "common.save": "บันทึก"
+  "common.save": "บันทึก",
+  "legal.privacyPolicy": "Privacy Policy",
+  "legal.privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
+  "legal.readPrivacyPolicy": "Read Privacy Policy",
+  "legal.termsOfService": "Terms of Service",
+  "legal.termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
+  "legal.readTermsOfService": "Read Terms of Service",
+  "legal.lastUpdated": "Last updated",
+  "success.voiceSettingsSaved": "บันทึกการตั้งค่าเสียงสำเร็จ!",
+  "error.loadVoiceSettings": "เกิดข้อผิดพลาดในการโหลดการตั้งค่าเสียง",
+  "error.saveVoiceSettings": "เกิดข้อผิดพลาดในการบันทึกการตั้งค่าเสียง",
+  "passkey.addedOn": "เพิ่มเมื่อ"
 }

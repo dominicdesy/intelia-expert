@@ -909,15 +909,6 @@
   "profile.productionType.layer": "レイヤー（採卵鶏）",
   "profile.productionType.both": "両方",
   "profile.productionType.why": "この情報により、生産タイプに応じて回答をカスタマイズし、知識ベースから関連ドキュメントをフィルタリングできます。",
-  "legal": {
-    "privacyPolicy": "Privacy Policy",
-    "privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
-    "readPrivacyPolicy": "Read Privacy Policy",
-    "termsOfService": "Terms of Service",
-    "termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
-    "readTermsOfService": "Read Terms of Service",
-    "lastUpdated": "Last updated"
-  },
   "chat.addImages": "Add images",
   "chat.removeImage": "Remove image",
   "chat.imagesCount": "{count} image(s)",
@@ -1057,19 +1048,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "success": {
-    "voiceSettingsSaved": "音声設定が正常に保存されました！"
-  },
-  "error": {
-    "loadVoiceSettings": "音声設定の読み込みエラー",
-    "saveVoiceSettings": "音声設定の保存エラー"
-  },
-  "passkey": {
-    "addedOn": "追加日"
-  },
-  "profile": {
-    "security": "セキュリティ"
-  },
   "voiceSettings.title": "音声アシスタント",
   "voiceSettings.selectVoice": "音声の選択",
   "voiceSettings.speed": "話す速度",
@@ -1080,5 +1058,16 @@
   "voiceSettings.upgradeRequired": "アップグレードが必要です",
   "voiceSettings.upgradeMessage": "音声アシスタントはEliteとInteliaプランでのみ利用可能です。この機能にアクセスするにはプランをアップグレードしてください。",
   "voiceSettings.currentPlan": "現在のプラン",
-  "common.save": "保存"
+  "common.save": "保存",
+  "legal.privacyPolicy": "Privacy Policy",
+  "legal.privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
+  "legal.readPrivacyPolicy": "Read Privacy Policy",
+  "legal.termsOfService": "Terms of Service",
+  "legal.termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
+  "legal.readTermsOfService": "Read Terms of Service",
+  "legal.lastUpdated": "Last updated",
+  "success.voiceSettingsSaved": "音声設定が正常に保存されました！",
+  "error.loadVoiceSettings": "音声設定の読み込みエラー",
+  "error.saveVoiceSettings": "音声設定の保存エラー",
+  "passkey.addedOn": "追加日"
 }

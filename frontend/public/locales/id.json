@@ -909,15 +909,6 @@
   "profile.productionType.layer": "Layer (Ayam Petelur)",
   "profile.productionType.both": "Keduanya",
   "profile.productionType.why": "Informasi ini membantu kami mempersonalisasi jawaban sesuai jenis produksi Anda dan menyaring dokumen yang relevan dalam basis pengetahuan kami.",
-  "legal": {
-    "privacyPolicy": "Privacy Policy",
-    "privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
-    "readPrivacyPolicy": "Read Privacy Policy",
-    "termsOfService": "Terms of Service",
-    "termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
-    "readTermsOfService": "Read Terms of Service",
-    "lastUpdated": "Last updated"
-  },
   "chat.addImages": "Add images",
   "chat.removeImage": "Remove image",
   "chat.imagesCount": "{count} image(s)",
@@ -1057,19 +1048,6 @@
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
   "components.cachedData": "Cached data",
-  "success": {
-    "voiceSettingsSaved": "Pengaturan suara berhasil disimpan!"
-  },
-  "error": {
-    "loadVoiceSettings": "Kesalahan memuat pengaturan suara",
-    "saveVoiceSettings": "Kesalahan menyimpan pengaturan suara"
-  },
-  "passkey": {
-    "addedOn": "Ditambahkan pada"
-  },
-  "profile": {
-    "security": "Keamanan"
-  },
   "voiceSettings.title": "Asisten suara",
   "voiceSettings.selectVoice": "Pemilihan suara",
   "voiceSettings.speed": "Kecepatan bicara",
@@ -1080,5 +1058,16 @@
   "voiceSettings.upgradeRequired": "Upgrade diperlukan",
   "voiceSettings.upgradeMessage": "Asisten suara hanya tersedia untuk paket Elite dan Intelia. Tingkatkan paket Anda untuk mengakses fitur ini.",
   "voiceSettings.currentPlan": "Paket Anda saat ini",
-  "common.save": "Simpan"
+  "common.save": "Simpan",
+  "legal.privacyPolicy": "Privacy Policy",
+  "legal.privacyPolicyDesc": "How we collect, use, and protect your personal information. Includes data retention periods and your GDPR rights.",
+  "legal.readPrivacyPolicy": "Read Privacy Policy",
+  "legal.termsOfService": "Terms of Service",
+  "legal.termsOfServiceDesc": "Our service agreement including acceptable use, fees, your data rights, and what happens when you delete your account.",
+  "legal.readTermsOfService": "Read Terms of Service",
+  "legal.lastUpdated": "Last updated",
+  "success.voiceSettingsSaved": "Pengaturan suara berhasil disimpan!",
+  "error.loadVoiceSettings": "Kesalahan memuat pengaturan suara",
+  "error.saveVoiceSettings": "Kesalahan menyimpan pengaturan suara",
+  "passkey.addedOn": "Ditambahkan pada"
 }

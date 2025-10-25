@@ -914,15 +914,6 @@
   "profile.category.equipmentTechnology": "Équipements & Technologie",
   "profile.category.other": "Autre",
   "profile.category.otherPlaceholder": "Précisez votre activité...",
-  "legal": {
-    "privacyPolicy": "Politique de confidentialité",
-    "privacyPolicyDesc": "Comment nous collectons, utilisons et protégeons vos informations personnelles. Inclut les durées de conservation et vos droits RGPD.",
-    "readPrivacyPolicy": "Lire la politique de confidentialité",
-    "termsOfService": "Conditions d'utilisation",
-    "termsOfServiceDesc": "Notre accord de service incluant les usages acceptables, les frais, vos droits sur les données et ce qui se passe lorsque vous supprimez votre compte.",
-    "readTermsOfService": "Lire les conditions d'utilisation",
-    "lastUpdated": "Dernière mise à jour"
-  },
   "shared.notFound": "Cette conversation partagée n'existe pas ou a été supprimée",
   "shared.expired": "Ce lien de partage a expiré",
   "shared.loadError": "Impossible de charger la conversation",
@@ -1057,19 +1048,6 @@
   "components.toggleBilling": "Basculer le cycle de facturation",
   "components.subscriptionPlans": "Plans d'abonnement",
   "components.cachedData": "Données en cache",
-  "success": {
-    "voiceSettingsSaved": "Préférences vocales sauvegardées avec succès !"
-  },
-  "error": {
-    "loadVoiceSettings": "Erreur lors du chargement des préférences vocales",
-    "saveVoiceSettings": "Erreur lors de la sauvegarde des préférences vocales"
-  },
-  "passkey": {
-    "addedOn": "Ajouté le"
-  },
-  "profile": {
-    "security": "Sécurité"
-  },
   "voiceSettings.title": "Assistant vocal",
   "voiceSettings.selectVoice": "Sélection de la voix",
   "voiceSettings.speed": "Vitesse de parole",
@@ -1080,5 +1058,16 @@
   "voiceSettings.upgradeRequired": "Mise à niveau requise",
   "voiceSettings.upgradeMessage": "L'assistant vocal est disponible uniquement pour les plans Elite et Intelia. Mettez à niveau votre abonnement pour accéder à cette fonctionnalité.",
   "voiceSettings.currentPlan": "Votre plan actuel",
-  "common.save": "Enregistrer"
+  "common.save": "Enregistrer",
+  "legal.privacyPolicy": "Politique de confidentialité",
+  "legal.privacyPolicyDesc": "Comment nous collectons, utilisons et protégeons vos informations personnelles. Inclut les durées de conservation et vos droits RGPD.",
+  "legal.readPrivacyPolicy": "Lire la politique de confidentialité",
+  "legal.termsOfService": "Conditions d'utilisation",
+  "legal.termsOfServiceDesc": "Notre accord de service incluant les usages acceptables, les frais, vos droits sur les données et ce qui se passe lorsque vous supprimez votre compte.",
+  "legal.readTermsOfService": "Lire les conditions d'utilisation",
+  "legal.lastUpdated": "Dernière mise à jour",
+  "success.voiceSettingsSaved": "Préférences vocales sauvegardées avec succès !",
+  "error.loadVoiceSettings": "Erreur lors du chargement des préférences vocales",
+  "error.saveVoiceSettings": "Erreur lors de la sauvegarde des préférences vocales",
+  "passkey.addedOn": "Ajouté le"
 }
