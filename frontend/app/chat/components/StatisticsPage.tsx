@@ -254,7 +254,7 @@ export const StatisticsPage: React.FC = () => {
     "day" | "week" | "month" | "year"
   >("month");
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "questions" | "invitations" | "quality" | "satisfaction"
+    "dashboard" | "questions" | "invitations" | "quality" | "satisfaction" | "metrics"
   >("dashboard");
   const [questionFilters, setQuestionFilters] = useState({
     search: "",
@@ -371,7 +371,7 @@ export const StatisticsPage: React.FC = () => {
 
   // Reset des références quand on change d'onglet
   const handleTabChange = (
-    newTab: "dashboard" | "questions" | "invitations" | "quality" | "satisfaction",
+    newTab: "dashboard" | "questions" | "invitations" | "quality" | "satisfaction" | "metrics",
   ) => {
     if (newTab !== activeTab) {
       secureLog.log(`[StatisticsPage] Changement onglet: ${activeTab} -> ${newTab} `);
@@ -961,6 +961,16 @@ export const StatisticsPage: React.FC = () => {
                 >
                   Satisfaction
                 </button>
+                <button
+                  onClick={() => handleTabChange("metrics")}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    activeTab === "metrics"
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Métriques
+                </button>
               </div>
             </div>
 
@@ -1126,6 +1136,28 @@ export const StatisticsPage: React.FC = () => {
           </>
         ) : activeTab === "satisfaction" ? (
           <SatisfactionStatsTab timeRange={selectedTimeRange} />
+        ) : activeTab === "metrics" ? (
+          <div className="bg-white border border-gray-200 p-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Métriques Système</h2>
+              <p className="text-sm text-gray-600">
+                Dashboards Grafana pour le monitoring en temps réel
+              </p>
+            </div>
+            <div className="border border-gray-300 rounded-lg overflow-hidden">
+              <iframe
+                src={process.env.NEXT_PUBLIC_GRAFANA_URL || "https://your-grafana-domain.com/d/dashboard-id?orgId=1&kiosk=tv&theme=light"}
+                width="100%"
+                height="800"
+                frameBorder="0"
+                title="Grafana Metrics Dashboard"
+                className="w-full"
+              />
+            </div>
+            <div className="mt-4 text-xs text-gray-500">
+              <p>💡 Configurez NEXT_PUBLIC_GRAFANA_URL dans votre fichier .env.local</p>
+            </div>
+          </div>
         ) : null}
 
         {/* Modal de détail de question */}
