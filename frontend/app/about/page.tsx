@@ -279,17 +279,16 @@ export default function AboutPage() {
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-900 mb-1">
-                    Privacy Policy
+                    {t("legal.privacyPolicy")}
                   </h3>
                   <p className="text-sm text-gray-600 mb-2">
-                    How we collect, use, and protect your personal information.
-                    Includes data retention periods and your GDPR rights.
+                    {t("legal.privacyPolicyDesc")}
                   </p>
                   <Link
                     href="/privacy"
                     className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors inline-flex items-center"
                   >
-                    Read Privacy Policy
+                    {t("legal.readPrivacyPolicy")}
                     <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                     </svg>
@@ -298,7 +297,7 @@ export default function AboutPage() {
                     <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                     </svg>
-                    Last updated: August 14, 2025
+                    {t("legal.lastUpdated")}: August 14, 2025
                   </div>
                 </div>
               </div>
@@ -322,17 +321,16 @@ export default function AboutPage() {
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-900 mb-1">
-                    Terms of Service
+                    {t("legal.termsOfService")}
                   </h3>
                   <p className="text-sm text-gray-600 mb-2">
-                    Our service agreement including acceptable use, fees,
-                    your data rights, and what happens when you delete your account.
+                    {t("legal.termsOfServiceDesc")}
                   </p>
                   <Link
                     href="/terms"
                     className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors inline-flex items-center"
                   >
-                    Read Terms of Service
+                    {t("legal.readTermsOfService")}
                     <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                     </svg>
@@ -341,7 +339,7 @@ export default function AboutPage() {
                     <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                     </svg>
-                    Last updated: August 14, 2025
+                    {t("legal.lastUpdated")}: August 14, 2025
                   </div>
                 </div>
               </div>

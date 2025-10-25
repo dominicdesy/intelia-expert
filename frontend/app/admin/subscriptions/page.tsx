@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { buildApiUrl } from "@/lib/api/config";
+import { useTranslation } from "@/lib/languages/i18n";
 import SubscriptionPlansManager from "./components/SubscriptionPlansManager";
 import CountryPricingManager from "./components/CountryPricingManager";
 import AdminHistoryLog from "./components/AdminHistoryLog";
@@ -23,6 +24,7 @@ type TabType = "overview" | "plans" | "pricing" | "history";
 
 export default function SubscriptionsAdminPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [stats, setStats] = useState<SubscriptionStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
@@ -80,7 +82,7 @@ export default function SubscriptionsAdminPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Accès refusé");
+        throw new Error(t("admin.accessDenied"));
       }
 
       const data = await response.json();
@@ -100,17 +102,17 @@ export default function SubscriptionsAdminPage() {
       setStats(adaptedStats);
     } catch (error) {
       console.error("[SubscriptionsAdmin] Erreur fetch stats:", error);
-      toast.error("Erreur lors du chargement des statistiques");
+      toast.error(t("admin.subscriptions.loadError"));
     } finally {
       setIsLoading(false);
     }
   };
 
   const tabs = [
-    { id: "overview", label: "Vue d'ensemble", icon: "📊" },
-    { id: "plans", label: "Gestion des plans", icon: "📋" },
-    { id: "pricing", label: "Prix par pays", icon: "🌍" },
-    { id: "history", label: "Historique", icon: "📜" },
+    { id: "overview", label: t("admin.subscriptions.tabs.overview"), icon: "📊" },
+    { id: "plans", label: t("admin.subscriptions.tabs.plans"), icon: "📋" },
+    { id: "pricing", label: t("admin.subscriptions.tabs.pricing"), icon: "🌍" },
+    { id: "history", label: t("admin.subscriptions.tabs.history"), icon: "📜" },
   ];
 
   if (isLoading) {
@@ -118,7 +120,7 @@ export default function SubscriptionsAdminPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-600">Chargement des statistiques...</p>
+          <p className="mt-4 text-gray-600">{t("admin.subscriptions.loading")}</p>
         </div>
       </div>
     );
@@ -132,17 +134,17 @@ export default function SubscriptionsAdminPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                Gestion des Abonnements
+                {t("admin.subscriptions.title")}
               </h1>
               <p className="mt-2 text-gray-600">
-                Administration complète des plans, prix et quotas
+                {t("admin.subscriptions.subtitle")}
               </p>
             </div>
             <button
               onClick={() => router.push("/chat")}
               className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             >
-              ← Retour
+              {t("admin.subscriptions.back")}
             </button>
           </div>
         </div>
@@ -176,7 +178,7 @@ export default function SubscriptionsAdminPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">
-                      Total Abonnements
+                      {t("admin.subscriptions.totalSubscriptions")}
                     </p>
                     <p className="mt-2 text-3xl font-bold text-gray-900">
                       {stats?.total_subscriptions || 0}
@@ -204,7 +206,7 @@ export default function SubscriptionsAdminPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">
-                      Abonnements Actifs
+                      {t("admin.subscriptions.activeSubscriptions")}
                     </p>
                     <p className="mt-2 text-3xl font-bold text-green-600">
                       {stats?.active_subscriptions || 0}
@@ -232,7 +234,7 @@ export default function SubscriptionsAdminPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">
-                      Revenu Mensuel
+                      {t("admin.subscriptions.monthlyRevenue")}
                     </p>
                     <p className="mt-2 text-3xl font-bold text-purple-600">
                       ${stats?.total_revenue_monthly?.toFixed(2) || "0.00"}
@@ -261,7 +263,7 @@ export default function SubscriptionsAdminPage() {
             <div className="bg-white rounded-lg shadow overflow-hidden mb-8">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  Répartition par Plan
+                  {t("admin.subscriptions.planBreakdown")}
                 </h2>
               </div>
               <div className="overflow-x-auto">
@@ -272,13 +274,13 @@ export default function SubscriptionsAdminPage() {
                         Plan
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Abonnés
+                        {t("admin.subscriptions.subscribers")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Revenu Mensuel
+                        {t("admin.subscriptions.revenue")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        %
+                        {t("admin.subscriptions.percentage")}
                       </th>
                     </tr>
                   </thead>
@@ -337,7 +339,7 @@ export default function SubscriptionsAdminPage() {
             {/* Quick Actions */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Actions Rapides
+                {t("admin.subscriptions.quickActions")}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <a
@@ -347,7 +349,7 @@ export default function SubscriptionsAdminPage() {
                   className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                 >
                   <span className="mr-2">🔗</span>
-                  Ouvrir Stripe Dashboard
+                  {t("admin.subscriptions.openStripeDashboard")}
                 </a>
                 <button
                   onClick={() => {
@@ -356,14 +358,14 @@ export default function SubscriptionsAdminPage() {
                   className="flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
                   <span className="mr-2">🔄</span>
-                  Actualiser les données
+                  {t("admin.subscriptions.refreshData")}
                 </button>
                 <button
-                  onClick={() => toast("Export à venir...")}
+                  onClick={() => toast(t("admin.subscriptions.exportComing"))}
                   className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                 >
                   <span className="mr-2">📥</span>
-                  Exporter les données
+                  {t("admin.subscriptions.exportData")}
                 </button>
               </div>
             </div>

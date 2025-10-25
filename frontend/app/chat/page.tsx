@@ -172,7 +172,7 @@ const ChatInput = React.memo(
                 <button
                   onClick={() => onImageRemove(index)}
                   className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 active:scale-95"
-                  title="Retirer l'image"
+                  title={t("chat.removeImage")}
                 >
                   <XMarkIcon className="w-4 h-4" />
                 </button>
@@ -192,8 +192,8 @@ const ChatInput = React.memo(
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoadingChat}
               className={`h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 flex-shrink-0 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
-              title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
-              aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+              title={selectedImages.length > 0 ? t("chat.imagesCount", { count: selectedImages.length }) : t("chat.addImages")}
+              aria-label={selectedImages.length > 0 ? t("chat.imagesCount", { count: selectedImages.length }) : t("chat.addImages")}
               style={{
                 minWidth: "48px",
                 width: "48px",
@@ -254,8 +254,8 @@ const ChatInput = React.memo(
                 ? "text-red-600 hover:text-red-700 hover:bg-red-50"
                 : "text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:text-gray-300"
             }`}
-            title={isLoadingChat ? t("chat.stop") || "Arrêter" : t("chat.send")}
-            aria-label={isLoadingChat ? t("chat.stop") || "Arrêter" : t("chat.send")}
+            title={isLoadingChat ? t("chat.stop") : t("chat.send")}
+            aria-label={isLoadingChat ? t("chat.stop") : t("chat.send")}
             style={{
               minWidth: "48px",
               width: "48px",
@@ -272,8 +272,8 @@ const ChatInput = React.memo(
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoadingChat}
                 className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
-                title={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
-                aria-label={selectedImages.length > 0 ? `${selectedImages.length} image(s)` : "Ajouter des images"}
+                title={selectedImages.length > 0 ? t("chat.imagesCount", { count: selectedImages.length }) : t("chat.addImages")}
+                aria-label={selectedImages.length > 0 ? t("chat.imagesCount", { count: selectedImages.length }) : t("chat.addImages")}
                 style={{
                   minWidth: "48px",
                   width: "48px",
@@ -373,7 +373,7 @@ const MessageList = React.memo(
                     message.imageUrls.length === 1 ? (
                       <img
                         src={message.imageUrls[0]}
-                        alt="Image envoyée"
+                        alt={t("chat.imageSent")}
                         className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
                       />
                     ) : (
@@ -391,7 +391,7 @@ const MessageList = React.memo(
                   ) : message.imageUrl ? (
                     <img
                       src={message.imageUrl}
-                      alt="Image envoyée"
+                      alt={t("chat.imageSent")}
                       className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
                     />
                   ) : null}
@@ -1853,11 +1853,12 @@ function ChatInterface() {
 
 // Composant de chargement
 function ChatLoading() {
+  const { t } = useTranslation();
   return (
     <div className="h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Chargement du chat...</p>
+        <p className="text-gray-600">{t("chat.loadingChat")}</p>
       </div>
     </div>
   );
