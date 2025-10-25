@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "تم حفظ إعدادات الصوت بنجاح!",
   "error.loadVoiceSettings": "خطأ في تحميل إعدادات الصوت",
   "error.saveVoiceSettings": "خطأ في حفظ إعدادات الصوت",
-  "passkey.addedOn": "أضيف في"
+  "passkey.addedOn": "أضيف في",
+  "voiceSettings.fast": "سريع",
+  "voiceSettings.veryFast": "سريع جداً"
 }

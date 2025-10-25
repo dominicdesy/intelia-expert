@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "บันทึกการตั้งค่าเสียงสำเร็จ!",
   "error.loadVoiceSettings": "เกิดข้อผิดพลาดในการโหลดการตั้งค่าเสียง",
   "error.saveVoiceSettings": "เกิดข้อผิดพลาดในการบันทึกการตั้งค่าเสียง",
-  "passkey.addedOn": "เพิ่มเมื่อ"
+  "passkey.addedOn": "เพิ่มเมื่อ",
+  "voiceSettings.fast": "เร็ว",
+  "voiceSettings.veryFast": "เร็วมาก"
 }

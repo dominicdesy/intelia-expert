@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "音声設定が正常に保存されました！",
   "error.loadVoiceSettings": "音声設定の読み込みエラー",
   "error.saveVoiceSettings": "音声設定の保存エラー",
-  "passkey.addedOn": "追加日"
+  "passkey.addedOn": "追加日",
+  "voiceSettings.fast": "速い",
+  "voiceSettings.veryFast": "とても速い"
 }

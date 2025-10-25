@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "Ses ayarları başarıyla kaydedildi!",
   "error.loadVoiceSettings": "Ses ayarları yüklenirken hata oluştu",
   "error.saveVoiceSettings": "Ses ayarları kaydedilirken hata oluştu",
-  "passkey.addedOn": "Eklenme tarihi"
+  "passkey.addedOn": "Eklenme tarihi",
+  "voiceSettings.fast": "Hızlı",
+  "voiceSettings.veryFast": "Çok hızlı"
 }

@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "Lưu cài đặt giọng nói thành công!",
   "error.loadVoiceSettings": "Lỗi tải cài đặt giọng nói",
   "error.saveVoiceSettings": "Lỗi lưu cài đặt giọng nói",
-  "passkey.addedOn": "Đã thêm vào"
+  "passkey.addedOn": "Đã thêm vào",
+  "voiceSettings.fast": "Nhanh",
+  "voiceSettings.veryFast": "Rất nhanh"
 }

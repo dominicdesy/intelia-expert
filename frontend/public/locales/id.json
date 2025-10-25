@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "Pengaturan suara berhasil disimpan!",
   "error.loadVoiceSettings": "Kesalahan memuat pengaturan suara",
   "error.saveVoiceSettings": "Kesalahan menyimpan pengaturan suara",
-  "passkey.addedOn": "Ditambahkan pada"
+  "passkey.addedOn": "Ditambahkan pada",
+  "voiceSettings.fast": "Cepat",
+  "voiceSettings.veryFast": "Sangat cepat"
 }

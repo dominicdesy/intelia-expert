@@ -1069,5 +1069,7 @@
   "success.voiceSettingsSaved": "आवाज सेटिंग्स सफलतापूर्वक सहेजी गईं!",
   "error.loadVoiceSettings": "आवाज सेटिंग्स लोड करने में त्रुटि",
   "error.saveVoiceSettings": "आवाज सेटिंग्स सहेजने में त्रुटि",
-  "passkey.addedOn": "जोड़ा गया"
+  "passkey.addedOn": "जोड़ा गया",
+  "voiceSettings.fast": "तेज़",
+  "voiceSettings.veryFast": "बहुत तेज़"
 }
