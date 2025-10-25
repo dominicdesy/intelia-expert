@@ -467,6 +467,24 @@ async def force_https_redirect(request: Request, call_next):
     return response
 
 
+# === MIDDLEWARE: BYPASS CORS FOR /METRICS ===
+@app.middleware("http")
+async def bypass_cors_for_metrics(request: Request, call_next):
+    """
+    Bypass CORS restrictions for /metrics endpoint
+
+    /metrics is protected by Basic Auth and needs to be accessible
+    by Grafana Cloud for scraping metrics.
+    """
+    if request.url.path == "/metrics":
+        response = await call_next(request)
+        # Allow any origin for metrics (protected by Basic Auth)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization"
+        return response
+    return await call_next(request)
+
 # === MIDDLEWARE CORS ===
 app.add_middleware(
     CORSMiddleware,
