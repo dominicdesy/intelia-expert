@@ -137,10 +137,10 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
         throw new Error("No auth token available");
       }
 
-      // WebSocket URL
-      const wsUrl = `${finalConfig.backendUrl?.replace("https://", "wss://").replace("http://", "ws://")}/api/v1/ws/voice`;
+      // WebSocket URL avec token en query parameter (requis par le backend)
+      const wsUrl = `${finalConfig.backendUrl?.replace("https://", "wss://").replace("http://", "ws://")}/api/v1/ws/voice?token=${encodeURIComponent(token)}`;
 
-      console.log("🔌 [Voice Realtime] Connecting to WebSocket:", wsUrl);
+      console.log("🔌 [Voice Realtime] Connecting to WebSocket:", wsUrl.replace(token, "***"));
 
       // Connexion WebSocket
       const ws = new WebSocket(wsUrl);
@@ -152,13 +152,7 @@ export function useVoiceRealtime(config: VoiceRealtimeConfig = {}) {
         setState("idle");
         reconnectAttemptsRef.current = 0;
 
-        // Envoyer token d'authentification
-        ws.send(
-          JSON.stringify({
-            type: "auth",
-            token: token,
-          })
-        );
+        // Le token est maintenant envoyé dans l'URL, pas besoin de message d'auth
       };
 
       // Event: Message
