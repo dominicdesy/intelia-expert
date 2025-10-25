@@ -93,10 +93,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               {t("contact.emailDescription")}
             </p>
             <a
-              href="mailto:support@intelia.com"
+              href="mailto:cognito@intelia.com"
               className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
             >
-              support@intelia.com
+              cognito@intelia.com
             </a>
           </div>
         </div>

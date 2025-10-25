@@ -85,7 +85,7 @@ export default function BillingCancelPage() {
           <p className="text-sm text-gray-500">
             {tUnsafe("stripe.billing.cancel.needHelp")}{" "}
             <a
-              href="mailto:support@intelia.com"
+              href="mailto:cognito@intelia.com"
               className="text-blue-600 hover:text-blue-700 underline"
             >
               {tUnsafe("stripe.billing.cancel.contactSupport")}

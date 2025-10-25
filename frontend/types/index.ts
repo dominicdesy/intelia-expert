@@ -3301,7 +3301,7 @@ export const APP_CONFIG = {
   VERSION: "4.0.0", // Version JSON System
   DESCRIPTION: "Plateforme IA spécialisée en élevage avicole avec système RAG JSON avancé",
   COMPANY: "Intelia",
-  SUPPORT_EMAIL: "support@intelia.com",
+  SUPPORT_EMAIL: "cognito@intelia.com",
   PRIVACY_URL: "https://intelia.com/privacy",
   TERMS_URL: "https://intelia.com/terms",
 

@@ -110,39 +110,6 @@ export default function AboutPage() {
             </h2>
 
             <div className="space-y-4">
-              {/* Téléphone */}
-              <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200">
-                <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.5}
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-1">
-                    {t("contact.phone")}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {t("contact.phoneDescription")}
-                  </p>
-                  <a
-                    href="tel:+18666666221"
-                    className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
-                  >
-                    +1 (866) 666 6221
-                  </a>
-                </div>
-              </div>
-
               {/* Email */}
               <div className="flex items-start space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200">
                 <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -168,10 +135,10 @@ export default function AboutPage() {
                     {t("contact.emailDescription")}
                   </p>
                   <a
-                    href="mailto:support@intelia.com"
+                    href="mailto:cognito@intelia.com"
                     className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
                   >
-                    support@intelia.com
+                    cognito@intelia.com
                   </a>
                 </div>
               </div>
@@ -327,11 +294,11 @@ export default function AboutPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                     </svg>
                   </Link>
-                  <div className="mt-2 flex items-center text-xs text-green-600">
-                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  <div className="mt-2 flex items-center text-xs text-blue-600">
+                    <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                     </svg>
-                    GDPR Compliant
+                    Last updated: August 14, 2025
                   </div>
                 </div>
               </div>

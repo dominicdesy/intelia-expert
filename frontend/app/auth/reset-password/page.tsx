@@ -696,7 +696,7 @@ function ResetPasswordPageContent() {
               type="button"
               onClick={() =>
                 window.open(
-                  "mailto:support@intelia.com?subject=Problème réinitialisation mot de passe",
+                  "mailto:cognito@intelia.com?subject=Problème réinitialisation mot de passe",
                   "_blank",
                 )
               }
