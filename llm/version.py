@@ -5,7 +5,7 @@ Simple hardcoded version that increments with each deployment
 """
 
 # HARDCODED VERSION - INCREMENT THIS NUMBER WITH EACH DEPLOYMENT
-VERSION = "2.1.2"
+VERSION = "2.1.3"
 
 import subprocess  # noqa: E402
 import os  # noqa: E402
