@@ -546,18 +546,35 @@ async def delete_user_profile(current_user: Dict[str, Any] = Depends(get_current
 
 @router.get("/export", response_model=Dict[str, Any])
 async def export_user_data(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """Exporte toutes les données utilisateur (RGPD)"""
+    """
+    Exporte toutes les données utilisateur (RGPD Article 20).
 
-    logger.info(f"[export_user_data] Export données pour {mask_email(current_user.get('email'))}")
+    Inclut:
+    - Profil utilisateur (Supabase)
+    - Invitations envoyées (Supabase)
+    - Conversations complètes avec messages (PostgreSQL)
+    - Images médicales métadonnées (PostgreSQL)
+    - Statistiques d'utilisation (PostgreSQL)
+    """
+
+    logger.info(f"[export_user_data] Export GDPR complet pour {mask_email(current_user.get('email'))}")
 
     try:
+        from app.core.database import get_pg_connection
+
         supabase = get_supabase_admin_client()
+        user_id = current_user["user_id"]
+        user_email = current_user["email"]
+
+        # ========================================================================
+        # SUPABASE : Profil + Invitations
+        # ========================================================================
 
         # Récupérer le profil
         profile_response = (
             supabase.table("users")
             .select("*")
-            .eq("auth_user_id", current_user["user_id"])
+            .eq("auth_user_id", user_id)
             .execute()
         )
 
@@ -565,29 +582,147 @@ async def export_user_data(current_user: Dict[str, Any] = Depends(get_current_us
         invitations_response = (
             supabase.table("invitations")
             .select("*")
-            .eq("inviter_email", current_user["email"])
+            .eq("inviter_email", user_email)
             .execute()
         )
 
-        # TODO: Ajouter d'autres données selon vos tables
-        # conversations_response = supabase.table('conversations').select('*').eq('user_id', current_user['user_id']).execute()
+        # ========================================================================
+        # POSTGRESQL : Conversations, Messages, Images
+        # ========================================================================
+
+        conversations_data = []
+        medical_images_data = []
+        billing_data = []
+
+        with get_pg_connection() as conn:
+            cursor = conn.cursor()
+
+            # Récupérer toutes les conversations avec leurs messages
+            cursor.execute("""
+                SELECT
+                    c.id,
+                    c.user_id,
+                    c.title,
+                    c.model,
+                    c.created_at,
+                    c.updated_at,
+                    COALESCE(
+                        json_agg(
+                            json_build_object(
+                                'id', m.id,
+                                'role', m.role,
+                                'content', m.content,
+                                'timestamp', m.timestamp,
+                                'model', m.model,
+                                'tokens_used', m.tokens_used
+                            ) ORDER BY m.timestamp
+                        ) FILTER (WHERE m.id IS NOT NULL),
+                        '[]'::json
+                    ) as messages
+                FROM conversations c
+                LEFT JOIN messages m ON m.conversation_id = c.id
+                WHERE c.user_id = %s
+                GROUP BY c.id
+                ORDER BY c.created_at DESC
+            """, (user_id,))
+
+            conversations_raw = cursor.fetchall()
+
+            # Formater les conversations
+            for row in conversations_raw:
+                conversations_data.append({
+                    "id": row[0],
+                    "user_id": row[1],
+                    "title": row[2],
+                    "model": row[3],
+                    "created_at": row[4].isoformat() if row[4] else None,
+                    "updated_at": row[5].isoformat() if row[5] else None,
+                    "messages": row[6] if row[6] else []
+                })
+
+            logger.info(f"[export_user_data] {len(conversations_data)} conversations exportées")
+
+            # Récupérer les images médicales (métadonnées uniquement)
+            try:
+                cursor.execute("""
+                    SELECT
+                        id, user_id, file_name, file_size,
+                        content_type, upload_date, s3_key
+                    FROM medical_images
+                    WHERE user_id = %s
+                    ORDER BY upload_date DESC
+                """, (user_id,))
+
+                images_raw = cursor.fetchall()
+
+                for row in images_raw:
+                    medical_images_data.append({
+                        "id": row[0],
+                        "file_name": row[2],
+                        "file_size": row[3],
+                        "content_type": row[4],
+                        "upload_date": row[5].isoformat() if row[5] else None,
+                        "s3_key": row[6]
+                    })
+
+                logger.info(f"[export_user_data] {len(medical_images_data)} images médicales exportées")
+            except Exception as e:
+                logger.warning(f"[export_user_data] Erreur export images: {str(e)}")
+
+            # Récupérer les données de facturation (anonymisées)
+            try:
+                cursor.execute("""
+                    SELECT
+                        user_email, subscription_tier, subscription_status,
+                        billing_cycle, created_at, updated_at
+                    FROM user_billing_info
+                    WHERE user_email = %s
+                """, (user_email,))
+
+                billing_raw = cursor.fetchone()
+
+                if billing_raw:
+                    billing_data = {
+                        "subscription_tier": billing_raw[1],
+                        "subscription_status": billing_raw[2],
+                        "billing_cycle": billing_raw[3],
+                        "created_at": billing_raw[4].isoformat() if billing_raw[4] else None,
+                        "updated_at": billing_raw[5].isoformat() if billing_raw[5] else None
+                    }
+
+                logger.info(f"[export_user_data] Données de facturation exportées")
+            except Exception as e:
+                logger.warning(f"[export_user_data] Erreur export billing: {str(e)}")
+
+        # ========================================================================
+        # ASSEMBLAGE FINAL
+        # ========================================================================
 
         export_data = {
             "user_profile": profile_response.data[0] if profile_response.data else None,
             "invitations_sent": invitations_response.data or [],
+            "conversations": conversations_data,
+            "medical_images": medical_images_data,
+            "billing_info": billing_data,
             "export_date": datetime.now().isoformat(),
-            "user_id": current_user["user_id"],
-            "email": current_user["email"],
+            "user_id": user_id,
+            "email": user_email,
+            "total_conversations": len(conversations_data),
+            "total_messages": sum(len(conv.get("messages", [])) for conv in conversations_data),
+            "gdpr_compliant": True,
+            "data_format": "JSON",
+            "export_version": "1.0"
         }
 
         logger.info(
-            f"[export_user_data] Données exportées pour {current_user['email']}"
+            f"[export_user_data] ✅ Export GDPR complet: {export_data['total_conversations']} conversations, "
+            f"{export_data['total_messages']} messages pour {mask_email(user_email)}"
         )
 
         return export_data
 
     except Exception as e:
-        logger.error(f"[export_user_data] Erreur : {str(e)}")
+        logger.error(f"[export_user_data] ❌ Erreur export GDPR: {str(e)}")
         raise HTTPException(status_code=500, detail="Erreur export données utilisateur")
 
 

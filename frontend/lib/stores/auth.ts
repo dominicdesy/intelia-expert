@@ -1003,7 +1003,7 @@ export const useAuthStore = create<AuthState>()(
             throw new Error("Utilisateur non connecté");
           }
 
-          const response = await apiClient.getSecure("/users/export-data");
+          const response = await apiClient.getSecure("/users/export");
 
           if (!response.success) {
             throw new Error(

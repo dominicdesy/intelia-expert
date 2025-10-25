@@ -601,7 +601,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
   });
 
   // ✅ TOUS LES HOOKS SONT MAINTENANT AU DÉBUT DU COMPOSANT
-  const { updateProfile } = useAuthStore();
+  const { updateProfile, exportUserData } = useAuthStore();
   const isMountedRef = useRef(true);
   const { t, changeLanguage, getCurrentLanguage } = useTranslation();
   const {
@@ -716,6 +716,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
   const [passkeySuccess, setPasskeySuccess] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState("");
 
   const tabs = useMemo(
     () => [
@@ -1089,6 +1091,38 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
       setFormErrors([err.message || t("passkey.manage.deleteError") || "Failed to delete passkey"]);
     }
   }, [removePasskey, loadPasskeys, t]);
+
+  // Export data handler (GDPR Article 20)
+  const handleExportData = useCallback(async () => {
+    setIsExporting(true);
+    setExportSuccess("");
+    setFormErrors([]);
+
+    try {
+      const data = await exportUserData();
+
+      // Create JSON blob
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `intelia-expert-data-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setExportSuccess("✅ Vos données ont été exportées avec succès !");
+    } catch (error: any) {
+      setFormErrors([error.message || "Erreur lors de l'export des données"]);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [exportUserData]);
 
   // Delete account handler
   const handleDeleteAccount = useCallback(async () => {
@@ -1586,11 +1620,68 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
             {/* Security Tab */}
             {activeTab === "security" && (
               <div className="space-y-6" data-debug="security-tab">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  🛡️ Sécurité et Confidentialité
+                </h3>
+
+                {/* Export Success Message */}
+                {exportSuccess && (
+                  <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
+                    {exportSuccess}
+                  </div>
+                )}
+
+                {/* 1. EXPORT DES DONNÉES (GDPR Article 20) */}
+                <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
+                  <h4 className="font-medium text-blue-900 mb-2 flex items-center">
+                    <span className="mr-2">📥</span>
+                    Exporter mes données
+                  </h4>
+                  <p className="text-sm text-blue-700 mb-4">
+                    Téléchargez toutes vos données personnelles au format JSON (profil, conversations, historique de paiements).
+                    Conformité GDPR Article 20 - Droit à la portabilité des données.
+                  </p>
+                  <button
+                    onClick={handleExportData}
+                    disabled={isExporting}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 flex items-center"
+                  >
+                    {isExporting && (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    )}
+                    {isExporting ? "Export en cours..." : "📥 Télécharger mes données"}
+                  </button>
+                </div>
+
+                {/* 2. POLITIQUE DE CONSERVATION */}
+                <div className="p-4 border border-gray-200 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-2 flex items-center">
+                    <span className="mr-2">📅</span>
+                    Durée de conservation des données
+                  </h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Vos conversations sont conservées <strong>indéfiniment</strong> tant que votre compte est actif.
+                    Cette conservation nous permet de vous fournir un historique accessible et d'améliorer continuellement le service.
+                  </p>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Base légale : GDPR Article 6(1)(b) - Exécution du contrat. L'historique conversationnel est une fonctionnalité essentielle du service.
+                  </p>
+                  <a
+                    href="/data-retention-policy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:underline flex items-center"
+                  >
+                    📄 Consulter la politique complète de conservation →
+                  </a>
+                </div>
+
+                {/* 3. SUPPRESSION DE COMPTE (GDPR Article 17) */}
                 <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-                  <h3 className="text-lg font-medium text-red-900 mb-2 flex items-center">
+                  <h4 className="text-lg font-medium text-red-900 mb-2 flex items-center">
                     <span className="mr-2">⚠️</span>
                     Supprimer mon compte
-                  </h3>
+                  </h4>
                   <p className="text-sm text-red-700 mb-4">
                     La suppression de votre compte est <strong>irréversible</strong>. Vos données personnelles seront définitivement supprimées ou anonymisées conformément au RGPD.
                   </p>
@@ -1621,7 +1712,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
                       disabled={isDeleting}
                       className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
                     >
-                      Supprimer mon compte
+                      🗑️ Supprimer mon compte
                     </button>
                   ) : (
                     <div className="space-y-3">
