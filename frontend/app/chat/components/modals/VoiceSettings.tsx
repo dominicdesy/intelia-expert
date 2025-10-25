@@ -20,6 +20,13 @@ interface VoiceSettingsData {
   plan: string;
 }
 
+interface VoicesListResponse {
+  voices: VoiceOption[];
+  default: string;
+  recommended_speed_range: { min: number; max: number };
+  speed_range: { min: number; max: number };
+}
+
 export const VoiceSettings: React.FC = () => {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(true);
@@ -48,14 +55,17 @@ export const VoiceSettings: React.FC = () => {
     try {
       // Charger voix disponibles (endpoint public)
       const voicesResponse = await apiClient.get('/voice-settings/voices');
-      if (voicesResponse.success && voicesResponse.data?.voices) {
-        setVoices(voicesResponse.data.voices);
+      if (voicesResponse.success && voicesResponse.data) {
+        const voicesData = voicesResponse.data as VoicesListResponse;
+        if (voicesData.voices) {
+          setVoices(voicesData.voices);
+        }
       }
 
       // Charger préférences utilisateur (endpoint authentifié)
       const settingsResponse = await apiClient.getSecure('/voice-settings');
       if (settingsResponse.success && settingsResponse.data) {
-        const data: VoiceSettingsData = settingsResponse.data;
+        const data = settingsResponse.data as VoiceSettingsData;
         setVoicePreference(data.voice_preference);
         setVoiceSpeed(data.voice_speed);
         setCanUseVoice(data.can_use_voice);
