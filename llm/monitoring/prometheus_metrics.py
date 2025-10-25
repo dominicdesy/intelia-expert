@@ -3,6 +3,8 @@ Prometheus Metrics for Intelia Expert LLM Service
 ==================================================
 
 Centralized metrics tracking for LLM costs, performance, and system health.
+
+Tracks metrics for OpenAI, Anthropic Claude, and DeepSeek providers.
 """
 
 from prometheus_client import Counter, Histogram, Gauge, Info, generate_latest, CONTENT_TYPE_LATEST
