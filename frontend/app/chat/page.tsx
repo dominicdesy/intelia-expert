@@ -192,8 +192,8 @@ const ChatInput = React.memo(
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoadingChat}
               className={`h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 flex-shrink-0 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
-              title={selectedImages.length > 0 ? t("chat.imagesCount", { count: selectedImages.length }) : t("chat.addImages")}
-              aria-label={selectedImages.length > 0 ? t("chat.imagesCount", { count: selectedImages.length }) : t("chat.addImages")}
+              title={selectedImages.length > 0 ? t("chat.imagesCount").replace("{count}", String(selectedImages.length)) : t("chat.addImages")}
+              aria-label={selectedImages.length > 0 ? t("chat.imagesCount").replace("{count}", String(selectedImages.length)) : t("chat.addImages")}
               style={{
                 minWidth: "48px",
                 width: "48px",
@@ -272,8 +272,8 @@ const ChatInput = React.memo(
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoadingChat}
                 className={`flex-shrink-0 h-12 w-12 flex items-center justify-center text-blue-600 hover:text-blue-700 disabled:text-gray-300 transition-colors rounded-full hover:bg-blue-50 ${selectedImages.length > 0 ? "bg-blue-50" : ""}`}
-                title={selectedImages.length > 0 ? t("chat.imagesCount", { count: selectedImages.length }) : t("chat.addImages")}
-                aria-label={selectedImages.length > 0 ? t("chat.imagesCount", { count: selectedImages.length }) : t("chat.addImages")}
+                title={selectedImages.length > 0 ? t("chat.imagesCount").replace("{count}", String(selectedImages.length)) : t("chat.addImages")}
+                aria-label={selectedImages.length > 0 ? t("chat.imagesCount").replace("{count}", String(selectedImages.length)) : t("chat.addImages")}
                 style={{
                   minWidth: "48px",
                   width: "48px",

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { buildApiUrl } from "@/lib/api/config";
+import { useTranslation } from "@/lib/languages/i18n";
 
 interface CountryPricing {
   country_code: string;
@@ -23,6 +24,7 @@ interface CountryPricingManagerProps {
 export default function CountryPricingManager({
   accessToken,
 }: CountryPricingManagerProps) {
+  const { t } = useTranslation();
   const [countries, setCountries] = useState<CountryPricing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,14 +67,14 @@ export default function CountryPricingManager({
       });
 
       if (!response.ok) {
-        throw new Error("Erreur lors du chargement des pays");
+        throw new Error(t("admin.pricing.loadError"));
       }
 
       const data = await response.json();
       setCountries(data.countries || []);
     } catch (error) {
       console.error("[CountryPricingManager] Erreur fetch countries:", error);
-      toast.error("Erreur lors du chargement des pays");
+      toast.error(t("admin.pricing.loadError"));
     } finally {
       setIsLoading(false);
     }
@@ -98,7 +100,7 @@ export default function CountryPricingManager({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Erreur lors de la mise à jour");
+        throw new Error(errorData.detail || t("admin.pricing.updateError"));
       }
 
       const data = await response.json();
@@ -110,12 +112,12 @@ export default function CountryPricingManager({
       await fetchCountries();
     } catch (error: any) {
       console.error("[CountryPricingManager] Erreur update price:", error);
-      toast.error(error.message || "Erreur lors de la mise à jour du prix");
+      toast.error(error.message || t("admin.pricing.updateError"));
     }
   };
 
   const handleDeleteCountry = async (countryCode: string, countryName: string) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer ${countryName} (${countryCode}) ?`)) {
+    if (!confirm(t("admin.pricing.deleteConfirm").replace("{country}", countryName).replace("{code}", countryCode))) {
       return;
     }
 
@@ -132,14 +134,14 @@ export default function CountryPricingManager({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Erreur lors de la suppression");
+        throw new Error(errorData.detail || t("admin.pricing.deleteError"));
       }
 
-      toast.success(`${countryName} supprimé avec succès`);
+      toast.success(t("admin.pricing.deleteSuccess").replace("{country}", countryName));
       await fetchCountries();
     } catch (error: any) {
       console.error("[CountryPricingManager] Erreur delete country:", error);
-      toast.error(error.message || "Erreur lors de la suppression");
+      toast.error(error.message || t("admin.pricing.deleteError"));
     }
   };
 
@@ -161,19 +163,19 @@ export default function CountryPricingManager({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Erreur lors de la mise à jour");
+        throw new Error(errorData.detail || t("admin.pricing.updateError"));
       }
 
       const data = await response.json();
       toast.success(
-        `Tier modifié pour ${countryCode}: Tier ${data.old_tier} → Tier ${data.new_tier}`
+        t("admin.pricing.tierUpdated").replace("{code}", countryCode).replace("{oldTier}", String(data.old_tier)).replace("{newTier}", String(data.new_tier))
       );
 
       setEditingTier(null);
       await fetchCountries();
     } catch (error: any) {
       console.error("[CountryPricingManager] Erreur update tier:", error);
-      toast.error(error.message || "Erreur lors de la mise à jour du tier");
+      toast.error(error.message || t("admin.pricing.tierUpdateError"));
     }
   };
 
@@ -224,10 +226,10 @@ export default function CountryPricingManager({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
-              Gestion des Prix par Pays
+              {t("admin.pricing.title")}
             </h3>
             <p className="mt-1 text-sm text-gray-600">
-              {countryEntries.length} pays configurés • Devises: CAD, USD, EUR
+              {t("admin.pricing.countriesConfigured").replace("{count}", String(countryEntries.length))}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -257,7 +259,7 @@ export default function CountryPricingManager({
               onClick={fetchCountries}
               className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
-              🔄 Actualiser
+              {t("admin.pricing.refresh")}
             </button>
           </div>
         </div>
@@ -266,7 +268,7 @@ export default function CountryPricingManager({
         <div className="relative">
           <input
             type="text"
-            placeholder="Rechercher un pays (ex: Canada, FR)..."
+            placeholder={t("admin.pricing.searchPlaceholder")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -292,10 +294,10 @@ export default function CountryPricingManager({
           <thead className="bg-gray-50 sticky top-0">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Pays
+                {t("admin.pricing.country")}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Tier
+                {t("admin.pricing.tier")}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Essential
@@ -307,7 +309,7 @@ export default function CountryPricingManager({
                 Elite
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
+                {t("admin.plans.actions")}
               </th>
             </tr>
           </thead>
@@ -343,10 +345,10 @@ export default function CountryPricingManager({
                         className="px-2 py-1 border border-gray-300 rounded text-sm"
                         autoFocus
                       >
-                        <option value={1}>Tier 1</option>
-                        <option value={2}>Tier 2</option>
-                        <option value={3}>Tier 3</option>
-                        <option value={4}>Tier 4</option>
+                        <option value={1}>{t("admin.pricing.tierLevel").replace("{level}", "1")}</option>
+                        <option value={2}>{t("admin.pricing.tierLevel").replace("{level}", "2")}</option>
+                        <option value={3}>{t("admin.pricing.tierLevel").replace("{level}", "3")}</option>
+                        <option value={4}>{t("admin.pricing.tierLevel").replace("{level}", "4")}</option>
                       </select>
                       <button
                         onClick={() => handleUpdateTier(country.country_code)}
@@ -377,7 +379,7 @@ export default function CountryPricingManager({
                           : "bg-orange-100 text-orange-800"
                       }`}
                     >
-                      Tier {country.tier_level}
+                      {t("admin.pricing.tierLevel").replace("{level}", String(country.tier_level))}
                     </span>
                   )}
                 </td>
@@ -439,7 +441,7 @@ export default function CountryPricingManager({
                           {pricing && pricing.price_type === "auto_marketing" && (
                             <span
                               className="text-xs px-1 py-0.5 bg-blue-100 text-blue-700 rounded"
-                              title="Prix marketing calculé automatiquement depuis le tier"
+                              title={t("admin.pricing.marketingPriceTooltip")}
                             >
                               Auto
                             </span>
@@ -447,7 +449,7 @@ export default function CountryPricingManager({
                           {pricing && pricing.price_type === "custom" && (
                             <span
                               className="text-xs px-1 py-0.5 bg-purple-100 text-purple-700 rounded"
-                              title="Prix personnalisé défini manuellement"
+                              title={t("admin.pricing.customPriceTooltip")}
                             >
                               Custom
                             </span>
@@ -474,7 +476,7 @@ export default function CountryPricingManager({
                           }}
                           className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:border-blue-500 focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white"
                         >
-                          ✏️  Modifier...
+                          {t("admin.pricing.editButton")}
                         </button>
                         {showPlanMenu === country.country_code && (
                           <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-300 rounded-md shadow-lg z-10">
@@ -505,7 +507,7 @@ export default function CountryPricingManager({
                           )
                         }
                         className="px-2 py-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                        title="Supprimer ce pays"
+                        title={t("admin.pricing.deleteButton")}
                       >
                         🗑️
                       </button>
@@ -521,8 +523,8 @@ export default function CountryPricingManager({
       {countryEntries.length === 0 && (
         <div className="px-6 py-12 text-center text-gray-500">
           {searchTerm
-            ? `Aucun pays trouvé pour "${searchTerm}"`
-            : "Aucun pays configuré"}
+            ? t("admin.pricing.noCountriesFound").replace("{search}", searchTerm)
+            : t("admin.pricing.noCountries")}
         </div>
       )}
 
@@ -532,36 +534,36 @@ export default function CountryPricingManager({
           <div className="flex items-center gap-4 text-xs text-gray-600">
             <div className="flex items-center gap-2">
               <span className="inline-block w-3 h-3 rounded-full bg-green-100 border border-green-300"></span>
-              Tier 1 (Marchés émergents)
+              {t("admin.pricing.tier1")}
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-block w-3 h-3 rounded-full bg-blue-100 border border-blue-300"></span>
-              Tier 2 (Intermédiaire)
+              {t("admin.pricing.tier2")}
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-block w-3 h-3 rounded-full bg-purple-100 border border-purple-300"></span>
-              Tier 3 (Développés)
+              {t("admin.pricing.tier3")}
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-block w-3 h-3 rounded-full bg-orange-100 border border-orange-300"></span>
-              Tier 4 (Premium)
+              {t("admin.pricing.tier4")}
             </div>
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-600">
             <div className="flex items-center gap-1">
               <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded">Auto</span>
-              <span>Prix marketing automatique</span>
+              <span>{t("admin.pricing.marketingPrice")}</span>
             </div>
             <div className="flex items-center gap-1">
               <span className="px-1 py-0.5 bg-purple-100 text-purple-700 rounded">Custom</span>
-              <span>Prix personnalisé</span>
+              <span>{t("admin.pricing.customPrice")}</span>
             </div>
           </div>
         </div>
         <div className="text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded p-2">
           <strong>Calcul automatique:</strong> Les prix "Auto" sont calculés depuis les prix tier (Gestion des plans)
           + conversion devise + ajustement marketing (ex: 20.34 → 19.99).
-          Vous pouvez personnaliser n'importe quel prix en cliquant sur "Modifier" (devient "Custom").
+          {t("admin.pricing.customizeNote")}
         </div>
       </div>
     </div>

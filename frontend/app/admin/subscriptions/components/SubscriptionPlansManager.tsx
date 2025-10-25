@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { buildApiUrl } from "@/lib/api/config";
+import { useTranslation } from "@/lib/languages/i18n";
 
 interface BillingPlan {
   plan_name: string;
@@ -25,6 +26,7 @@ interface SubscriptionPlansManagerProps {
 export default function SubscriptionPlansManager({
   accessToken,
 }: SubscriptionPlansManagerProps) {
+  const { t } = useTranslation();
   const [plans, setPlans] = useState<BillingPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingQuota, setEditingQuota] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function SubscriptionPlansManager({
       });
 
       if (!response.ok) {
-        throw new Error("Erreur lors du chargement des plans");
+        throw new Error(t("admin.plans.loadError"));
       }
 
       const data = await response.json();
@@ -60,7 +62,7 @@ export default function SubscriptionPlansManager({
       await fetchAllTierPrices(loadedPlans);
     } catch (error) {
       console.error("[PlansManager] Erreur fetch plans:", error);
-      toast.error("Erreur lors du chargement des plans");
+      toast.error(t("admin.plans.loadError"));
     } finally {
       setIsLoading(false);
     }
@@ -114,7 +116,7 @@ export default function SubscriptionPlansManager({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Erreur lors de la mise à jour");
+        throw new Error(errorData.detail || t("admin.plans.updateError"));
       }
 
       const data = await response.json();
@@ -126,12 +128,12 @@ export default function SubscriptionPlansManager({
       await fetchPlans();
 
       // Demander si on veut recalculer tous les prix des pays
-      if (confirm("Voulez-vous recalculer automatiquement les prix marketing de tous les pays avec ce nouveau prix tier ?")) {
+      if (confirm(t("admin.plans.recalculateConfirm"))) {
         await handleRecalculatePrices();
       }
     } catch (error: any) {
       console.error("[PlansManager] Erreur update tier price:", error);
-      toast.error(error.message || "Erreur lors de la mise à jour du prix");
+      toast.error(error.message || t("admin.plans.updateError"));
     }
   };
 
@@ -149,7 +151,7 @@ export default function SubscriptionPlansManager({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Erreur lors du recalcul");
+        throw new Error(errorData.detail || t("admin.plans.recalculateError"));
       }
 
       const data = await response.json();
@@ -158,7 +160,7 @@ export default function SubscriptionPlansManager({
       );
     } catch (error: any) {
       console.error("[PlansManager] Erreur recalculate prices:", error);
-      toast.error(error.message || "Erreur lors du recalcul des prix");
+      toast.error(error.message || t("admin.plans.recalculateError"));
     }
   };
 
@@ -180,19 +182,19 @@ export default function SubscriptionPlansManager({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Erreur lors de la mise à jour");
+        throw new Error(errorData.detail || t("admin.plans.updateError"));
       }
 
       const data = await response.json();
       toast.success(
-        `Quota modifié: ${data.old_quota} → ${data.new_quota} questions/mois`
+        t("admin.plans.quotaUpdated").replace("{plan}", planName).replace("{oldQuota}", String(data.old_quota)).replace("{newQuota}", String(data.new_quota))
       );
 
       setEditingQuota(null);
       await fetchPlans();
     } catch (error: any) {
       console.error("[PlansManager] Erreur update quota:", error);
-      toast.error(error.message || "Erreur lors de la mise à jour du quota");
+      toast.error(error.message || t("admin.plans.updateError"));
     }
   };
 
@@ -214,19 +216,19 @@ export default function SubscriptionPlansManager({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || "Erreur lors de la mise à jour");
+        throw new Error(errorData.detail || t("admin.plans.updateError"));
       }
 
       const data = await response.json();
       toast.success(
-        `Nom modifié: "${data.old_name}" → "${data.new_name}"`
+        t("admin.plans.nameUpdated").replace("{plan}", planName).replace("{oldName}", data.old_name).replace("{newName}", data.new_name)
       );
 
       setEditingName(null);
       await fetchPlans();
     } catch (error: any) {
       console.error("[PlansManager] Erreur update name:", error);
-      toast.error(error.message || "Erreur lors de la mise à jour du nom");
+      toast.error(error.message || t("admin.plans.updateError"));
     }
   };
 
@@ -244,10 +246,10 @@ export default function SubscriptionPlansManager({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
-              Gestion des Plans d'Abonnement
+              {t("admin.plans.title")}
             </h3>
             <p className="mt-1 text-sm text-gray-600">
-              Modifier les quotas et les noms d'affichage des plans
+              {t("admin.plans.subtitle")}
             </p>
           </div>
           <button
@@ -264,19 +266,19 @@ export default function SubscriptionPlansManager({
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Plan
+                {t("admin.plans.plan")}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Nom d'affichage
+                {t("admin.plans.displayName")}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Quota Mensuel
+                {t("admin.plans.quota")}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Statut
+                {t("admin.plans.status")}
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
+                {t("admin.plans.actions")}
               </th>
             </tr>
           </thead>
@@ -361,7 +363,7 @@ export default function SubscriptionPlansManager({
                     </div>
                   ) : (
                     <span className="text-sm text-gray-900">
-                      {plan.monthly_quota.toLocaleString()} questions
+                      {t("admin.plans.questions").replace("{quota}", plan.monthly_quota.toLocaleString())}
                     </span>
                   )}
                 </td>
@@ -414,7 +416,7 @@ export default function SubscriptionPlansManager({
 
       {plans.length === 0 && (
         <div className="px-6 py-12 text-center text-gray-500">
-          Aucun plan trouvé
+          {t("admin.plans.noPlans")}
         </div>
       )}
 

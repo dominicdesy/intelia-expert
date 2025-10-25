@@ -146,18 +146,18 @@ export default function SharedConversationPage() {
             <MessageCircle className="w-5 h-5 text-blue-600 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm text-blue-900 font-medium">
-                {t("shared.sharedBy", { name: share_info.shared_by })}
+                {t("shared.sharedBy").replace("{name}", share_info.shared_by)}
               </p>
               <div className="flex items-center gap-4 mt-2 text-xs text-blue-700">
                 <div className="flex items-center gap-1">
                   <Eye size={14} />
-                  <span>{t(share_info.view_count > 1 ? "shared.viewCountPlural" : "shared.viewCount", { count: share_info.view_count })}</span>
+                  <span>{t(share_info.view_count > 1 ? "shared.viewCountPlural" : "shared.viewCount").replace("{count}", String(share_info.view_count))}</span>
                 </div>
                 {share_info.expires_at && (
                   <div className="flex items-center gap-1">
                     <Clock size={14} />
                     <span>
-                      {t("shared.expiresOn", { date: new Date(share_info.expires_at).toLocaleDateString("fr-FR") })}
+                      {t("shared.expiresOn").replace("{date}", new Date(share_info.expires_at).toLocaleDateString("fr-FR"))}
                     </span>
                   </div>
                 )}

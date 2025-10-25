@@ -1078,6 +1078,190 @@ export interface TranslationKeys {
 
   // Devices
   "passkey.devices.supported": string;
+
+  // ===========================================
+  // LEGAL & ABOUT PAGES
+  // ===========================================
+  "legal.privacyPolicy": string;
+  "legal.privacyPolicyDesc": string;
+  "legal.readPrivacyPolicy": string;
+  "legal.termsOfService": string;
+  "legal.termsOfServiceDesc": string;
+  "legal.readTermsOfService": string;
+  "legal.lastUpdated": string;
+
+  // ===========================================
+  // SHARED CONVERSATION
+  // ===========================================
+  "shared.notFound": string;
+  "shared.expired": string;
+  "shared.loadError": string;
+  "shared.error": string;
+  "shared.loading": string;
+  "shared.unavailable": string;
+  "shared.backToHome": string;
+  "shared.title": string;
+  "shared.subtitle": string;
+  "shared.tryFree": string;
+  "shared.sharedBy": string;
+  "shared.viewCount": string;
+  "shared.viewCountPlural": string;
+  "shared.expiresOn": string;
+  "shared.question": string;
+  "shared.answer": string;
+  "shared.impressed": string;
+  "shared.createFreeAccount": string;
+  "shared.createAccount": string;
+  "shared.signIn": string;
+  "shared.generatedBy": string;
+  "shared.dataAnonymized": string;
+
+  // ===========================================
+  // CHAT ADDITIONS
+  // ===========================================
+  "chat.addImages": string;
+  "chat.removeImage": string;
+  "chat.imagesCount": string;
+  "chat.loadingChat": string;
+  "chat.imageSent": string;
+  "chat.stop": string;
+  "chat.placeholderMobile": string;
+
+  // ===========================================
+  // ADMIN - SUBSCRIPTIONS
+  // ===========================================
+  "admin.accessDenied": string;
+  "admin.subscriptions.loadError": string;
+  "admin.subscriptions.tabs.overview": string;
+  "admin.subscriptions.tabs.plans": string;
+  "admin.subscriptions.tabs.pricing": string;
+  "admin.subscriptions.tabs.history": string;
+  "admin.subscriptions.loading": string;
+  "admin.subscriptions.title": string;
+  "admin.subscriptions.subtitle": string;
+  "admin.subscriptions.back": string;
+  "admin.subscriptions.totalSubscriptions": string;
+  "admin.subscriptions.activeSubscriptions": string;
+  "admin.subscriptions.monthlyRevenue": string;
+  "admin.subscriptions.planBreakdown": string;
+  "admin.subscriptions.plan": string;
+  "admin.subscriptions.subscribers": string;
+  "admin.subscriptions.revenue": string;
+  "admin.subscriptions.percentage": string;
+  "admin.subscriptions.quickActions": string;
+  "admin.subscriptions.openStripeDashboard": string;
+  "admin.subscriptions.refreshData": string;
+  "admin.subscriptions.exportData": string;
+  "admin.subscriptions.exportComing": string;
+
+  // ===========================================
+  // ADMIN - COUNTRY PRICING
+  // ===========================================
+  "admin.pricing.loadError": string;
+  "admin.pricing.updateError": string;
+  "admin.pricing.deleteConfirm": string;
+  "admin.pricing.deleteError": string;
+  "admin.pricing.deleteSuccess": string;
+  "admin.pricing.tierUpdated": string;
+  "admin.pricing.tierUpdateError": string;
+  "admin.pricing.title": string;
+  "admin.pricing.countriesConfigured": string;
+  "admin.pricing.sortAZ": string;
+  "admin.pricing.sortTier": string;
+  "admin.pricing.refresh": string;
+  "admin.pricing.searchPlaceholder": string;
+  "admin.pricing.country": string;
+  "admin.pricing.tier": string;
+  "admin.pricing.currency": string;
+  "admin.pricing.tierLevel": string;
+  "admin.pricing.save": string;
+  "admin.pricing.cancel": string;
+  "admin.pricing.edit": string;
+  "admin.pricing.editButton": string;
+  "admin.pricing.deleteButton": string;
+  "admin.pricing.noCountriesFound": string;
+  "admin.pricing.noCountries": string;
+  "admin.pricing.tier1": string;
+  "admin.pricing.tier2": string;
+  "admin.pricing.tier3": string;
+  "admin.pricing.tier4": string;
+  "admin.pricing.marketingPrice": string;
+  "admin.pricing.customPrice": string;
+  "admin.pricing.marketingPriceTooltip": string;
+  "admin.pricing.customPriceTooltip": string;
+  "admin.pricing.customizeNote": string;
+
+  // ===========================================
+  // ADMIN - SUBSCRIPTION PLANS
+  // ===========================================
+  "admin.plans.loadError": string;
+  "admin.plans.updateError": string;
+  "admin.plans.priceUpdated": string;
+  "admin.plans.recalculateConfirm": string;
+  "admin.plans.recalculateError": string;
+  "admin.plans.recalculateSuccess": string;
+  "admin.plans.quotaUpdated": string;
+  "admin.plans.nameUpdated": string;
+  "admin.plans.title": string;
+  "admin.plans.subtitle": string;
+  "admin.plans.plan": string;
+  "admin.plans.displayName": string;
+  "admin.plans.quota": string;
+  "admin.plans.basePriceUSD": string;
+  "admin.plans.status": string;
+  "admin.plans.actions": string;
+  "admin.plans.questions": string;
+  "admin.plans.active": string;
+  "admin.plans.inactive": string;
+  "admin.plans.editQuota": string;
+  "admin.plans.editName": string;
+  "admin.plans.quotaButton": string;
+  "admin.plans.nameButton": string;
+  "admin.plans.noPlans": string;
+  "admin.plans.tierPricing": string;
+  "admin.plans.tierPricingSubtitle": string;
+  "admin.plans.tierEmerging": string;
+  "admin.plans.tierIntermediate": string;
+  "admin.plans.tierDeveloped": string;
+  "admin.plans.tierPremium": string;
+  "admin.plans.clickToEdit": string;
+  "admin.plans.usdPricingNote": string;
+
+  // ===========================================
+  // ADMIN - QUALITY ISSUES & QUESTIONS
+  // ===========================================
+  "admin.quality.loadError": string;
+  "admin.quality.analyzeConfirm": string;
+  "admin.quality.analysisComplete": string;
+  "admin.quality.analyzeError": string;
+  "admin.quality.markedFalsePositive": string;
+  "admin.quality.markedReviewed": string;
+  "admin.quality.markError": string;
+  "admin.quality.deleteConfirm": string;
+  "admin.quality.deleteError": string;
+  "admin.questions.noQuestionsToExport": string;
+  "admin.currency.loadError": string;
+  "admin.history.loadError": string;
+
+  // ===========================================
+  // SIGNUP COMPONENTS
+  // ===========================================
+  "signup.passwordsMatch": string;
+  "signup.passwordsMismatch": string;
+  "signup.loading": string;
+  "signup.acceptTerms": string;
+  "signup.and": string;
+  "signup.searchCountry": string;
+
+  // ===========================================
+  // COMMON COMPONENTS
+  // ===========================================
+  "components.close": string;
+  "components.delete": string;
+  "components.selectImage": string;
+  "components.toggleBilling": string;
+  "components.subscriptionPlans": string;
+  "components.cachedData": string;
 }
 
 // ✅ SOLUTION D: NotificationManager supprimé - Système redondant avec useState/useEffect
