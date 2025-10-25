@@ -279,6 +279,84 @@ export default function TermsPage() {
                   communicate with you for service-related purposes, as required
                   by applicable data protection and privacy laws.
                 </p>
+
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                  5.4 Your Data Rights (GDPR)
+                </h3>
+                <p className="text-gray-700 leading-relaxed mb-4">
+                  In accordance with the General Data Protection Regulation (GDPR)
+                  and applicable Canadian privacy laws, you have the following rights
+                  regarding your personal information:
+                </p>
+                <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
+                  <li>
+                    <strong>Right of Access (Article 15):</strong> You can access
+                    and view your personal information through your account settings
+                    at any time.
+                  </li>
+                  <li>
+                    <strong>Right to Data Portability (Article 20):</strong> You can
+                    export all your data in structured JSON format via Profile →
+                    Security tab → "Download my data". This includes your profile,
+                    conversations, billing history, and medical images metadata.
+                  </li>
+                  <li>
+                    <strong>Right to Erasure / Right to be Forgotten (Article 17):</strong>{" "}
+                    You can delete your account and anonymize your personal data at
+                    any time via Profile → Security tab → "Delete my account". Upon
+                    deletion, your personal information is immediately anonymized and
+                    can no longer be linked to you.
+                  </li>
+                  <li>
+                    <strong>Right to Rectification (Article 16):</strong> You can
+                    update or correct your personal information through your account
+                    settings or by contacting us.
+                  </li>
+                  <li>
+                    <strong>Right to Object (Article 21):</strong> You have the right
+                    to object to the processing of your data, particularly when
+                    processing is based on legitimate interests. Contact{" "}
+                    <a
+                      href="mailto:confidentialite@intelia.com"
+                      className="text-blue-600 hover:text-blue-700 underline"
+                    >
+                      confidentialite@intelia.com
+                    </a>{" "}
+                    to exercise this right.
+                  </li>
+                  <li>
+                    <strong>Right to Lodge a Complaint:</strong> You have the right
+                    to file a complaint with your competent data protection authority
+                    (e.g., CNIL in France, Office of the Privacy Commissioner of
+                    Canada).
+                  </li>
+                </ul>
+                <p className="text-gray-700 leading-relaxed mb-4">
+                  To exercise these rights, visit your account settings or contact us
+                  at{" "}
+                  <a
+                    href="mailto:confidentialite@intelia.com"
+                    className="text-blue-600 hover:text-blue-700 underline"
+                  >
+                    confidentialite@intelia.com
+                  </a>
+                  . We will respond to your request within 30 days as required by
+                  applicable law (GDPR Article 12).
+                </p>
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
+                  <p className="text-blue-800 text-sm">
+                    <strong>Note:</strong> For detailed information about how we
+                    collect, use, and retain your data, please refer to our{" "}
+                    <Link
+                      href="/privacy"
+                      className="text-blue-600 hover:text-blue-700 underline font-medium"
+                    >
+                      Privacy Policy
+                    </Link>
+                    , specifically Section 4 (Data Retention) and Section 5 (Your
+                    Privacy Rights).
+                  </p>
+                </div>
               </section>
 
               {/* 6. FEES AND PAYMENT */}
@@ -472,6 +550,70 @@ export default function TermsPage() {
                   immediately. Provisions regarding intellectual property,
                   disclaimers, limitations of liability, and governing law shall
                   survive the termination of this agreement.
+                </p>
+
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                  9.4 Your Data Upon Account Deletion or Termination
+                </h3>
+                <p className="text-gray-700 leading-relaxed mb-4">
+                  When you delete your account or upon termination of these Terms,
+                  the following data handling procedures apply in accordance with
+                  GDPR Article 17 (Right to Erasure):
+                </p>
+                <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
+                  <li>
+                    <strong>Personal Information (Immediate Anonymization):</strong>{" "}
+                    Your personal data (name, email address, phone number, profile
+                    information) is immediately anonymized and replaced with an
+                    anonymous identifier. This makes it impossible to link any
+                    remaining data back to you.
+                  </li>
+                  <li>
+                    <strong>Conversations and Messages (Anonymized Retention):</strong>{" "}
+                    Your conversation history and messages are anonymized (user ID
+                    replaced with anonymous identifier) but retained for analytics
+                    and service improvement purposes. Legal basis: GDPR Article
+                    6(1)(f) - Legitimate Interest. The anonymized data can no longer
+                    be used to identify you.
+                  </li>
+                  <li>
+                    <strong>Billing Records (Legal Retention):</strong> Anonymized
+                    billing information is retained for 10 years after your last
+                    transaction as required by Canadian tax law (General Tax Code
+                    Art. L102 B). Legal basis: GDPR Article 6(1)(c) - Legal
+                    Obligation.
+                  </li>
+                  <li>
+                    <strong>Medical Images (Anonymized Metadata):</strong> Metadata
+                    for any uploaded medical images is anonymized. Physical files may
+                    remain in cloud storage but are no longer linked to your identity.
+                  </li>
+                  <li>
+                    <strong>Authentication Data (Deleted):</strong> Your WebAuthn
+                    passkeys and authentication credentials are permanently deleted.
+                  </li>
+                </ul>
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                  <p className="text-yellow-800 font-medium mb-2">
+                    Important: Export Your Data Before Deletion
+                  </p>
+                  <p className="text-yellow-700 text-sm">
+                    If you wish to keep a copy of your data, you must export it
+                    BEFORE deleting your account via Profile → Security tab →
+                    "Download my data". Once your account is deleted and data is
+                    anonymized, it cannot be recovered or re-identified.
+                  </p>
+                </div>
+                <p className="text-gray-700 leading-relaxed">
+                  For detailed information about data retention periods and handling,
+                  please refer to our{" "}
+                  <Link
+                    href="/privacy"
+                    className="text-blue-600 hover:text-blue-700 underline"
+                  >
+                    Privacy Policy, Section 4 (Data Retention)
+                  </Link>
+                  .
                 </p>
               </section>
 

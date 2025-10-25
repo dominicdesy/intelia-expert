@@ -439,92 +439,247 @@ export default function PrivacyPage() {
                 <p className="text-gray-700 mb-4">
                   We retain your personal information for as long as necessary
                   to provide our Services and fulfill the purposes described in
-                  this Privacy Policy.
+                  this Privacy Policy, in accordance with GDPR Article 5(1)(e)
+                  - Storage Limitation Principle.
                 </p>
 
-                <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <div className="bg-gray-50 p-4 rounded-lg mb-6">
                   <p className="font-semibold text-gray-900 mb-2">
                     General Principle:
                   </p>
                   <p className="text-gray-700 text-sm">
                     Personal data shall be processed and stored for as long as
                     required by the purpose for which they have been collected.
+                    Each category of data has a specific retention period based
+                    on its legal basis and purpose.
                   </p>
                 </div>
 
-                <p className="text-gray-700 mb-4">
-                  Specific retention periods include:
-                </p>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                  Specific Retention Periods:
+                </h3>
 
-                <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-6">
-                  <li>
-                    <strong>Personal Data for Contract Performance:</strong>{" "}
-                    Retained until the contract between us and you has been
-                    fully performed
-                  </li>
-                  <li>
-                    <strong>Personal Data for Legitimate Interests:</strong>{" "}
-                    Retained as long as needed to fulfill such purposes
-                  </li>
-                  <li>
-                    <strong>Account Information:</strong> Retained while your
-                    account is active and for a reasonable period thereafter
-                  </li>
-                  <li>
-                    <strong>Inputs and Outputs:</strong> Stored according to
-                    your account settings and our data retention policies
-                  </li>
-                  <li>
-                    <strong>Usage and Log Data:</strong> Typically retained for
-                    up to 24 months for security and service improvement
-                    purposes
-                  </li>
-                  <li>
-                    <strong>Communication Records:</strong> Retained for
-                    customer service and legal compliance purposes
-                  </li>
-                </ul>
+                <div className="space-y-6">
+                  <div className="border-l-4 border-blue-500 pl-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">
+                      Conversations and Messages (Inputs & Outputs)
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Retention Period:</strong> Indefinitely while your account is active
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Legal Basis:</strong> GDPR Article 6(1)(b) - Performance of Contract
+                    </p>
+                    <p className="text-gray-700 text-sm">
+                      <strong>Justification:</strong> Your conversation history is an essential
+                      feature of the Service, enabling continuity across sessions and
+                      continuous improvement of our AI models. This is comparable to
+                      services like ChatGPT and Claude.ai which retain conversation
+                      history indefinitely.
+                    </p>
+                    <p className="text-gray-700 text-sm mt-2">
+                      <strong>Upon Account Deletion:</strong> Conversations are anonymized
+                      (not deleted) - all identifying information is replaced with an
+                      anonymous identifier, making it impossible to link the data back
+                      to you.
+                    </p>
+                  </div>
 
-                <div className="space-y-4">
+                  <div className="border-l-4 border-green-500 pl-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">
+                      Account Information (Profile Data)
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Retention Period:</strong> While your account is active
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Legal Basis:</strong> GDPR Article 6(1)(b) - Performance of Contract
+                    </p>
+                    <p className="text-gray-700 text-sm">
+                      Personal information (name, email, preferences) is essential to
+                      identify you and personalize your experience. Upon account deletion,
+                      this data is immediately anonymized.
+                    </p>
+                  </div>
+
+                  <div className="border-l-4 border-purple-500 pl-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">
+                      Billing and Payment Information
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Retention Period:</strong> 10 years after last transaction
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Legal Basis:</strong> GDPR Article 6(1)(c) - Legal Obligation
+                    </p>
+                    <p className="text-gray-700 text-sm mb-2">
+                      <strong>Justification:</strong> Canadian General Tax Code (Art. L102 B)
+                      requires businesses to retain accounting records for 10 years.
+                    </p>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mt-2">
+                      <p className="text-yellow-800 text-xs">
+                        <strong>Important:</strong> This retention is mandatory by law and
+                        cannot be waived even upon explicit request. Upon account deletion,
+                        billing data is anonymized but retained for the full legal period.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-l-4 border-orange-500 pl-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">
+                      Session Data
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Active Sessions:</strong> Until expiration (24 hours of inactivity)
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Expired Sessions:</strong> 7 days after expiration
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Legal Basis:</strong> GDPR Article 6(1)(f) - Legitimate Interest
+                    </p>
+                    <p className="text-gray-700 text-sm">
+                      Temporary retention of expired sessions allows detection of suspicious
+                      activity and security monitoring.
+                    </p>
+                  </div>
+
+                  <div className="border-l-4 border-red-500 pl-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">
+                      Application Logs
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Retention Period:</strong> Maximum 12 months
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Legal Basis:</strong> GDPR Article 6(1)(f) - Legitimate Interest
+                    </p>
+                    <p className="text-gray-700 text-sm mb-2">
+                      Server logs (errors, API requests) are essential for technical
+                      diagnosis, performance improvement, and intrusion detection.
+                    </p>
+                    <div className="bg-green-50 border border-green-200 rounded p-3 mt-2">
+                      <p className="text-green-800 text-xs">
+                        <strong>Privacy Protection:</strong> Email addresses in logs are
+                        automatically masked (e.g., "j***n@e***.com"). Passwords and
+                        sensitive health data are never logged.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-l-4 border-gray-500 pl-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">
+                      Medical Images
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Retention Period:</strong> While your account is active
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Legal Basis:</strong> GDPR Article 6(1)(b) - Performance of Contract
+                    </p>
+                    <p className="text-gray-700 text-sm">
+                      Images uploaded during consultations provide necessary medical context.
+                      Upon account deletion, metadata is anonymized but files remain in
+                      cloud storage unlinked to your identity.
+                    </p>
+                  </div>
+
+                  <div className="border-l-4 border-indigo-500 pl-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">
+                      Anonymized Data
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Retention Period:</strong> Indefinitely
+                    </p>
+                    <p className="text-gray-700 mb-2">
+                      <strong>Legal Basis:</strong> Not subject to GDPR (Article 4(1))
+                    </p>
+                    <p className="text-gray-700 text-sm">
+                      Once data is properly anonymized (no longer allows identification),
+                      it is no longer considered "personal data" under GDPR and can be
+                      retained indefinitely for analytics and service improvement.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mt-6">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                    Automatic Data Cleanup
+                  </h3>
+                  <p className="text-blue-700 text-sm mb-2">
+                    We have implemented automated processes to ensure compliance with
+                    these retention periods:
+                  </p>
+                  <ul className="list-disc pl-6 text-blue-700 text-sm space-y-1">
+                    <li>Daily cleanup of expired sessions (older than 7 days)</li>
+                    <li>Monthly rotation and archival of application logs</li>
+                    <li>Automatic deletion of logs older than 12 months</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-4 mt-6">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      Extended Retention:
+                      Extended Retention
                     </h3>
                     <p className="text-gray-700 mb-2">
-                      We may retain personal data for a longer period when:
+                      We may retain personal data beyond the standard periods when:
                     </p>
                     <ul className="list-disc pl-6 text-gray-700 space-y-1">
                       <li>
-                        You have given consent to such processing, as long as
-                        such consent is not withdrawn
+                        You have given explicit consent to such processing, as long as
+                        consent is not withdrawn
                       </li>
                       <li>
-                        Required to do so for the performance of a legal
-                        obligation or upon order of an authority
+                        Required by law or upon order of a regulatory authority
                       </li>
                       <li>
-                        Necessary to protect our rights and interests or those
-                        of our users or third parties
+                        Necessary for the establishment, exercise, or defense of legal
+                        claims
+                      </li>
+                      <li>
+                        Necessary to protect the vital interests of you or another person
                       </li>
                     </ul>
                   </div>
 
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      Data Deletion:
+                      Your Control Over Data Retention
                     </h3>
                     <p className="text-gray-700 mb-2">
-                      Once the retention period expires, personal data shall be
-                      deleted. Therefore, the rights of access, erasure,
-                      rectification, and data portability cannot be enforced
-                      after the expiration of the retention period.
+                      You can exercise control over your data at any time:
                     </p>
-                    <p className="text-gray-700">
-                      You can delete individual conversations and manage your
-                      data through your account settings. When you delete your
-                      account, we will delete or anonymize your personal
-                      information, except as required for legal compliance or
-                      legitimate business purposes.
+                    <ul className="list-disc pl-6 text-gray-700 space-y-1">
+                      <li>
+                        <strong>Delete Individual Conversations:</strong> Via your account
+                        settings (immediate deletion)
+                      </li>
+                      <li>
+                        <strong>Export All Your Data:</strong> Profile → Security tab →
+                        "Download my data" (GDPR Article 20)
+                      </li>
+                      <li>
+                        <strong>Delete Your Account:</strong> Profile → Security tab →
+                        "Delete my account" (GDPR Article 17)
+                      </li>
+                    </ul>
+                    <p className="text-gray-700 mt-2">
+                      When you delete your account, we immediately anonymize all your
+                      personal information (name, email, phone), making it impossible
+                      to identify you. Anonymized conversations and billing records are
+                      retained as described above, but can no longer be linked to you.
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Post-Retention Period Rights
+                    </h3>
+                    <p className="text-gray-700 text-sm">
+                      Once the retention period expires and personal data is deleted,
+                      the rights of access, erasure, rectification, and data portability
+                      can no longer be exercised, as the data no longer exists.
                     </p>
                   </div>
                 </div>
