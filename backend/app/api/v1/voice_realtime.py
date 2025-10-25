@@ -218,30 +218,25 @@ class VoiceRealtimeSession:
         self.current_assistant_response: Optional[str] = None
 
     async def load_voice_preferences(self):
-        """Charge les préférences vocales depuis la DB"""
+        """Charge les préférences vocales depuis Supabase"""
         try:
-            from app.core.database import get_pg_connection
-            from psycopg2.extras import RealDictCursor
+            from app.core.database import get_supabase_client
 
-            with get_pg_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute("""
-                        SELECT voice_preference, voice_speed
-                        FROM public.users
-                        WHERE id = %s
-                    """, (self.user_id,))
+            supabase = get_supabase_client()
+            response = supabase.table("users").select(
+                "voice_preference, voice_speed"
+            ).eq("id", self.user_id).execute()
 
-                    result = cur.fetchone()
-
-                    if result:
-                        self.voice_preference = result.get("voice_preference") or "alloy"
-                        self.voice_speed = float(result.get("voice_speed") or 1.0)
-                        logger.info(
-                            f"[VoicePrefs] Loaded for {self.user_email}: "
-                            f"voice={self.voice_preference}, speed={self.voice_speed}"
-                        )
-                    else:
-                        logger.warning(f"[VoicePrefs] No preferences found for {self.user_email}, using defaults")
+            if response.data and len(response.data) > 0:
+                result = response.data[0]
+                self.voice_preference = result.get("voice_preference") or "alloy"
+                self.voice_speed = float(result.get("voice_speed") or 1.0)
+                logger.info(
+                    f"[VoicePrefs] Loaded for {self.user_email}: "
+                    f"voice={self.voice_preference}, speed={self.voice_speed}"
+                )
+            else:
+                logger.warning(f"[VoicePrefs] No preferences found for {self.user_email}, using defaults")
 
         except Exception as e:
             logger.error(f"[VoicePrefs] Error loading preferences for {self.user_email}: {e}")

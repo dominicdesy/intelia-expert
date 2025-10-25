@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, validator
 import logging
 
 from app.api.v1.auth import get_current_user
-from app.core.database import get_pg_connection
+from app.core.database import get_pg_connection, get_supabase_client
 from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
@@ -109,49 +109,55 @@ async def get_voice_settings(
         )
 
     try:
-        with get_pg_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Récupérer préférences depuis table users
-                cur.execute("""
-                    SELECT
-                        u.voice_preference,
-                        u.voice_speed,
-                        ubi.plan_name
-                    FROM public.users u
-                    LEFT JOIN user_billing_info ubi ON u.email = ubi.user_email
-                    WHERE u.id = %s
-                """, (user_id,))
+        # 1. Récupérer préférences vocales depuis Supabase
+        supabase = get_supabase_client()
+        supabase_response = supabase.table("users").select(
+            "email, voice_preference, voice_speed"
+        ).eq("id", user_id).execute()
 
-                result = cur.fetchone()
+        if not supabase_response.data or len(supabase_response.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found in Supabase"
+            )
 
-                if not result:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="User not found"
-                    )
+        user_data = supabase_response.data[0]
+        user_email = user_data.get("email")
+        voice_preference = user_data.get("voice_preference") or "alloy"
+        voice_speed = float(user_data.get("voice_speed") or 1.0)
 
-                # Valeurs par défaut si NULL
-                voice_preference = result.get("voice_preference") or "alloy"
-                voice_speed = float(result.get("voice_speed") or 1.0)
-                plan = result.get("plan_name") or "essential"
+        # 2. Récupérer plan depuis backend PostgreSQL
+        plan = "essential"  # Valeur par défaut
+        if user_email:
+            with get_pg_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute("""
+                        SELECT plan_name
+                        FROM user_billing_info
+                        WHERE user_email = %s
+                    """, (user_email,))
 
-                # Vérifier accès vocal
-                can_use = check_voice_access({
-                    "plan": plan,
-                    "is_admin": current_user.get("is_admin", False)
-                })
+                    billing_result = cur.fetchone()
+                    if billing_result:
+                        plan = billing_result.get("plan_name") or "essential"
 
-                logger.info(
-                    f"[VoiceSettings] GET for user {user_id}: "
-                    f"voice={voice_preference}, speed={voice_speed}, plan={plan}"
-                )
+        # 3. Vérifier accès vocal
+        can_use = check_voice_access({
+            "plan": plan,
+            "is_admin": current_user.get("is_admin", False)
+        })
 
-                return VoiceSettingsResponse(
-                    voice_preference=voice_preference,
-                    voice_speed=voice_speed,
-                    can_use_voice=can_use,
-                    plan=plan
-                )
+        logger.info(
+            f"[VoiceSettings] GET for user {user_id} ({user_email}): "
+            f"voice={voice_preference}, speed={voice_speed}, plan={plan}"
+        )
+
+        return VoiceSettingsResponse(
+            voice_preference=voice_preference,
+            voice_speed=voice_speed,
+            can_use_voice=can_use,
+            plan=plan
+        )
 
     except HTTPException:
         raise
@@ -208,44 +214,35 @@ async def update_voice_settings(
         )
 
     try:
-        with get_pg_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Mettre à jour les préférences
-                cur.execute("""
-                    UPDATE public.users
-                    SET
-                        voice_preference = %s,
-                        voice_speed = %s
-                    WHERE id = %s
-                    RETURNING
-                        voice_preference,
-                        voice_speed
-                """, (settings.voice_preference, settings.voice_speed, user_id))
+        # Mettre à jour les préférences dans Supabase
+        supabase = get_supabase_client()
+        update_response = supabase.table("users").update({
+            "voice_preference": settings.voice_preference,
+            "voice_speed": settings.voice_speed
+        }).eq("id", user_id).execute()
 
-                result = cur.fetchone()
+        if not update_response.data or len(update_response.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
 
-                if not result:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="User not found"
-                    )
+        updated_data = update_response.data[0]
 
-                conn.commit()
+        logger.info(
+            f"[VoiceSettings] PUT success for user {user_id}: "
+            f"voice={settings.voice_preference}, speed={settings.voice_speed}"
+        )
 
-                logger.info(
-                    f"[VoiceSettings] PUT success for user {user_id}: "
-                    f"voice={settings.voice_preference}, speed={settings.voice_speed}"
-                )
+        # Récupérer le plan pour la réponse
+        plan = current_user.get("plan", "elite")
 
-                # Récupérer le plan pour la réponse
-                plan = current_user.get("plan", "elite")
-
-                return VoiceSettingsResponse(
-                    voice_preference=result["voice_preference"],
-                    voice_speed=float(result["voice_speed"]),
-                    can_use_voice=True,
-                    plan=plan
-                )
+        return VoiceSettingsResponse(
+            voice_preference=updated_data["voice_preference"],
+            voice_speed=float(updated_data["voice_speed"]),
+            can_use_voice=True,
+            plan=plan
+        )
 
     except HTTPException:
         raise
