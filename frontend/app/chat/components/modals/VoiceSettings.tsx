@@ -254,6 +254,7 @@ export const VoiceSettings: React.FC<VoiceSettingsProps> = ({ preloadedVoices })
         <div className="relative text-xs text-gray-500 mt-1 h-4">
           <span className="absolute left-0">0.8x {t('voiceSettings.slower') || 'Slower'}</span>
           <span className="absolute left-[28.6%] -translate-x-1/2">1.0x {t('voiceSettings.normal') || 'Normal'}</span>
+          <span className="absolute left-[57.1%] -translate-x-1/2">1.2x</span>
           <span className="absolute right-0">1.5x {t('voiceSettings.faster') || 'Faster'}</span>
         </div>
       </div>
