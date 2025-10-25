@@ -5,8 +5,8 @@ import { secureLog } from "@/lib/utils/secureLogger";
 
 /**
  * SÉCURITÉ: Proxy générique pour tous les endpoints LLM
- * Redirige les requêtes /api/llm/* vers http://intelia-llm:8080/*
- * Permet de bloquer l'accès public au service LLM
+ * Redirige les requêtes /api/llm/* vers http://intelia-llm:8080/* (réseau interne)
+ * Permet de bloquer l'accès public au service LLM pour une sécurité accrue
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
