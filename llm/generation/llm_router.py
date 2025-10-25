@@ -230,6 +230,9 @@ class LLMRouter:
     ) -> str:
         """Generate using DeepSeek ($0.55/1M)"""
 
+        import time
+        start_time = time.time()
+
         response = await self.deepseek_client.chat.completions.create(
             model="deepseek-chat",
             messages=messages,
@@ -237,13 +240,33 @@ class LLMRouter:
             max_tokens=max_tokens,
         )
 
+        duration = time.time() - start_time
+
         # Track usage
+        prompt_tokens = response.usage.prompt_tokens
+        completion_tokens = response.usage.completion_tokens
         tokens = response.usage.total_tokens
         cost = tokens / 1_000_000 * 0.55  # $0.55 per 1M tokens
 
         self.usage_stats[LLMProvider.DEEPSEEK.value]["calls"] += 1
         self.usage_stats[LLMProvider.DEEPSEEK.value]["tokens"] += tokens
         self.usage_stats[LLMProvider.DEEPSEEK.value]["cost"] += cost
+
+        # Track Prometheus metrics
+        try:
+            from monitoring.prometheus_metrics import track_llm_call
+            track_llm_call(
+                model="deepseek-chat",
+                provider="deepseek",
+                feature="chat",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cost_usd=cost,
+                duration=duration,
+                status="success"
+            )
+        except Exception as e:
+            logger.debug(f"Failed to track Prometheus metrics: {e}")
 
         logger.info(f"✅ DeepSeek: {tokens} tokens, ${cost:.4f}")
 
@@ -253,6 +276,9 @@ class LLMRouter:
         self, messages: List[Dict], temperature: float, max_tokens: int
     ) -> str:
         """Generate using Claude 3.5 Sonnet ($3/1M)"""
+
+        import time
+        start_time = time.time()
 
         # Convert OpenAI format to Anthropic format
         system_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
@@ -271,13 +297,33 @@ class LLMRouter:
             max_tokens=max_tokens,
         )
 
+        duration = time.time() - start_time
+
         # Track usage
-        tokens = response.usage.input_tokens + response.usage.output_tokens
+        prompt_tokens = response.usage.input_tokens
+        completion_tokens = response.usage.output_tokens
+        tokens = prompt_tokens + completion_tokens
         cost = tokens / 1_000_000 * 3.0  # $3 per 1M tokens
 
         self.usage_stats[LLMProvider.CLAUDE_35_SONNET.value]["calls"] += 1
         self.usage_stats[LLMProvider.CLAUDE_35_SONNET.value]["tokens"] += tokens
         self.usage_stats[LLMProvider.CLAUDE_35_SONNET.value]["cost"] += cost
+
+        # Track Prometheus metrics
+        try:
+            from monitoring.prometheus_metrics import track_llm_call
+            track_llm_call(
+                model=model,
+                provider="anthropic",
+                feature="chat",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cost_usd=cost,
+                duration=duration,
+                status="success"
+            )
+        except Exception as e:
+            logger.debug(f"Failed to track Prometheus metrics: {e}")
 
         logger.info(f"✅ Claude 3.5 Sonnet: {tokens} tokens, ${cost:.4f}")
 
@@ -288,6 +334,9 @@ class LLMRouter:
     ) -> str:
         """Generate using GPT-4o ($15/1M)"""
 
+        import time
+        start_time = time.time()
+
         response = await self.openai_client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
@@ -295,13 +344,33 @@ class LLMRouter:
             max_tokens=max_tokens,
         )
 
+        duration = time.time() - start_time
+
         # Track usage
+        prompt_tokens = response.usage.prompt_tokens
+        completion_tokens = response.usage.completion_tokens
         tokens = response.usage.total_tokens
         cost = tokens / 1_000_000 * 15.0  # $15 per 1M tokens
 
         self.usage_stats[LLMProvider.GPT_4O.value]["calls"] += 1
         self.usage_stats[LLMProvider.GPT_4O.value]["tokens"] += tokens
         self.usage_stats[LLMProvider.GPT_4O.value]["cost"] += cost
+
+        # Track Prometheus metrics
+        try:
+            from monitoring.prometheus_metrics import track_llm_call
+            track_llm_call(
+                model="gpt-4o",
+                provider="openai",
+                feature="chat",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cost_usd=cost,
+                duration=duration,
+                status="success"
+            )
+        except Exception as e:
+            logger.debug(f"Failed to track Prometheus metrics: {e}")
 
         logger.info(f"✅ GPT-4o: {tokens} tokens, ${cost:.4f}")
 

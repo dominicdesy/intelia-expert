@@ -10,6 +10,7 @@ from fastapi import APIRouter
 from .basic_health import create_basic_health_routes
 from .status_routes import create_status_routes
 from .metrics_routes import create_metrics_routes
+from .prometheus_routes import create_prometheus_routes
 
 
 def create_health_endpoints(services: Dict[str, Any]) -> APIRouter:
@@ -32,6 +33,7 @@ def create_health_endpoints(services: Dict[str, Any]) -> APIRouter:
     router.include_router(create_basic_health_routes(get_service))
     router.include_router(create_status_routes(get_service))
     router.include_router(create_metrics_routes(get_service))
+    router.include_router(create_prometheus_routes(get_service))
 
     return router
 
