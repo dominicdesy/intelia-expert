@@ -1056,5 +1056,30 @@
   "components.selectImage": "Select an image to upload",
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
-  "components.cachedData": "Cached data"
+  "components.cachedData": "Cached data",
+  "voiceSettings": {
+    "title": "Asistente de voz",
+    "selectVoice": "Selección de voz",
+    "speed": "Velocidad del habla",
+    "listen": "Escuchar",
+    "slower": "Más lento",
+    "normal": "Normal",
+    "faster": "Más rápido",
+    "upgradeRequired": "Actualización requerida",
+    "upgradeMessage": "El asistente de voz solo está disponible para los planes Elite e Intelia. Actualice su plan para acceder a esta función.",
+    "currentPlan": "Su plan actual"
+  },
+  "success": {
+    "voiceSettingsSaved": "¡Configuración de voz guardada con éxito!"
+  },
+  "error": {
+    "loadVoiceSettings": "Error al cargar la configuración de voz",
+    "saveVoiceSettings": "Error al guardar la configuración de voz"
+  },
+  "passkey": {
+    "addedOn": "Agregado el"
+  },
+  "profile": {
+    "security": "Seguridad"
+  }
 }

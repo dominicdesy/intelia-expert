@@ -1056,5 +1056,30 @@
   "components.selectImage": "Select an image to upload",
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
-  "components.cachedData": "Cached data"
+  "components.cachedData": "Cached data",
+  "voiceSettings": {
+    "title": "Asystent głosowy",
+    "selectVoice": "Wybór głosu",
+    "speed": "Prędkość mowy",
+    "listen": "Słuchaj",
+    "slower": "Wolniej",
+    "normal": "Normalny",
+    "faster": "Szybciej",
+    "upgradeRequired": "Wymagana aktualizacja",
+    "upgradeMessage": "Asystent głosowy jest dostępny tylko dla planów Elite i Intelia. Zaktualizuj swój plan, aby uzyskać dostęp do tej funkcji.",
+    "currentPlan": "Twój obecny plan"
+  },
+  "success": {
+    "voiceSettingsSaved": "Ustawienia głosu zapisane pomyślnie!"
+  },
+  "error": {
+    "loadVoiceSettings": "Błąd ładowania ustawień głosu",
+    "saveVoiceSettings": "Błąd zapisu ustawień głosu"
+  },
+  "passkey": {
+    "addedOn": "Dodano"
+  },
+  "profile": {
+    "security": "Bezpieczeństwo"
+  }
 }

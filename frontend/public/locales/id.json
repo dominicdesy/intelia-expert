@@ -1056,5 +1056,30 @@
   "components.selectImage": "Select an image to upload",
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
-  "components.cachedData": "Cached data"
+  "components.cachedData": "Cached data",
+  "voiceSettings": {
+    "title": "Asisten suara",
+    "selectVoice": "Pemilihan suara",
+    "speed": "Kecepatan bicara",
+    "listen": "Dengarkan",
+    "slower": "Lebih lambat",
+    "normal": "Normal",
+    "faster": "Lebih cepat",
+    "upgradeRequired": "Upgrade diperlukan",
+    "upgradeMessage": "Asisten suara hanya tersedia untuk paket Elite dan Intelia. Tingkatkan paket Anda untuk mengakses fitur ini.",
+    "currentPlan": "Paket Anda saat ini"
+  },
+  "success": {
+    "voiceSettingsSaved": "Pengaturan suara berhasil disimpan!"
+  },
+  "error": {
+    "loadVoiceSettings": "Kesalahan memuat pengaturan suara",
+    "saveVoiceSettings": "Kesalahan menyimpan pengaturan suara"
+  },
+  "passkey": {
+    "addedOn": "Ditambahkan pada"
+  },
+  "profile": {
+    "security": "Keamanan"
+  }
 }

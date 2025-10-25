@@ -208,10 +208,44 @@ class VoiceRealtimeSession:
         # Langue détectée (pour ajuster vitesse)
         self.detected_language: Optional[str] = None
 
+        # Préférences vocales utilisateur (chargées de la DB)
+        self.voice_preference = "alloy"  # Default
+        self.voice_speed = 1.0  # Default
+
         # Conversation history for database storage
         self.conversation_history: list = []
         self.current_user_message: Optional[str] = None
         self.current_assistant_response: Optional[str] = None
+
+    async def load_voice_preferences(self):
+        """Charge les préférences vocales depuis la DB"""
+        try:
+            from app.core.database import get_pg_connection
+            from psycopg2.extras import RealDictCursor
+
+            with get_pg_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute("""
+                        SELECT voice_preference, voice_speed
+                        FROM public.users
+                        WHERE id = %s
+                    """, (self.user_id,))
+
+                    result = cur.fetchone()
+
+                    if result:
+                        self.voice_preference = result.get("voice_preference") or "alloy"
+                        self.voice_speed = float(result.get("voice_speed") or 1.0)
+                        logger.info(
+                            f"[VoicePrefs] Loaded for {self.user_email}: "
+                            f"voice={self.voice_preference}, speed={self.voice_speed}"
+                        )
+                    else:
+                        logger.warning(f"[VoicePrefs] No preferences found for {self.user_email}, using defaults")
+
+        except Exception as e:
+            logger.error(f"[VoicePrefs] Error loading preferences for {self.user_email}: {e}")
+            # Garder les valeurs par défaut en cas d'erreur
 
     async def connect_openai(self):
         """Connexion WebSocket à OpenAI Realtime API"""
@@ -241,9 +275,13 @@ class VoiceRealtimeSession:
             return False
 
     async def configure_openai_session(self, language: Optional[str] = None):
-        """Configurer session OpenAI avec instructions multilingues et vitesse ajustée"""
-        # Ajuster vitesse pour chinois: 15% plus rapide
-        speed = 1.15 if language == "zh" else 1.0
+        """Configurer session OpenAI avec instructions multilingues et préférences utilisateur"""
+        # Utiliser vitesse préférée de l'utilisateur
+        # Note: Si langue chinoise détectée et pas de préférence custom, ajuster vitesse
+        speed = self.voice_speed
+        if language == "zh" and self.voice_speed == 1.0:
+            speed = 1.15
+            logger.info(f"⚡ Auto-adjusting speed to {speed}x for Chinese")
 
         config = {
             "type": "session.update",
@@ -274,7 +312,7 @@ class VoiceRealtimeSession:
                     "\n"
                     "Supported voice languages: English, French, Spanish, Portuguese, German, Italian, Dutch, Japanese, Chinese, Korean"
                 ),
-                "voice": "alloy",
+                "voice": self.voice_preference,  # Voix préférée de l'utilisateur
                 "input_audio_format": "pcm16",
                 "output_audio_format": "pcm16",
                 "input_audio_transcription": {
@@ -294,10 +332,10 @@ class VoiceRealtimeSession:
         # Ajouter paramètre speed seulement si différent de 1.0
         if speed != 1.0:
             config["session"]["speed"] = speed
-            logger.info(f"⚡ Adjusting playback speed to {speed}x for language: {language}")
+            logger.info(f"⚡ Playback speed set to {speed}x (user preference)")
 
         await self.openai_ws.send(json.dumps(config))
-        logger.info("⚙️  OpenAI session configured")
+        logger.info(f"⚙️  OpenAI session configured with voice={self.voice_preference}, speed={speed}x")
 
     async def handle_partial_transcript(self, transcript: str):
         """
@@ -475,6 +513,9 @@ class VoiceRealtimeSession:
         self.running = True
 
         try:
+            # Charger préférences vocales utilisateur
+            await self.load_voice_preferences()
+
             # Connexion OpenAI
             if not await self.connect_openai():
                 await self.client_ws.close(code=1011, reason="OpenAI connection failed")
@@ -630,18 +671,18 @@ async def voice_realtime_endpoint(
         logger.error(f"❌ Authentication failed: {e}")
         return  # WebSocket already closed by get_current_user_from_websocket
 
-    # VÉRIFICATION DU PLAN - Assistant vocal réservé aux plans Pro, Elite et Intelia
+    # VÉRIFICATION DU PLAN - Assistant vocal réservé aux plans Elite et Intelia
     try:
         from app.services.usage_limiter import get_user_plan_and_quota
         plan_name, _, _ = get_user_plan_and_quota(user_email)
         plan_lower = plan_name.lower() if plan_name else "essential"
 
-        # Assistant vocal réservé aux plans Pro, Elite et Intelia
-        if plan_lower not in ["pro", "elite", "intelia"]:
+        # Assistant vocal réservé aux plans Elite et Intelia (killer feature Elite)
+        if plan_lower not in ["elite", "intelia"]:
             logger.warning(f"❌ Voice assistant denied for {user_email} (plan: {plan_name})")
             await websocket.close(
                 code=4003,
-                reason="L'assistant vocal est réservé aux plans Pro, Elite et Intelia. Mettez à niveau votre abonnement."
+                reason="L'assistant vocal est réservé aux plans Elite et Intelia. Mettez à niveau votre abonnement."
             )
             return
 

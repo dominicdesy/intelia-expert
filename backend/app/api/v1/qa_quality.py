@@ -276,9 +276,10 @@ async def analyze_batch(
                     try:
                         # Déterminer le trigger
                         trigger = "batch"
+                        confidence = qa.get("response_confidence")
                         if qa["feedback"] == "-1" or qa["feedback"] == -1:
                             trigger = "negative_feedback"
-                        elif qa.get("response_confidence", 1.0) < 0.3:
+                        elif confidence is not None and confidence < 0.3:
                             trigger = "low_confidence"
 
                         # Analyser
@@ -676,9 +677,10 @@ async def cron_analyze_batch(
                     try:
                         # Déterminer le trigger
                         trigger = "cron_automatic"
+                        confidence = qa.get("response_confidence")
                         if qa["feedback"] == "-1" or qa["feedback"] == -1:
                             trigger = "cron_negative_feedback"
-                        elif qa.get("response_confidence", 1.0) < 0.3:
+                        elif confidence is not None and confidence < 0.3:
                             trigger = "cron_low_confidence"
 
                         # Analyser

@@ -1056,5 +1056,30 @@
   "components.selectImage": "Select an image to upload",
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
-  "components.cachedData": "Cached data"
+  "components.cachedData": "Cached data",
+  "voiceSettings": {
+    "title": "مساعد صوتي",
+    "selectVoice": "اختيار الصوت",
+    "speed": "سرعة الكلام",
+    "listen": "استمع",
+    "slower": "أبطأ",
+    "normal": "عادي",
+    "faster": "أسرع",
+    "upgradeRequired": "الترقية مطلوبة",
+    "upgradeMessage": "المساعد الصوتي متاح فقط لخطط Elite و Intelia. قم بترقية خطتك للوصول إلى هذه الميزة.",
+    "currentPlan": "خطتك الحالية"
+  },
+  "success": {
+    "voiceSettingsSaved": "تم حفظ إعدادات الصوت بنجاح!"
+  },
+  "error": {
+    "loadVoiceSettings": "خطأ في تحميل إعدادات الصوت",
+    "saveVoiceSettings": "خطأ في حفظ إعدادات الصوت"
+  },
+  "passkey": {
+    "addedOn": "أضيف في"
+  },
+  "profile": {
+    "security": "الأمان"
+  }
 }

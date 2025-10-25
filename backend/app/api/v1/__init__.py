@@ -739,6 +739,27 @@ if SATISFACTION_AVAILABLE and satisfaction_router:
 else:
     logger.warning("Satisfaction router non monté (module non disponible)")
 
+# Voice Settings (préférences vocales utilisateur - Elite et Intelia uniquement)
+VOICE_SETTINGS_AVAILABLE = False
+try:
+    from .voice_settings import router as voice_settings_router
+    VOICE_SETTINGS_AVAILABLE = True
+    logger.debug("Voice Settings router importé avec %d routes", len(voice_settings_router.routes))
+except ImportError as e:
+    logger.warning(f"Voice Settings router import failed: {e}")
+    voice_settings_router = None
+except Exception as e:
+    logger.error(f"ERREUR import voice_settings router: {e}")
+    voice_settings_router = None
+
+if VOICE_SETTINGS_AVAILABLE and voice_settings_router:
+    router.include_router(voice_settings_router, tags=["Voice-Settings"])
+    logger.debug("Voice Settings router monté")
+    logger.debug("Voice Settings router maintenant disponible sur /v1/voice-settings/*")
+    logger.info("Voice Settings activé (personnalisation assistant vocal - Elite/Intelia)!")
+else:
+    logger.warning("Voice Settings router non monté (module non disponible)")
+
 # Résumé final
 total_routes = len(router.routes)
 logger.info("Router v1 créé avec %d routes au total", total_routes)

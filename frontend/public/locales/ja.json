@@ -1056,5 +1056,30 @@
   "components.selectImage": "Select an image to upload",
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
-  "components.cachedData": "Cached data"
+  "components.cachedData": "Cached data",
+  "voiceSettings": {
+    "title": "音声アシスタント",
+    "selectVoice": "音声の選択",
+    "speed": "話す速度",
+    "listen": "聴く",
+    "slower": "遅く",
+    "normal": "通常",
+    "faster": "速く",
+    "upgradeRequired": "アップグレードが必要です",
+    "upgradeMessage": "音声アシスタントはEliteとInteliaプランでのみ利用可能です。この機能にアクセスするにはプランをアップグレードしてください。",
+    "currentPlan": "現在のプラン"
+  },
+  "success": {
+    "voiceSettingsSaved": "音声設定が正常に保存されました！"
+  },
+  "error": {
+    "loadVoiceSettings": "音声設定の読み込みエラー",
+    "saveVoiceSettings": "音声設定の保存エラー"
+  },
+  "passkey": {
+    "addedOn": "追加日"
+  },
+  "profile": {
+    "security": "セキュリティ"
+  }
 }

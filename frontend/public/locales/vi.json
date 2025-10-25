@@ -1056,5 +1056,30 @@
   "components.selectImage": "Select an image to upload",
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
-  "components.cachedData": "Cached data"
+  "components.cachedData": "Cached data",
+  "voiceSettings": {
+    "title": "Trợ lý giọng nói",
+    "selectVoice": "Chọn giọng nói",
+    "speed": "Tốc độ nói",
+    "listen": "Nghe",
+    "slower": "Chậm hơn",
+    "normal": "Bình thường",
+    "faster": "Nhanh hơn",
+    "upgradeRequired": "Cần nâng cấp",
+    "upgradeMessage": "Trợ lý giọng nói chỉ khả dụng cho gói Elite và Intelia. Nâng cấp gói của bạn để truy cập tính năng này.",
+    "currentPlan": "Gói hiện tại của bạn"
+  },
+  "success": {
+    "voiceSettingsSaved": "Lưu cài đặt giọng nói thành công!"
+  },
+  "error": {
+    "loadVoiceSettings": "Lỗi tải cài đặt giọng nói",
+    "saveVoiceSettings": "Lỗi lưu cài đặt giọng nói"
+  },
+  "passkey": {
+    "addedOn": "Đã thêm vào"
+  },
+  "profile": {
+    "security": "Bảo mật"
+  }
 }

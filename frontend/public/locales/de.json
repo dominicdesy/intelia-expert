@@ -1056,5 +1056,30 @@
   "components.selectImage": "Select an image to upload",
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
-  "components.cachedData": "Cached data"
+  "components.cachedData": "Cached data",
+  "voiceSettings": {
+    "title": "Sprachassistent",
+    "selectVoice": "Sprachauswahl",
+    "speed": "Sprechgeschwindigkeit",
+    "listen": "Anhören",
+    "slower": "Langsamer",
+    "normal": "Normal",
+    "faster": "Schneller",
+    "upgradeRequired": "Upgrade erforderlich",
+    "upgradeMessage": "Der Sprachassistent ist nur für Elite- und Intelia-Pläne verfügbar. Aktualisieren Sie Ihren Plan, um auf diese Funktion zuzugreifen.",
+    "currentPlan": "Ihr aktueller Plan"
+  },
+  "success": {
+    "voiceSettingsSaved": "Spracheinstellungen erfolgreich gespeichert!"
+  },
+  "error": {
+    "loadVoiceSettings": "Fehler beim Laden der Spracheinstellungen",
+    "saveVoiceSettings": "Fehler beim Speichern der Spracheinstellungen"
+  },
+  "passkey": {
+    "addedOn": "Hinzugefügt am"
+  },
+  "profile": {
+    "security": "Sicherheit"
+  }
 }

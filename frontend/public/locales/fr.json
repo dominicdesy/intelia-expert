@@ -1056,5 +1056,30 @@
   "components.selectImage": "Sélectionner une image à télécharger",
   "components.toggleBilling": "Basculer le cycle de facturation",
   "components.subscriptionPlans": "Plans d'abonnement",
-  "components.cachedData": "Données en cache"
+  "components.cachedData": "Données en cache",
+  "voiceSettings": {
+    "title": "Assistant vocal",
+    "selectVoice": "Sélection de la voix",
+    "speed": "Vitesse de parole",
+    "listen": "Écouter",
+    "slower": "Plus lent",
+    "normal": "Normal",
+    "faster": "Plus rapide",
+    "upgradeRequired": "Mise à niveau requise",
+    "upgradeMessage": "L'assistant vocal est disponible uniquement pour les plans Elite et Intelia. Mettez à niveau votre abonnement pour accéder à cette fonctionnalité.",
+    "currentPlan": "Votre plan actuel"
+  },
+  "success": {
+    "voiceSettingsSaved": "Préférences vocales sauvegardées avec succès !"
+  },
+  "error": {
+    "loadVoiceSettings": "Erreur lors du chargement des préférences vocales",
+    "saveVoiceSettings": "Erreur lors de la sauvegarde des préférences vocales"
+  },
+  "passkey": {
+    "addedOn": "Ajouté le"
+  },
+  "profile": {
+    "security": "Sécurité"
+  }
 }

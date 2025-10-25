@@ -1056,5 +1056,30 @@
   "components.selectImage": "Select an image to upload",
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
-  "components.cachedData": "Cached data"
+  "components.cachedData": "Cached data",
+  "voiceSettings": {
+    "title": "Sesli asistan",
+    "selectVoice": "Ses seçimi",
+    "speed": "Konuşma hızı",
+    "listen": "Dinle",
+    "slower": "Daha yavaş",
+    "normal": "Normal",
+    "faster": "Daha hızlı",
+    "upgradeRequired": "Yükseltme gerekli",
+    "upgradeMessage": "Sesli asistan yalnızca Elite ve Intelia planları için kullanılabilir. Bu özelliğe erişmek için planınızı yükseltin.",
+    "currentPlan": "Mevcut planınız"
+  },
+  "success": {
+    "voiceSettingsSaved": "Ses ayarları başarıyla kaydedildi!"
+  },
+  "error": {
+    "loadVoiceSettings": "Ses ayarları yüklenirken hata oluştu",
+    "saveVoiceSettings": "Ses ayarları kaydedilirken hata oluştu"
+  },
+  "passkey": {
+    "addedOn": "Eklenme tarihi"
+  },
+  "profile": {
+    "security": "Güvenlik"
+  }
 }

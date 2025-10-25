@@ -14,6 +14,7 @@ import { CountrySelect } from "../CountrySelect";
 import { apiClient } from "@/lib/api/client";
 import { secureLog } from "@/lib/utils/secureLogger";
 import { BaseDialog } from "../BaseDialog";
+import { VoiceSettings } from "./VoiceSettings";
 
 // Debug utility - TEMPORAIREMENT DÉSACTIVÉ
 const debugLog = (category: string, message: string, data?: any) => {
@@ -723,8 +724,8 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     () => [
       { id: "profile", label: t("nav.profile"), icon: "👤" },
       { id: "password", label: t("profile.password"), icon: "🔒" },
-      { id: "passkey", label: t("passkey.title"), icon: "🔐" },
-      { id: "security", label: "Sécurité", icon: "🛡️" },
+      { id: "voice", label: t("voiceSettings.title") || "Assistant vocal", icon: "🎙️" },
+      { id: "security", label: t("profile.security") || "Sécurité", icon: "🛡️" },
     ],
     [t],
   );
@@ -1146,9 +1147,9 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
     }
   }, [showDeleteConfirm]);
 
-  // Load passkeys when passkey tab is active
+  // Load passkeys when security tab is active (passkeys now in security tab)
   useEffect(() => {
-    if (activeTab === "passkey" && user) {
+    if (activeTab === "security" && user) {
       loadPasskeys();
     }
   }, [activeTab, user, loadPasskeys]);
@@ -1528,19 +1529,37 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
               </div>
             )}
 
-            {/* Passkey Tab */}
-            {activeTab === "passkey" && (
-              <div className="space-y-6" data-debug="passkey-tab">
+            {/* Voice Settings Tab (ancien Passkey) */}
+            {activeTab === "voice" && (
+              <div className="space-y-6" data-debug="voice-tab">
+                <VoiceSettings />
+              </div>
+            )}
+
+            {/* Security Tab */}
+            {activeTab === "security" && (
+              <div className="space-y-6" data-debug="security-tab">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  🛡️ {t("profile.security") || "Sécurité et Confidentialité"}
+                </h3>
+
+                {/* Success Messages */}
                 {passkeySuccess && (
                   <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
                     {passkeySuccess}
                   </div>
                 )}
+                {exportSuccess && (
+                  <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
+                    {exportSuccess}
+                  </div>
+                )}
 
+                {/* 0. AUTHENTIFICATION BIOMÉTRIQUE (déplacé depuis Passkey) */}
                 <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
                   <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center">
                     <span className="mr-2">🔐</span>
-                    {t("passkey.setupTitle") || "Configure votre Passkey"}
+                    {t("passkey.setupTitle") || "Authentification biométrique"}
                   </h3>
                   <p className="text-sm text-gray-600 mb-4">
                     {t("passkey.description") || "Utilisez Face ID, Touch ID ou votre empreinte digitale pour vous connecter rapidement."}
@@ -1564,72 +1583,56 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
                   <button
                     onClick={handleSetupPasskey}
                     disabled={isPasskeyLoading || !isPasskeySupported()}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed mb-4"
                   >
                     {isPasskeyLoading
                       ? t("passkey.setup.inProgress") || "Configuration..."
                       : t("passkey.setupButton") || "Configurer un Passkey"}
                   </button>
-                </div>
 
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-3">
-                    {t("passkey.registered") || "Passkeys enregistrés"}
-                  </h4>
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <h4 className="font-medium text-gray-900 mb-3">
+                      {t("passkey.registered") || "Passkeys enregistrés"}
+                    </h4>
 
-                  {isLoadingPasskeys ? (
-                    <div className="flex justify-center py-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                    </div>
-                  ) : passkeys.length === 0 ? (
-                    <p className="text-sm text-gray-500">
-                      {t("passkey.noPasskeys") || "Aucun passkey enregistré"}
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {passkeys.map((passkey) => (
-                        <div
-                          key={passkey.id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <span>🔐</span>
-                            <div>
-                              <p className="font-medium text-sm text-gray-900">
-                                {passkey.device_name || "Appareil"}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Ajouté le {new Date(passkey.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleDeletePasskey(passkey.credential_id)}
-                            className="text-red-600 hover:text-red-700 text-sm font-medium"
+                    {isLoadingPasskeys ? (
+                      <div className="flex justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      </div>
+                    ) : passkeys.length === 0 ? (
+                      <p className="text-sm text-gray-500">
+                        {t("passkey.noPasskeys") || "Aucun passkey enregistré"}
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {passkeys.map((passkey) => (
+                          <div
+                            key={passkey.id}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded"
                           >
-                            {t("passkey.manage.delete") || "Supprimer"}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Security Tab */}
-            {activeTab === "security" && (
-              <div className="space-y-6" data-debug="security-tab">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  🛡️ Sécurité et Confidentialité
-                </h3>
-
-                {/* Export Success Message */}
-                {exportSuccess && (
-                  <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
-                    {exportSuccess}
+                            <div className="flex items-center space-x-2">
+                              <span>🔐</span>
+                              <div>
+                                <p className="font-medium text-sm text-gray-900">
+                                  {passkey.device_name || "Appareil"}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {t("passkey.addedOn") || "Ajouté le"} {new Date(passkey.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleDeletePasskey(passkey.credential_id)}
+                              className="text-red-600 hover:text-red-700 text-sm font-medium"
+                            >
+                              {t("passkey.manage.delete") || "Supprimer"}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* 1. EXPORT DES DONNÉES (GDPR Article 20) */}
                 <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
@@ -1746,7 +1749,7 @@ export const UserInfoModal: React.FC<UserInfoModalProps> = ({
             )}
 
             {/* Footer Buttons */}
-            {activeTab !== "passkey" && activeTab !== "security" && (
+            {activeTab !== "voice" && activeTab !== "security" && (
               <div
                 className="flex justify-end space-x-3 pt-4 pb-8"
                 data-debug="footer"

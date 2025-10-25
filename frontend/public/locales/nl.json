@@ -1056,5 +1056,30 @@
   "components.selectImage": "Select an image to upload",
   "components.toggleBilling": "Toggle billing cycle",
   "components.subscriptionPlans": "Subscription plans",
-  "components.cachedData": "Cached data"
+  "components.cachedData": "Cached data",
+  "voiceSettings": {
+    "title": "Spraakassistent",
+    "selectVoice": "Stem selectie",
+    "speed": "Spreeksnelheid",
+    "listen": "Luisteren",
+    "slower": "Langzamer",
+    "normal": "Normaal",
+    "faster": "Sneller",
+    "upgradeRequired": "Upgrade vereist",
+    "upgradeMessage": "Spraakassistent is alleen beschikbaar voor Elite en Intelia abonnementen. Upgrade uw abonnement om toegang te krijgen tot deze functie.",
+    "currentPlan": "Uw huidige abonnement"
+  },
+  "success": {
+    "voiceSettingsSaved": "Spraak instellingen succesvol opgeslagen!"
+  },
+  "error": {
+    "loadVoiceSettings": "Fout bij het laden van spraak instellingen",
+    "saveVoiceSettings": "Fout bij het opslaan van spraak instellingen"
+  },
+  "passkey": {
+    "addedOn": "Toegevoegd op"
+  },
+  "profile": {
+    "security": "Beveiliging"
+  }
 }
