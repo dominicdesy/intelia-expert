@@ -20,7 +20,7 @@ scrape_configs:
     scheme: http
     static_configs:
       - targets:
-        - intelia-llm:8080
+        - intelia-llm:8000
     metrics_path: /metrics
     scrape_interval: 15s
     scrape_timeout: 10s
