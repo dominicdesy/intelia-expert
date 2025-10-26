@@ -450,17 +450,15 @@ async def get_cost_by_user(
         query = """
             SELECT
                 m.user_id,
-                u.email,
                 SUM(m.cost_usd) as total_cost_usd,
                 SUM(m.total_tokens) as total_tokens,
                 SUM(m.request_count) as total_requests,
                 COUNT(DISTINCT m.model) as models_used
             FROM llm_metrics_history m
-            LEFT JOIN auth.users u ON m.user_id = u.id
             WHERE m.recorded_at >= %s
               AND m.recorded_at <= %s
               AND m.user_id IS NOT NULL
-            GROUP BY m.user_id, u.email
+            GROUP BY m.user_id
             ORDER BY total_cost_usd DESC
             LIMIT %s
         """
@@ -470,22 +468,40 @@ async def get_cost_by_user(
                 cur.execute(query, (start, end, limit))
                 rows = cur.fetchall()
 
+        # Get emails from Supabase for each user_id
+        from app.core.database import get_supabase_client
+        supabase = get_supabase_client()
+
+        users_data = []
+        for row in rows:
+            user_id = str(row[0]) if row[0] else None
+            email = None
+
+            # Try to get email from Supabase
+            if user_id:
+                try:
+                    user_response = supabase.auth.admin.get_user_by_id(user_id)
+                    if hasattr(user_response, 'user') and user_response.user:
+                        email = user_response.user.email
+                except Exception as e:
+                    logger.debug(f"Could not fetch email for user {user_id}: {e}")
+                    email = f"user-{user_id[:8]}"
+
+            users_data.append({
+                "user_id": user_id,
+                "email": email or f"user-{user_id[:8] if user_id else 'unknown'}",
+                "total_cost_usd": float(row[1]) if row[1] else 0.0,
+                "total_tokens": row[2] if row[2] else 0,
+                "total_requests": row[3] if row[3] else 0,
+                "models_used": row[4] if row[4] else 0
+            })
+
         return {
             "success": True,
-            "count": len(rows),
+            "count": len(users_data),
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
-            "users": [
-                {
-                    "user_id": str(row[0]) if row[0] else None,
-                    "email": row[1],
-                    "total_cost_usd": float(row[2]) if row[2] else 0.0,
-                    "total_tokens": row[3] if row[3] else 0,
-                    "total_requests": row[4] if row[4] else 0,
-                    "models_used": row[5] if row[5] else 0
-                }
-                for row in rows
-            ]
+            "users": users_data
         }
 
     except Exception as e:
