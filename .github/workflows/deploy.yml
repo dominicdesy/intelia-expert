@@ -56,13 +56,16 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Login to DOCR
-        uses: docker/login-action@v3
         with:
-          registry: registry.digitalocean.com
-          username: doctl
-          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      - name: Login to DOCR (native docker login)
+        run: |
+          echo "Login to DigitalOcean Container Registry..."
+          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u ${{ secrets.DOCR_NAME }} --password-stdin
+          echo "✅ Login successful"
 
       - name: Build & push frontend
         uses: docker/build-push-action@v6
@@ -71,7 +74,6 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
@@ -82,6 +84,15 @@ jobs:
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
+      - name: Create latest tag for frontend
+        run: |
+          echo "Création explicite du tag 'latest' pour frontend..."
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main \
+                     registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
+          echo "✅ Tag 'latest' créé et poussé pour frontend"
+
   build-backend:
     runs-on: ubuntu-latest
     needs: detect-changes
@@ -91,13 +102,16 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Login to DOCR
-        uses: docker/login-action@v3
         with:
-          registry: registry.digitalocean.com
-          username: doctl
-          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      - name: Login to DOCR (native docker login)
+        run: |
+          echo "Login to DigitalOcean Container Registry..."
+          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u ${{ secrets.DOCR_NAME }} --password-stdin
+          echo "✅ Login successful"
 
       - name: Build & push backend
         uses: docker/build-push-action@v6
@@ -106,13 +120,21 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
           provenance: false
           sbom: false
+
+      - name: Create latest tag for backend
+        run: |
+          echo "Création explicite du tag 'latest' pour backend..."
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main \
+                     registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
+          echo "✅ Tag 'latest' créé et poussé pour backend"
 
   build-llm:
     runs-on: ubuntu-latest
@@ -166,13 +188,16 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Login to DOCR
-        uses: docker/login-action@v3
         with:
-          registry: registry.digitalocean.com
-          username: doctl
-          password: ${{ secrets.DOCR_ACCESS_TOKEN }}
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      - name: Login to DOCR (native docker login)
+        run: |
+          echo "Login to DigitalOcean Container Registry..."
+          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u ${{ secrets.DOCR_NAME }} --password-stdin
+          echo "✅ Login successful"
 
       - name: Build & push Prometheus
         uses: docker/build-push-action@v6
@@ -181,13 +206,21 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:latest
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:buildcache,mode=max
           provenance: false
           sbom: false
+
+      - name: Create latest tag for prometheus
+        run: |
+          echo "Création explicite du tag 'latest' pour prometheus..."
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main
+          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main \
+                     registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:latest
+          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:latest
+          echo "✅ Tag 'latest' créé et poussé pour prometheus"
 
   deploy:
     name: Deploy to DigitalOcean App Platform
@@ -274,22 +307,13 @@ jobs:
 
           echo "✅ Spec correctement configurée, pas besoin de mise à jour"
 
-      - name: Deployment via Autodeploy
+      - name: Trigger manual deployment to App Platform
         run: |
-          echo "╔════════════════════════════════════════════════════════════╗"
-          echo "║  AUTODEPLOY ACTIVÉ - PAS DE DÉPLOIEMENT MANUEL REQUIS    ║"
-          echo "╚════════════════════════════════════════════════════════════╝"
+          echo "╔═══════════════════════════════════════════════════════════╗"
+          echo "║  DÉPLOIEMENT MANUEL VIA DOCTL                             ║"
+          echo "╚═══════════════════════════════════════════════════════════╝"
           echo ""
-          echo "✅ Images pushed avec tag 'latest'"
-          echo "✅ App Platform Autodeploy activé pour tous les services"
-          echo ""
-          echo "App Platform va détecter automatiquement les nouvelles images"
-          echo "et déclencher le déploiement dans les prochaines minutes."
-          echo ""
-          echo "Surveillez le déploiement sur:"
-          echo "https://cloud.digitalocean.com/apps"
-          echo ""
-          echo "Services avec Autodeploy:"
+          echo "Services qui vont être déployés:"
           if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
             echo "  ✅ Frontend (intelia-frontend:latest)"
           fi
@@ -302,6 +326,15 @@ jobs:
           if [[ "${{ needs.build-prometheus.result }}" == "success" ]]; then
             echo "  ✅ Prometheus (intelia-prometheus:latest)"
           fi
+          echo ""
+          echo "Déclenchement du déploiement sur App Platform..."
+
+          # Trigger deployment via doctl
+          doctl apps create-deployment ${{ secrets.DO_APP_ID }} --wait
+
+          echo ""
+          echo "✅ Déploiement terminé avec succès!"
+          echo "Surveillez les logs sur: https://cloud.digitalocean.com/apps"
 
   summary:
     runs-on: ubuntu-latest
