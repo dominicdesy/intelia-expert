@@ -8,6 +8,8 @@ import { secureLog } from "@/lib/utils/secureLogger";
  * - Proxy vers http://grafana:3000 (réseau interne)
  * - Protection par auth anonyme Grafana (role Viewer read-only)
  * - Page /admin/statistics vérifie déjà super_admin côté React
+ *
+ * Build: 2025-01-26
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
