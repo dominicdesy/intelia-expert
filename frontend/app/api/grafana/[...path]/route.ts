@@ -85,23 +85,28 @@ async function proxyToGrafana(req: NextRequest, params: { path: string[] }) {
   }
 }
 
-export async function GET(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const params = await context.params;
   return proxyToGrafana(req, params);
 }
 
-export async function POST(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function POST(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const params = await context.params;
   return proxyToGrafana(req, params);
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const params = await context.params;
   return proxyToGrafana(req, params);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const params = await context.params;
   return proxyToGrafana(req, params);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const params = await context.params;
   return proxyToGrafana(req, params);
 }
 
