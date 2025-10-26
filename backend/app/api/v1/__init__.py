@@ -760,6 +760,27 @@ if VOICE_SETTINGS_AVAILABLE and voice_settings_router:
 else:
     logger.warning("Voice Settings router non monté (module non disponible)")
 
+# Metrics Sync (synchronisation Prometheus → PostgreSQL pour historique 6+ mois)
+METRICS_SYNC_AVAILABLE = False
+try:
+    from .metrics_sync import router as metrics_sync_router
+    METRICS_SYNC_AVAILABLE = True
+    logger.debug("Metrics Sync router importé avec %d routes", len(metrics_sync_router.routes))
+except ImportError as e:
+    logger.warning(f"Metrics Sync router import failed: {e}")
+    metrics_sync_router = None
+except Exception as e:
+    logger.error(f"ERREUR import metrics_sync router: {e}")
+    metrics_sync_router = None
+
+if METRICS_SYNC_AVAILABLE and metrics_sync_router:
+    router.include_router(metrics_sync_router, prefix="/metrics", tags=["Metrics-Sync"])
+    logger.debug("Metrics Sync router monté")
+    logger.debug("Metrics Sync router maintenant disponible sur /v1/metrics/*")
+    logger.info("Metrics Sync activé (synchronisation Prometheus → PostgreSQL)!")
+else:
+    logger.warning("Metrics Sync router non monté (module non disponible)")
+
 # Résumé final
 total_routes = len(router.routes)
 logger.info("Router v1 créé avec %d routes au total", total_routes)

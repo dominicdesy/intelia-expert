@@ -6,6 +6,7 @@ import { QuestionsTab } from "./QuestionsTab";
 import { InvitationStatsComponent } from "./InvitationStats";
 import { QualityIssuesTab } from "./QualityIssuesTab";
 import { SatisfactionStatsTab } from "./SatisfactionStatsTab";
+import PrometheusMetrics from "./PrometheusMetrics";
 import { secureLog } from "@/lib/utils/secureLogger";
 
 // ✅ HOOK SIMPLIFIÉ - Plus de fallback localStorage/Supabase
@@ -1137,39 +1138,7 @@ export const StatisticsPage: React.FC = () => {
         ) : activeTab === "satisfaction" ? (
           <SatisfactionStatsTab timeRange={selectedTimeRange} />
         ) : activeTab === "metrics" ? (
-          <div className="bg-white border border-gray-200 p-6">
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Métriques Système</h2>
-              <p className="text-sm text-gray-600">
-                Dashboards Grafana pour le monitoring en temps réel des coûts LLM, performances API et métriques système
-              </p>
-            </div>
-
-            <div className="border border-gray-300 rounded-lg overflow-hidden bg-gray-50 p-4">
-              <iframe
-                src="/grafana-proxy/d-solo/ad768cq/cot-llm-total-24h?orgId=1&from=now-24h&to=now&timezone=browser&panelId=panel-1&refresh=30s"
-                width="100%"
-                height="400"
-                style={{ border: 0 }}
-                title="Grafana LLM Metrics - Dernières 24h"
-                className="w-full"
-              />
-            </div>
-
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-xs text-gray-500">
-                📊 Coût total LLM (dernières 24h) - Rafraîchi toutes les 30s • Accès sécurisé
-              </p>
-              <a
-                href="/grafana-proxy/d/ad768cq/cot-llm-total-24h?orgId=1&from=now-24h&to=now"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:text-blue-700 underline"
-              >
-                Voir dashboard complet →
-              </a>
-            </div>
-          </div>
+          <PrometheusMetrics />
         ) : null}
 
         {/* Modal de détail de question */}
