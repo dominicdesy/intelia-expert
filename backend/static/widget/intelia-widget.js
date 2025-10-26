@@ -533,24 +533,46 @@
         }
       }
 
-      // Lire la réponse (streaming)
+      // Lire la réponse (streaming SSE)
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantMessage = '';
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        assistantMessage += chunk;
+        // Ajouter au buffer
+        buffer += decoder.decode(value, { stream: true });
 
-        // Mettre à jour le message en temps réel
-        updateLastAssistantMessage(assistantMessage);
+        // Parser les lignes SSE
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Garder la dernière ligne incomplète dans le buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+
+              // Extraire seulement le contenu des chunks
+              if (data.type === 'chunk' && data.content) {
+                assistantMessage += data.content;
+                // Mettre à jour le message en temps réel
+                updateLastAssistantMessage(assistantMessage);
+              }
+            } catch (e) {
+              // Ignorer les erreurs de parsing JSON
+              console.debug('Parse error:', e);
+            }
+          }
+        }
       }
 
       // Message complet reçu
-      messages.push({ role: 'assistant', content: assistantMessage });
+      if (assistantMessage) {
+        messages.push({ role: 'assistant', content: assistantMessage });
+      }
 
     } catch (error) {
       console.error('Widget error:', error);
