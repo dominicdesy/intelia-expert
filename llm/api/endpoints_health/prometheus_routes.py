@@ -15,7 +15,7 @@ def create_prometheus_routes(get_service: Callable) -> APIRouter:
 
     router = APIRouter()
 
-    @router.get("/metrics")
+    @router.get("/prometheus")
     async def prometheus_metrics():
         """
         Export Prometheus metrics for Grafana
