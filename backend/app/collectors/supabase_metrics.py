@@ -7,7 +7,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Optional
-from app.core.database import get_supabase_admin_client
+from app.core.database import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ async def collect_supabase_metrics() -> Optional[Dict]:
     Returns dict with user counts, storage size, costs
     """
     try:
-        supabase = get_supabase_admin_client()
+        supabase = get_supabase_client()
 
         metrics = {
             "recorded_at": datetime.utcnow(),
