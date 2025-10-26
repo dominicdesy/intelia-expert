@@ -216,57 +216,90 @@ jobs:
           echo "Cleaning up old frontend tags (keeping 10 most recent)..."
 
           # List all tags sorted by update time (newest first) in JSON format
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-frontend --output json)
+          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-frontend --output json || echo "[]")
 
-          # Extract tag names, skip first 10 (most recent), delete the rest one by one
-          echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
-            if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
-              echo "Deleting tag: $tag"
-              doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-frontend "$tag" --force || true
-            fi
-          done
+          # Count total tags
+          TAG_COUNT=$(echo "$TAGS" | jq '. | length')
+          echo "Found $TAG_COUNT tags total"
+
+          # Only cleanup if we have more than 10 tags
+          if [ "$TAG_COUNT" -gt 10 ]; then
+            echo "Deleting $(($TAG_COUNT - 10)) old tags..."
+            echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
+              if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
+                echo "Deleting tag: $tag"
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-frontend "$tag" --force || true
+              fi
+            done
+          else
+            echo "Only $TAG_COUNT tags found, no cleanup needed (keeping all)"
+          fi
 
       - name: Cleanup old backend tags
         if: needs.build-backend.result == 'success'
         run: |
           echo "Cleaning up old backend tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-backend --output json)
+          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-backend --output json || echo "[]")
 
-          echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
-            if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
-              echo "Deleting tag: $tag"
-              doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-backend "$tag" --force || true
-            fi
-          done
+          TAG_COUNT=$(echo "$TAGS" | jq '. | length')
+          echo "Found $TAG_COUNT tags total"
+
+          if [ "$TAG_COUNT" -gt 10 ]; then
+            echo "Deleting $(($TAG_COUNT - 10)) old tags..."
+            echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
+              if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
+                echo "Deleting tag: $tag"
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-backend "$tag" --force || true
+              fi
+            done
+          else
+            echo "Only $TAG_COUNT tags found, no cleanup needed (keeping all)"
+          fi
 
       - name: Cleanup old llm tags
         if: needs.build-llm.result == 'success'
         run: |
           echo "Cleaning up old llm tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-llm --output json)
+          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-llm --output json || echo "[]")
 
-          echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
-            if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
-              echo "Deleting tag: $tag"
-              doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-llm "$tag" --force || true
-            fi
-          done
+          TAG_COUNT=$(echo "$TAGS" | jq '. | length')
+          echo "Found $TAG_COUNT tags total"
+
+          if [ "$TAG_COUNT" -gt 10 ]; then
+            echo "Deleting $(($TAG_COUNT - 10)) old tags..."
+            echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
+              if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
+                echo "Deleting tag: $tag"
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-llm "$tag" --force || true
+              fi
+            done
+          else
+            echo "Only $TAG_COUNT tags found, no cleanup needed (keeping all)"
+          fi
 
       - name: Cleanup old prometheus tags
         if: needs.build-prometheus.result == 'success'
         run: |
           echo "Cleaning up old prometheus tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-prometheus --output json)
+          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-prometheus --output json || echo "[]")
 
-          echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
-            if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
-              echo "Deleting tag: $tag"
-              doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-prometheus "$tag" --force || true
-            fi
-          done
+          TAG_COUNT=$(echo "$TAGS" | jq '. | length')
+          echo "Found $TAG_COUNT tags total"
+
+          if [ "$TAG_COUNT" -gt 10 ]; then
+            echo "Deleting $(($TAG_COUNT - 10)) old tags..."
+            echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
+              if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
+                echo "Deleting tag: $tag"
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-prometheus "$tag" --force || true
+              fi
+            done
+          else
+            echo "Only $TAG_COUNT tags found, no cleanup needed (keeping all)"
+          fi
 
       - name: Run garbage collection
         run: |
