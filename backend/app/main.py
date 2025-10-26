@@ -19,8 +19,9 @@ from typing import Optional
 
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.staticfiles import StaticFiles
 import secrets
 
 # .env (facultatif)
@@ -682,6 +683,15 @@ async def csp_violation_report(request: Request):
         logger.error(f"Error processing CSP report: {e}")
         return JSONResponse(status_code=204, content={})  # Always return 204
 
+
+# === STATIC FILES - WIDGET ===
+# Servir les fichiers statiques du widget (JS, CSS, HTML)
+static_path = pathlib.Path(__file__).parent.parent / "static"
+if static_path.exists():
+    app.mount("/widget", StaticFiles(directory=str(static_path / "widget")), name="widget")
+    logger.info(f"Widget static files mounted at /widget from {static_path / 'widget'}")
+else:
+    logger.warning(f"Static directory not found: {static_path}")
 
 # === MONTAGE DES ROUTERS ===
 try:

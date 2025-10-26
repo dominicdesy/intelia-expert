@@ -781,6 +781,27 @@ if METRICS_SYNC_AVAILABLE and metrics_sync_router:
 else:
     logger.warning("Metrics Sync router non monté (module non disponible)")
 
+# Widget (intégration chat sur sites externes)
+WIDGET_AVAILABLE = False
+try:
+    from .widget import router as widget_router
+    WIDGET_AVAILABLE = True
+    logger.debug("Widget router importé avec %d routes", len(widget_router.routes))
+except ImportError as e:
+    logger.warning(f"Widget router import failed: {e}")
+    widget_router = None
+except Exception as e:
+    logger.error(f"ERREUR import widget router: {e}")
+    widget_router = None
+
+if WIDGET_AVAILABLE and widget_router:
+    router.include_router(widget_router, tags=["Widget"])
+    logger.debug("Widget router monté")
+    logger.debug("Widget router maintenant disponible sur /v1/widget/*")
+    logger.info("Widget activé (intégration chat sur sites externes)!")
+else:
+    logger.warning("Widget router non monté (module non disponible)")
+
 # Résumé final
 total_routes = len(router.routes)
 logger.info("Router v1 créé avec %d routes au total", total_routes)
