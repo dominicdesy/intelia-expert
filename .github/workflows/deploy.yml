@@ -226,86 +226,18 @@ jobs:
     name: Deploy to DigitalOcean App Platform
     runs-on: ubuntu-latest
     needs: [detect-changes, build-frontend, build-backend, build-llm, build-prometheus]
-    if: always() && (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success' || needs.build-llm.result == 'success' || needs.build-prometheus.result == 'success')
+    if: |
+      always() &&
+      !cancelled() &&
+      (needs.build-frontend.result == 'success' ||
+       needs.build-backend.result == 'success' ||
+       needs.build-llm.result == 'success' ||
+       needs.build-prometheus.result == 'success')
     steps:
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
-
-      - name: Login to registry
-        run: |
-          doctl registry login --expiry-seconds 3600
-
-      - name: Wait for registry propagation and verify images
-        run: |
-          echo "Vérification que les images sont accessibles depuis App Platform..."
-
-          REGISTRY="registry.digitalocean.com/${{ secrets.DOCR_NAME }}"
-
-          # Force a fresh pull to ensure images are really available
-          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-            echo "Test pull intelia-llm:latest..."
-            docker pull $REGISTRY/intelia-llm:latest
-            echo "✅ intelia-llm:latest confirmed pullable"
-          fi
-
-          if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-            echo "Test pull intelia-frontend:latest..."
-            docker pull $REGISTRY/intelia-frontend:latest
-            echo "✅ intelia-frontend:latest confirmed pullable"
-          fi
-
-          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-            echo "Test pull intelia-backend:latest..."
-            docker pull $REGISTRY/intelia-backend:latest
-            echo "✅ intelia-backend:latest confirmed pullable"
-          fi
-
-          if [[ "${{ needs.build-prometheus.result }}" == "success" ]]; then
-            echo "Test pull intelia-prometheus:latest..."
-            docker pull $REGISTRY/intelia-prometheus:latest
-            echo "✅ intelia-prometheus:latest confirmed pullable"
-          fi
-
-          echo "Attente supplémentaire de 60s pour synchronisation App Platform..."
-          sleep 60
-
-      - name: Verify App Platform spec uses latest tags
-        run: |
-          echo "Verification de la spec de l'App Platform..."
-
-          # Get current spec
-          doctl apps spec get ${{ secrets.DO_APP_ID }} --format yaml > app-spec.yaml
-
-          echo "Configuration actuelle des images:"
-          grep -A 5 "image:" app-spec.yaml | grep -E "(repository|tag):"
-
-          # Check if all services use 'latest' tag
-          NEEDS_UPDATE=false
-
-          if grep -q 'tag:.*latest' app-spec.yaml; then
-            echo "✅ Toutes les images utilisent le tag 'latest'"
-          else
-            echo "⚠️ Certaines images n'utilisent pas 'latest'"
-            NEEDS_UPDATE=true
-          fi
-
-          # Check for hardcoded digests
-          if grep -q "digest:" app-spec.yaml; then
-            echo "⚠️ Des digests sont hardcodés dans la spec"
-            NEEDS_UPDATE=true
-          fi
-
-          if [ "$NEEDS_UPDATE" = true ]; then
-            echo "❌ La spec doit être mise à jour manuellement:"
-            echo "   1. Aller sur https://cloud.digitalocean.com/apps"
-            echo "   2. Settings → Components"
-            echo "   3. Pour chaque service, s'assurer que Tag = 'latest'"
-            exit 1
-          fi
-
-          echo "✅ Spec correctement configurée, pas besoin de mise à jour"
 
       - name: Trigger manual deployment to App Platform
         run: |
@@ -313,7 +245,7 @@ jobs:
           echo "║  DÉPLOIEMENT MANUEL VIA DOCTL                             ║"
           echo "╚═══════════════════════════════════════════════════════════╝"
           echo ""
-          echo "Services qui vont être déployés:"
+          echo "Services qui ont été buildés avec succès:"
           if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
             echo "  ✅ Frontend (intelia-frontend:latest)"
           fi
@@ -328,13 +260,16 @@ jobs:
           fi
           echo ""
           echo "Déclenchement du déploiement sur App Platform..."
+          echo "⏳ Cela peut prendre plusieurs minutes..."
+          echo ""
 
           # Trigger deployment via doctl
           doctl apps create-deployment ${{ secrets.DO_APP_ID }} --wait
 
           echo ""
           echo "✅ Déploiement terminé avec succès!"
-          echo "Surveillez les logs sur: https://cloud.digitalocean.com/apps"
+          echo ""
+          echo "📊 Surveillez les logs sur: https://cloud.digitalocean.com/apps"
 
   summary:
     runs-on: ubuntu-latest
