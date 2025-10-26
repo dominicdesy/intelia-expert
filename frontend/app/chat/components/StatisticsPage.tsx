@@ -1147,21 +1147,21 @@ export const StatisticsPage: React.FC = () => {
 
             <div className="border border-gray-300 rounded-lg overflow-hidden bg-gray-50 p-4">
               <iframe
-                src="https://inteliacognito.grafana.net/d-solo/dorfxct/intelia-llm-monitoring?orgId=1&from=now-6h&to=now&timezone=browser&panelId=panel-1&__feature.dashboardSceneSolo=true&theme=light"
+                src="https://expert.intelia.com/grafana/d-solo/ad768cq/cot-llm-total-24h?orgId=1&from=now-24h&to=now&timezone=browser&panelId=panel-1&refresh=30s"
                 width="100%"
                 height="400"
-                frameBorder="0"
-                title="Grafana LLM Metrics"
+                style={{ border: 0 }}
+                title="Grafana LLM Metrics - Dernières 24h"
                 className="w-full"
               />
             </div>
 
             <div className="mt-4 flex items-center justify-between">
               <p className="text-xs text-gray-500">
-                📊 Métriques mises à jour en temps réel depuis Grafana Cloud
+                📊 Coût total LLM (dernières 24h) - Rafraîchi toutes les 30s
               </p>
               <a
-                href="https://inteliacognito.grafana.net/d/dorfxct/intelia-llm-monitoring?orgId=1&theme=light"
+                href="https://expert.intelia.com/grafana/d/ad768cq/cot-llm-total-24h?orgId=1&from=now-24h&to=now"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-blue-600 hover:text-blue-700 underline"
