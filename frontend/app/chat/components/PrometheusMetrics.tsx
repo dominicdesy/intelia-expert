@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase/client";
 import {
   BarChart,
   Bar,
@@ -77,12 +78,45 @@ export default function PrometheusMetrics() {
       setLoading(true);
       setError(null);
 
+      // Get access token for authentication
+      let accessToken: string | null = null;
+
+      const authData = localStorage.getItem("intelia-expert-auth");
+      if (authData) {
+        try {
+          const parsed = JSON.parse(authData);
+          accessToken = parsed.access_token;
+        } catch (e) {
+          console.error("[PrometheusMetrics] parse error:", e);
+        }
+      }
+
+      if (!accessToken) {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (!sessionError && session?.access_token) {
+          accessToken = session.access_token;
+        }
+      }
+
+      if (!accessToken) {
+        throw new Error("Session expirée. Veuillez vous reconnecter.");
+      }
+
       // Fetch monthly summary (last 6 months)
       const monthlyResponse = await fetch(
-        "/api/v1/metrics/metrics-monthly-summary?months=6"
+        "/api/v1/metrics/metrics-monthly-summary?months=6",
+        {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
 
       if (!monthlyResponse.ok) {
+        if (monthlyResponse.status === 403) {
+          throw new Error("Accès refusé. Privilèges administrateur requis.");
+        }
         throw new Error("Failed to fetch monthly metrics");
       }
 
@@ -108,10 +142,19 @@ export default function PrometheusMetrics() {
       const startDate = firstDayOfMonth.toISOString().split("T")[0];
 
       const historyResponse = await fetch(
-        `/api/v1/metrics/metrics-history?start_date=${startDate}`
+        `/api/v1/metrics/metrics-history?start_date=${startDate}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
 
       if (!historyResponse.ok) {
+        if (historyResponse.status === 403) {
+          throw new Error("Accès refusé. Privilèges administrateur requis.");
+        }
         throw new Error("Failed to fetch metrics history");
       }
 
