@@ -1147,7 +1147,7 @@ export const StatisticsPage: React.FC = () => {
 
             <div className="border border-gray-300 rounded-lg overflow-hidden bg-gray-50 p-4">
               <iframe
-                src="https://expert.intelia.com/grafana/d-solo/ad768cq/cot-llm-total-24h?orgId=1&from=now-24h&to=now&timezone=browser&panelId=panel-1&refresh=30s"
+                src="/api/grafana/d-solo/ad768cq/cot-llm-total-24h?orgId=1&from=now-24h&to=now&timezone=browser&panelId=panel-1&refresh=30s"
                 width="100%"
                 height="400"
                 style={{ border: 0 }}
@@ -1158,10 +1158,10 @@ export const StatisticsPage: React.FC = () => {
 
             <div className="mt-4 flex items-center justify-between">
               <p className="text-xs text-gray-500">
-                📊 Coût total LLM (dernières 24h) - Rafraîchi toutes les 30s
+                📊 Coût total LLM (dernières 24h) - Rafraîchi toutes les 30s • Accès sécurisé
               </p>
               <a
-                href="https://expert.intelia.com/grafana/d/ad768cq/cot-llm-total-24h?orgId=1&from=now-24h&to=now"
+                href="/api/grafana/d/ad768cq/cot-llm-total-24h?orgId=1&from=now-24h&to=now"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-blue-600 hover:text-blue-700 underline"
