@@ -27,8 +27,8 @@ JWT_SECRET = os.getenv("WIDGET_JWT_SECRET", os.getenv("JWT_SECRET", ""))
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_MINUTES = 60
 
-# LLM API URL
-LLM_API_URL = os.getenv("LLM_API_URL", "http://llm:8000/api/v1")
+# LLM API URL (réseau interne Docker - même que WhatsApp webhooks)
+LLM_API_URL = os.getenv("LLM_INTERNAL_URL", "http://intelia-llm:8080")
 
 
 # ============================================
@@ -120,12 +120,18 @@ async def check_client_quota(client_id: str) -> dict:
         Dict avec can_use, requests_used, monthly_limit, etc.
     """
     try:
-        supabase = get_supabase_client()
+        from app.core.database import get_pg_connection
 
-        # Récupérer les infos du client dans la table widget_clients
-        response = supabase.table("widget_clients").select("*").eq("client_id", client_id).execute()
+        # Récupérer les infos du client dans la table widget_clients (PostgreSQL)
+        with get_pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT is_active, monthly_limit FROM widget_clients WHERE client_id = %s",
+                    (client_id,)
+                )
+                result = cur.fetchone()
 
-        if not response.data:
+        if not result:
             logger.warning(f"Client widget inconnu: {client_id}")
             # Par défaut, autoriser (fail-open)
             return {
@@ -134,9 +140,7 @@ async def check_client_quota(client_id: str) -> dict:
                 "error": "client_not_found"
             }
 
-        client_data = response.data[0]
-        monthly_limit = client_data.get("monthly_limit", 1000)
-        is_active = client_data.get("is_active", True)
+        is_active, monthly_limit = result
 
         if not is_active:
             return {
