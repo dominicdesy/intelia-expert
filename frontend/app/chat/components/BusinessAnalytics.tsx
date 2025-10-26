@@ -138,25 +138,25 @@ export default function BusinessAnalytics() {
       if (!monthlyLLMRes.success) throw new Error(monthlyLLMRes.error?.message || "Failed to fetch monthly LLM");
       if (!infraCostsRes.success) throw new Error(infraCostsRes.error?.message || "Failed to fetch infrastructure costs");
 
-      const costByUser = costByUserRes.data;
-      const tokenRatios = tokenRatiosRes.data;
-      const errorRates = errorRatesRes.data;
-      const monthlyLLM = monthlyLLMRes.data;
-      const infraCosts = infraCostsRes.data;
+      const costByUser = costByUserRes.data as any;
+      const tokenRatios = tokenRatiosRes.data as any;
+      const errorRates = errorRatesRes.data as any;
+      const monthlyLLM = monthlyLLMRes.data as any;
+      const infraCosts = infraCostsRes.data as any;
 
       // Calculate summary
-      const totalLLMCost = monthlyLLM.summary?.reduce((sum: number, m: MonthlySummary) => sum + m.total_cost_usd, 0) || 0;
-      const latestInfra = infraCosts.costs?.[0];
+      const totalLLMCost = monthlyLLM?.summary?.reduce((sum: number, m: MonthlySummary) => sum + m.total_cost_usd, 0) || 0;
+      const latestInfra = infraCosts?.costs?.[0];
       const totalRevenue = latestInfra?.mrr_usd * 6 || 0; // 6 months of MRR
-      const totalInfraCost = infraCosts.costs?.reduce((sum: number, c: InfrastructureCost) => sum + c.total_cost_usd, 0) || 0;
+      const totalInfraCost = infraCosts?.costs?.reduce((sum: number, c: InfrastructureCost) => sum + c.total_cost_usd, 0) || 0;
       const netMargin = totalRevenue - totalLLMCost - totalInfraCost;
 
       setMetrics({
-        costByUser: costByUser.users || [],
-        tokenRatios: tokenRatios.ratios || [],
-        errorRates: errorRates.providers || [],
-        monthlyLLM: monthlyLLM.summary || [],
-        infrastructureCosts: infraCosts.costs || [],
+        costByUser: costByUser?.users || [],
+        tokenRatios: tokenRatios?.ratios || [],
+        errorRates: errorRates?.providers || [],
+        monthlyLLM: monthlyLLM?.summary || [],
+        infrastructureCosts: infraCosts?.costs || [],
         totalLLMCost,
         totalInfraCost,
         totalRevenue,
