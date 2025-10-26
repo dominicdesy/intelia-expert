@@ -46,7 +46,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: registry.digitalocean.com
-          username: ${{ secrets.DOCR_ACCESS_TOKEN }}
+          username: ${{ secrets.DOCR_EMAIL }}
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
       - name: Set up Docker Buildx
@@ -89,7 +89,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: registry.digitalocean.com
-          username: ${{ secrets.DOCR_ACCESS_TOKEN }}
+          username: ${{ secrets.DOCR_EMAIL }}
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
       - name: Set up Docker Buildx
@@ -129,7 +129,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: registry.digitalocean.com
-          username: ${{ secrets.DOCR_ACCESS_TOKEN }}
+          username: ${{ secrets.DOCR_EMAIL }}
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
       - name: Set up Docker Buildx
@@ -169,7 +169,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: registry.digitalocean.com
-          username: ${{ secrets.DOCR_ACCESS_TOKEN }}
+          username: ${{ secrets.DOCR_EMAIL }}
           password: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
       - name: Set up Docker Buildx
