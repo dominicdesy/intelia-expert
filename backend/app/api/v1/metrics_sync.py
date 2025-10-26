@@ -12,7 +12,7 @@ import httpx
 from sqlalchemy import text
 
 from app.core.database import get_pg_connection
-from app.dependencies import require_admin
+from app.api.v1.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -110,13 +110,20 @@ async def sync_prometheus_to_db_cron(
 
 @router.post("/sync-prometheus-metrics")
 async def sync_prometheus_to_db_admin(
-    _: dict = Depends(require_admin),
+    current_user: dict = Depends(get_current_user),
     db = Depends(get_pg_connection)
 ):
     """
     Synchronize current Prometheus metrics to PostgreSQL
     Admin only - for manual sync
     """
+    # Verify admin privileges
+    user_role = current_user.get("role", "user")
+    is_admin = user_role in ["admin", "superuser"] or current_user.get("is_admin", False)
+
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
     return await _sync_prometheus_to_db(db)
 
 
@@ -243,13 +250,19 @@ async def get_metrics_history(
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     model: Optional[str] = Query(None, description="Filter by model"),
     provider: Optional[str] = Query(None, description="Filter by provider"),
-    _: dict = Depends(require_admin),
+    current_user: dict = Depends(get_current_user),
     db = Depends(get_pg_connection)
 ):
     """
     Get historical metrics from PostgreSQL
     Admin only
     """
+    # Verify admin privileges
+    user_role = current_user.get("role", "user")
+    is_admin = user_role in ["admin", "superuser"] or current_user.get("is_admin", False)
+
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
     try:
         # Default to last 30 days if no dates provided
         if not start_date:
@@ -327,13 +340,19 @@ async def get_metrics_history(
 @router.get("/metrics-monthly-summary")
 async def get_monthly_summary(
     months: int = Query(6, description="Number of months to retrieve"),
-    _: dict = Depends(require_admin),
+    current_user: dict = Depends(get_current_user),
     db = Depends(get_pg_connection)
 ):
     """
     Get monthly cost summary for the last N months
     Admin only
     """
+    # Verify admin privileges
+    user_role = current_user.get("role", "user")
+    is_admin = user_role in ["admin", "superuser"] or current_user.get("is_admin", False)
+
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
     try:
         query = text("""
             SELECT
