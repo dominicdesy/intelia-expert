@@ -54,6 +54,10 @@
       fr: 'Besoin d\'aide ?',
       en: 'Need help?'
     },
+    sendButton: {
+      fr: 'Envoyer',
+      en: 'Send'
+    },
     errorMessages: {
       network: {
         fr: 'Erreur de connexion. Veuillez réessayer.',
@@ -417,7 +421,7 @@
             placeholder="${config.placeholder[config.locale]}"
             rows="1"
           ></textarea>
-          <button id="intelia-widget-send">Envoyer</button>
+          <button id="intelia-widget-send">${config.sendButton[config.locale]}</button>
         </div>
       </div>
     `;
@@ -652,7 +656,7 @@
   function updateSendButton() {
     const sendBtn = document.getElementById('intelia-widget-send');
     sendBtn.disabled = isLoading;
-    sendBtn.textContent = isLoading ? '...' : 'Envoyer';
+    sendBtn.textContent = isLoading ? '...' : config.sendButton[config.locale];
   }
 
   // Exposer l'API publique
