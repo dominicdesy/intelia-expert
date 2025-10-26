@@ -1,4 +1,4 @@
-# Widget Intelia - Guide d'Intégration
+# Widget Intelia Cognito - Guide d'Intégration
 
 **Version**: 1.0.0
 **Date**: 26 octobre 2025
@@ -8,7 +8,7 @@
 
 ## 1. Vue d'Ensemble
 
-Le Widget Intelia permet d'intégrer un assistant IA conversationnel sur n'importe quel site web. Les utilisateurs peuvent poser des questions et obtenir des réponses instantanées basées sur votre base de connaissances Intelia.
+Le Widget Intelia Cognito permet d'intégrer un assistant IA conversationnel sur n'importe quel site web. Les utilisateurs peuvent poser des questions et obtenir des réponses instantanées basées sur votre base de connaissances Intelia.
 
 ### Caractéristiques Principales
 
@@ -45,7 +45,7 @@ Le Widget Intelia permet d'intégrer un assistant IA conversationnel sur n'impor
                │ 3. Envoie message + token
                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                 API Intelia Expert                           │
+│                 API Intelia Cognito                          │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │  Widget API (/api/v1/widget)                          │  │
 │  │  - Vérifie JWT token                                  │  │
@@ -144,16 +144,23 @@ InteliaWidget.close();
 InteliaWidget.version; // "1.0.0"
 ```
 
-### 3.4 Page de Demo
+### 3.4 Pages de Demo
 
-**Fichier**: `backend/static/widget/demo.html`
+**Fichier**: `backend/static/widget/demo-client.html`
 
-Page HTML complète avec:
-- Présentation du widget
-- Guide d'intégration étape par étape
-- Exemples de code
-- Documentation des options
-- Design professionnel avec CSS
+Page de démonstration professionnelle pour clients (exemple: Animal Production company) avec:
+- Site web complet avec widget intégré
+- Design professionnel et responsive
+- Exemple de configuration du widget
+- Génération automatique de token JWT
+
+**Fichier**: `backend/static/widget/test.html`
+
+Page de test technique avec:
+- Console de logs en temps réel
+- Test de génération de token
+- Initialisation manuelle du widget
+- Monitoring des appels API
 
 ---
 
@@ -334,7 +341,7 @@ Le widget utilise JWT (JSON Web Tokens) pour l'authentification:
 
 - Le widget fonctionne sur n'importe quel domaine
 - Domaine enregistré dans `widget_clients.domain` pour analytics
-- Pas de restriction CORS (le widget appelle l'API Intelia directement)
+- Pas de restriction CORS (le widget appelle l'API Intelia Cognito directement)
 
 ---
 
@@ -437,7 +444,8 @@ Fonctionnalités prévues:
 
 ### Documentation
 
-- **Guide d'intégration**: [https://expert.intelia.com/widget/demo.html](https://expert.intelia.com/widget/demo.html)
+- **Guide d'intégration**: [https://expert.intelia.com/widget/demo-client.html](https://expert.intelia.com/widget/demo-client.html)
+- **Page de test**: [https://expert.intelia.com/widget/test.html](https://expert.intelia.com/widget/test.html)
 - **API Documentation**: [https://expert.intelia.com/api/docs](https://expert.intelia.com/api/docs)
 - **Changelog**: [https://expert.intelia.com/widget/changelog](https://expert.intelia.com/widget/changelog)
 
@@ -495,8 +503,8 @@ Ajouter dans `.env` du backend:
 # Widget JWT Secret (généré avec: openssl rand -hex 32)
 WIDGET_JWT_SECRET=votre_secret_jwt_de_64_caracteres_minimum
 
-# URL du LLM API (si différent du défaut)
-LLM_API_URL=http://llm:8000/api/v1
+# URL du LLM API (réseau interne Docker)
+LLM_INTERNAL_URL=http://intelia-llm:8080
 ```
 
 ---
@@ -505,11 +513,11 @@ LLM_API_URL=http://llm:8000/api/v1
 
 ### Test Manuel
 
-1. Ouvrir `https://expert.intelia.com/widget/demo.html`
-2. Cliquer sur "Tester le Widget"
-3. Vérifier que la bulle de chat apparaît
+1. Ouvrir `https://expert.intelia.com/widget/test.html`
+2. Cliquer sur "Initialiser le Widget"
+3. Vérifier que la bulle de chat apparaît avec le logo Intelia
 4. Envoyer un message de test
-5. Vérifier que la réponse s'affiche en streaming
+5. Vérifier que la réponse s'affiche en streaming (texte propre, pas de JSON brut)
 
 ### Test Automatisé (À venir)
 
