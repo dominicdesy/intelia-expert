@@ -636,8 +636,9 @@ MÉTRIQUES CLÉS BROILERS:
                     duration=0.0,  # Duration not tracked in generators.py
                     status="success"
                 )
+                logger.info(f"📊 Prometheus tracking: {self.cot_model} - {tokens} tokens, ${cost:.6f}")
             except Exception as e:
-                logger.debug(f"Failed to track Prometheus metrics: {e}")
+                logger.error(f"❌ Failed to track Prometheus metrics: {e}")
 
             # 🧠 DEBUG: Log raw LLM response to check for CoT tags
             logger.info(f"🔍 Raw LLM response length: {len(generated_response)} chars")
