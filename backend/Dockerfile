@@ -23,6 +23,9 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copie du code source selon la vraie structure
 COPY app/ ./app/
 
+# Copie des fichiers statiques (widget, images, etc.)
+COPY static/ ./static/
+
 # Nettoyage final
 RUN find . -name "*.pyc" -delete \
     && find . -name "__pycache__" -type d -exec rm -rf {} + \
