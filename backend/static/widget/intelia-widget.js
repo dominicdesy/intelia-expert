@@ -179,6 +179,9 @@
   let isOpen = false;
   let isLoading = false;
 
+  // Langues RTL (Right-to-Left)
+  const RTL_LANGUAGES = ['ar', 'he', 'fa', 'ur'];
+
   /**
    * Initialisation du widget
    */
@@ -489,6 +492,37 @@
           height: calc(100vh - 120px);
         }
       }
+
+      /* RTL Support (Arabic, Hebrew, etc.) */
+      ${RTL_LANGUAGES.includes(config.locale) ? `
+        #intelia-widget-chat {
+          direction: rtl;
+        }
+
+        #intelia-widget-messages {
+          direction: rtl;
+        }
+
+        .intelia-message.user {
+          align-self: flex-start;
+          border-bottom-right-radius: 12px;
+          border-bottom-left-radius: 4px;
+        }
+
+        .intelia-message.assistant {
+          align-self: flex-end;
+          border-bottom-left-radius: 12px;
+          border-bottom-right-radius: 4px;
+        }
+
+        #intelia-widget-input-container {
+          direction: rtl;
+        }
+
+        #intelia-widget-input {
+          text-align: right;
+        }
+      ` : ''}
     `;
     document.head.appendChild(style);
   }

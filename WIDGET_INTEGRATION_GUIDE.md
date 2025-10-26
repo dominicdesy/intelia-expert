@@ -448,6 +448,27 @@ Fonctionnalités prévues:
 - **Page de test**: [https://expert.intelia.com/api/widget/test.html](https://expert.intelia.com/api/widget/test.html)
 - **API Documentation**: [https://expert.intelia.com/api/docs](https://expert.intelia.com/api/docs)
 
+### Démonstration Multilingue
+
+Le widget supporte 16 langues. Testez-les directement sur la page de démo en ajoutant le paramètre `?lang=` à l'URL:
+
+- **Anglais**: [?lang=en](https://expert.intelia.com/api/widget/demo-client.html?lang=en)
+- **Français**: [?lang=fr](https://expert.intelia.com/api/widget/demo-client.html?lang=fr)
+- **Espagnol**: [?lang=es](https://expert.intelia.com/api/widget/demo-client.html?lang=es)
+- **Allemand**: [?lang=de](https://expert.intelia.com/api/widget/demo-client.html?lang=de)
+- **Italien**: [?lang=it](https://expert.intelia.com/api/widget/demo-client.html?lang=it)
+- **Portugais**: [?lang=pt](https://expert.intelia.com/api/widget/demo-client.html?lang=pt)
+- **Néerlandais**: [?lang=nl](https://expert.intelia.com/api/widget/demo-client.html?lang=nl)
+- **Polonais**: [?lang=pl](https://expert.intelia.com/api/widget/demo-client.html?lang=pl)
+- **Japonais**: [?lang=ja](https://expert.intelia.com/api/widget/demo-client.html?lang=ja)
+- **Chinois**: [?lang=zh](https://expert.intelia.com/api/widget/demo-client.html?lang=zh)
+- **Arabe**: [?lang=ar](https://expert.intelia.com/api/widget/demo-client.html?lang=ar)
+- **Hindi**: [?lang=hi](https://expert.intelia.com/api/widget/demo-client.html?lang=hi)
+- **Indonésien**: [?lang=id](https://expert.intelia.com/api/widget/demo-client.html?lang=id)
+- **Thaï**: [?lang=th](https://expert.intelia.com/api/widget/demo-client.html?lang=th)
+- **Turc**: [?lang=tr](https://expert.intelia.com/api/widget/demo-client.html?lang=tr)
+- **Vietnamien**: [?lang=vi](https://expert.intelia.com/api/widget/demo-client.html?lang=vi)
+
 ### Contact
 
 - **Email**: support@intelia.com

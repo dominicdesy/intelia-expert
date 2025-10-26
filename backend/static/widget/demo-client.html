@@ -311,6 +311,12 @@
     <!-- Intelia Widget -->
     <script src="/api/widget/intelia-widget.js"></script>
     <script>
+        // Fonction pour obtenir un paramètre de l'URL
+        function getURLParameter(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name);
+        }
+
         // Fonction pour générer un token JWT automatiquement
         async function generateToken() {
             try {
@@ -341,6 +347,15 @@
 
         // Initialiser le widget automatiquement au chargement de la page
         document.addEventListener('DOMContentLoaded', function() {
+            // Lire la langue depuis l'URL, par défaut 'en'
+            const lang = getURLParameter('lang') || 'en';
+
+            // Langues supportées (16 langues)
+            const supportedLangs = ['en', 'fr', 'es', 'de', 'it', 'pt', 'nl', 'pl', 'ja', 'zh', 'ar', 'hi', 'id', 'th', 'tr', 'vi'];
+            const locale = supportedLangs.includes(lang) ? lang : 'en';
+
+            console.log('Widget locale:', locale);
+
             InteliaWidget.init({
                 apiUrl: '/api/v1/widget',
                 getToken: generateToken,
@@ -348,7 +363,7 @@
                 userEmail: 'demo@abccorp.com',
                 position: 'bottom-right',
                 primaryColor: '#2563eb',
-                locale: 'en'
+                locale: locale
             });
         });
     </script>
