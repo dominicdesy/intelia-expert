@@ -58,10 +58,12 @@ async function proxyToGrafana(req: NextRequest, params: { path?: string[] }) {
     // Copier les headers de la réponse
     const responseHeaders = new Headers();
     response.headers.forEach((value, key) => {
-      // Ne pas copier les headers de sécurité qui pourraient interférer
-      if (!["x-frame-options", "content-security-policy"].includes(key.toLowerCase())) {
-        responseHeaders.set(key, value);
+      const lowerKey = key.toLowerCase();
+      // Ne pas copier les headers qui pourraient interférer
+      if (["x-frame-options", "content-security-policy", "location"].includes(lowerKey)) {
+        return;
       }
+      responseHeaders.set(key, value);
     });
 
     // Pour les réponses HTML/JSON
