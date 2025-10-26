@@ -20,10 +20,10 @@ const GRAFANA_INTERNAL_URL =
 /**
  * Proxy générique pour toutes les méthodes HTTP vers Grafana
  */
-async function proxyToGrafana(req: NextRequest, params: { path: string[] }) {
+async function proxyToGrafana(req: NextRequest, params: { path?: string[] }) {
 
   const { path } = params;
-  const targetPath = path.join("/");
+  const targetPath = path?.join("/") || "";
   const targetUrl = `${GRAFANA_INTERNAL_URL}/${targetPath}`;
 
   // Copier les query params
@@ -85,27 +85,27 @@ async function proxyToGrafana(req: NextRequest, params: { path: string[] }) {
   }
 }
 
-export async function GET(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
   const params = await context.params;
   return proxyToGrafana(req, params);
 }
 
-export async function POST(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+export async function POST(req: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
   const params = await context.params;
   return proxyToGrafana(req, params);
 }
 
-export async function PUT(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
   const params = await context.params;
   return proxyToGrafana(req, params);
 }
 
-export async function DELETE(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
   const params = await context.params;
   return proxyToGrafana(req, params);
 }
 
-export async function PATCH(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
   const params = await context.params;
   return proxyToGrafana(req, params);
 }
