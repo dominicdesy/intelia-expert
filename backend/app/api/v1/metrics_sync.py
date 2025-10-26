@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 import httpx
 from sqlalchemy import text
 
-from app.core.database import get_db_connection
+from app.core.database import get_pg_connection
 from app.dependencies import require_admin
 
 logger = logging.getLogger(__name__)
@@ -93,7 +93,7 @@ async def insert_metric_to_db(
 @router.post("/sync-prometheus-metrics-cron")
 async def sync_prometheus_to_db_cron(
     secret: str = Query(..., description="Cron secret"),
-    db = Depends(get_db_connection)
+    db = Depends(get_pg_connection)
 ):
     """
     Synchronize current Prometheus metrics to PostgreSQL
@@ -111,7 +111,7 @@ async def sync_prometheus_to_db_cron(
 @router.post("/sync-prometheus-metrics")
 async def sync_prometheus_to_db_admin(
     _: dict = Depends(require_admin),
-    db = Depends(get_db_connection)
+    db = Depends(get_pg_connection)
 ):
     """
     Synchronize current Prometheus metrics to PostgreSQL
@@ -244,7 +244,7 @@ async def get_metrics_history(
     model: Optional[str] = Query(None, description="Filter by model"),
     provider: Optional[str] = Query(None, description="Filter by provider"),
     _: dict = Depends(require_admin),
-    db = Depends(get_db_connection)
+    db = Depends(get_pg_connection)
 ):
     """
     Get historical metrics from PostgreSQL
@@ -328,7 +328,7 @@ async def get_metrics_history(
 async def get_monthly_summary(
     months: int = Query(6, description="Number of months to retrieve"),
     _: dict = Depends(require_admin),
-    db = Depends(get_db_connection)
+    db = Depends(get_pg_connection)
 ):
     """
     Get monthly cost summary for the last N months
