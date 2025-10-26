@@ -299,6 +299,7 @@ jobs:
   # DEPLOY TO DIGITALOCEAN
   # ======================================================
   # CLEANUP REGISTRY - Keep only 10 most recent tags
+  # TEMPORARILY DISABLED: Waiting for DO support to fix stuck garbage collection
   # ======================================================
   cleanup-registry:
     needs:
@@ -306,15 +307,7 @@ jobs:
       - build-backend
       - build-llm
       - build-prometheus
-    if: >
-      always() &&
-      !cancelled() &&
-      (
-        needs.build-frontend.result == 'success' ||
-        needs.build-backend.result == 'success' ||
-        needs.build-llm.result == 'success' ||
-        needs.build-prometheus.result == 'success'
-      )
+    if: false  # Temporarily disabled until DO fixes garbage collection issue
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
