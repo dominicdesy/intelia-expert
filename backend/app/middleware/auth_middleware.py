@@ -71,6 +71,7 @@ PUBLIC_ENDPOINTS = {
     "/api/v1/billing/admin/currency-rates/update-cron",
     # === ENDPOINTS METRICS SYNC PUBLICS (cron avec secret) ===
     "/api/v1/metrics/sync-prometheus-metrics-cron",
+    "/v1/metrics/sync-prometheus-metrics-cron",
     # === ENDPOINTS SANS PREFIX /api ===
     "/",
     "/docs",
