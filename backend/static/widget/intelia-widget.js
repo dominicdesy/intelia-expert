@@ -133,7 +133,7 @@
         width: 60px;
         height: 60px;
         border-radius: 50%;
-        background: ${config.primaryColor};
+        background: white;
         color: white;
         border: none;
         cursor: pointer;
@@ -143,6 +143,14 @@
         justify-content: center;
         font-size: 24px;
         transition: all 0.3s ease;
+        overflow: hidden;
+        padding: 8px;
+      }
+
+      #intelia-widget-button img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
       }
 
       #intelia-widget-button:hover {
@@ -391,11 +399,11 @@
     container.id = 'intelia-widget-container';
     container.innerHTML = `
       <button id="intelia-widget-button" aria-label="${config.buttonLabel[config.locale]}">
-        💬
+        <img src="/api/static/images/logo.png" alt="Intelia" />
       </button>
       <div id="intelia-widget-chat">
         <div id="intelia-widget-header">
-          <h3>Intelia Expert</h3>
+          <h3>Intelia Cognito</h3>
           <button id="intelia-widget-close" aria-label="Fermer">×</button>
         </div>
         <div id="intelia-widget-messages">

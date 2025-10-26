@@ -684,12 +684,17 @@ async def csp_violation_report(request: Request):
         return JSONResponse(status_code=204, content={})  # Always return 204
 
 
-# === STATIC FILES - WIDGET ===
-# Servir les fichiers statiques du widget (JS, CSS, HTML)
+# === STATIC FILES - WIDGET & IMAGES ===
+# Servir les fichiers statiques du widget (JS, CSS, HTML) et images
 static_path = pathlib.Path(__file__).parent.parent / "static"
 if static_path.exists():
     app.mount("/widget", StaticFiles(directory=str(static_path / "widget")), name="widget")
     logger.info(f"Widget static files mounted at /widget from {static_path / 'widget'}")
+
+    # Servir les images (logo, etc.)
+    if (static_path / "images").exists():
+        app.mount("/static/images", StaticFiles(directory=str(static_path / "images")), name="images")
+        logger.info(f"Images mounted at /static/images from {static_path / 'images'}")
 else:
     logger.warning(f"Static directory not found: {static_path}")
 
