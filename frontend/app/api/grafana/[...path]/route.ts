@@ -2,13 +2,12 @@
 
 import { type NextRequest } from "next/server";
 import { secureLog } from "@/lib/utils/secureLogger";
-import { createClient } from "@/lib/supabase/server";
 
 /**
- * SÉCURITÉ: Proxy sécurisé pour Grafana
- * - Vérifie l'authentification utilisateur
- * - Vérifie les permissions super_admin
- * - Proxy vers http://grafana:3000 (réseau interne uniquement)
+ * SÉCURITÉ: Proxy pour Grafana (réseau interne uniquement)
+ * - Proxy vers http://grafana:3000 (réseau interne)
+ * - Protection par auth anonyme Grafana (role Viewer read-only)
+ * - Page /admin/statistics vérifie déjà super_admin côté React
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,64 +16,9 @@ const GRAFANA_INTERNAL_URL =
   process.env.GRAFANA_INTERNAL_URL ?? "http://grafana:3000";
 
 /**
- * Vérifie que l'utilisateur est authentifié et super_admin
- */
-async function checkAuth(req: NextRequest): Promise<{ authorized: boolean; error?: string }> {
-  try {
-    const supabase = await createClient();
-
-    // Vérifier l'authentification Supabase
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      secureLog.warn("[grafana-proxy] User not authenticated");
-      return { authorized: false, error: "Authentication required" };
-    }
-
-    // Récupérer le user_type depuis la table users
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("user_type")
-      .eq("email", user.email)
-      .single();
-
-    if (userError || !userData) {
-      secureLog.warn(`[grafana-proxy] User data not found for ${user.email}`);
-      return { authorized: false, error: "User data not found" };
-    }
-
-    // Vérifier que l'utilisateur est super_admin
-    if (userData.user_type !== "super_admin") {
-      secureLog.warn(`[grafana-proxy] Access denied for ${user.email} (role: ${userData.user_type})`);
-      return { authorized: false, error: "Super admin access required" };
-    }
-
-    secureLog.log(`[grafana-proxy] Access granted for ${user.email}`);
-    return { authorized: true };
-  } catch (error) {
-    secureLog.error(`[grafana-proxy] Auth check failed: ${error}`);
-    return { authorized: false, error: "Authentication check failed" };
-  }
-}
-
-/**
  * Proxy générique pour toutes les méthodes HTTP vers Grafana
  */
 async function proxyToGrafana(req: NextRequest, params: { path: string[] }) {
-  // Vérifier l'authentification et les permissions
-  const authCheck = await checkAuth(req);
-  if (!authCheck.authorized) {
-    return new Response(
-      JSON.stringify({
-        error: "Access denied",
-        detail: authCheck.error,
-      }),
-      {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-  }
 
   const { path } = params;
   const targetPath = path.join("/");
