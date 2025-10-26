@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 import httpx
-from sqlalchemy import text
 
 from app.core.database import get_pg_connection
 from app.api.v1.auth import get_current_user
@@ -44,56 +43,9 @@ async def query_prometheus(query: str) -> Dict:
         raise HTTPException(status_code=502, detail=f"Prometheus unavailable: {str(e)}")
 
 
-async def insert_metric_to_db(
-    conn,
-    recorded_at: datetime,
-    model: str,
-    provider: str,
-    feature: str,
-    prompt_tokens: int,
-    completion_tokens: int,
-    cost_usd: float,
-    request_count: int = 1,
-    status: str = "success"
-):
-    """Insert or update a metric record in PostgreSQL"""
-    query = text("""
-        INSERT INTO llm_metrics_history (
-            recorded_at, model, provider, feature,
-            prompt_tokens, completion_tokens, total_tokens,
-            cost_usd, request_count, status
-        ) VALUES (
-            :recorded_at, :model, :provider, :feature,
-            :prompt_tokens, :completion_tokens, :total_tokens,
-            :cost_usd, :request_count, :status
-        )
-        ON CONFLICT (recorded_at, model, provider, feature, status)
-        DO UPDATE SET
-            prompt_tokens = llm_metrics_history.prompt_tokens + EXCLUDED.prompt_tokens,
-            completion_tokens = llm_metrics_history.completion_tokens + EXCLUDED.completion_tokens,
-            total_tokens = llm_metrics_history.total_tokens + EXCLUDED.total_tokens,
-            cost_usd = llm_metrics_history.cost_usd + EXCLUDED.cost_usd,
-            request_count = llm_metrics_history.request_count + EXCLUDED.request_count
-    """)
-
-    await conn.execute(query, {
-        "recorded_at": recorded_at,
-        "model": model,
-        "provider": provider,
-        "feature": feature or "chat",
-        "prompt_tokens": prompt_tokens,
-        "completion_tokens": completion_tokens,
-        "total_tokens": prompt_tokens + completion_tokens,
-        "cost_usd": cost_usd,
-        "request_count": request_count,
-        "status": status
-    })
-
-
 @router.post("/sync-prometheus-metrics-cron")
 async def sync_prometheus_to_db_cron(
-    secret: str = Query(..., description="Cron secret"),
-    db = Depends(get_pg_connection)
+    secret: str = Query(..., description="Cron secret")
 ):
     """
     Synchronize current Prometheus metrics to PostgreSQL
@@ -105,13 +57,12 @@ async def sync_prometheus_to_db_cron(
         logger.warning(f"Invalid cron secret attempt")
         raise HTTPException(status_code=403, detail="Invalid secret")
 
-    return await _sync_prometheus_to_db(db)
+    return await _sync_prometheus_to_db()
 
 
 @router.post("/sync-prometheus-metrics")
 async def sync_prometheus_to_db_admin(
-    current_user: dict = Depends(get_current_user),
-    db = Depends(get_pg_connection)
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Synchronize current Prometheus metrics to PostgreSQL
@@ -124,10 +75,10 @@ async def sync_prometheus_to_db_admin(
     if not is_admin:
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
-    return await _sync_prometheus_to_db(db)
+    return await _sync_prometheus_to_db()
 
 
-async def _sync_prometheus_to_db(db):
+async def _sync_prometheus_to_db():
     """
     Internal function to sync Prometheus metrics to PostgreSQL
     """
@@ -214,21 +165,41 @@ async def _sync_prometheus_to_db(db):
             metrics_map[key]["status"] = metric.get("status", "success")
 
         # Insert all aggregated metrics into PostgreSQL
-        async with db.begin():
-            for metric_data in metrics_map.values():
-                await insert_metric_to_db(
-                    db,
-                    recorded_at,
-                    metric_data["model"],
-                    metric_data["provider"],
-                    metric_data["feature"],
-                    metric_data["prompt_tokens"],
-                    metric_data["completion_tokens"],
-                    metric_data["cost_usd"],
-                    metric_data["request_count"],
-                    metric_data["status"]
-                )
-                synced_count += 1
+        with get_pg_connection() as conn:
+            with conn.cursor() as cur:
+                for metric_data in metrics_map.values():
+                    insert_metric_query = """
+                        INSERT INTO llm_metrics_history (
+                            recorded_at, model, provider, feature,
+                            prompt_tokens, completion_tokens, total_tokens,
+                            cost_usd, request_count, status
+                        ) VALUES (
+                            %s, %s, %s, %s,
+                            %s, %s, %s,
+                            %s, %s, %s
+                        )
+                        ON CONFLICT (recorded_at, model, provider, feature, status)
+                        DO UPDATE SET
+                            prompt_tokens = llm_metrics_history.prompt_tokens + EXCLUDED.prompt_tokens,
+                            completion_tokens = llm_metrics_history.completion_tokens + EXCLUDED.completion_tokens,
+                            total_tokens = llm_metrics_history.total_tokens + EXCLUDED.total_tokens,
+                            cost_usd = llm_metrics_history.cost_usd + EXCLUDED.cost_usd,
+                            request_count = llm_metrics_history.request_count + EXCLUDED.request_count
+                    """
+
+                    cur.execute(insert_metric_query, (
+                        recorded_at,
+                        metric_data["model"],
+                        metric_data["provider"],
+                        metric_data["feature"],
+                        metric_data["prompt_tokens"],
+                        metric_data["completion_tokens"],
+                        metric_data["prompt_tokens"] + metric_data["completion_tokens"],
+                        metric_data["cost_usd"],
+                        metric_data["request_count"],
+                        metric_data["status"]
+                    ))
+                    synced_count += 1
 
         logger.info(f"✅ Synced {synced_count} metrics to PostgreSQL at {recorded_at}")
 
@@ -250,8 +221,7 @@ async def get_metrics_history(
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     model: Optional[str] = Query(None, description="Filter by model"),
     provider: Optional[str] = Query(None, description="Filter by provider"),
-    current_user: dict = Depends(get_current_user),
-    db = Depends(get_pg_connection)
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Get historical metrics from PostgreSQL
@@ -288,19 +258,19 @@ async def get_metrics_history(
                 SUM(cost_usd) as cost_usd,
                 SUM(request_count) as request_count
             FROM llm_metrics_history
-            WHERE recorded_at >= :start_date
-              AND recorded_at <= :end_date
+            WHERE recorded_at >= %s
+              AND recorded_at <= %s
         """
 
-        params = {"start_date": start, "end_date": end}
+        params = [start, end]
 
         if model:
-            query += " AND model = :model"
-            params["model"] = model
+            query += " AND model = %s"
+            params.append(model)
 
         if provider:
-            query += " AND provider = :provider"
-            params["provider"] = provider
+            query += " AND provider = %s"
+            params.append(provider)
 
         query += """
             GROUP BY recorded_at, model, provider, feature
@@ -308,8 +278,10 @@ async def get_metrics_history(
             LIMIT 1000
         """
 
-        result = await db.execute(text(query), params)
-        rows = result.fetchall()
+        with get_pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
 
         return {
             "success": True,
@@ -340,8 +312,7 @@ async def get_metrics_history(
 @router.get("/metrics-monthly-summary")
 async def get_monthly_summary(
     months: int = Query(6, description="Number of months to retrieve"),
-    current_user: dict = Depends(get_current_user),
-    db = Depends(get_pg_connection)
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Get monthly cost summary for the last N months
@@ -354,7 +325,7 @@ async def get_monthly_summary(
     if not is_admin:
         raise HTTPException(status_code=403, detail="Admin privileges required")
     try:
-        query = text("""
+        query = """
             SELECT
                 DATE_TRUNC('month', recorded_at) as month,
                 SUM(cost_usd) as total_cost,
@@ -362,13 +333,15 @@ async def get_monthly_summary(
                 SUM(request_count) as total_requests,
                 COUNT(DISTINCT model) as unique_models
             FROM llm_metrics_history
-            WHERE recorded_at >= NOW() - INTERVAL ':months months'
+            WHERE recorded_at >= NOW() - INTERVAL '%s months'
             GROUP BY DATE_TRUNC('month', recorded_at)
             ORDER BY month DESC
-        """)
+        """
 
-        result = await db.execute(query, {"months": months})
-        rows = result.fetchall()
+        with get_pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (months,))
+                rows = cur.fetchall()
 
         return {
             "success": True,
