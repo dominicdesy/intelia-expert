@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Secret pour les cron jobs (même que currency rates)
-CRON_SECRET = os.getenv("CRON_SECRET", "")
+CRON_SECRET = os.getenv("CRON_SECRET_KEY", "")
 
 PROMETHEUS_URL = "http://intelia-prometheus:9090"
 
