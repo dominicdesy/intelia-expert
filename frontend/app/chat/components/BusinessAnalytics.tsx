@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { apiClient } from "@/lib/api/client";
 import {
   BarChart,
   Bar,
@@ -116,36 +116,7 @@ export default function BusinessAnalytics() {
       setLoading(true);
       setError(null);
 
-      // Get access token for authentication
-      let accessToken: string | null = null;
-
-      const authData = localStorage.getItem("intelia-expert-auth");
-      if (authData) {
-        try {
-          const parsed = JSON.parse(authData);
-          accessToken = parsed.access_token;
-        } catch (e) {
-          console.error("[BusinessAnalytics] parse error:", e);
-        }
-      }
-
-      if (!accessToken) {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (!sessionError && session?.access_token) {
-          accessToken = session.access_token;
-        }
-      }
-
-      if (!accessToken) {
-        throw new Error("Session expirée. Veuillez vous reconnecter.");
-      }
-
-      const headers = {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      };
-
-      // Fetch all metrics in parallel
+      // Fetch all metrics in parallel using apiClient.getSecure
       const [
         costByUserRes,
         tokenRatiosRes,
@@ -153,25 +124,25 @@ export default function BusinessAnalytics() {
         monthlyLLMRes,
         infraCostsRes
       ] = await Promise.all([
-        fetch("/api/v1/metrics/cost-by-user?limit=20", { headers }),
-        fetch("/api/v1/metrics/token-ratios", { headers }),
-        fetch("/api/v1/metrics/error-rates", { headers }),
-        fetch("/api/v1/metrics/metrics-monthly-summary?months=6", { headers }),
-        fetch("/api/v1/metrics/infrastructure-costs?days=30", { headers })
+        apiClient.getSecure("metrics/cost-by-user?limit=20"),
+        apiClient.getSecure("metrics/token-ratios"),
+        apiClient.getSecure("metrics/error-rates"),
+        apiClient.getSecure("metrics/metrics-monthly-summary?months=6"),
+        apiClient.getSecure("metrics/infrastructure-costs?days=30")
       ]);
 
       // Check responses
-      if (!costByUserRes.ok) throw new Error("Failed to fetch cost by user");
-      if (!tokenRatiosRes.ok) throw new Error("Failed to fetch token ratios");
-      if (!errorRatesRes.ok) throw new Error("Failed to fetch error rates");
-      if (!monthlyLLMRes.ok) throw new Error("Failed to fetch monthly LLM");
-      if (!infraCostsRes.ok) throw new Error("Failed to fetch infrastructure costs");
+      if (!costByUserRes.success) throw new Error(costByUserRes.error?.message || "Failed to fetch cost by user");
+      if (!tokenRatiosRes.success) throw new Error(tokenRatiosRes.error?.message || "Failed to fetch token ratios");
+      if (!errorRatesRes.success) throw new Error(errorRatesRes.error?.message || "Failed to fetch error rates");
+      if (!monthlyLLMRes.success) throw new Error(monthlyLLMRes.error?.message || "Failed to fetch monthly LLM");
+      if (!infraCostsRes.success) throw new Error(infraCostsRes.error?.message || "Failed to fetch infrastructure costs");
 
-      const costByUser = await costByUserRes.json();
-      const tokenRatios = await tokenRatiosRes.json();
-      const errorRates = await errorRatesRes.json();
-      const monthlyLLM = await monthlyLLMRes.json();
-      const infraCosts = await infraCostsRes.json();
+      const costByUser = costByUserRes.data;
+      const tokenRatios = tokenRatiosRes.data;
+      const errorRates = errorRatesRes.data;
+      const monthlyLLM = monthlyLLMRes.data;
+      const infraCosts = infraCostsRes.data;
 
       // Calculate summary
       const totalLLMCost = monthlyLLM.summary?.reduce((sum: number, m: MonthlySummary) => sum + m.total_cost_usd, 0) || 0;
