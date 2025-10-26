@@ -1,6 +1,7 @@
 """
 LLM Metrics Sync API
 Synchronizes Prometheus metrics to PostgreSQL for long-term storage (6+ months)
+Also collects infrastructure metrics from external APIs (DO, Stripe, etc.)
 """
 
 import logging
@@ -12,6 +13,13 @@ import httpx
 
 from app.core.database import get_pg_connection
 from app.api.v1.auth import get_current_user
+from app.collectors import (
+    collect_do_metrics,
+    collect_stripe_metrics,
+    collect_weaviate_metrics,
+    collect_supabase_metrics,
+    collect_twilio_metrics
+)
 
 logger = logging.getLogger(__name__)
 
@@ -675,3 +683,308 @@ async def get_error_rates(
     except Exception as e:
         logger.error(f"Failed to fetch error rates: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# UNIFIED SYNC ENDPOINT - Collect ALL metrics
+# ============================================================
+
+@router.post("/sync-all-metrics-cron")
+async def sync_all_metrics_cron(
+    secret: str = Query(..., description="Cron secret")
+):
+    """
+    UNIFIED SYNC ENDPOINT
+    Synchronizes ALL metrics from all sources:
+    - Prometheus → PostgreSQL (LLM metrics)
+    - Digital Ocean API → PostgreSQL
+    - Stripe API → PostgreSQL
+    - Weaviate API → PostgreSQL
+    - Supabase API → PostgreSQL
+    - Twilio API → PostgreSQL
+
+    Called by cron-job.org daily
+    URL: /api/v1/metrics/sync-all-metrics-cron?secret=xxx
+    """
+    # Validate secret
+    if not CRON_SECRET or secret != CRON_SECRET:
+        logger.warning(f"Invalid cron secret attempt")
+        raise HTTPException(status_code=403, detail="Invalid secret")
+
+    results = {
+        "success": True,
+        "timestamp": datetime.utcnow().isoformat(),
+        "prometheus": None,
+        "digital_ocean": None,
+        "stripe": None,
+        "weaviate": None,
+        "supabase": None,
+        "twilio": None,
+        "errors": []
+    }
+
+    # 1. Sync Prometheus metrics (LLM)
+    try:
+        logger.info("📊 Syncing Prometheus metrics...")
+        prom_result = await _sync_prometheus_to_db()
+        results["prometheus"] = {
+            "synced_count": prom_result.get("synced_count", 0),
+            "enriched_count": prom_result.get("enriched_count", 0)
+        }
+        logger.info(f"✅ Prometheus: {results['prometheus']['synced_count']} records synced")
+    except Exception as e:
+        error_msg = f"Prometheus sync failed: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        results["errors"].append(error_msg)
+
+    # 2. Collect Digital Ocean metrics
+    try:
+        logger.info("☁️ Collecting Digital Ocean metrics...")
+        do_metrics = await collect_do_metrics()
+        if do_metrics:
+            await _save_do_metrics(do_metrics)
+            results["digital_ocean"] = {
+                "total_cost_usd": do_metrics["total_cost_usd"],
+                "apps": do_metrics["app_platform_apps"]
+            }
+            logger.info(f"✅ Digital Ocean: ${do_metrics['total_cost_usd']:.2f}")
+        else:
+            results["digital_ocean"] = "skipped"
+    except Exception as e:
+        error_msg = f"Digital Ocean collection failed: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        results["errors"].append(error_msg)
+
+    # 3. Collect Stripe metrics
+    try:
+        logger.info("💰 Collecting Stripe metrics...")
+        stripe_metrics = await collect_stripe_metrics()
+        if stripe_metrics:
+            await _save_stripe_metrics(stripe_metrics)
+            results["stripe"] = {
+                "mrr_usd": stripe_metrics["mrr_usd"],
+                "active_subs": stripe_metrics["active_subscriptions"],
+                "churn_rate": stripe_metrics["churn_rate_percent"]
+            }
+            logger.info(f"✅ Stripe: MRR=${stripe_metrics['mrr_usd']:.2f}, {stripe_metrics['active_subscriptions']} subs")
+        else:
+            results["stripe"] = "skipped"
+    except Exception as e:
+        error_msg = f"Stripe collection failed: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        results["errors"].append(error_msg)
+
+    # 4. Collect Weaviate metrics
+    try:
+        logger.info("🗂️ Collecting Weaviate metrics...")
+        weaviate_metrics = await collect_weaviate_metrics()
+        if weaviate_metrics:
+            await _save_weaviate_metrics(weaviate_metrics)
+            results["weaviate"] = {
+                "total_objects": weaviate_metrics["total_objects"],
+                "storage_mb": weaviate_metrics["storage_size_mb"]
+            }
+            logger.info(f"✅ Weaviate: {weaviate_metrics['total_objects']} objects")
+        else:
+            results["weaviate"] = "skipped"
+    except Exception as e:
+        error_msg = f"Weaviate collection failed: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        results["errors"].append(error_msg)
+
+    # 5. Collect Supabase metrics
+    try:
+        logger.info("🔐 Collecting Supabase metrics...")
+        supabase_metrics = await collect_supabase_metrics()
+        if supabase_metrics:
+            await _save_supabase_metrics(supabase_metrics)
+            results["supabase"] = {
+                "total_users": supabase_metrics["total_users"],
+                "active_users_30d": supabase_metrics["active_users_30d"]
+            }
+            logger.info(f"✅ Supabase: {supabase_metrics['total_users']} users")
+        else:
+            results["supabase"] = "skipped"
+    except Exception as e:
+        error_msg = f"Supabase collection failed: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        results["errors"].append(error_msg)
+
+    # 6. Collect Twilio metrics
+    try:
+        logger.info("📱 Collecting Twilio metrics...")
+        twilio_metrics = await collect_twilio_metrics()
+        if twilio_metrics:
+            await _save_twilio_metrics(twilio_metrics)
+            results["twilio"] = {
+                "sms_sent": twilio_metrics["sms_sent"],
+                "whatsapp_sent": twilio_metrics["whatsapp_sent"],
+                "total_cost_usd": twilio_metrics["total_cost_usd"]
+            }
+            logger.info(f"✅ Twilio: {twilio_metrics['sms_sent']} SMS, ${twilio_metrics['total_cost_usd']:.4f}")
+        else:
+            results["twilio"] = "skipped"
+    except Exception as e:
+        error_msg = f"Twilio collection failed: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        results["errors"].append(error_msg)
+
+    # Summary
+    if results["errors"]:
+        logger.warning(f"⚠️ Sync completed with {len(results['errors'])} errors")
+        results["success"] = len(results["errors"]) < 3  # Allow partial success
+
+    logger.info("🎉 All metrics sync completed!")
+    return results
+
+
+# ============================================================
+# HELPER FUNCTIONS - Save metrics to database
+# ============================================================
+
+async def _save_do_metrics(metrics: Dict):
+    """Save Digital Ocean metrics to database"""
+    with get_pg_connection() as conn:
+        with conn.cursor() as cur:
+            query = """
+                INSERT INTO do_metrics (
+                    recorded_at, app_platform_cost_usd, app_platform_apps,
+                    db_cost_usd, db_size_gb, registry_cost_usd, registry_size_gb,
+                    registry_bandwidth_gb, spaces_cost_usd, spaces_size_gb, total_cost_usd
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (recorded_at) DO UPDATE SET
+                    app_platform_cost_usd = EXCLUDED.app_platform_cost_usd,
+                    app_platform_apps = EXCLUDED.app_platform_apps,
+                    db_cost_usd = EXCLUDED.db_cost_usd,
+                    db_size_gb = EXCLUDED.db_size_gb,
+                    registry_cost_usd = EXCLUDED.registry_cost_usd,
+                    registry_size_gb = EXCLUDED.registry_size_gb,
+                    total_cost_usd = EXCLUDED.total_cost_usd
+            """
+            cur.execute(query, (
+                metrics["recorded_at"],
+                metrics["app_platform_cost_usd"],
+                metrics["app_platform_apps"],
+                metrics["db_cost_usd"],
+                metrics["db_size_gb"],
+                metrics["registry_cost_usd"],
+                metrics["registry_size_gb"],
+                metrics["registry_bandwidth_gb"],
+                metrics["spaces_cost_usd"],
+                metrics["spaces_size_gb"],
+                metrics["total_cost_usd"]
+            ))
+
+
+async def _save_stripe_metrics(metrics: Dict):
+    """Save Stripe metrics to database"""
+    with get_pg_connection() as conn:
+        with conn.cursor() as cur:
+            query = """
+                INSERT INTO stripe_metrics (
+                    recorded_at, mrr_usd, arr_usd, active_subscriptions,
+                    new_subscriptions, cancelled_subscriptions, churn_rate_percent,
+                    essential_subs, pro_subs, elite_subs,
+                    essential_mrr, pro_mrr, elite_mrr
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (recorded_at) DO UPDATE SET
+                    mrr_usd = EXCLUDED.mrr_usd,
+                    arr_usd = EXCLUDED.arr_usd,
+                    active_subscriptions = EXCLUDED.active_subscriptions,
+                    churn_rate_percent = EXCLUDED.churn_rate_percent
+            """
+            cur.execute(query, (
+                metrics["recorded_at"],
+                metrics["mrr_usd"],
+                metrics["arr_usd"],
+                metrics["active_subscriptions"],
+                metrics["new_subscriptions"],
+                metrics["cancelled_subscriptions"],
+                metrics["churn_rate_percent"],
+                metrics["essential_subs"],
+                metrics["pro_subs"],
+                metrics["elite_subs"],
+                metrics["essential_mrr"],
+                metrics["pro_mrr"],
+                metrics["elite_mrr"]
+            ))
+
+
+async def _save_weaviate_metrics(metrics: Dict):
+    """Save Weaviate metrics to database"""
+    with get_pg_connection() as conn:
+        with conn.cursor() as cur:
+            query = """
+                INSERT INTO weaviate_metrics (
+                    recorded_at, total_objects, storage_size_mb,
+                    queries_count, avg_query_time_ms, estimated_cost_usd
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (recorded_at) DO UPDATE SET
+                    total_objects = EXCLUDED.total_objects,
+                    storage_size_mb = EXCLUDED.storage_size_mb,
+                    estimated_cost_usd = EXCLUDED.estimated_cost_usd
+            """
+            cur.execute(query, (
+                metrics["recorded_at"],
+                metrics["total_objects"],
+                metrics["storage_size_mb"],
+                metrics["queries_count"],
+                metrics["avg_query_time_ms"],
+                metrics["estimated_cost_usd"]
+            ))
+
+
+async def _save_supabase_metrics(metrics: Dict):
+    """Save Supabase metrics to database"""
+    with get_pg_connection() as conn:
+        with conn.cursor() as cur:
+            query = """
+                INSERT INTO supabase_metrics (
+                    recorded_at, total_users, active_users_7d, active_users_30d,
+                    storage_size_gb, storage_objects, db_size_mb, total_cost_usd
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (recorded_at) DO UPDATE SET
+                    total_users = EXCLUDED.total_users,
+                    active_users_7d = EXCLUDED.active_users_7d,
+                    active_users_30d = EXCLUDED.active_users_30d,
+                    total_cost_usd = EXCLUDED.total_cost_usd
+            """
+            cur.execute(query, (
+                metrics["recorded_at"],
+                metrics["total_users"],
+                metrics["active_users_7d"],
+                metrics["active_users_30d"],
+                metrics["storage_size_gb"],
+                metrics["storage_objects"],
+                metrics["db_size_mb"],
+                metrics["total_cost_usd"]
+            ))
+
+
+async def _save_twilio_metrics(metrics: Dict):
+    """Save Twilio metrics to database"""
+    with get_pg_connection() as conn:
+        with conn.cursor() as cur:
+            query = """
+                INSERT INTO twilio_metrics (
+                    recorded_at, sms_sent, sms_cost_usd,
+                    whatsapp_sent, whatsapp_cost_usd,
+                    voice_minutes, voice_cost_usd, total_cost_usd
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (recorded_at) DO UPDATE SET
+                    sms_sent = EXCLUDED.sms_sent,
+                    sms_cost_usd = EXCLUDED.sms_cost_usd,
+                    whatsapp_sent = EXCLUDED.whatsapp_sent,
+                    whatsapp_cost_usd = EXCLUDED.whatsapp_cost_usd,
+                    total_cost_usd = EXCLUDED.total_cost_usd
+            """
+            cur.execute(query, (
+                metrics["recorded_at"],
+                metrics["sms_sent"],
+                metrics["sms_cost_usd"],
+                metrics["whatsapp_sent"],
+                metrics["whatsapp_cost_usd"],
+                metrics["voice_minutes"],
+                metrics["voice_cost_usd"],
+                metrics["total_cost_usd"]
+            ))
