@@ -685,6 +685,71 @@ async def get_error_rates(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/infrastructure-costs")
+async def get_infrastructure_costs(
+    days: int = Query(30, description="Number of days to retrieve"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get infrastructure costs summary from all sources
+    Combines LLM, Digital Ocean, Stripe, Weaviate, Supabase, Twilio
+    Admin only
+    """
+    # Verify admin privileges
+    user_role = current_user.get("role", "user")
+    is_admin = user_role in ["admin", "superuser"] or current_user.get("is_admin", False)
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    try:
+        query = """
+            SELECT
+                date,
+                llm_cost_usd,
+                do_cost_usd,
+                weaviate_cost_usd,
+                supabase_cost_usd,
+                twilio_cost_usd,
+                mrr_usd,
+                total_cost_usd,
+                margin_usd
+            FROM infrastructure_costs_summary
+            WHERE date >= CURRENT_DATE - INTERVAL '%s days'
+            ORDER BY date DESC
+        """
+
+        with get_pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (days,))
+                rows = cur.fetchall()
+
+        costs = [
+            {
+                "date": row[0].isoformat() if row[0] else None,
+                "llm_cost_usd": float(row[1]) if row[1] else 0.0,
+                "do_cost_usd": float(row[2]) if row[2] else 0.0,
+                "weaviate_cost_usd": float(row[3]) if row[3] else 0.0,
+                "supabase_cost_usd": float(row[4]) if row[4] else 0.0,
+                "twilio_cost_usd": float(row[5]) if row[5] else 0.0,
+                "mrr_usd": float(row[6]) if row[6] else 0.0,
+                "total_cost_usd": float(row[7]) if row[7] else 0.0,
+                "margin_usd": float(row[8]) if row[8] else 0.0,
+            }
+            for row in rows
+        ]
+
+        return {
+            "success": True,
+            "days": days,
+            "count": len(costs),
+            "costs": costs
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to fetch infrastructure costs: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================
 # UNIFIED SYNC ENDPOINT - Collect ALL metrics
 # ============================================================

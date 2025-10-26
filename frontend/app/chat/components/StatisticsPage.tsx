@@ -7,6 +7,7 @@ import { InvitationStatsComponent } from "./InvitationStats";
 import { QualityIssuesTab } from "./QualityIssuesTab";
 import { SatisfactionStatsTab } from "./SatisfactionStatsTab";
 import PrometheusMetrics from "./PrometheusMetrics";
+import BusinessAnalytics from "./BusinessAnalytics";
 import { secureLog } from "@/lib/utils/secureLogger";
 
 // ✅ HOOK SIMPLIFIÉ - Plus de fallback localStorage/Supabase
@@ -255,7 +256,7 @@ export const StatisticsPage: React.FC = () => {
     "day" | "week" | "month" | "year"
   >("month");
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "questions" | "invitations" | "quality" | "satisfaction" | "metrics"
+    "dashboard" | "questions" | "invitations" | "quality" | "satisfaction" | "metrics" | "business"
   >("dashboard");
   const [questionFilters, setQuestionFilters] = useState({
     search: "",
@@ -372,7 +373,7 @@ export const StatisticsPage: React.FC = () => {
 
   // Reset des références quand on change d'onglet
   const handleTabChange = (
-    newTab: "dashboard" | "questions" | "invitations" | "quality" | "satisfaction" | "metrics",
+    newTab: "dashboard" | "questions" | "invitations" | "quality" | "satisfaction" | "metrics" | "business",
   ) => {
     if (newTab !== activeTab) {
       secureLog.log(`[StatisticsPage] Changement onglet: ${activeTab} -> ${newTab} `);
@@ -972,6 +973,16 @@ export const StatisticsPage: React.FC = () => {
                 >
                   Métriques
                 </button>
+                <button
+                  onClick={() => handleTabChange("business")}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    activeTab === "business"
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Business
+                </button>
               </div>
             </div>
 
@@ -1139,6 +1150,8 @@ export const StatisticsPage: React.FC = () => {
           <SatisfactionStatsTab timeRange={selectedTimeRange} />
         ) : activeTab === "metrics" ? (
           <PrometheusMetrics />
+        ) : activeTab === "business" ? (
+          <BusinessAnalytics />
         ) : null}
 
         {/* Modal de détail de question */}
