@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget Intelia - Test Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 10px 0;
+        }
+
+        .status.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .button {
+            background: #2563eb;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .button:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+
+        .button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .info {
+            background: #dbeafe;
+            border-left: 4px solid #2563eb;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .info h3 {
+            color: #1e40af;
+            margin-bottom: 8px;
+        }
+
+        .info p {
+            color: #1e3a8a;
+            margin: 0;
+        }
+
+        pre {
+            background: #1f2937;
+            color: #e5e7eb;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+
+        .log {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 16px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 20px 0;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 4px;
+        }
+
+        .log-entry.success {
+            color: #065f46;
+        }
+
+        .log-entry.error {
+            color: #991b1b;
+        }
+
+        .log-entry.info {
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>🧪 Widget Intelia - Page de Test</h1>
+            <p>Cette page teste le widget avec un client de test pré-configuré.</p>
+
+            <div class="info">
+                <h3>ℹ️ Configuration</h3>
+                <p><strong>Client ID:</strong> test-client-001</p>
+                <p><strong>Mode:</strong> Test automatique (génération token via API)</p>
+                <p><strong>Quota:</strong> 10,000 requêtes/mois</p>
+            </div>
+
+            <div style="margin: 20px 0;">
+                <button id="initButton" class="button" onclick="initializeWidget()">
+                    Initialiser le Widget
+                </button>
+                <span id="status" class="status pending">Prêt à initialiser</span>
+            </div>
+
+            <div id="logs" class="log"></div>
+        </div>
+
+        <div class="card">
+            <h2>📝 Instructions</h2>
+            <ol style="line-height: 2; margin-left: 20px; color: #6b7280;">
+                <li>Cliquez sur "Initialiser le Widget"</li>
+                <li>Un token JWT sera généré automatiquement</li>
+                <li>La bulle de chat apparaîtra en bas à droite</li>
+                <li>Cliquez dessus et posez une question !</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Charger le widget -->
+    <script src="/api/widget/intelia-widget.js"></script>
+    <script>
+        const statusEl = document.getElementById('status');
+        const logsEl = document.getElementById('logs');
+        const initButton = document.getElementById('initButton');
+
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logsEl.insertBefore(entry, logsEl.firstChild);
+        }
+
+        async function generateToken() {
+            addLog('Génération du token JWT...', 'info');
+
+            try {
+                const response = await fetch('/api/v1/widget/generate-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        client_id: 'test-client-001',
+                        user_id: 'test-user-' + Date.now(),
+                        user_email: 'test@example.com',
+                        expiration_minutes: 60
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${error}`);
+                }
+
+                const data = await response.json();
+                addLog('✅ Token généré avec succès', 'success');
+                addLog(`Expire dans: ${data.expires_in_seconds}s`, 'info');
+                return data.token;
+            } catch (error) {
+                addLog(`❌ Erreur génération token: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        async function initializeWidget() {
+            try {
+                initButton.disabled = true;
+                statusEl.textContent = 'Initialisation...';
+                statusEl.className = 'status pending';
+
+                addLog('Démarrage initialisation du widget...', 'info');
+
+                // Initialiser le widget
+                InteliaWidget.init({
+                    apiUrl: '/api/v1/widget',
+                    getToken: async () => {
+                        addLog('Widget demande un nouveau token...', 'info');
+                        return await generateToken();
+                    },
+                    userId: 'test-user-' + Date.now(),
+                    userEmail: 'test@example.com',
+                    position: 'bottom-right',
+                    primaryColor: '#667eea',
+                    locale: 'fr'
+                });
+
+                statusEl.textContent = 'Widget initialisé ✓';
+                statusEl.className = 'status success';
+                addLog('✅ Widget initialisé avec succès !', 'success');
+                addLog('Vous pouvez maintenant cliquer sur la bulle de chat', 'info');
+
+                // Ouvrir automatiquement après 1 seconde
+                setTimeout(() => {
+                    InteliaWidget.open();
+                    addLog('Widget ouvert automatiquement', 'info');
+                }, 1000);
+
+            } catch (error) {
+                statusEl.textContent = 'Erreur: ' + error.message;
+                statusEl.className = 'status error';
+                addLog(`❌ Erreur: ${error.message}`, 'error');
+                initButton.disabled = false;
+            }
+        }
+
+        // Log initial
+        addLog('Page de test chargée - Prêt à initialiser', 'success');
+    </script>
+</body>
+</html>
