@@ -294,13 +294,15 @@ async def widget_chat(
         )
 
 
-@router.post("/generate-token")
-async def generate_widget_token(
-    client_id: str,
-    user_id: Optional[str] = None,
-    user_email: Optional[str] = None,
+class GenerateTokenRequest(BaseModel):
+    client_id: str
+    user_id: Optional[str] = None
+    user_email: Optional[str] = None
     expiration_minutes: int = JWT_EXPIRATION_MINUTES
-):
+
+
+@router.post("/generate-token")
+async def generate_widget_token(request: GenerateTokenRequest):
     """
     ENDPOINT ADMINISTRATIF - Générer un JWT token pour le widget
 
@@ -308,10 +310,7 @@ async def generate_widget_token(
     Il doit être protégé (pas exposé publiquement)
 
     Args:
-        client_id: ID du client (entreprise)
-        user_id: ID utilisateur dans leur système (optionnel)
-        user_email: Email utilisateur (optionnel)
-        expiration_minutes: Durée de validité en minutes (défaut: 60)
+        request: Contient client_id, user_id (optionnel), user_email (optionnel), expiration_minutes
 
     Returns:
         JWT token signé
@@ -322,11 +321,11 @@ async def generate_widget_token(
 
     try:
         # Créer le payload
-        exp = datetime.utcnow() + timedelta(minutes=expiration_minutes)
+        exp = datetime.utcnow() + timedelta(minutes=request.expiration_minutes)
         payload = {
-            "client_id": client_id,
-            "user_id": user_id,
-            "user_email": user_email,
+            "client_id": request.client_id,
+            "user_id": request.user_id,
+            "user_email": request.user_email,
             "exp": exp,
             "iat": datetime.utcnow()
         }
@@ -334,12 +333,12 @@ async def generate_widget_token(
         # Signer le token
         token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-        logger.info(f"Token généré pour client: {client_id}, user: {user_id}")
+        logger.info(f"Token généré pour client: {request.client_id}, user: {request.user_id}")
 
         return {
             "token": token,
             "expires_at": exp.isoformat(),
-            "expires_in_seconds": expiration_minutes * 60
+            "expires_in_seconds": request.expiration_minutes * 60
         }
 
     except Exception as e:
