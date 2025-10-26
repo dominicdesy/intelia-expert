@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "音声設定の保存エラー",
   "passkey.addedOn": "追加日",
   "voiceSettings.fast": "速い",
-  "voiceSettings.veryFast": "とても速い"
+  "voiceSettings.veryFast": "とても速い",
+  "widget.placeholder": "質問を入力してください...",
+  "widget.welcomeMessage": "こんにちは！どのようにお手伝いできますか？",
+  "widget.buttonLabel": "お困りですか？",
+  "widget.sendButton": "送信",
+  "widget.errorNetwork": "接続エラー。もう一度お試しください。",
+  "widget.errorToken": "認証エラー。",
+  "widget.errorQuota": "使用制限に達しました。"
 }

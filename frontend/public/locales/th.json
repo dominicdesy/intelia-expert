@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "เกิดข้อผิดพลาดในการบันทึกการตั้งค่าเสียง",
   "passkey.addedOn": "เพิ่มเมื่อ",
   "voiceSettings.fast": "เร็ว",
-  "voiceSettings.veryFast": "เร็วมาก"
+  "voiceSettings.veryFast": "เร็วมาก",
+  "widget.placeholder": "ถามคำถามของคุณ...",
+  "widget.welcomeMessage": "สวัสดี! ฉันจะช่วยคุณได้อย่างไร?",
+  "widget.buttonLabel": "ต้องการความช่วยเหลือ?",
+  "widget.sendButton": "ส่ง",
+  "widget.errorNetwork": "ข้อผิดพลาดในการเชื่อมต่อ กรุณาลองอีกครั้ง",
+  "widget.errorToken": "ข้อผิดพลาดในการตรวจสอบสิทธิ์",
+  "widget.errorQuota": "ถึงขีดจำกัดการใช้งานแล้ว"
 }

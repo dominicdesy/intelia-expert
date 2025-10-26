@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "Lỗi lưu cài đặt giọng nói",
   "passkey.addedOn": "Đã thêm vào",
   "voiceSettings.fast": "Nhanh",
-  "voiceSettings.veryFast": "Rất nhanh"
+  "voiceSettings.veryFast": "Rất nhanh",
+  "widget.placeholder": "Đặt câu hỏi của bạn...",
+  "widget.welcomeMessage": "Xin chào! Tôi có thể giúp gì cho bạn?",
+  "widget.buttonLabel": "Cần giúp đỡ?",
+  "widget.sendButton": "Gửi",
+  "widget.errorNetwork": "Lỗi kết nối. Vui lòng thử lại.",
+  "widget.errorToken": "Lỗi xác thực.",
+  "widget.errorQuota": "Đã đạt giới hạn sử dụng."
 }

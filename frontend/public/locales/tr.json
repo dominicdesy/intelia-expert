@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "Ses ayarları kaydedilirken hata oluştu",
   "passkey.addedOn": "Eklenme tarihi",
   "voiceSettings.fast": "Hızlı",
-  "voiceSettings.veryFast": "Çok hızlı"
+  "voiceSettings.veryFast": "Çok hızlı",
+  "widget.placeholder": "Sorunuzu sorun...",
+  "widget.welcomeMessage": "Merhaba! Size nasıl yardımcı olabilirim?",
+  "widget.buttonLabel": "Yardıma mı ihtiyacınız var?",
+  "widget.sendButton": "Gönder",
+  "widget.errorNetwork": "Bağlantı hatası. Lütfen tekrar deneyin.",
+  "widget.errorToken": "Kimlik doğrulama hatası.",
+  "widget.errorQuota": "Kullanım sınırına ulaşıldı."
 }

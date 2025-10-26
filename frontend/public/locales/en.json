@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "Error saving voice settings",
   "passkey.addedOn": "Added on",
   "voiceSettings.fast": "Fast",
-  "voiceSettings.veryFast": "Very fast"
+  "voiceSettings.veryFast": "Very fast",
+  "widget.placeholder": "Ask your question...",
+  "widget.welcomeMessage": "Hello! How can I help you?",
+  "widget.buttonLabel": "Need help?",
+  "widget.sendButton": "Send",
+  "widget.errorNetwork": "Connection error. Please try again.",
+  "widget.errorToken": "Authentication error.",
+  "widget.errorQuota": "Usage limit reached."
 }

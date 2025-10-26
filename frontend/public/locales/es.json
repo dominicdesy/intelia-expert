@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "Error al guardar la configuración de voz",
   "passkey.addedOn": "Agregado el",
   "voiceSettings.fast": "Rápido",
-  "voiceSettings.veryFast": "Muy rápido"
+  "voiceSettings.veryFast": "Muy rápido",
+  "widget.placeholder": "Haga su pregunta...",
+  "widget.welcomeMessage": "¡Hola! ¿Cómo puedo ayudarle?",
+  "widget.buttonLabel": "¿Necesita ayuda?",
+  "widget.sendButton": "Enviar",
+  "widget.errorNetwork": "Error de conexión. Por favor, inténtelo de nuevo.",
+  "widget.errorToken": "Error de autenticación.",
+  "widget.errorQuota": "Límite de uso alcanzado."
 }

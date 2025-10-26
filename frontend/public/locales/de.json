@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "Fehler beim Speichern der Spracheinstellungen",
   "passkey.addedOn": "Hinzugefügt am",
   "voiceSettings.fast": "Schnell",
-  "voiceSettings.veryFast": "Sehr schnell"
+  "voiceSettings.veryFast": "Sehr schnell",
+  "widget.placeholder": "Stellen Sie Ihre Frage...",
+  "widget.welcomeMessage": "Hallo! Wie kann ich Ihnen helfen?",
+  "widget.buttonLabel": "Brauchen Sie Hilfe?",
+  "widget.sendButton": "Senden",
+  "widget.errorNetwork": "Verbindungsfehler. Bitte versuchen Sie es erneut.",
+  "widget.errorToken": "Authentifizierungsfehler.",
+  "widget.errorQuota": "Nutzungslimit erreicht."
 }

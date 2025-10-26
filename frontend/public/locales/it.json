@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "Errore nel salvataggio delle impostazioni vocali",
   "passkey.addedOn": "Aggiunto il",
   "voiceSettings.fast": "Veloce",
-  "voiceSettings.veryFast": "Molto veloce"
+  "voiceSettings.veryFast": "Molto veloce",
+  "widget.placeholder": "Fai la tua domanda...",
+  "widget.welcomeMessage": "Ciao! Come posso aiutarti?",
+  "widget.buttonLabel": "Hai bisogno di aiuto?",
+  "widget.sendButton": "Invia",
+  "widget.errorNetwork": "Errore di connessione. Riprova.",
+  "widget.errorToken": "Errore di autenticazione.",
+  "widget.errorQuota": "Limite di utilizzo raggiunto."
 }

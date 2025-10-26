@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "保存语音设置时出错",
   "passkey.addedOn": "添加于",
   "voiceSettings.fast": "快速",
-  "voiceSettings.veryFast": "非常快"
+  "voiceSettings.veryFast": "非常快",
+  "widget.placeholder": "请提问...",
+  "widget.welcomeMessage": "您好！我能帮您什么？",
+  "widget.buttonLabel": "需要帮助吗？",
+  "widget.sendButton": "发送",
+  "widget.errorNetwork": "连接错误。请重试。",
+  "widget.errorToken": "认证错误。",
+  "widget.errorQuota": "已达到使用限制。"
 }

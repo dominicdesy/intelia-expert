@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "خطأ في حفظ إعدادات الصوت",
   "passkey.addedOn": "أضيف في",
   "voiceSettings.fast": "سريع",
-  "voiceSettings.veryFast": "سريع جداً"
+  "voiceSettings.veryFast": "سريع جداً",
+  "widget.placeholder": "اطرح سؤالك...",
+  "widget.welcomeMessage": "مرحبا! كيف يمكنني مساعدتك؟",
+  "widget.buttonLabel": "هل تحتاج إلى مساعدة؟",
+  "widget.sendButton": "إرسال",
+  "widget.errorNetwork": "خطأ في الاتصال. يرجى المحاولة مرة أخرى.",
+  "widget.errorToken": "خطأ في المصادقة.",
+  "widget.errorQuota": "تم الوصول إلى حد الاستخدام."
 }

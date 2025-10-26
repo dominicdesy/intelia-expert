@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "आवाज सेटिंग्स सहेजने में त्रुटि",
   "passkey.addedOn": "जोड़ा गया",
   "voiceSettings.fast": "तेज़",
-  "voiceSettings.veryFast": "बहुत तेज़"
+  "voiceSettings.veryFast": "बहुत तेज़",
+  "widget.placeholder": "अपना प्रश्न पूछें...",
+  "widget.welcomeMessage": "नमस्ते! मैं आपकी कैसे मदद कर सकता हूं?",
+  "widget.buttonLabel": "मदद चाहिए?",
+  "widget.sendButton": "भेजें",
+  "widget.errorNetwork": "कनेक्शन त्रुटि। कृपया पुनः प्रयास करें।",
+  "widget.errorToken": "प्रमाणीकरण त्रुटि।",
+  "widget.errorQuota": "उपयोग सीमा पहुंच गई।"
 }

@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "Fout bij het opslaan van spraak instellingen",
   "passkey.addedOn": "Toegevoegd op",
   "voiceSettings.fast": "Snel",
-  "voiceSettings.veryFast": "Heel snel"
+  "voiceSettings.veryFast": "Heel snel",
+  "widget.placeholder": "Stel uw vraag...",
+  "widget.welcomeMessage": "Hallo! Hoe kan ik u helpen?",
+  "widget.buttonLabel": "Hulp nodig?",
+  "widget.sendButton": "Verzenden",
+  "widget.errorNetwork": "Verbindingsfout. Probeer het opnieuw.",
+  "widget.errorToken": "Authenticatiefout.",
+  "widget.errorQuota": "Gebruikslimiet bereikt."
 }

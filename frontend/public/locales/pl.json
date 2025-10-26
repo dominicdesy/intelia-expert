@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "Błąd zapisu ustawień głosu",
   "passkey.addedOn": "Dodano",
   "voiceSettings.fast": "Szybko",
-  "voiceSettings.veryFast": "Bardzo szybko"
+  "voiceSettings.veryFast": "Bardzo szybko",
+  "widget.placeholder": "Zadaj pytanie...",
+  "widget.welcomeMessage": "Cześć! Jak mogę Ci pomóc?",
+  "widget.buttonLabel": "Potrzebujesz pomocy?",
+  "widget.sendButton": "Wyślij",
+  "widget.errorNetwork": "Błąd połączenia. Spróbuj ponownie.",
+  "widget.errorToken": "Błąd uwierzytelniania.",
+  "widget.errorQuota": "Osiągnięto limit użycia."
 }

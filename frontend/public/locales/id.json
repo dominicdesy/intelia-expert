@@ -1071,5 +1071,12 @@
   "error.saveVoiceSettings": "Kesalahan menyimpan pengaturan suara",
   "passkey.addedOn": "Ditambahkan pada",
   "voiceSettings.fast": "Cepat",
-  "voiceSettings.veryFast": "Sangat cepat"
+  "voiceSettings.veryFast": "Sangat cepat",
+  "widget.placeholder": "Ajukan pertanyaan Anda...",
+  "widget.welcomeMessage": "Halo! Bagaimana saya bisa membantu Anda?",
+  "widget.buttonLabel": "Butuh bantuan?",
+  "widget.sendButton": "Kirim",
+  "widget.errorNetwork": "Kesalahan koneksi. Silakan coba lagi.",
+  "widget.errorToken": "Kesalahan autentikasi.",
+  "widget.errorQuota": "Batas penggunaan tercapai."
 }
