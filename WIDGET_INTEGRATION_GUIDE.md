@@ -281,7 +281,7 @@ Ajouter 2 lignes de code dans votre HTML:
     <!-- Votre contenu -->
 
     <!-- Charger le widget Intelia -->
-    <script src="https://expert.intelia.com/widget/intelia-widget.js"></script>
+    <script src="https://expert.intelia.com/api/widget/intelia-widget.js"></script>
     <script>
         InteliaWidget.init({
             apiUrl: 'https://expert.intelia.com/api/v1/widget',
@@ -444,10 +444,9 @@ Fonctionnalités prévues:
 
 ### Documentation
 
-- **Guide d'intégration**: [https://expert.intelia.com/widget/demo-client.html](https://expert.intelia.com/widget/demo-client.html)
-- **Page de test**: [https://expert.intelia.com/widget/test.html](https://expert.intelia.com/widget/test.html)
+- **Guide d'intégration**: [https://expert.intelia.com/api/widget/demo-client.html](https://expert.intelia.com/api/widget/demo-client.html)
+- **Page de test**: [https://expert.intelia.com/api/widget/test.html](https://expert.intelia.com/api/widget/test.html)
 - **API Documentation**: [https://expert.intelia.com/api/docs](https://expert.intelia.com/api/docs)
-- **Changelog**: [https://expert.intelia.com/widget/changelog](https://expert.intelia.com/widget/changelog)
 
 ### Contact
 
@@ -513,7 +512,7 @@ LLM_INTERNAL_URL=http://intelia-llm:8080
 
 ### Test Manuel
 
-1. Ouvrir `https://expert.intelia.com/widget/test.html`
+1. Ouvrir `https://expert.intelia.com/api/widget/test.html`
 2. Cliquer sur "Initialiser le Widget"
 3. Vérifier que la bulle de chat apparaît avec le logo Intelia
 4. Envoyer un message de test
