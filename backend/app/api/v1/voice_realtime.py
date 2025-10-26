@@ -123,15 +123,10 @@ class WeaviateRAGService:
         if self.enabled:
             try:
                 # Import dynamique pour ne pas casser si module absent
-                from retrieval.retriever_core import HybridWeaviateRetriever
-                from utils.imports_and_dependencies import wvc
-
-                self.client = wvc.Client(
-                    url=WEAVIATE_URL,
-                    auth_client_secret=wvc.AuthApiKey(WEAVIATE_API_KEY) if WEAVIATE_API_KEY else None
-                )
-                self.retriever = HybridWeaviateRetriever(self.client)
-                logger.info("✅ Weaviate RAG Service initialized")
+                # Les modules du LLM ne sont pas disponibles dans le backend
+                # On désactive le RAG pour Voice Realtime dans le backend
+                logger.warning("⚠️ Weaviate RAG not available in backend context - Voice Realtime will work without RAG pre-loading")
+                self.enabled = False
             except Exception as e:
                 logger.error(f"❌ Weaviate initialization failed: {e}")
                 self.enabled = False
