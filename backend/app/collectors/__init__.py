@@ -1,6 +1,6 @@
 """
 Infrastructure Metrics Collectors
-Collect usage and cost data from external services
+Collect usage and cost data from external services.
 """
 
 from .digital_ocean import collect_do_metrics
