@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ABC Corporation - Services Médicaux</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* Header */
+        header {
+            background: #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2563eb;
+        }
+
+        nav ul {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: #555;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: #2563eb;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 80px 0;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .hero p {
+            font-size: 20px;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Services Section */
+        .services {
+            padding: 60px 0;
+            background: #f9fafb;
+        }
+
+        .services h2 {
+            text-align: center;
+            font-size: 36px;
+            margin-bottom: 40px;
+            color: #1f2937;
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .service-card {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .service-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .service-card h3 {
+            color: #2563eb;
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+
+        .service-card p {
+            color: #6b7280;
+        }
+
+        /* About Section */
+        .about {
+            padding: 60px 0;
+        }
+
+        .about h2 {
+            text-align: center;
+            font-size: 36px;
+            margin-bottom: 30px;
+            color: #1f2937;
+        }
+
+        .about-content {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+            color: #6b7280;
+            font-size: 18px;
+        }
+
+        /* Contact Section */
+        .contact {
+            padding: 60px 0;
+            background: #f9fafb;
+        }
+
+        .contact h2 {
+            text-align: center;
+            font-size: 36px;
+            margin-bottom: 30px;
+            color: #1f2937;
+        }
+
+        .contact-info {
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .contact-item {
+            margin: 20px 0;
+            font-size: 18px;
+            color: #6b7280;
+        }
+
+        .contact-item strong {
+            color: #1f2937;
+        }
+
+        /* Footer */
+        footer {
+            background: #1f2937;
+            color: white;
+            text-align: center;
+            padding: 30px 0;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 32px;
+            }
+
+            .hero p {
+                font-size: 16px;
+            }
+
+            nav ul {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">ABC Corporation</div>
+                <nav>
+                    <ul>
+                        <li><a href="#services">Services</a></li>
+                        <li><a href="#about">À propos</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Services Médicaux de Qualité</h1>
+            <p>Votre santé est notre priorité. Découvrez nos services personnalisés et notre expertise médicale.</p>
+        </div>
+    </section>
+
+    <!-- Services Section -->
+    <section id="services" class="services">
+        <div class="container">
+            <h2>Nos Services</h2>
+            <div class="services-grid">
+                <div class="service-card">
+                    <h3>Consultations Générales</h3>
+                    <p>Prenez rendez-vous avec nos médecins généralistes pour tous vos besoins de santé quotidiens.</p>
+                </div>
+                <div class="service-card">
+                    <h3>Spécialistes</h3>
+                    <p>Accédez à notre réseau de spécialistes en cardiologie, dermatologie, orthopédie et plus encore.</p>
+                </div>
+                <div class="service-card">
+                    <h3>Télémédecine</h3>
+                    <p>Consultez nos médecins à distance, confortablement depuis chez vous, 7 jours sur 7.</p>
+                </div>
+                <div class="service-card">
+                    <h3>Analyses Médicales</h3>
+                    <p>Laboratoire sur place pour tous vos examens et analyses médicales avec résultats rapides.</p>
+                </div>
+                <div class="service-card">
+                    <h3>Vaccination</h3>
+                    <p>Programme de vaccination complet pour toute la famille, du nourrisson à l'adulte.</p>
+                </div>
+                <div class="service-card">
+                    <h3>Suivi Personnalisé</h3>
+                    <p>Un suivi médical adapté à vos besoins avec un dossier médical électronique sécurisé.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about">
+        <div class="container">
+            <h2>À Propos de Nous</h2>
+            <div class="about-content">
+                <p>
+                    ABC Corporation est un leader dans le domaine des services médicaux depuis plus de 25 ans.
+                    Notre équipe de professionnels dévoués s'engage à fournir des soins de santé de qualité
+                    supérieure dans un environnement chaleureux et accueillant.
+                </p>
+                <p style="margin-top: 20px;">
+                    Nous croyons que chaque patient mérite une attention personnalisée et des soins adaptés
+                    à ses besoins spécifiques. C'est pourquoi nous investissons continuellement dans les
+                    technologies médicales de pointe et la formation de notre personnel.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact">
+        <div class="container">
+            <h2>Contactez-Nous</h2>
+            <div class="contact-info">
+                <div class="contact-item">
+                    <strong>Téléphone:</strong> 1-800-ABC-CORP
+                </div>
+                <div class="contact-item">
+                    <strong>Email:</strong> contact@abccorp.com
+                </div>
+                <div class="contact-item">
+                    <strong>Adresse:</strong> 123 Rue Médicale, Montréal, QC H2X 1Y5
+                </div>
+                <div class="contact-item">
+                    <strong>Heures d'ouverture:</strong> Lundi - Vendredi: 8h - 18h<br>
+                    Samedi: 9h - 17h | Dimanche: Fermé
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 ABC Corporation. Tous droits réservés.</p>
+            <p style="margin-top: 10px; font-size: 14px; opacity: 0.8;">
+                Assistant IA fourni par Intelia Expert
+            </p>
+        </div>
+    </footer>
+
+    <!-- Intelia Widget -->
+    <script src="/api/widget/intelia-widget.js"></script>
+    <script>
+        // Fonction pour générer un token JWT automatiquement
+        async function generateToken() {
+            try {
+                const response = await fetch('/api/v1/widget/generate-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        client_id: 'test-client-001',
+                        user_id: 'demo-user-' + Date.now(),
+                        user_email: 'demo@abccorp.com',
+                        expiration_minutes: 60
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to generate token');
+                }
+
+                const data = await response.json();
+                return data.token;
+            } catch (error) {
+                console.error('Error generating token:', error);
+                throw error;
+            }
+        }
+
+        // Initialiser le widget automatiquement au chargement de la page
+        document.addEventListener('DOMContentLoaded', function() {
+            InteliaWidget.init({
+                apiUrl: '/api/v1/widget',
+                getToken: generateToken,
+                userId: 'demo-user-' + Date.now(),
+                userEmail: 'demo@abccorp.com',
+                position: 'bottom-right',
+                primaryColor: '#2563eb',
+                locale: 'fr'
+            });
+        });
+    </script>
+</body>
+</html>
