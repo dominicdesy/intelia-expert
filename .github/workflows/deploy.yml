@@ -1,34 +1,26 @@
-name: Smart Selective Build and Deploy
+name: Build and Deploy to DigitalOcean App Platform
 
 on:
   push:
-    branches: [ main ]
-    paths-ignore:
-      - '**.md'
-      - '.gitignore'
-      - 'docs/**'
-      - 'README.md'
-  workflow_dispatch:
-
-concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+    branches:
+      - main
 
 jobs:
   detect-changes:
+    name: Detect Changed Services
     runs-on: ubuntu-latest
     outputs:
-      frontend-changed: ${{ steps.changes.outputs.frontend }}
-      backend-changed: ${{ steps.changes.outputs.backend }}
-      llm-changed: ${{ steps.changes.outputs.llm }}
-      prometheus-changed: ${{ steps.changes.outputs.prometheus }}
+      frontend-changed: ${{ steps.filter.outputs.frontend }}
+      backend-changed: ${{ steps.filter.outputs.backend }}
+      llm-changed: ${{ steps.filter.outputs.llm }}
+      prometheus-changed: ${{ steps.filter.outputs.prometheus }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: dorny/paths-filter@v3
-        id: changes
+      - name: Detect path changes
+        id: filter
+        uses: dorny/paths-filter@v3
         with:
           filters: |
             frontend:
@@ -40,290 +32,225 @@ jobs:
             prometheus:
               - 'prometheus-service/**'
 
-      - name: Show changes
-        run: |
-          echo "Frontend changed: ${{ steps.changes.outputs.frontend }}"
-          echo "Backend changed: ${{ steps.changes.outputs.backend }}"
-          echo "LLM changed: ${{ steps.changes.outputs.llm }}"
-          echo "Prometheus changed: ${{ steps.changes.outputs.prometheus }}"
-
+  # ======================================================
+  # FRONTEND
+  # ======================================================
   build-frontend:
-    runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.frontend-changed == 'true'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in to DigitalOcean Container Registry
+        run: |
+          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login \
+            registry.digitalocean.com \
+            -u ${{ secrets.DOCR_USERNAME }} \
+            --password-stdin
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-            network=host
 
-      - name: Login to DOCR (native docker login)
-        run: |
-          echo "Login to DigitalOcean Container Registry..."
-          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u ${{ secrets.DOCR_NAME }} --password-stdin
-          echo "✅ Login successful"
-
-      - name: Build & push frontend
+      - name: Build and push frontend image
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
-          platforms: linux/amd64
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
-          provenance: false
-          sbom: false
           build-args: |
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
-      - name: Create latest tag for frontend
+      - name: Tag and push :latest
         run: |
-          echo "Création explicite du tag 'latest' pour frontend..."
           docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
-          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main \
-                     registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
-          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
-          echo "✅ Tag 'latest' créé et poussé pour frontend"
+          docker tag \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
+          docker push \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
 
+  # ======================================================
+  # BACKEND
+  # ======================================================
   build-backend:
-    runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.backend-changed == 'true'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in to DigitalOcean Container Registry
+        run: |
+          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login \
+            registry.digitalocean.com \
+            -u ${{ secrets.DOCR_USERNAME }} \
+            --password-stdin
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-            network=host
 
-      - name: Login to DOCR (native docker login)
-        run: |
-          echo "Login to DigitalOcean Container Registry..."
-          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u ${{ secrets.DOCR_NAME }} --password-stdin
-          echo "✅ Login successful"
-
-      - name: Build & push backend
+      - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
-          platforms: linux/amd64
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
-          provenance: false
-          sbom: false
 
-      - name: Create latest tag for backend
+      - name: Tag and push :latest
         run: |
-          echo "Création explicite du tag 'latest' pour backend..."
           docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
-          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main \
-                     registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
-          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
-          echo "✅ Tag 'latest' créé et poussé pour backend"
+          docker tag \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
+          docker push \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
 
+  # ======================================================
+  # LLM
+  # ======================================================
   build-llm:
-    runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.llm-changed == 'true'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in to DigitalOcean Container Registry
+        run: |
+          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login \
+            registry.digitalocean.com \
+            -u ${{ secrets.DOCR_USERNAME }} \
+            --password-stdin
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-            network=host
 
-      - name: Login to DOCR (native docker login)
-        run: |
-          echo "Login to DigitalOcean Container Registry..."
-          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u ${{ secrets.DOCR_NAME }} --password-stdin
-          echo "✅ Login successful"
-
-      - name: Build & push LLM
+      - name: Build and push LLM image
         uses: docker/build-push-action@v6
         with:
           context: ./llm
           push: true
-          platforms: linux/amd64
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
-          provenance: false
-          sbom: false
 
-      - name: Create latest tag explicitly
+      - name: Tag and push :latest
         run: |
-          echo "Création explicite du tag 'latest'..."
           docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
-          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main \
-                     registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
-          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
-          echo "✅ Tag 'latest' créé et poussé"
+          docker tag \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
+          docker push \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
 
+  # ======================================================
+  # PROMETHEUS
+  # ======================================================
   build-prometheus:
-    runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.prometheus-changed == 'true'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in to DigitalOcean Container Registry
+        run: |
+          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login \
+            registry.digitalocean.com \
+            -u ${{ secrets.DOCR_USERNAME }} \
+            --password-stdin
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-            network=host
 
-      - name: Login to DOCR (native docker login)
-        run: |
-          echo "Login to DigitalOcean Container Registry..."
-          echo "${{ secrets.DOCR_ACCESS_TOKEN }}" | docker login registry.digitalocean.com -u ${{ secrets.DOCR_NAME }} --password-stdin
-          echo "✅ Login successful"
-
-      - name: Build & push Prometheus
+      - name: Build and push Prometheus image
         uses: docker/build-push-action@v6
         with:
           context: ./prometheus-service
           push: true
-          platforms: linux/amd64
           tags: |
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main-${{ github.sha }}
           cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:buildcache
           cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:buildcache,mode=max
-          provenance: false
-          sbom: false
 
-      - name: Create latest tag for prometheus
+      - name: Tag and push :latest
         run: |
-          echo "Création explicite du tag 'latest' pour prometheus..."
           docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main
-          docker tag registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main \
-                     registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:latest
-          docker push registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:latest
-          echo "✅ Tag 'latest' créé et poussé pour prometheus"
+          docker tag \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:latest
+          docker push \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:latest
 
+  # ======================================================
+  # DEPLOY TO DIGITALOCEAN
+  # ======================================================
   deploy:
-    name: Deploy to DigitalOcean App Platform
-    runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend, build-llm, build-prometheus]
-    if: |
+    needs:
+      - build-frontend
+      - build-backend
+      - build-llm
+      - build-prometheus
+    if: >
       always() &&
       !cancelled() &&
-      (needs.build-frontend.result == 'success' ||
-       needs.build-backend.result == 'success' ||
-       needs.build-llm.result == 'success' ||
-       needs.build-prometheus.result == 'success')
+      (
+        needs.build-frontend.result == 'success' ||
+        needs.build-backend.result == 'success' ||
+        needs.build-llm.result == 'success' ||
+        needs.build-prometheus.result == 'success'
+      )
+    runs-on: ubuntu-latest
     steps:
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
-          token: ${{ secrets.DOCR_ACCESS_TOKEN }}
+          token: ${{ secrets.DO_API_TOKEN }}
 
-      - name: Trigger manual deployment to App Platform
-        run: |
-          echo "╔═══════════════════════════════════════════════════════════╗"
-          echo "║  DÉPLOIEMENT MANUEL VIA DOCTL                             ║"
-          echo "╚═══════════════════════════════════════════════════════════╝"
-          echo ""
-          echo "Services qui ont été buildés avec succès:"
-          if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-            echo "  ✅ Frontend (intelia-frontend:latest)"
-          fi
-          if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-            echo "  ✅ Backend (intelia-backend:latest)"
-          fi
-          if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-            echo "  ✅ LLM (intelia-llm:latest)"
-          fi
-          if [[ "${{ needs.build-prometheus.result }}" == "success" ]]; then
-            echo "  ✅ Prometheus (intelia-prometheus:latest)"
-          fi
-          echo ""
-          echo "Déclenchement du déploiement sur App Platform..."
-          echo "⏳ Cela peut prendre plusieurs minutes..."
-          echo ""
+      - name: Trigger App Platform deployment
+        run: doctl apps create-deployment ${{ secrets.DO_APP_ID }} --wait
 
-          # Trigger deployment via doctl
-          doctl apps create-deployment ${{ secrets.DO_APP_ID }} --wait
-
-          echo ""
-          echo "✅ Déploiement terminé avec succès!"
-          echo ""
-          echo "📊 Surveillez les logs sur: https://cloud.digitalocean.com/apps"
-
+  # ======================================================
+  # SUMMARY
+  # ======================================================
   summary:
+    needs:
+      - detect-changes
+      - build-frontend
+      - build-backend
+      - build-llm
+      - build-prometheus
+      - deploy
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-frontend, build-backend, build-llm, build-prometheus, deploy]
     if: always()
     steps:
-      - name: Deployment Summary
+      - name: Print deployment summary
         run: |
-          echo "DEPLOYMENT SUMMARY"
-          echo "=================="
-
-          if [[ "${{ needs.detect-changes.outputs.frontend-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-frontend.result }}" == "success" ]]; then
-              echo "Frontend: DEPLOYED"
-            else
-              echo "Frontend: FAILED"
-            fi
-          else
-            echo "Frontend: SKIPPED (no changes)"
-          fi
-
-          if [[ "${{ needs.detect-changes.outputs.backend-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-backend.result }}" == "success" ]]; then
-              echo "Backend: DEPLOYED"
-            else
-              echo "Backend: FAILED"
-            fi
-          else
-            echo "Backend: SKIPPED (no changes)"
-          fi
-
-          if [[ "${{ needs.detect-changes.outputs.llm-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-llm.result }}" == "success" ]]; then
-              echo "LLM: DEPLOYED"
-            else
-              echo "LLM: FAILED"
-            fi
-          else
-            echo "LLM: SKIPPED (no changes)"
-          fi
-
-          if [[ "${{ needs.detect-changes.outputs.prometheus-changed }}" == "true" ]]; then
-            if [[ "${{ needs.build-prometheus.result }}" == "success" ]]; then
-              echo "Prometheus: DEPLOYED"
-            else
-              echo "Prometheus: FAILED"
-            fi
-          else
-            echo "Prometheus: SKIPPED (no changes)"
-          fi
-
+          echo "=== Deployment Summary ==="
           echo ""
+          echo "Frontend:  changed=${{ needs.detect-changes.outputs.frontend-changed }},  result=${{ needs.build-frontend.result }}"
+          echo "Backend:   changed=${{ needs.detect-changes.outputs.backend-changed }},  result=${{ needs.build-backend.result }}"
+          echo "LLM:       changed=${{ needs.detect-changes.outputs.llm-changed }},  result=${{ needs.build-llm.result }}"
+          echo "Prometheus:changed=${{ needs.detect-changes.outputs.prometheus-changed }},  result=${{ needs.build-prometheus.result }}"
+          echo ""
+
           if [[ "${{ needs.deploy.result }}" == "success" ]]; then
-            echo "Deploiement: REUSSI"
+            echo "Deployment: SUCCESS ✅"
+          elif [[ "${{ needs.deploy.result }}" == "skipped" ]]; then
+            echo "Deployment: SKIPPED (no changes)"
           else
-            echo "Deploiement: ECHEC"
+            echo "Deployment: FAILED ❌"
           fi
