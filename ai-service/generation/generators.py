@@ -591,61 +591,13 @@ MÉTRIQUES CLÉS BROILERS:
             ]
 
             # Generate response using routed provider
+            # Note: LLM router handles Prometheus tracking internally for all providers
             generated_response = await self.llm_router.generate(
                 provider=provider,
                 messages=messages,
                 temperature=0.1,
                 max_tokens=1500
             )
-
-            # For backward compatibility, create a mock response object
-            class MockResponse:
-                def __init__(self, content, model):
-                    self.choices = [type('obj', (object,), {'message': type('obj', (object,), {'content': content})()})]
-                    self.usage = type('obj', (object,), {
-                        'prompt_tokens': 0,
-                        'completion_tokens': 0,
-                        'total_tokens': 0
-                    })()
-                    self.model = model
-
-            response = MockResponse(generated_response, provider.value)
-
-
-            generated_response = response.choices[0].message.content.strip()
-
-            # Track Prometheus metrics for this LLM call
-            try:
-                from monitoring.prometheus_metrics import track_llm_call
-                prompt_tokens = response.usage.prompt_tokens
-                completion_tokens = response.usage.completion_tokens
-                tokens = response.usage.total_tokens
-
-                # Determine cost per 1M tokens based on model
-                if "o1-preview" in self.cot_model:
-                    cost_per_1m = 15.0  # $15/1M for o1-preview
-                elif "o1-mini" in self.cot_model:
-                    cost_per_1m = 3.0  # $3/1M for o1-mini
-                elif "gpt-4o" in self.cot_model:
-                    cost_per_1m = 5.0  # $5/1M for gpt-4o (average of input/output)
-                else:
-                    cost_per_1m = 15.0  # Default fallback
-
-                cost = tokens / 1_000_000 * cost_per_1m
-
-                track_llm_call(
-                    model=self.cot_model,
-                    provider="openai",
-                    feature="chat",
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens,
-                    cost_usd=cost,
-                    duration=0.0,  # Duration not tracked in generators.py
-                    status="success"
-                )
-                logger.info(f"📊 Prometheus tracking: {self.cot_model} - {tokens} tokens, ${cost:.6f}")
-            except Exception as e:
-                logger.error(f"❌ Failed to track Prometheus metrics: {e}")
 
             # 🧠 DEBUG: Log raw LLM response to check for CoT tags
             logger.info(f"🔍 Raw LLM response length: {len(generated_response)} chars")
