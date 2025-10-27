@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
+main.py - Intelia Expert LLM Service - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
 
 Version: 2.2.2 - Rate limiting middleware timing fixed
