@@ -87,10 +87,10 @@ class HuggingFaceProvider(LLMClient):
             logger.info(f"Calling HuggingFace Inference Providers for model: {self.model}")
 
             # Use OpenAI-compatible API endpoint for Inference Providers
-            # This routes through api-inference.huggingface.co/v1 to multiple providers
+            # This routes through router.huggingface.co to multiple providers
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
-                    "https://api-inference.huggingface.co/v1/chat/completions",
+                    "https://router.huggingface.co/v1/chat/completions",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json",
@@ -110,9 +110,16 @@ class HuggingFaceProvider(LLMClient):
 
             generated_text = data["choices"][0]["message"]["content"]
 
-            # Estimate token counts (HF API doesn't provide exact counts)
-            prompt_tokens = self._estimate_tokens(messages)
-            completion_tokens = self._estimate_tokens([{"role": "assistant", "content": generated_text}])
+            # Extract actual token counts from response (Inference Providers returns them)
+            usage = data.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+
+            # Fallback to estimation if not provided
+            if prompt_tokens == 0:
+                prompt_tokens = self._estimate_tokens(messages)
+            if completion_tokens == 0:
+                completion_tokens = self._estimate_tokens([{"role": "assistant", "content": generated_text}])
 
             logger.info(f"Generation successful. Tokens: ~{prompt_tokens}+{completion_tokens}")
 
