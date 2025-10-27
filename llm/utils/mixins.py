@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Mixins for common serialization patterns
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Mixins for common serialization patterns
 
 Provides standardized serialization for dataclasses and custom objects,
 eliminating duplicate to_dict() implementations across the codebase.

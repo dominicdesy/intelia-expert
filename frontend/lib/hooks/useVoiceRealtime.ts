@@ -1,5 +1,10 @@
 /**
  * useVoiceRealtime Hook
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * useVoiceRealtime Hook
  * =====================
  *
  * Hook React pour conversation vocale en temps réel avec WebSocket

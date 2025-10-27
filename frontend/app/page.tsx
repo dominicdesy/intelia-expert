@@ -1,3 +1,8 @@
+/**
+ * Page
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 "use client";
 // Build: 1.0.0.9 - FINAL FIX: React hooks order + hydration warnings resolved
 

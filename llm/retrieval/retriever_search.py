@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 retriever_search.py - Méthodes de recherche hybride avec améliorations
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+retriever_search.py - Méthodes de recherche hybride avec améliorations
 VERSION AMÉLIORÉE avec gestion d'erreur robuste
 """
 

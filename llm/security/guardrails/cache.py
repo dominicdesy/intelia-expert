@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 cache.py - Cache management for guardrails verification
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+cache.py - Cache management for guardrails verification
 """
 
 import hashlib

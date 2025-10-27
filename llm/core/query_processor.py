@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Query processor - Handles query processing pipeline for RAG engine
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Query processor - Handles query processing pipeline for RAG engine
 """
 
 import logging

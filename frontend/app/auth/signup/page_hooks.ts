@@ -1,3 +1,8 @@
+/**
+ * Page Hooks
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // page_hooks.ts - Hooks et utilitaires pour la page d'authentification (nettoyé)
 "use client";
 

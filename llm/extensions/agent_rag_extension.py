@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 agent_rag_extension.py - Extension Agent RAG pour Intelia Expert
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+agent_rag_extension.py - Extension Agent RAG pour Intelia Expert
 Implémente un Agent RAG avec décomposition de requêtes et synthèse multi-documents
 Compatible avec votre architecture existante
 

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 user_profiling.py - User Profile Management for LLM Personalization
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+user_profiling.py - User Profile Management for LLM Personalization
 
 Retrieves and applies user profiling information to personalize LLM responses:
 - Production type (broiler, layer, both)

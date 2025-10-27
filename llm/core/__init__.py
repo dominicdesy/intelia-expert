@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Core module - Modules centraux du système RAG
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Core module - Modules centraux du système RAG
 """
 
 # NOTE IMPORTANTE: InteliaRAGEngine n'est PAS importé ici pour éviter un import circulaire.

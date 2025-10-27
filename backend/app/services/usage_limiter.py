@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 usage_limiter.py - Service de limitation d'usage pour les plans
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+usage_limiter.py - Service de limitation d'usage pour les plans
 
 Gère les quotas mensuels de questions pour le plan Essential:
 - Vérifie si l'utilisateur a atteint sa limite mensuelle

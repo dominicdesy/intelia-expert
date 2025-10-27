@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 retriever_rrf.py - Support pour RRF (Reciprocal Rank Fusion) intelligent
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+retriever_rrf.py - Support pour RRF (Reciprocal Rank Fusion) intelligent
 """
 
 import logging

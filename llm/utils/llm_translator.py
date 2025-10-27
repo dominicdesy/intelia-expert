@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 llm_translator.py - LLM-Based Translation Service
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+llm_translator.py - LLM-Based Translation Service
 High-quality translation via OpenAI GPT-4o-mini with Redis cache support
 Preserves Markdown structure and provides fast, cost-effective translations
 """

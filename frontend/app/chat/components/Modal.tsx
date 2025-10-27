@@ -1,3 +1,8 @@
+/**
+ * Modal
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 import { ModalProps } from "../../../types";
 import { useTranslation } from "@/lib/languages/i18n";
 

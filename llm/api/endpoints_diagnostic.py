@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_diagnostic.py - Compatibility layer for refactored diagnostic endpoints
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_diagnostic.py - Compatibility layer for refactored diagnostic endpoints
 
 REFACTORED VERSION:
 Original file (1369 lines) has been split into focused modules.

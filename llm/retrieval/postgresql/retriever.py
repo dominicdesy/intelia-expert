@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_retriever.py - Récupérateur de données PostgreSQL
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_postgresql_retriever.py - Récupérateur de données PostgreSQL
 Version 3.4: Support du filtrage par species + mode strict/souple
 - Mapping breed → nom PostgreSQL via breeds_registry
 - Retourne RAGResult avec documents formatés correctement

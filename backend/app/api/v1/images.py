@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 app/api/v1/images.py - Gestion upload images médicales (ADMINISTRATIF SEULEMENT)
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+app/api/v1/images.py - Gestion upload images médicales (ADMINISTRATIF SEULEMENT)
 Version 1.0.0 - Upload S3 + métadonnées PostgreSQL
 IMPORTANT: Pas d'analyse IA ici - seulement stockage et métadonnées
 """

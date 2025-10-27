@@ -1,3 +1,8 @@
+/**
+ * Signup Components
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // page_components.tsx - Composants UI pour la page d'authentification (nettoyé)
 "use client";
 

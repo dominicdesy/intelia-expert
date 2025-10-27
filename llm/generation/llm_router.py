@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 llm_router.py - Intelligent Multi-LLM Router
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+llm_router.py - Intelligent Multi-LLM Router
 Routes queries to optimal LLM based on complexity and type
 
 COST OPTIMIZATION: -70% via intelligent routing

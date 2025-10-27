@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 context_analyzer.py - Query context analysis for OOD detection
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+context_analyzer.py - Query context analysis for OOD detection
 
 This module contains the ContextAnalyzer class responsible for analyzing
 the context of user queries to classify query types and detect technical

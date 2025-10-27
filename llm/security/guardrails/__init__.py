@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Guardrails Package - Modular Response Verification System
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Guardrails Package - Modular Response Verification System
 
 This package provides a modular architecture for verifying LLM responses
 against source documents to detect hallucinations and ensure factual accuracy.

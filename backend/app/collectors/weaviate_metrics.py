@@ -1,5 +1,10 @@
 """
 Weaviate Metrics Collector
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Weaviate Metrics Collector
 Collects vector database usage and performance metrics
 """
 

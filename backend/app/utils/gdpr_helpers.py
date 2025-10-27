@@ -1,5 +1,10 @@
 """
 GDPR Helper Functions
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+GDPR Helper Functions
 Utilities for GDPR compliance (masking PII, anonymization, etc.)
 """
 

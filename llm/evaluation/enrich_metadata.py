@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 enrich_metadata.py - Add lang and difficulty metadata to all tests
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+enrich_metadata.py - Add lang and difficulty metadata to all tests
 
 Automatically infers:
 - lang: from question text (fr/en/th detection)

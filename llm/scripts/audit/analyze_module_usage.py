@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Analyse complète de l'utilisation des modules avancés du système
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Analyse complète de l'utilisation des modules avancés du système
 """
 
 import re

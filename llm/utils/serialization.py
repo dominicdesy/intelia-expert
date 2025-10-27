@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Central serialization utilities for LLM codebase
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Central serialization utilities for LLM codebase
 
 Consolidates duplicate serialization logic found across:
 - api/utils.py

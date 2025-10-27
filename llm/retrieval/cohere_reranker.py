@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 cohere_reranker.py - Cohere API Re-Ranking (Production-Grade)
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+cohere_reranker.py - Cohere API Re-Ranking (Production-Grade)
 
 VERSION 1.0 - Alternative to MS-MARCO cross-encoder
 Uses Cohere's rerank-multilingual-v3.0 model for superior re-ranking

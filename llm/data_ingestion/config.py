@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Configuration for data ingestion pipeline
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Configuration for data ingestion pipeline
 """
 
 from typing import Dict, List

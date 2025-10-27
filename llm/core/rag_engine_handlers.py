@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine_handlers.py - DEPRECATED - Use handlers package instead
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_engine_handlers.py - DEPRECATED - Use handlers package instead
 
 This file is kept for backward compatibility.
 Import from handlers package directly:

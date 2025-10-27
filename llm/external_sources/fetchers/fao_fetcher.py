@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 FAO (Food and Agriculture Organization) document fetcher
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+FAO (Food and Agriculture Organization) document fetcher
 
 Source: http://www.fao.org/faostat/en/#search
 Rate limit: 1 request/second (web scraping)

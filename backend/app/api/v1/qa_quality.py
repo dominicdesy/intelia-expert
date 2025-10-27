@@ -1,5 +1,10 @@
 """
 API Endpoints pour l'analyse de qualité Q&A
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+API Endpoints pour l'analyse de qualité Q&A
 Permet de détecter et gérer les réponses problématiques
 """
 

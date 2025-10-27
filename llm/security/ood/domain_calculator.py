@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 domain_calculator.py - Domain relevance calculation logic
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+domain_calculator.py - Domain relevance calculation logic
 
 This module handles all domain-related calculations including relevance scoring,
 blocked term detection, universal pattern recognition, context boosting, and

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 response_validator.py - Validation de la qualité des réponses générées
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+response_validator.py - Validation de la qualité des réponses générées
 Version 1.0 - Détecte problèmes de qualité et calcule score
 """
 

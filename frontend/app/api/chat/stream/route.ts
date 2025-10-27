@@ -1,3 +1,8 @@
+/**
+ * Forcer un vrai streaming côté Next.js
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // app/api/chat/stream/route.ts
 
 import type { NextRequest } from "next/server";

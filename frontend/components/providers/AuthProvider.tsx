@@ -1,3 +1,8 @@
+/**
+ * Authprovider
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // AuthProvider.tsx - Version corrigée avec session tracking automatique
 "use client";
 

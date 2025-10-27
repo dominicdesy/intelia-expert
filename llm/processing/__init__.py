@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Processing module - Traitement des intentions et entités
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Processing module - Traitement des intentions et entités
 CORRIGÉ: Imports modulaires selon nouvelle architecture
 NOTE: EntityExtractor a été déplacé vers core.entity_extractor
 """

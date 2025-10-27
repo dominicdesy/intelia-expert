@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 View Analysis Results - Display comprehensive analysis reports
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+View Analysis Results - Display comprehensive analysis reports
 
 Quick script to view the results of overnight analysis runs.
 """

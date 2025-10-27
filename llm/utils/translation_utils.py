@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 utils/translation_utils.py - Module de traduction et messages multilingues
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+utils/translation_utils.py - Module de traduction et messages multilingues
 Extrait de utilities.py pour modularisation
 """
 

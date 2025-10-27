@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 openai_utils.py — GPT-5 safe, backwards-compatible utilities
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+openai_utils.py — GPT-5 safe, backwards-compatible utilities
 
 VERSION CORRIGÉE - Toutes les fonctions manquantes ajoutées pour résoudre les erreurs d'import
 

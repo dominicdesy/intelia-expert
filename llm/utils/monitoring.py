@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 monitoring.py - Module de surveillance et monitoring du système
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+monitoring.py - Module de surveillance et monitoring du système
 SystemHealthMonitor déplacé depuis main.py pour architecture modulaire
 VERSION CORRIGÉE: Gestion robuste du cache et des erreurs de connectivité Weaviate + Agent RAG
 """

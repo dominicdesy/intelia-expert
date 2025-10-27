@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 Replace ALL console.log/error/warn/debug with secureLog equivalents
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Replace ALL console.log/error/warn/debug with secureLog equivalents
 across the entire frontend codebase.
 
 This script:

@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Script de synchronisation des fichiers de traduction
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Script de synchronisation des fichiers de traduction
 Utilise en.json comme référence et synchronise tous les autres fichiers
 """
 

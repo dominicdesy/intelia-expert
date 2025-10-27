@@ -1,5 +1,10 @@
 /**
  * Composant LoadingMessage
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Composant LoadingMessage
  * Affiche un message animé pendant le chargement de la réponse de l'IA
  */
 

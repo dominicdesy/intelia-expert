@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_chat/json_routes.py - JSON system endpoints
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_chat/json_routes.py - JSON system endpoints
 Version 5.0.1 - JSON validation, ingestion, search, and upload endpoints
 """
 

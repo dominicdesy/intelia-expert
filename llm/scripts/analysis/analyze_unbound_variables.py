@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 Analyze Pyright Possibly Unbound Variable errors
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Analyze Pyright Possibly Unbound Variable errors
 Categorizes into: Conditional Imports, Real Bugs, False Positives
 """
 

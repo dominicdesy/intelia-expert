@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 core.py - Main orchestrator for guardrails system
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+core.py - Main orchestrator for guardrails system
 
 Simple orchestration layer that coordinates all verification modules.
 """

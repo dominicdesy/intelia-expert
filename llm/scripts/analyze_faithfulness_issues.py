@@ -1,5 +1,10 @@
 """
 Analyse détaillée des problèmes de Faithfulness dans les résultats RAGAS
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Analyse détaillée des problèmes de Faithfulness dans les résultats RAGAS
 Identifie les patterns de hallucination et les problèmes récurrents
 """
 

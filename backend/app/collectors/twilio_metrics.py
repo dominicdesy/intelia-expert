@@ -1,5 +1,10 @@
 """
 Twilio Metrics Collector
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Twilio Metrics Collector
 Collects SMS and WhatsApp usage and costs from Twilio API
 """
 

@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 SQL Security Audit Script
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+SQL Security Audit Script
 Analyzes Python files for SQL injection vulnerabilities
 """
 

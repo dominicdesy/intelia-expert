@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 metric_calculator.py - Calculs mathématiques sur les métriques avicoles
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+metric_calculator.py - Calculs mathématiques sur les métriques avicoles
 VERSION 3.0 - English templates with LLM translation
 - Gestion correcte des métriques où "plus bas = meilleur" (FCR, mortalité)
 - Validation stricte contre division par zéro

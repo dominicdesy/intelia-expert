@@ -1,5 +1,10 @@
 """
 API Stats Fast - CORRIGÉ pour nouvelle architecture
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+API Stats Fast - CORRIGÉ pour nouvelle architecture
 ====================================================
 PostgreSQL: conversations, feedback, invitations
 Supabase: users (via helper function)

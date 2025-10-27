@@ -1,5 +1,10 @@
 /**
  * SatisfactionStatsTab Component
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * SatisfactionStatsTab Component
  * ===============================
  *
  * Displays satisfaction survey statistics in the admin panel

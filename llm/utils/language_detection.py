@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 utils/language_detection.py - Module de détection de langue multilingue
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+utils/language_detection.py - Module de détection de langue multilingue
 Version corrigée avec FastText proper et téléchargement automatique pour Digital Ocean
 """
 

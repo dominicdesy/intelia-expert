@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Add Help Translations
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 """Add help tour translations to all locale files"""
 
 import json

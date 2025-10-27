@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 stripe_mode.py - Gestion des modes de fonctionnement Stripe
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+stripe_mode.py - Gestion des modes de fonctionnement Stripe
 
 Modes disponibles:
 - PRODUCTION: Stripe actif, facture réellement les clients, quotas appliqués

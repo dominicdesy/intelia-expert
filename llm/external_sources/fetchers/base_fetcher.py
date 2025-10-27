@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Base class for external source fetchers
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Base class for external source fetchers
 """
 
 import logging

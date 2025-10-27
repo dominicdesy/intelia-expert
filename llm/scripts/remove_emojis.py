@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Remove Emojis
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 """Script pour remplacer les emojis par du texte professionnel dans les logs"""
 
 import re

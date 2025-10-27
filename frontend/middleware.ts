@@ -1,3 +1,8 @@
+/**
+ * Middleware
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 data_models.py - Classes et structures de données pour RAG Engine
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+data_models.py - Classes et structures de données pour RAG Engine
 VERSION 4.2 - Support contextualisation + tous les RAGSource nécessaires
 """
 

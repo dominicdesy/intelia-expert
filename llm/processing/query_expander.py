@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 query_expander.py - Expanseur de requêtes avec synonymes du domaine
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+query_expander.py - Expanseur de requêtes avec synonymes du domaine
 CORRIGÉ: Imports modulaires + logique sexe/as-hatched pour recherche élargie
 """
 

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Temporal query handler for processing time-range requests
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Temporal query handler for processing time-range requests
 """
 
 import re

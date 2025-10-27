@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 Script to update all imports after directory reorganization
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Script to update all imports after directory reorganization
 """
 
 from pathlib import Path

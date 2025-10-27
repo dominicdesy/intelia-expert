@@ -1,3 +1,8 @@
+"""
+Router pour l'accès public aux conversations partagées.
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 # app/api/v1/shared.py
 """
 Router pour l'accès public aux conversations partagées.

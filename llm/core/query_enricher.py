@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 query_enricher.py - Enrichissement conversationnel des requêtes
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+query_enricher.py - Enrichissement conversationnel des requêtes
 Version 1.0 - Reformule les questions de suivi avec le contexte précédent
 """
 

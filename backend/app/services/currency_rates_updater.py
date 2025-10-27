@@ -1,5 +1,10 @@
 """
 Currency Rates Updater Service
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Currency Rates Updater Service
 Fetches live exchange rates from Frankfurter API and updates the database
 """
 

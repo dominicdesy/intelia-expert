@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Query handlers package for specialized request processing
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Query handlers package for specialized request processing
 """
 
 from .base_handler import BaseQueryHandler

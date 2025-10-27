@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 auto_add_metadata.py - Automatically add lang and difficulty to golden_dataset_intelia.py
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+auto_add_metadata.py - Automatically add lang and difficulty to golden_dataset_intelia.py
 
 Uses regex to insert metadata after "category" field in each test.
 """

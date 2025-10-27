@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 Script pour trouver tous les RAGResults manquant context_docs
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Script pour trouver tous les RAGResults manquant context_docs
 """
 import os
 from pathlib import Path

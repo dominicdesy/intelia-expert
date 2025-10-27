@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 config.py - Configuration centralisée avec support multilingue
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+config.py - Configuration centralisée avec support multilingue
 OptimisÉ pour Digital Ocean App Platform
 Version multilingue: Support 13 langues + service traduction hybride
 Updated: 2025-10-24 - Image storage + TTS voice responses

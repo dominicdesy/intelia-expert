@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 hallucination_detector.py - Hallucination detection methods for guardrails system
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+hallucination_detector.py - Hallucination detection methods for guardrails system
 
 This module contains methods for detecting hallucination risks and internal contradictions
 in AI-generated responses. Extracted from advanced_guardrails.py for better modularity.

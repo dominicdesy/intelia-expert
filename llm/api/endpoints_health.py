@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_health.py - Compatibility layer for refactored health endpoints
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_health.py - Compatibility layer for refactored health endpoints
 
 REFACTORED VERSION:
 Original file (443 lines) has been split into focused modules.

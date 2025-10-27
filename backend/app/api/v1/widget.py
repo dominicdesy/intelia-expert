@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Widget API - Endpoints pour intégration chat sur sites externes
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Widget API - Endpoints pour intégration chat sur sites externes
 VERSION 1.0.0
 """
 

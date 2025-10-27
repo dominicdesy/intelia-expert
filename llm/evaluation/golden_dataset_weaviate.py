@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 golden_dataset_weaviate.py - Dataset RAGAS pour évaluation Weaviate uniquement
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+golden_dataset_weaviate.py - Dataset RAGAS pour évaluation Weaviate uniquement
 
 Ce dataset teste UNIQUEMENT le contenu narratif/qualitatif indexé dans Weaviate:
 - Guides de management (brooding, ventilation, densité, biosécurité)

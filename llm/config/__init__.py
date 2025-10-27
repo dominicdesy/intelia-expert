@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Configuration module - Configuration centralisée du projet
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Configuration module - Configuration centralisée du projet
 """
 
 from .config import (

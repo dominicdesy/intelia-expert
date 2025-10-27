@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Search endpoint handlers - Extracted from search_routes for complexity reduction
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Search endpoint handlers - Extracted from search_routes for complexity reduction
 Each handler is a standalone async function that implements endpoint logic
 """
 

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ragas_evaluator.py - RAGAS-based evaluation for Intelia Expert LLM
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+ragas_evaluator.py - RAGAS-based evaluation for Intelia Expert LLM
 
 Implements comprehensive RAG evaluation using the RAGAS framework.
 Metrics: Context Precision, Context Recall, Faithfulness, Answer Relevancy

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Central type definitions for entire LLM codebase
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Central type definitions for entire LLM codebase
 
 This module consolidates all common typing imports to reduce duplication
 across 65+ files that were importing the same types individually.

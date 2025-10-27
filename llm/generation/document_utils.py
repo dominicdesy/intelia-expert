@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 document_utils.py - Document utility methods for processing Document objects and dicts
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+document_utils.py - Document utility methods for processing Document objects and dicts
 
 This module provides utility methods for extracting content and metadata from documents
 that can be either Document objects or dictionaries. These utilities ensure consistent

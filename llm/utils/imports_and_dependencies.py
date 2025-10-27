@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 imports_and_dependencies.py - Gestion robuste des dépendances avec structure modulaire
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+imports_and_dependencies.py - Gestion robuste des dépendances avec structure modulaire
 Version CORRIGÉE FINALE - Résolution des imports circulaires + Fix _test_weaviate_v4_safe
 """
 

@@ -1,5 +1,10 @@
 /**
  * Service API pour le monitoring de qualité Q&A
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Service API pour le monitoring de qualité Q&A
  * Utilise apiClient pour une gestion cohérente des requêtes
  */
 

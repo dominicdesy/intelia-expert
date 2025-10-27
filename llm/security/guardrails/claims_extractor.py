@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 claims_extractor.py - Extraction de différents types de claims (affirmations) depuis les réponses
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+claims_extractor.py - Extraction de différents types de claims (affirmations) depuis les réponses
 Ce module fournit des méthodes pour extraire des affirmations factuelles, numériques, qualitatives et comparatives
 depuis les réponses générées par le système RAG, permettant leur vérification ultérieure.
 """

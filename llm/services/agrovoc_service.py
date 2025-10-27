@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 AGROVOC Service - Hybrid 3-Level Poultry Term Detection
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+AGROVOC Service - Hybrid 3-Level Poultry Term Detection
 
 Level 1: AGROVOC Cache (10 languages: fr, en, es, de, it, pt, pl, hi, th, zh)
 Level 2: Manual Terms (for nl, id + modern terms not in AGROVOC)

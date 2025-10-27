@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 entity_extractor.py - Extracteur d'entités centralisé
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+entity_extractor.py - Extracteur d'entités centralisé
 Remplace la logique éparpillée dans comparative_detector, query_preprocessor, etc.
 Version 3.0 - Améliorations robustesse + support breeds_registry complet
 """

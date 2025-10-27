@@ -1,5 +1,10 @@
 """
 Diagnostic script pour comprendre pourquoi Context Recall est si bas (6.67%)
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Diagnostic script pour comprendre pourquoi Context Recall est si bas (6.67%)
 
 Analyse manuelle d'une query problématique pour identifier:
 1. Ce qui a été récupéré (mauvais chunks)

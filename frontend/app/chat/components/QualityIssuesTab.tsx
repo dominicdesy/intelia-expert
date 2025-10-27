@@ -1,5 +1,10 @@
 /**
  * Onglet Anomalies potentielles pour le monitoring de qualité Q&A
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Onglet Anomalies potentielles pour le monitoring de qualité Q&A
  * Affiche les Q&A problématiques détectées par l'IA
  */
 

@@ -1,3 +1,8 @@
+/**
+ * Countryselect
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
 import { secureLog } from "@/lib/utils/secureLogger";

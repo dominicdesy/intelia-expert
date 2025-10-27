@@ -1,3 +1,8 @@
+"""
+Service d'envoi d'emails multilingues pour l'authentification Supabase
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 # app/services/email_service.py
 """
 Service d'envoi d'emails multilingues pour l'authentification Supabase

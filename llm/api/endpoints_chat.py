@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_chat.py - Compatibility layer for refactored chat endpoints
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_chat.py - Compatibility layer for refactored chat endpoints
 
 REFACTORED VERSION:
 Original file (773 lines) has been split into focused modules.

@@ -1,3 +1,8 @@
+/**
+ * Supabase
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // types/supabase.ts - Types de base Supabase pour Intelia Cognito
 
 export interface Database {

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 cache_stats.py - Module de gestion des statistiques du cache
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+cache_stats.py - Module de gestion des statistiques du cache
 Collecte et présentation des métriques de performance
 CORRIGÉ: Utilisation de self.core.config au lieu d'attributs directs inexistants
 """

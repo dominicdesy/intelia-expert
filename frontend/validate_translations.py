@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 Translation validation script - Compares all language files against FR/EN reference
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Translation validation script - Compares all language files against FR/EN reference
 """
 import json
 import os

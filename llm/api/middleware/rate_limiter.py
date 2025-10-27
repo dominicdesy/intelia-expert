@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Rate limiting middleware pour FastAPI
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Rate limiting middleware pour FastAPI
 Limite: 10 requêtes/minute par utilisateur
 """
 

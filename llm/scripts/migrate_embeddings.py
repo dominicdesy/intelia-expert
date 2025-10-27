@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 migrate_embeddings.py - Migration vers text-embedding-3-large
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+migrate_embeddings.py - Migration vers text-embedding-3-large
 
 Re-vectorise tous les documents existants avec le nouveau modèle d'embedding.
 Supporte les dimensions réduites (1536) et complètes (3072).

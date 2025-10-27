@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 clarification_helper.py - Helper pour messages de clarification intelligents
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+clarification_helper.py - Helper pour messages de clarification intelligents
 Version 3.0 - Templates EN avec traduction LLM robuste
 """
 

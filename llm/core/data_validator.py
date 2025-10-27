@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 data_validator.py - Validation de cohérence des données
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+data_validator.py - Validation de cohérence des données
 Vérifie la cohérence mathématique et logique des données retournées
 """
 

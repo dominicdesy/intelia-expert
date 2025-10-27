@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 golden_dataset_intelia.py - Dataset de test pour Intelia Expert
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+golden_dataset_intelia.py - Dataset de test pour Intelia Expert
 
 Questions de test avec ground truth pour évaluation RAGAS.
 Maintenu et enrichi progressivement.

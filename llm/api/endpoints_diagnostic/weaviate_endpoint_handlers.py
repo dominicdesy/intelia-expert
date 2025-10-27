@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Weaviate endpoint handlers - Extracted from weaviate_routes.py for better modularity
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Weaviate endpoint handlers - Extracted from weaviate_routes.py for better modularity
 Handles Weaviate status and Digital Ocean diagnostic functionality
 """
 

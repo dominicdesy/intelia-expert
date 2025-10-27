@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 security.ood - Out-Of-Domain Detection Module (Refactored v3.0.0)
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+security.ood - Out-Of-Domain Detection Module (Refactored v3.0.0)
 
 This package provides multilingual out-of-domain detection capabilities
 for filtering queries that fall outside the poultry farming domain.

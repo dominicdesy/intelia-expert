@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 validate_golden_dataset.py - Comprehensive validator for RAGAS golden dataset
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+validate_golden_dataset.py - Comprehensive validator for RAGAS golden dataset
 
 Validates structure, types, and content quality for optimal RAGAS evaluation.
 Based on pragmatic recommendations for production-ready datasets.

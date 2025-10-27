@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 adaptive_length.py - Adaptive Response Length Calculator
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+adaptive_length.py - Adaptive Response Length Calculator
 
 Dynamically determines optimal max_tokens based on query complexity.
 

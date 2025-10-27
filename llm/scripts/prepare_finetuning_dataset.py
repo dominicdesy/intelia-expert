@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 prepare_finetuning_dataset.py - Génération dataset fine-tuning embeddings avicoles
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+prepare_finetuning_dataset.py - Génération dataset fine-tuning embeddings avicoles
 
 Extrait documents de Weaviate/PostgreSQL et génère des paires (query, positive)
 pour fine-tuner text-embedding-3-large sur vocabulaire avicole.

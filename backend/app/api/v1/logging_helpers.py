@@ -1,3 +1,8 @@
+"""
+🔧 FONCTIONS HELPER ET SINGLETON POUR LE SYSTÈME DE LOGGING
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 # app/api/v1/logging_helpers.py
 # -*- coding: utf-8 -*-
 """

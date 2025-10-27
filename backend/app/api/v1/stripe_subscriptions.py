@@ -1,3 +1,8 @@
+"""
+Stripe Subscription Management avec Link Payment
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 # app/api/v1/stripe_subscriptions.py
 # -*- coding: utf-8 -*-
 """

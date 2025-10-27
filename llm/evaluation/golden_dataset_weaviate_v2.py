@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 golden_dataset_weaviate_v2.py - Dataset RAGAS basé sur le contenu RÉEL des documents Health
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+golden_dataset_weaviate_v2.py - Dataset RAGAS basé sur le contenu RÉEL des documents Health
 
 Ce dataset contient 10 questions extraites directement des documents indexés dans Weaviate:
 - ascites_extracted.txt

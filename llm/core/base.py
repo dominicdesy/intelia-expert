@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Base classes and mixins for common patterns
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Base classes and mixins for common patterns
 
 Consolidates repeated initialization and cleanup patterns found across:
 - All RAG components (13 occurrences of __init__)

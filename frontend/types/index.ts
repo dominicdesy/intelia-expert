@@ -1,3 +1,8 @@
+/**
+ * Index
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 import { secureLog } from "@/lib/utils/secureLogger";
 
 // types/index.ts - VERSION COMPLÈTE AVEC SUPPORT RAG JSON + TOUT LE CONTENU ORIGINAL

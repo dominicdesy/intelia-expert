@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Detect code duplication in the codebase using AST similarity analysis
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Detect code duplication in the codebase using AST similarity analysis
 """
 
 import ast

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 detector.py - Main OOD Detector Orchestrator
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+detector.py - Main OOD Detector Orchestrator
 
 This module contains the main OODDetector class which orchestrates all
 OOD detection components. It is a simple coordinator that delegates to

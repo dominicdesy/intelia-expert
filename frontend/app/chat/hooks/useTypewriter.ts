@@ -1,5 +1,10 @@
 /**
  * useTypewriter.ts - Hook for typewriter animation effect
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * useTypewriter.ts - Hook for typewriter animation effect
  *
  * Simulates typing animation like claude.ai for LLM responses
  */

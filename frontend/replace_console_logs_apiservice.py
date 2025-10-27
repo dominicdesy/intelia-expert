@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Replace Console Logs Apiservice
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 """Replace console.log with secureLog in apiService.ts"""
 
 import re

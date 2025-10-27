@@ -1,5 +1,10 @@
 """
 LLM Metrics Sync API
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+LLM Metrics Sync API
 Synchronizes Prometheus metrics to PostgreSQL for long-term storage (6+ months)
 Also collects infrastructure metrics from external APIs (DO, Stripe, etc.)
 """

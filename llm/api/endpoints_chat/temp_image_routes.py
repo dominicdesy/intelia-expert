@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_chat/temp_image_routes.py - Upload temporaire d'images pour accumulation
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_chat/temp_image_routes.py - Upload temporaire d'images pour accumulation
 Version 1.0.0 - Stockage temporaire pour analyse différée multi-images
 """
 

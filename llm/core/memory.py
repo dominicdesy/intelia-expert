@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 memory.py - Mémoire conversationnelle avec support contextualisation
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+memory.py - Mémoire conversationnelle avec support contextualisation
 Version 4.2 - Gestion des clarifications en attente
 """
 

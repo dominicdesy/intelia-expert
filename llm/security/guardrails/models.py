@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 models.py - Data models for guardrails system
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+models.py - Data models for guardrails system
 """
 
 from dataclasses import dataclass

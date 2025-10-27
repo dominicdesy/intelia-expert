@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Generate training data for fine-tuning cross-encoder re-ranker
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Generate training data for fine-tuning cross-encoder re-ranker
 
 Strategy:
 1. Extract (query, relevant_doc) pairs from PostgreSQL query logs

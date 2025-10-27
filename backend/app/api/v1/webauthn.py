@@ -1,5 +1,10 @@
 """
 WebAuthn API - Biometric Authentication (Face ID, Touch ID, Fingerprint)
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+WebAuthn API - Biometric Authentication (Face ID, Touch ID, Fingerprint)
 =========================================================================
 Endpoints pour l'authentification biométrique via WebAuthn/Passkeys
 """

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 calculation_handler.py - Handler pour les requêtes de calcul complexes
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+calculation_handler.py - Handler pour les requêtes de calcul complexes
 Gère les calculs multi-étapes, projections, et recherches inversées
 """
 

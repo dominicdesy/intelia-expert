@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 redis_cache_manager.py - Gestionnaire de cache Redis principal (refactorisé)
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+redis_cache_manager.py - Gestionnaire de cache Redis principal (refactorisé)
 Point d'entrée principal pour le cache Redis avec fonctionnalités modulaires
 VERSION PERFECTIONNÉE: Interface complète pour compatibilité rag_engine.py
 """

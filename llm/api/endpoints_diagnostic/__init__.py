@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Diagnostic endpoints package
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Diagnostic endpoints package
 
 Refactored from monolithic endpoints_diagnostic.py (1369 lines)
 Split into focused route modules for better maintainability.

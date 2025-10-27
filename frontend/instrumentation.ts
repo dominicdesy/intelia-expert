@@ -1,5 +1,10 @@
 /**
  * Instrumentation file for Next.js
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Instrumentation file for Next.js
  * This file is automatically executed when the server starts
  * Useful for startup logs visible in Digital Ocean logs
  */

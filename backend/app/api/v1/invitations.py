@@ -1,3 +1,8 @@
+"""
+Router Invitations pour Intelia Expert - VERSION SUPABASE NATIVE
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 # app/api/v1/invitations.py - VERSION CORRIGÉE AVEC AUTH UNIFIÉE
 """
 Router Invitations pour Intelia Expert - VERSION SUPABASE NATIVE

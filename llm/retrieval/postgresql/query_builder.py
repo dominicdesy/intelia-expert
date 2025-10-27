@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 postgresql_query_builder.py - Construction de requêtes SQL pour PostgreSQL
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+postgresql_query_builder.py - Construction de requêtes SQL pour PostgreSQL
 Version REFACTORISÉE - Utilisation de BreedsRegistry au lieu de mappings hardcodés
 """
 

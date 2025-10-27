@@ -1,5 +1,10 @@
 """
 Country Tracking & Fraud Detection Service
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Country Tracking & Fraud Detection Service
 Tracks user country at signup and every login for pricing fraud detection
 """
 

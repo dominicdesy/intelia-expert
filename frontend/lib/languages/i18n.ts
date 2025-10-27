@@ -1,3 +1,8 @@
+/**
+ * I18N
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // ==================== SYSTÈME DE TRADUCTION INTELIA EXPERT ====================
 
 import { useState, useEffect, useRef } from "react";

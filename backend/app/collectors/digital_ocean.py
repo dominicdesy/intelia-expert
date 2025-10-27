@@ -1,5 +1,10 @@
 """
 Digital Ocean Metrics Collector
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Digital Ocean Metrics Collector
 Collects costs and usage data from Digital Ocean API
 """
 

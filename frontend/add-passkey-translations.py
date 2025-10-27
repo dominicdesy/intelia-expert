@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Script pour ajouter les traductions WebAuthn/Passkey à tous les fichiers de langue
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Script pour ajouter les traductions WebAuthn/Passkey à tous les fichiers de langue
 """
 
 import json

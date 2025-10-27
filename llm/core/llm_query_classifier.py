@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 llm_query_classifier.py - LLM-Based Query Classification with Structured Output
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+llm_query_classifier.py - LLM-Based Query Classification with Structured Output
 Version 1.0 - Remplace les patterns regex fragiles par classification LLM robuste
 
 Avantages vs patterns regex:

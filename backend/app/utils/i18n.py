@@ -1,5 +1,10 @@
 """
 Backend i18n (internationalization) system for PDF exports and other server-side translations.
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Backend i18n (internationalization) system for PDF exports and other server-side translations.
 Supports 16 languages with JSON-based translation files.
 """
 

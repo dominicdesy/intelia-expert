@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 post_processor.py - Response post-processing utilities
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+post_processor.py - Response post-processing utilities
 Extracted from generators.py for better modularity and maintainability
 """
 

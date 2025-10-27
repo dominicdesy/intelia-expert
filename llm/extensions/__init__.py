@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Extensions module - Extensions optionnelles du système
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Extensions module - Extensions optionnelles du système
 """
 
 try:

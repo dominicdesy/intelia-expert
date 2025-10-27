@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 data_models.py - Weaviate Data Models for Intelia Expert
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+data_models.py - Weaviate Data Models for Intelia Expert
 Defines the schema and data classes for Weaviate collections
 """
 

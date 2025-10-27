@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 run_ragas_evaluation.py - Script d'évaluation RAGAS pour Intelia Expert
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+run_ragas_evaluation.py - Script d'évaluation RAGAS pour Intelia Expert
 
 Évalue le système RAG avec un dataset de questions avicoles.
 Génère un rapport détaillé avec scores RAGAS.

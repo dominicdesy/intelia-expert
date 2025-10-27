@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 proactive_assistant.py - Proactive Follow-up Questions Generator
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+proactive_assistant.py - Proactive Follow-up Questions Generator
 
 Transforms the system from a passive data provider to an active assistant
 that offers help and guidance after answering queries.

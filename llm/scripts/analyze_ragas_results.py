@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 analyze_ragas_results.py - Analyse détaillée des résultats RAGAS
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+analyze_ragas_results.py - Analyse détaillée des résultats RAGAS
 
 Compare les résultats avant/après les corrections et génère un rapport détaillé.
 """

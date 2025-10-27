@@ -1,3 +1,8 @@
+/**
+ * Safeuserhelpers
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // utils/safeUserHelpers.ts - Helpers sécurisés pour éviter React #300
 
 export const getSafeName = (user: any): string => {

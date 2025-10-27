@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+depth_paren = 0
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 """Script pour trouver tous les appels secureLog.log() avec plus de 2 arguments"""
 
 import re

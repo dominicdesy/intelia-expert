@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 utils/intent_processing.py - Module de traitement d'intentions et validation
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+utils/intent_processing.py - Module de traitement d'intentions et validation
 Extrait de utilities.py pour modularisation
 """
 

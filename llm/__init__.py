@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Intelia Expert — Backend (package init)
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Intelia Expert — Backend (package init)
 Version architecture modulaire - Imports sécurisés
 """
 

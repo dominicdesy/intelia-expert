@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_admin.py - Admin endpoints for system management
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_admin.py - Admin endpoints for system management
 
 Includes:
 - RAGAS evaluation trigger and results

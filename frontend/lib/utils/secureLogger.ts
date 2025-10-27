@@ -1,5 +1,10 @@
 /**
  * Secure Logger Utility
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Secure Logger Utility
  * Sanitizes sensitive data before logging to prevent exposure of confidential information
  */
 

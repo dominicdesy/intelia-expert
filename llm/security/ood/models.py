@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 models.py - Domain relevance models for OOD detection
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+models.py - Domain relevance models for OOD detection
 
 This module contains the data models used for representing domain relevance
 scores and levels in the out-of-domain detection system.

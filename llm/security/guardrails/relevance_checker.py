@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 relevance_checker.py - Relevance verification for LLM responses
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+relevance_checker.py - Relevance verification for LLM responses
 
 Verifies that retrieved documents and generated responses are actually relevant
 to the user's query, preventing off-topic content (e.g., dairy cattle when asking about poultry).

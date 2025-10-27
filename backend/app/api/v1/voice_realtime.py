@@ -1,5 +1,10 @@
 """
 Voice Realtime API - WebSocket Endpoint
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Voice Realtime API - WebSocket Endpoint
 ========================================
 
 Endpoint WebSocket pour conversation vocale en temps réel avec OpenAI Realtime API.

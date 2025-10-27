@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Semantic Scholar API fetcher
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Semantic Scholar API fetcher
 
 API Docs: https://api.semanticscholar.org/api-docs/
 Rate limit: 10 requests/second (no API key needed)

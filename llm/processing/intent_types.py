@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 intent_types.py - Types et structures de données pour le processeur d'intentions
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+intent_types.py - Types et structures de données pour le processeur d'intentions
 """
 
 from utils.types import Dict, List, Any, Optional

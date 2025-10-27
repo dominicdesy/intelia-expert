@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 enhanced_rrf_fusion.py - RRF Intelligent avec apprentissage contextuel pour l'aviculture
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+enhanced_rrf_fusion.py - RRF Intelligent avec apprentissage contextuel pour l'aviculture
 Optimisé pour Digital Ocean App Platform avec Redis externe
 VERSION CORRIGÉE - Gestion robuste des types intent_result et boost lignée génétique amélioré
 VERSION 2.0 - Intégration breeds_registry pour détection dynamique des lignées

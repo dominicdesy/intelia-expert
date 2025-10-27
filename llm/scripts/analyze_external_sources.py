@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Analyze External Sources Activity Logs
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Analyze External Sources Activity Logs
 
 Usage:
     python analyze_external_sources.py [days]

@@ -1,5 +1,10 @@
 """
 Dépendance FastAPI pour vérification automatique des quotas
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Dépendance FastAPI pour vérification automatique des quotas
 """
 from fastapi import Depends, HTTPException, WebSocket, status
 from typing import Dict, Any, Optional

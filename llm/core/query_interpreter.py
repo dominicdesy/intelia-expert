@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 query_interpreter.py - Interprétation intelligente des requêtes via OpenAI
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+query_interpreter.py - Interprétation intelligente des requêtes via OpenAI
 """
 
 import logging

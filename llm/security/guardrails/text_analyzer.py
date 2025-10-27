@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 text_analyzer.py - Text analysis utilities for guardrails
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+text_analyzer.py - Text analysis utilities for guardrails
 
 This module provides text analysis utilities extracted from advanced_guardrails.py
 for cleaner code organization and reusability.

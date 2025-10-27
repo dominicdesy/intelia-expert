@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 messages.py - Gestionnaire centralisé des messages système multilingues
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+messages.py - Gestionnaire centralisé des messages système multilingues
 Charge les messages depuis languages.json avec cache et fallbacks
 """
 

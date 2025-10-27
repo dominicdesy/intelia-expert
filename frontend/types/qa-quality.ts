@@ -1,5 +1,10 @@
 /**
  * Types pour le système de monitoring de qualité Q&A
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Types pour le système de monitoring de qualité Q&A
  */
 
 export interface ProblematicQA {

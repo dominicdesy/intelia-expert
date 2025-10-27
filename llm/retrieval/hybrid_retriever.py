@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 hybrid_retriever.py - Retriever hybride optimisé avec RRF Intelligent
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+hybrid_retriever.py - Retriever hybride optimisé avec RRF Intelligent
 Combine recherche vectorielle et BM25 avec fusion intelligente
 CORRIGÉ: Ajout fonction hybrid_search globale pour import depuis rag_engine.py
 """

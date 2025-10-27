@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 Analyze Pyright reportArgumentType errors
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Analyze Pyright reportArgumentType errors
 Extract and categorize by pattern and risk level
 """
 

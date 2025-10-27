@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 PubMed E-utilities API fetcher
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+PubMed E-utilities API fetcher
 
 API Docs: https://www.ncbi.nlm.nih.gov/books/NBK25501/
 Rate limit: 3 requests/second (10 with API key)

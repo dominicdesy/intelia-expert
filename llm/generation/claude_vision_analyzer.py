@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 llm/generation/claude_vision_analyzer.py - Medical Image Analysis with Claude Vision
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+llm/generation/claude_vision_analyzer.py - Medical Image Analysis with Claude Vision
 Version 1.0.0 - Veterinary diagnostic support for poultry diseases
 
 Utilise Claude 3.5 Sonnet Vision pour analyser des images médicales d'élevage avicole

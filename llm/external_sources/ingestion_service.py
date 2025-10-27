@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Document Ingestion Service - Ingests external documents into Weaviate
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Document Ingestion Service - Ingests external documents into Weaviate
 Version 2.0 - Uses unified ChunkingService for optimal performance
 """
 

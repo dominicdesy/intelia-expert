@@ -1,5 +1,10 @@
 /**
  * Stockage backend pour l'historique des publicités
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Stockage backend pour l'historique des publicités
  * Synchronise avec la table users.ad_history dans Supabase
  * Fonctionne même en mode navigation privée
  */

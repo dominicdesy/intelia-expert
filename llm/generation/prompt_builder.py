@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 prompt_builder.py - Prompt building utilities for response generation
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+prompt_builder.py - Prompt building utilities for response generation
 
 This module provides the PromptBuilder class that handles all prompt construction
 logic for the response generation pipeline. It extracts prompt building methods

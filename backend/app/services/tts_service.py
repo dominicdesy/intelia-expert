@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Service de synthèse vocale (Text-to-Speech) avec OpenAI
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Service de synthèse vocale (Text-to-Speech) avec OpenAI
 Génère des réponses audio pour WhatsApp
 """
 

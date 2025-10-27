@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 analyze_question_coverage.py - Analyse approfondie de la couverture des questions avicoles
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+analyze_question_coverage.py - Analyse approfondie de la couverture des questions avicoles
 
 Analyse:
 1. Types d'intentions supportées

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_json_system.py - Système de recherche JSON avicole
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_json_system.py - Système de recherche JSON avicole
 Extrait du fichier principal pour modularité
 """
 

@@ -1,3 +1,8 @@
+/**
+ * Config
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // lib/api/config.ts
 export const API_CONFIG = {
   // Base URL peut être configurée via env ou détectée automatiquement

@@ -1,5 +1,10 @@
 """
 Stripe Revenue Metrics Collector
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Stripe Revenue Metrics Collector
 Collects revenue, MRR, subscriptions, and churn data from Stripe API
 """
 

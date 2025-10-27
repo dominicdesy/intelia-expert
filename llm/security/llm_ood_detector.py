@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 llm_ood_detector.py - LLM-Based Out-of-Domain Detection
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+llm_ood_detector.py - LLM-Based Out-of-Domain Detection
 Version 1.0 - Remplace le système basé sur keywords par classification LLM
 
 Avantages vs système keyword:

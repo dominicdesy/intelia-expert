@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Download AGROVOC poultry terms cache for all supported languages
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Download AGROVOC poultry terms cache for all supported languages
 
 This script downloads all poultry-related terms from AGROVOC FAO database
 for the 10 languages supported by AGROVOC (fr, en, es, de, it, pt, pl, hi, th, zh).

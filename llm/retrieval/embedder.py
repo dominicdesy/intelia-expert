@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 embedder.py - Embedder OpenAI avec cache Redis externe optimisé - CORRIGÉ
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+embedder.py - Embedder OpenAI avec cache Redis externe optimisé - CORRIGÉ
 """
 
 import logging

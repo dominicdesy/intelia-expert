@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine_core.py - RAG Engine core functionalities
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_engine_core.py - RAG Engine core functionalities
 """
 
 import logging

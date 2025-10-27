@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 reranker.py - Cohere Reranking Module
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+reranker.py - Cohere Reranking Module
 Reranks retrieved documents for improved precision
 
 Quick Win: +25% precision improvement for ~$100/month

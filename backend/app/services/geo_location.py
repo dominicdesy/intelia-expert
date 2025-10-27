@@ -1,5 +1,10 @@
 """
 Geo-location service to detect user country from IP address
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Geo-location service to detect user country from IP address
 Uses ip-api.com (free, no API key required, 45 requests/minute)
 """
 

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 config.py - Configuration constants for OOD detection
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+config.py - Configuration constants for OOD detection
 
 This module contains all configuration constants used by the OOD detector,
 including adaptive thresholds, language adjustments, fallback terms, and

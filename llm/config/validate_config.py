@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Validation script for centralized configuration files
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Validation script for centralized configuration files
 Checks JSON structure, required fields, and data integrity
 """
 import json

@@ -1,3 +1,8 @@
+/**
+ * Page
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 "use client";
 
 import React, { useState, useEffect } from "react";

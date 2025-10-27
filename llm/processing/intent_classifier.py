@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 intent_classifier.py - Classificateur d'intentions multilingue
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+intent_classifier.py - Classificateur d'intentions multilingue
 Version 3.0 - Utilisation complète des dictionnaires universels (universal_terms_*.json)
 CORRECTION MAJEURE: Suppression du texte hardcodé, chargement depuis dictionnaires JSON
 """

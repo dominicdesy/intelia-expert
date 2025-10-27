@@ -1,5 +1,10 @@
 """
 Module de gestion de la fermeture de compte conforme RGPD
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Module de gestion de la fermeture de compte conforme RGPD
 =========================================================
 Anonymise les données utilisateur au lieu de les supprimer complètement.
 

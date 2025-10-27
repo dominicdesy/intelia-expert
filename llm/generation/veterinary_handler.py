@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 veterinary_handler.py - Veterinary query detection and disclaimer management
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+veterinary_handler.py - Veterinary query detection and disclaimer management
 Extracted from generators.py for better modularity and maintainability
 """
 

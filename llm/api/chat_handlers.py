@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/chat_handlers.py - Logique de traitement des requêtes de chat
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/chat_handlers.py - Logique de traitement des requêtes de chat
 Version 5.1.0 - INTÉGRATION ConversationMemory
 Le contexte conversationnel est maintenant géré par QueryRouter + ConversationMemory
 """

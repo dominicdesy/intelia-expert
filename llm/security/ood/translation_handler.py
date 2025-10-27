@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 translation_handler.py - Translation service management with robust fallback
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+translation_handler.py - Translation service management with robust fallback
 
 This module handles the initialization and management of the translation service
 with safe initialization, caching, and health checking capabilities.

@@ -1,3 +1,8 @@
+/**
+ * Auth Errors
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 export class AuthError extends Error {
   public readonly code: string;
   public readonly statusCode: number;

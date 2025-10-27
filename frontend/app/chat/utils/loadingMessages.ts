@@ -1,5 +1,10 @@
 /**
  * Messages de chargement animés pour le chat
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Messages de chargement animés pour le chat
  * Utilisés pendant que l'IA génère une réponse
  */
 

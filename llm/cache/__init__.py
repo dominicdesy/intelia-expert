@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Cache module - Système de cache Redis avec gestion sémantique
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Cache module - Système de cache Redis avec gestion sémantique
 """
 
 from .cache_core import (

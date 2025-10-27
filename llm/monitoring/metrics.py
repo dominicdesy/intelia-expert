@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Monitoring basique avec OpenTelemetry et Prometheus
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Monitoring basique avec OpenTelemetry et Prometheus
 """
 
 import time

@@ -1,5 +1,10 @@
 """
 API Stats Fast - Cache Ultra-Rapide COMPLET
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+API Stats Fast - Cache Ultra-Rapide COMPLET
 Endpoints optimisés avec cache en mémoire + intégration health/billing/openai
 CORRIGÉ: Pool de connexions PostgreSQL et timeouts aiohttp typés
 """

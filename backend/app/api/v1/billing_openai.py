@@ -1,5 +1,10 @@
 """
 🔥 SOLUTION FINALE: Rate limiting + Cache + Fallback
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+🔥 SOLUTION FINALE: Rate limiting + Cache + Fallback
 Corrige définitivement les timeouts et rate limiting OpenAI
 """
 

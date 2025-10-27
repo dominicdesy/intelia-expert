@@ -1,3 +1,8 @@
+"""
+  Init  
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 # app/api/v1/__init__.py - VERSION 5.8 - WEBHOOKS MULTILINGUES
 # NOUVEAUTÉ: Support du router webhooks pour emails multilingues Supabase
 # SUPPRESSION COMPLÈTE DES RÉFÉRENCES EXPERT

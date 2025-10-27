@@ -1,5 +1,10 @@
 /**
  * Configuration de la publicité "Why Poultry Industry Should Embrace AI"
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Configuration de la publicité "Why Poultry Industry Should Embrace AI"
  */
 
 export const ad01Config = {

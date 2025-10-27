@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_postgresql_validator.py - Validateur flexible pour requêtes PostgreSQL
 VERSION 4.2: Fusion OpenAI + Contextualisation intelligente + Async Initialize
 - Préserve tous les champs originaux
 - Logs diagnostiques

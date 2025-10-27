@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 translation_service.py - Universal hybrid translation service
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+translation_service.py - Universal hybrid translation service
 Combines local dictionary and Google Translate with intelligent caching and dynamic loading
 """
 

@@ -1,3 +1,8 @@
+/**
+ * Useauthstore
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // lib/hooks/useAuthStore.ts - Hooks optimisés pour éviter les re-renders
 import { useAuthStore as useAuthStoreBase } from "@/lib/stores/auth";
 

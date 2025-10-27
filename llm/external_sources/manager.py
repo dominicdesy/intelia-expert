@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 External Source Manager - Coordinates parallel search across multiple sources
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+External Source Manager - Coordinates parallel search across multiple sources
 """
 
 import logging

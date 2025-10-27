@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_normalizer.py - Normaliseur de requêtes SQL multilingue
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_postgresql_normalizer.py - Normaliseur de requêtes SQL multilingue
 Version corrigée: Gestion correcte de la structure JSON avec domains
 """
 

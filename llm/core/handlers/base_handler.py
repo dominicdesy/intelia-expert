@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Base handler with common utilities for all query handlers
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Base handler with common utilities for all query handlers
 """
 
 import logging

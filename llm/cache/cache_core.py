@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 cache_core.py - Module central du cache Redis robuste
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+cache_core.py - Module central du cache Redis robuste
 Version corrigée: Configuration simplifiée, gestion mémoire stable, monitoring amélioré
 CORRIGÉ: Ajout protection_stats manquant et cohérence des attributs
 """

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Central service registry for API endpoints
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Central service registry for API endpoints
 
 Consolidates duplicate get_service() implementations found across:
 - api/endpoints_chat.py

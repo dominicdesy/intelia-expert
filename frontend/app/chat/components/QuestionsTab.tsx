@@ -1,3 +1,8 @@
+/**
+ * Questionstab
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 import React from "react";
 import { secureLog } from "@/lib/utils/secureLogger";
 

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 query_normalizer.py - Query normalization for OOD detection
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+query_normalizer.py - Query normalization for OOD detection
 
 This module contains the QueryNormalizer class responsible for normalizing
 user queries before domain analysis. Handles different normalization strategies

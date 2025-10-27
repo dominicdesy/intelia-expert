@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Security module - Sécurité et validation des réponses
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Security module - Sécurité et validation des réponses
 """
 
 from .ood_detector import EnhancedOODDetector

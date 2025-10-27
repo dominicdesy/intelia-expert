@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 utils/data_classes.py - Classes de données et utilitaires de sérialisation
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+utils/data_classes.py - Classes de données et utilitaires de sérialisation
 Extrait de utilities.py pour modularisation
 REFACTORED: Utilise utils/serialization.py pour éviter duplication
 """

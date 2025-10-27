@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 query_decomposer.py - Query Decomposer for Complex Multi-Criteria Questions
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+query_decomposer.py - Query Decomposer for Complex Multi-Criteria Questions
 
 Handles decomposition of complex queries into simpler sub-queries for better processing.
 

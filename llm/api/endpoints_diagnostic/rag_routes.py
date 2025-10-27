@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 RAG diagnostic routes
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+RAG diagnostic routes
 Contains endpoints for RAG system diagnostics and testing
 """
 

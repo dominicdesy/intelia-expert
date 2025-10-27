@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Add Common And
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 """Add common.and translation key to all locale files."""
 
 import json

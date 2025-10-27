@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 External Sources Activity Logger
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+External Sources Activity Logger
 Tracks all external source searches, document ingestions, and costs
 """
 

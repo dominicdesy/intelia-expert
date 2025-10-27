@@ -1,3 +1,8 @@
+"""
+Fix E722
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 import re
 from pathlib import Path
 

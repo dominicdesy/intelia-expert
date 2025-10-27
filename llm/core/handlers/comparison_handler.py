@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 comparison_handler.py - Wrapper de compatibilité vers ComparisonEngine
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+comparison_handler.py - Wrapper de compatibilité vers ComparisonEngine
 VERSION REFACTORISÉE: Délègue toute la logique au nouveau ComparisonEngine unifié
 
 CHANGEMENTS:

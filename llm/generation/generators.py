@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 generators.py - Enhanced response generators with entity enrichment and cache integration
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+generators.py - Enhanced response generators with entity enrichment and cache integration
 Handles multilingual response generation with specialized prompts and domain detection
 """
 

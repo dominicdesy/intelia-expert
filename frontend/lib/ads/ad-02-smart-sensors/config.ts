@@ -1,5 +1,10 @@
 /**
  * Configuration de la publicité "Smart Sensors Case Study - Mike's Success Story"
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Configuration de la publicité "Smart Sensors Case Study - Mike's Success Story"
  */
 
 export const ad02Config = {

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_temporal.py - Processeur de requêtes temporelles optimisées
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_postgresql_temporal.py - Processeur de requêtes temporelles optimisées
 """
 
 import re

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 enhanced_clarification.py - Enhanced Clarification System (Phase 3.2)
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+enhanced_clarification.py - Enhanced Clarification System (Phase 3.2)
 
 Wrapper that conditionally activates ClarificationHelper with graceful degradation
 and integration with ContextManager for multi-turn conversations.

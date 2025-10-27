@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 retriever_adaptive.py - Recherche adaptative avec stratégies intelligentes
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+retriever_adaptive.py - Recherche adaptative avec stratégies intelligentes
 """
 
 import logging

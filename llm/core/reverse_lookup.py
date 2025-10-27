@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 reverse_lookup.py - Recherches inversées (valeur → âge)
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+reverse_lookup.py - Recherches inversées (valeur → âge)
 Trouve l'âge correspondant à une valeur cible de métrique
 """
 

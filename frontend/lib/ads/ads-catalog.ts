@@ -1,5 +1,10 @@
 /**
  * Catalogue centralisé des publicités avec système de rotation
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Catalogue centralisé des publicités avec système de rotation
  */
 
 import { ad01Config } from "./ad-01-poultry-ai/config";

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 language_handler.py - Language handling utilities for response generation
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+language_handler.py - Language handling utilities for response generation
 
 This module provides centralized language management functionality, including:
 - Loading language display names from configuration

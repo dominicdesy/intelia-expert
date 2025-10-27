@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Data models for external source documents and search results
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Data models for external source documents and search results
 """
 
 from dataclasses import dataclass, field

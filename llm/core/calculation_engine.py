@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 calculation_engine.py - Calculation and projection engine for metrics
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+calculation_engine.py - Calculation and projection engine for metrics
 Handles complex calculations, projections and flock planning
 """
 

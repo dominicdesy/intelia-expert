@@ -1,3 +1,8 @@
+/**
+ * Feedbackmodal
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 import React, { useState } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
 import { ThumbUpIcon, ThumbDownIcon } from "../../utils/icons";

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 query_router.py - Intelligent 100% Config-Driven Router
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+query_router.py - Intelligent 100% Config-Driven Router
 Single entry point for ALL query processing
 
 REPLACES:

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Response generator - Ensures answers are generated from retrieved documents
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Response generator - Ensures answers are generated from retrieved documents
 """
 
 import logging

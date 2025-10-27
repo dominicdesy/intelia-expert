@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_weaviate_core.py - Logique Weaviate core avec RRF intelligent
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_weaviate_core.py - Logique Weaviate core avec RRF intelligent
 Extrait du fichier principal pour modularité
 """
 

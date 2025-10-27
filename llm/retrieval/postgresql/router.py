@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_router.py - Routeur intelligent pour types de requêtes
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_postgresql_router.py - Routeur intelligent pour types de requêtes
 Version 3.0 - Approche hybride avec ContextManager pour multi-turn
 """
 

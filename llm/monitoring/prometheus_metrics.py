@@ -1,5 +1,10 @@
 """
 Prometheus Metrics for Intelia Expert LLM Service
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Prometheus Metrics for Intelia Expert LLM Service
 ==================================================
 
 Centralized metrics tracking for LLM costs, performance, and system health.

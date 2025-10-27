@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Remove Tech Stack Translations
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 """Remove tech stack translations from all locale files"""
 
 import json

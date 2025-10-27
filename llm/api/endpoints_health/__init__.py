@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_health/__init__.py - Main entry point for health endpoints
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_health/__init__.py - Main entry point for health endpoints
 Exports the factory function to create all health-related routes
 """
 

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Admin endpoint handlers - Extracted from endpoints_admin for complexity reduction
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Admin endpoint handlers - Extracted from endpoints_admin for complexity reduction
 Each handler is a standalone async function that implements endpoint logic
 """
 

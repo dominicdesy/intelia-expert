@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 evidence_checker.py - Evidence checking and support verification for guardrails
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+evidence_checker.py - Evidence checking and support verification for guardrails
 
 This module provides evidence-based verification methods extracted from advanced_guardrails.py
 for cleaner code organization and reusability.

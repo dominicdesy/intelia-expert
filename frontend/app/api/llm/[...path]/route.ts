@@ -1,3 +1,8 @@
+/**
+ * SÉCURITÉ: Proxy générique pour tous les endpoints LLM
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // app/api/llm/[...path]/route.ts
 
 import { type NextRequest } from "next/server";

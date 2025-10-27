@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 comparison_engine.py - Moteur de comparaison unifié
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+comparison_engine.py - Moteur de comparaison unifié
 Version 3.0 - Templates EN avec traduction LLM robuste
 Fusionne: comparison_handler + comparison_utils + comparison_response_generator
 Utilise: metric_calculator (conservé pour calculs purs)

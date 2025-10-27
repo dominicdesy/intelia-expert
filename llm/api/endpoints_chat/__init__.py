@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_chat/__init__.py - Main entry point for chat endpoints
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_chat/__init__.py - Main entry point for chat endpoints
 Version 5.0.3 - Modular chat endpoints with factory pattern + Vision support + Temp image upload
 """
 

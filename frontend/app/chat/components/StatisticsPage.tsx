@@ -1,3 +1,8 @@
+/**
+ * Statisticspage
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAuthStore } from "@/lib/stores/auth"; // ✅ Store unifié uniquement
 import { apiClient } from "@/lib/api/client";

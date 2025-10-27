@@ -1,3 +1,8 @@
+/**
+ * Usepasskey
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 "use client";
 
 import { useState, useCallback } from "react";

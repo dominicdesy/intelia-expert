@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Unified Semantic Chunking Service - Maximum Performance
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Unified Semantic Chunking Service - Maximum Performance
 
 Combines best practices from RAG system and External Sources system:
 - Semantic boundary detection (sentences, paragraphs, markdown sections)

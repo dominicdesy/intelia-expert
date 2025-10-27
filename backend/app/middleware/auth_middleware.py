@@ -1,3 +1,8 @@
+"""
+Middleware d'authentification globale pour l'API Intelia Expert
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
 # app/middleware/auth_middleware.py
 """
 Middleware d'authentification globale pour l'API Intelia Expert

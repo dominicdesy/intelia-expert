@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 retriever.py - Interface principale conservée pour compatibilité
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+retriever.py - Interface principale conservée pour compatibilité
 Importe tout depuis les modules spécialisés
 """
 

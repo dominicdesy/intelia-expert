@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 multi_step_orchestrator.py - Orchestration de requêtes complexes multi-étapes
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+multi_step_orchestrator.py - Orchestration de requêtes complexes multi-étapes
 Décompose et exécute des requêtes nécessitant plusieurs étapes
 """
 

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 vocabulary_builder.py - Domain vocabulary construction for OOD detection
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+vocabulary_builder.py - Domain vocabulary construction for OOD detection
 
 This module contains the VocabularyBuilder class responsible for building
 the hierarchical domain vocabulary used in out-of-domain detection.

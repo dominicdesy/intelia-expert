@@ -1,5 +1,10 @@
 """
 Configuration des connexions aux bases de données
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Configuration des connexions aux bases de données
 =================================================
 - PostgreSQL (DigitalOcean): conversations, messages, analytics, billing
 - Supabase: auth.users, public.users, invitations

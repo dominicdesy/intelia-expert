@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Service de stockage média (audio + images) vers DigitalOcean Spaces
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Service de stockage média (audio + images) vers DigitalOcean Spaces
 Télécharge les fichiers audio et images (WhatsApp/Twilio/Frontend) et les stocke de façon permanente
 """
 

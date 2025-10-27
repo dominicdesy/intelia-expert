@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/chat_models.py - Modèles Pydantic pour les endpoints de chat
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/chat_models.py - Modèles Pydantic pour les endpoints de chat
 Version 4.2.3 - DÉTECTION AMÉLIORÉE + GESTION AMBIGUÏTÉ + ABANDON
 """
 

@@ -1,3 +1,8 @@
+/**
+ * Uselanguagestore
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // lib/hooks/useLanguageStore.ts - Hook de compatibilité
 import { useTranslation } from "@/lib/languages/i18n";
 

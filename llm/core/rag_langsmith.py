@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_langsmith.py - Intégration LangSmith pour monitoring et tracing
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_langsmith.py - Intégration LangSmith pour monitoring et tracing
 Extrait du fichier principal pour modularité
 """
 

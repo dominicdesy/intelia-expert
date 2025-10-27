@@ -1,3 +1,8 @@
+/**
+ * Useresponseconcision
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // hooks/useResponseConcision.ts - VERSION SIMPLIFIÉE POUR SÉLECTION DE VERSIONS BACKEND
 import { useState, useCallback, useEffect } from "react";
 import { secureLog } from "@/lib/utils/secureLogger";

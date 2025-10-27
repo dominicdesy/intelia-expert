@@ -1,5 +1,10 @@
 /**
  * Système de stockage persistant multi-méthodes
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * Système de stockage persistant multi-méthodes
  * Essaie plusieurs méthodes pour garantir la persistance même si localStorage est effacé
  *
  * Ordre de priorité:

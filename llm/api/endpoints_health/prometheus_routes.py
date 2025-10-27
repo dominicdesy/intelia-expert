@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_health/prometheus_routes.py - Prometheus metrics endpoint
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_health/prometheus_routes.py - Prometheus metrics endpoint
 """
 
 import logging

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 llm_ensemble.py - Multi-LLM Ensemble with Intelligent Arbitrage
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+llm_ensemble.py - Multi-LLM Ensemble with Intelligent Arbitrage
 
 Queries 3 LLMs in parallel (Anthropic Claude, OpenAI GPT-4, DeepSeek)
 and selects/fuses the best response using an intelligent judge.

@@ -1,3 +1,8 @@
+/**
+ * Auth
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // lib/stores/auth.ts - SYSTÈME D'AUTH UNIFIÉ - SUPABASE DIRECT + SESSION TRACKING
 // Version avec OAuth direct via auth.intelia.com + tracking temps de connexion + refresh automatique token
 

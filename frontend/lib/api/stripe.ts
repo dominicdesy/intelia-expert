@@ -1,3 +1,8 @@
+/**
+ * Stripe API Helper Functions
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 // lib/api/stripe.ts
 /**
  * Stripe API Helper Functions

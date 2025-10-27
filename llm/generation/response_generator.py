@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 response_generator.py - Main orchestrator for response generation
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+response_generator.py - Main orchestrator for response generation
 
 Simple orchestration layer that coordinates all generation modules.
 This replaces the monolithic EnhancedResponseGenerator class.

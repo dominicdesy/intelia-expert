@@ -1,5 +1,10 @@
 /**
  * TypewriterMessage.tsx - Message component with typewriter effect
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
+/**
+ * TypewriterMessage.tsx - Message component with typewriter effect
  *
  * Displays LLM response with smooth typing animation
  */

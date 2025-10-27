@@ -1,5 +1,10 @@
 """
 Utilitaires de sécurité pour la protection des données personnelles (RGPD)
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Utilitaires de sécurité pour la protection des données personnelles (RGPD)
 """
 import hashlib
 import re

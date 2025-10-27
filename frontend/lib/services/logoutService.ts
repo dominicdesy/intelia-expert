@@ -1,3 +1,8 @@
+/**
+ * Logoutservice
+ * Version: 1.4.1
+ * Last modified: 2025-10-26
+ */
 import { secureLog } from "@/lib/utils/secureLogger";
 
 // lib/services/logoutService.ts

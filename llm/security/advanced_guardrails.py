@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 advanced_guardrails_refactored.py - Backward compatibility wrapper
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+advanced_guardrails_refactored.py - Backward compatibility wrapper
 
 This file maintains backward compatibility with the old AdvancedResponseGuardrails API
 while using the new modular architecture underneath.

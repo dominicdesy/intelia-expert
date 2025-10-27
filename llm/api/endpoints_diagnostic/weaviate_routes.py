@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Weaviate diagnostic routes
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Weaviate diagnostic routes
 Contains endpoints for Weaviate status and connectivity diagnostics
 """
 

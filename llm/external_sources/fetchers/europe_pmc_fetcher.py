@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Europe PMC API fetcher
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Europe PMC API fetcher
 
 API Docs: https://europepmc.org/RestfulWebService
 Rate limit: 5 requests/second

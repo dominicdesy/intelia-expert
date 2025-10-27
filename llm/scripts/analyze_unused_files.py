@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Complete LLM Codebase Analysis - Find Unused Files and Optimization Opportunities
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Complete LLM Codebase Analysis - Find Unused Files and Optimization Opportunities
 
 This script performs a comprehensive analysis to identify:
 1. Unused Python files (imported nowhere)

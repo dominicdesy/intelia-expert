@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 context_manager.py - Context Manager for multi-turn conversation resolution
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+context_manager.py - Context Manager for multi-turn conversation resolution
 
 Manages conversation context to resolve coreferences in multi-turn dialogues.
 Example: "Et pour les femelles?" → "Poids femelles Ross 308 35 jours"

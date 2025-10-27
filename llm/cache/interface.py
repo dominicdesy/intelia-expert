@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Standard cache interface for all cache modules
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Standard cache interface for all cache modules
 
 This module defines the common interface that all cache implementations
 should follow, enabling consistent behavior across:

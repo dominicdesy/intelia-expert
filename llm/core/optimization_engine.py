@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 optimization_engine.py - Moteur d'optimisation multi-critères
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+optimization_engine.py - Moteur d'optimisation multi-critères
 Trouve les âges/paramètres optimaux selon contraintes
 """
 

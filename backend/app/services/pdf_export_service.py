@@ -1,5 +1,10 @@
 """
 Service d'exportation de conversations en PDF
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Service d'exportation de conversations en PDF
 Génère un PDF professionnel avec logo Intelia et mise en page élégante
 Supporte 16 langues avec traductions et formatage RTL pour l'arabe
 """

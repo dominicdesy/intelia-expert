@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 semantic_reranker.py - Re-Ranking Sémantique des Documents Récupérés
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+semantic_reranker.py - Re-Ranking Sémantique des Documents Récupérés
 
 VERSION 1.0 - Améliore drastiquement Context Precision
 Problème résolu: Recherche vectorielle retourne documents non pertinents

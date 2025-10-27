@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 vocabulary_extractor.py - Extracteur de vocabulaire spécialisé pour l'aviculture
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+vocabulary_extractor.py - Extracteur de vocabulaire spécialisé pour l'aviculture
 CORRIGÉ: Imports modulaires selon nouvelle architecture
 """
 

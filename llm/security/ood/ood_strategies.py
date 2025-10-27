@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ood_strategies.py - OOD calculation strategies
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+ood_strategies.py - OOD calculation strategies
 
 This module contains the OODStrategy class that implements the four main
 strategies for calculating out-of-domain (OOD) scores:

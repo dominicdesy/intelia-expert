@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 models.py - Data models for response generation
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+models.py - Data models for response generation
 """
 
 from dataclasses import dataclass

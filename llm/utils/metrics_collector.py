@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 utils/metrics_collector.py - Module de collecte de métriques
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+utils/metrics_collector.py - Module de collecte de métriques
 Extrait de utilities.py pour modularisation
 """
 

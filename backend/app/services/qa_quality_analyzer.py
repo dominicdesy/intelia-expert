@@ -1,5 +1,10 @@
 """
 Service d'analyse de qualité Q&A avec OpenAI
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Service d'analyse de qualité Q&A avec OpenAI
 Détecte automatiquement les réponses problématiques
 """
 

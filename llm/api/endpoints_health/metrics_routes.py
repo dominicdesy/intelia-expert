@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_health/metrics_routes.py - Metrics and testing endpoints
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_health/metrics_routes.py - Metrics and testing endpoints
 """
 
 import time

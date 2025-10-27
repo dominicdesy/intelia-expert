@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 cache_semantic.py - Module de cache sémantique intelligent
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+cache_semantic.py - Module de cache sémantique intelligent
 Gestion de l'extraction de mots-clés, normalisation et cache sémantique
 VERSION CORRIGÉE: Sérialisation JSON pour LanguageDetectionResult
 REFACTORED: Utilise utils/serialization.py pour éviter duplication

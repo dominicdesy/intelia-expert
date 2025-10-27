@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 analyze_routing_gaps.py - Analyse des gaps pour atteindre 100% de couverture
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+analyze_routing_gaps.py - Analyse des gaps pour atteindre 100% de couverture
 
 Identifie les cas où le routing échoue et propose des solutions
 """

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 api/endpoints_chat/vision_routes.py - Medical image analysis endpoints
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+api/endpoints_chat/vision_routes.py - Medical image analysis endpoints
 Version 1.1.0 - Claude Vision integration for veterinary diagnostics
 Multi-image support added
 """

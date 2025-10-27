@@ -1,5 +1,10 @@
 """
 Supabase Metrics Collector
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Supabase Metrics Collector
 Collects auth, storage, and database usage from Supabase
 """
 

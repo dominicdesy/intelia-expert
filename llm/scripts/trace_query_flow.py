@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 trace_query_flow.py - Trace le flow complet d'une query dans le système
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+trace_query_flow.py - Trace le flow complet d'une query dans le système
 
 Audit d'intégration Phase 2: Vérifie quels modules sont actifs
 """

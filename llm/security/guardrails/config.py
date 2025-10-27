@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 config.py - Configuration and patterns for guardrails system
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+config.py - Configuration and patterns for guardrails system
 """
 
 from utils.types import Dict, List

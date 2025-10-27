@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Utils module - Utilitaires et fonctions helpers
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Utils module - Utilitaires et fonctions helpers
 VERSION CORRIGÉE POUR STRUCTURE MODULAIRE - Import circulaire résolu
 """
 

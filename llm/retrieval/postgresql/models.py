@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_postgresql_models.py - Modèles de données pour PostgreSQL
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_postgresql_models.py - Modèles de données pour PostgreSQL
 """
 
 from dataclasses import dataclass

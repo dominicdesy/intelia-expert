@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
 Analyse le rapport Bandit et génère un résumé des problèmes de sécurité
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Analyse le rapport Bandit et génère un résumé des problèmes de sécurité
 """
 
 import json

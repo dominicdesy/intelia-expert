@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Search diagnostic routes
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+Search diagnostic routes
 Contains endpoints for document search and metadata diagnostics
 """
 

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 utilities.py - Point d'entrée principal des utilitaires - VERSION MODULAIRE
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+utilities.py - Point d'entrée principal des utilitaires - VERSION MODULAIRE
 Refactorisé pour éviter un seul gros fichier tout en conservant la compatibilité
 """
 

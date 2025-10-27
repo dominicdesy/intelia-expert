@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 rag_engine.py - RAG Engine with modular architecture
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+rag_engine.py - RAG Engine with modular architecture
 VERSION 5.0 - REFACTORED FOR MAINTAINABILITY:
 - Extracted query processing to RAGQueryProcessor
 - Extracted response generation to RAGResponseGenerator

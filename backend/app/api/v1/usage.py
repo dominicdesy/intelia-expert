@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 usage.py - API endpoints pour la consultation de l'usage et des quotas
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+usage.py - API endpoints pour la consultation de l'usage et des quotas
 
 Permet au frontend d'afficher:
 - Combien de questions l'utilisateur a utilisées ce mois

@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 utils/text_utilities.py - Utilitaires de traitement de texte et données
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+utils/text_utilities.py - Utilitaires de traitement de texte et données
 Extrait de utilities.py pour modularisation
 """
 

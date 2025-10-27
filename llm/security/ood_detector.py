@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ood_detector_refactored.py - Ultimate Backward Compatibility Wrapper
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+ood_detector_refactored.py - Ultimate Backward Compatibility Wrapper
 
 DEPRECATION NOTICE:
     This module provides 100% backward compatibility with the original

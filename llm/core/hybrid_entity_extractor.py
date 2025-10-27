@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 hybrid_entity_extractor.py - Multi-tier Entity Extraction System
+Version: 1.4.1
+Last modified: 2025-10-26
+"""
+"""
+hybrid_entity_extractor.py - Multi-tier Entity Extraction System
 Phase 1: Health Entities (Critical Priority)
 
 Architecture:
