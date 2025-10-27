@@ -14,25 +14,21 @@ ENV BUILD_VERSION=${BUILD_VERSION} \
     BUILD_DATE=${BUILD_DATE} \
     COMMIT_SHA=${COMMIT_SHA}
 
-# Install Python for version exporter
-USER root
-RUN apk add --no-cache python3
-
 # Copy Prometheus configuration
 COPY prometheus.yml /etc/prometheus/prometheus.yml
 
-# Copy version exporter and entrypoint
-COPY version_exporter.py /version_exporter.py
-COPY entrypoint.sh /entrypoint.sh
+# Copy version metadata file
+RUN echo "VERSION=${BUILD_VERSION}" > /etc/prometheus/version.txt && \
+    echo "BUILD_DATE=${BUILD_DATE}" >> /etc/prometheus/version.txt && \
+    echo "COMMIT_SHA=${COMMIT_SHA}" >> /etc/prometheus/version.txt
 
-# Make scripts executable
-RUN chmod +x /version_exporter.py /entrypoint.sh
+# Expose Prometheus port
+EXPOSE 9090
 
-# Switch back to prometheus user
-USER nobody
-
-# Expose Prometheus port (9090) and version exporter port (9091)
-EXPOSE 9090 9091
-
-# Use custom entrypoint that starts both Prometheus and version exporter
-ENTRYPOINT ["/entrypoint.sh"]
+# Use default Prometheus entrypoint with our config
+# Version info available via environment variables
+CMD ["--config.file=/etc/prometheus/prometheus.yml", \
+     "--storage.tsdb.path=/prometheus", \
+     "--storage.tsdb.retention.time=30d", \
+     "--web.console.libraries=/usr/share/prometheus/console_libraries", \
+     "--web.console.templates=/usr/share/prometheus/consoles"]
