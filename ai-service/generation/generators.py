@@ -88,6 +88,11 @@ class EnhancedResponseGenerator:
         self.claude_cot_budget = int(os.getenv("CLAUDE_COT_BUDGET", "4000"))
         logger.info(f"🧠 Claude CoT configured: {self.claude_cot_model} (budget: {self.claude_cot_budget} tokens)")
 
+        # Initialize Multi-LLM Router for cost optimization
+        from .llm_router import get_llm_router
+        self.llm_router = get_llm_router()
+        logger.info("✅ LLM Router initialized in EnhancedResponseGenerator")
+
         # Load centralized prompts manager
         if PROMPTS_AVAILABLE:
             try:
@@ -575,39 +580,36 @@ MÉTRIQUES CLÉS BROILERS:
             logger.info(f"🔍 CoT instruction length: {len(user_prompt.split('STRUCTURE DE RÉPONSE OBLIGATOIRE:')[-1] if 'STRUCTURE DE RÉPONSE OBLIGATOIRE:' in user_prompt else '')} chars")
             logger.debug(f"🔍 Full user prompt (last 500 chars): {user_prompt[-500:]}")
 
-            # Génération avec modèle CoT configuré
-            # 🧠 O1 models (o1-preview, o1-mini) have special requirements:
-            # - NO system messages (merge into user message)
-            # - NO temperature control (always 1.0)
-            # - NO max_tokens (use max_completion_tokens instead)
-            is_o1_model = self.cot_model.startswith("o1-")
+            # 🚀 Route query to optimal LLM provider
+            context_dicts = [self._doc_to_dict(doc) for doc in context_docs]
+            provider = self.llm_router.route_query(query, context_dicts, intent_result)
 
-            if is_o1_model:
-                # O1 models: Merge system + user into single user message
-                combined_prompt = f"""{system_prompt}
+            # Prepare messages
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
 
-{user_prompt}"""
-                response = await self.client.chat.completions.create(
-                    model=self.cot_model,
-                    messages=[
-                        {"role": "user", "content": combined_prompt},
-                    ],
-                    # O1 models don't support temperature, max_tokens, or max_completion_tokens in async
-                    # They manage token limits internally with native CoT reasoning
-                )
-                logger.info(f"🧠 Using O1 model: {self.cot_model} (native CoT reasoning)")
-            else:
-                # Standard models (gpt-4o, gpt-4o-2024-08-06, etc.)
-                response = await self.client.chat.completions.create(
-                    model=self.cot_model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    temperature=0.1,  # Optimal: 0.05 caused RAGAS timeouts, 0.1 provides best balance (Faithfulness: 71.57%)
-                    max_tokens=1500,  # Increased from 900 to allow complete CoT structure (thinking + analysis + answer)
-                )
-                logger.info(f"🧠 Using standard model: {self.cot_model} (structured CoT)")
+            # Generate response using routed provider
+            generated_response = await self.llm_router.generate(
+                provider=provider,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=1500
+            )
+
+            # For backward compatibility, create a mock response object
+            class MockResponse:
+                def __init__(self, content, model):
+                    self.choices = [type('obj', (object,), {'message': type('obj', (object,), {'content': content})()})]
+                    self.usage = type('obj', (object,), {
+                        'prompt_tokens': 0,
+                        'completion_tokens': 0,
+                        'total_tokens': 0
+                    })()
+                    self.model = model
+
+            response = MockResponse(generated_response, provider.value)
 
 
             generated_response = response.choices[0].message.content.strip()
