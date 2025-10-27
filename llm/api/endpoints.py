@@ -25,6 +25,9 @@ from .utils import (
 # Import du MetricsCollector centralisé depuis utils
 from utils.metrics_collector import METRICS as metrics_collector
 
+# Import version information
+from version import VERSION_INFO
+
 # Imports des modules d'endpoints
 from .endpoints_health import create_health_endpoints
 from .endpoints_diagnostic import create_diagnostic_endpoints
@@ -55,17 +58,23 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
 
     @router.get(f"{BASE_PATH}/version")
     async def version_info():
-        """Endpoint de version pour vérifier les déploiements"""
+        """
+        Endpoint de version pour vérifier les déploiements
+
+        Returns version information from VERSION_INFO (reads from BUILD_VERSION env or VERSION file)
+        """
         return {
-            "message": "VERSION MODULAIRE - Endpoints séparés",
-            "version": "4.1.2-metrics-centralized",
+            "version": VERSION_INFO['version'],
+            "build_id": VERSION_INFO['build_id'],
+            "commit_sha": VERSION_INFO['commit_sha'],
+            "commit_time": VERSION_INFO['commit_time'],
+            "branch": VERSION_INFO['branch'],
+            "deployed_at": VERSION_INFO['deployed_at'],
             "timestamp": time.time(),
             "architecture": "modular-endpoints",
             "modules": ["health", "diagnostic", "chat", "admin", "utils"],
             "services_count": len(_services),
             "services_list": list(_services.keys()),
-            "circular_import_fixed": True,
-            "metrics_centralized": True,
         }
 
     @router.get(f"{BASE_PATH}/deployment-test")
