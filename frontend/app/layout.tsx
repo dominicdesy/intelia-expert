@@ -12,6 +12,7 @@ import { AuthProvider } from "@/components/providers/AuthProvider";
 import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import { MenuProvider } from "@/lib/contexts/MenuContext";
 import { Toaster } from "react-hot-toast";
+import PWAManager from "@/components/pwa/PWAManager";
 // import { VoiceRealtimeProvider } from "@/components/providers/VoiceRealtimeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -512,6 +513,8 @@ export default function RootLayout({
                   },
                 }}
               />
+              {/* PWA Install Prompts */}
+              <PWAManager />
               {/* <VoiceRealtimeProvider /> */}
             </MenuProvider>
           </LanguageProvider>
