@@ -1,0 +1,118 @@
+{
+  "metadata": {
+    "version": "2.0.0",
+    "description": "Messages système multilingues pour Intelia Expert - Système expert avicole",
+    "supported_languages": ["de", "en", "es", "fr", "hi", "id", "it", "nl", "pl", "pt", "th", "zh"],
+    "language_names": {
+      "de": "GERMAN / DEUTSCH",
+      "en": "ENGLISH",
+      "es": "SPANISH / ESPAÑOL",
+      "fr": "FRENCH / FRANÇAIS",
+      "hi": "HINDI / हिन्दी",
+      "id": "INDONESIAN / BAHASA INDONESIA",
+      "it": "ITALIAN / ITALIANO",
+      "nl": "DUTCH / NEDERLANDS",
+      "pl": "POLISH / POLSKI",
+      "pt": "PORTUGUESE / PORTUGUÊS",
+      "th": "THAI / ไทย",
+      "zh": "CHINESE / 中文"
+    },
+    "message_types": [
+      "out_of_domain",
+      "error_generic",
+      "error_connection",
+      "error_timeout",
+      "error_not_found",
+      "welcome",
+      "clarification_needed",
+      "no_results",
+      "processing",
+      "farewell",
+      "success_generic",
+      "feedback_thanks",
+      "feedback_request",
+      "veterinary_disclaimer"
+    ],
+    "last_updated": "2025-01-15",
+    "encoding": "utf-8"
+  },
+
+  "messages": {
+    "fr": {
+      "out_of_domain": "Intelia Expert est un système expert spécialisé en production avicole et ne peut traiter les questions hors de ce domaine. Je suis là pour vous accompagner sur tous les aspects de l'élevage de volailles. Comment puis-je vous aider en aviculture ?",
+      "error_generic": "Une erreur s'est produite lors du traitement de votre demande. Veuillez réessayer dans quelques instants.",
+      "error_connection": "Erreur de connexion au système. Veuillez vérifier votre connexion internet et réessayer.",
+      "error_timeout": "La requête a pris trop de temps. Veuillez reformuler votre question ou réessayer.",
+      "error_not_found": "Information non trouvée dans notre base de connaissances avicoles.",
+      "welcome": "Bonjour ! Je suis Intelia Expert, votre assistant spécialisé en aviculture. Comment puis-je vous aider aujourd'hui ?",
+      "clarification_needed": "Pouvez-vous préciser votre question pour que je puisse vous fournir une réponse plus précise ?",
+      "followup_clarification": "Parfait ! Comment puis-je vous aider ?",
+      "no_results": "Je n'ai pas trouvé d'informations pertinentes dans ma base de connaissances avicoles. Pouvez-vous reformuler votre question ?",
+      "processing": "Je traite votre demande, veuillez patienter quelques instants...",
+      "farewell": "Au revoir ! N'hésitez pas à revenir si vous avez d'autres questions sur l'aviculture.",
+      "success_generic": "Opération effectuée avec succès.",
+      "feedback_thanks": "Merci pour votre retour ! Cela nous aide à améliorer Intelia Expert.",
+      "feedback_request": "Cette réponse vous a-t-elle été utile ? Votre avis nous aide à nous améliorer.",
+      "veterinary_disclaimer": "**Important** : Ces informations sont fournies à titre éducatif. Pour toute question concernant la santé de vos animaux, consultez un vétérinaire qualifié qui pourra établir un diagnostic précis et prescrire un traitement adapté."
+    },
+
+    "en": {
+      "out_of_domain": "Intelia Expert is an expert system specialized in poultry production and cannot assist with questions outside this domain. I am here to support you on all aspects of poultry farming. How can I help you with poultry?",
+      "error_generic": "An error occurred while processing your request. Please try again in a few moments.",
+      "error_connection": "Connection error to the system. Please check your internet connection and try again.",
+      "error_timeout": "The request took too long. Please rephrase your question or try again.",
+      "error_not_found": "Information not found in our poultry knowledge base.",
+      "welcome": "Hello! I'm Intelia Expert, your specialized assistant in poultry farming. How can I help you today?",
+      "clarification_needed": "Could you clarify your question so I can provide a more accurate answer?",
+      "followup_clarification": "Great! How can I help you?",
+      "no_results": "I couldn't find relevant information in my poultry knowledge base. Could you rephrase your question?",
+      "processing": "Processing your request, please wait a few moments...",
+      "farewell": "Goodbye! Feel free to come back if you have more questions about poultry.",
+      "success_generic": "Operation completed successfully.",
+      "feedback_thanks": "Thank you for your feedback! It helps us improve Intelia Expert.",
+      "feedback_request": "Was this answer helpful? Your feedback helps us improve.",
+      "veterinary_disclaimer": "**Important**: This information is provided for educational purposes. For any questions regarding your animals' health, consult a qualified veterinarian who can provide an accurate diagnosis and appropriate treatment."
+    },
+
+    "es": {
+      "out_of_domain": "Intelia Expert es un sistema experto especializado en producción avícola y no puede atender preguntas fuera de este ámbito. Estoy aquí para acompañarle en todos los aspectos de la cría de aves. ¿Cómo puedo ayudarle en avicultura?",
+      "error_generic": "Se produjo un error al procesar su solicitud. Por favor, inténtelo de nuevo en unos momentos.",
+      "error_connection": "Error de conexión al sistema. Por favor, verifique su conexión a internet e inténtelo de nuevo.",
+      "error_timeout": "La solicitud tardó demasiado. Por favor, reformule su pregunta o inténtelo de nuevo.",
+      "error_not_found": "Información no encontrada en nuestra base de conocimientos avícolas.",
+      "welcome": "¡Hola! Soy Intelia Expert, su asistente especializado en avicultura. ¿Cómo puedo ayudarle hoy?",
+      "clarification_needed": "¿Podría aclarar su pregunta para que pueda proporcionar una respuesta más precisa?",
+      "followup_clarification": "¡Perfecto! ¿Cómo puedo ayudarle?",
+      "no_results": "No encontré información relevante en mi base de conocimientos avícolas. ¿Podría reformular su pregunta?",
+      "processing": "Procesando su solicitud, por favor espere unos momentos...",
+      "farewell": "¡Hasta luego! No dude en volver si tiene más preguntas sobre avicultura.",
+      "success_generic": "Operación completada con éxito.",
+      "feedback_thanks": "¡Gracias por su comentario! Nos ayuda a mejorar Intelia Expert.",
+      "feedback_request": "¿Le resultó útil esta respuesta? Sus comentarios nos ayudan a mejorar.",
+      "veterinary_disclaimer": "**Importante**: Esta información se proporciona con fines educativos. Para cualquier pregunta sobre la salud de sus animales, consulte a un veterinario calificado."
+    },
+
+    "de": {
+      "out_of_domain": "Intelia Expert ist ein Expertensystem, das auf Geflügelproduktion spezialisiert ist und keine Fragen außerhalb dieses Bereichs behandeln kann. Ich bin hier, um Sie bei allen Aspekten der Geflügelhaltung zu unterstützen. Wie kann ich Ihnen in der Geflügelzucht helfen?",
+      "error_generic": "Bei der Verarbeitung Ihrer Anfrage ist ein Fehler aufgetreten. Bitte versuchen Sie es in einigen Augenblicken erneut.",
+      "error_connection": "Verbindungsfehler zum System. Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
+      "error_timeout": "Die Anfrage hat zu lange gedauert. Bitte formulieren Sie Ihre Frage um oder versuchen Sie es erneut.",
+      "error_not_found": "Information nicht in unserer Geflügel-Wissensdatenbank gefunden.",
+      "welcome": "Hallo! Ich bin Intelia Expert, Ihr spezialisierter Assistent für Geflügelzucht. Wie kann ich Ihnen heute helfen?",
+      "clarification_needed": "Könnten Sie Ihre Frage präzisieren, damit ich eine genauere Antwort geben kann?",
+      "followup_clarification": "Prima! Wie kann ich Ihnen helfen?",
+      "no_results": "Ich habe keine relevanten Informationen in meiner Geflügel-Wissensdatenbank gefunden. Könnten Sie Ihre Frage umformulieren?",
+      "processing": "Ihre Anfrage wird bearbeitet, bitte warten Sie einige Augenblicke...",
+      "farewell": "Auf Wiedersehen! Zögern Sie nicht, zurückzukommen, wenn Sie weitere Fragen zur Geflügelzucht haben.",
+      "success_generic": "Vorgang erfolgreich abgeschlossen.",
+      "feedback_thanks": "Vielen Dank für Ihr Feedback! Es hilft uns, Intelia Expert zu verbessern.",
+      "feedback_request": "War diese Antwort hilfreich? Ihr Feedback hilft uns, uns zu verbessern.",
+      "veterinary_disclaimer": "**Wichtig**: Diese Informationen dienen nur zu Bildungszwecken. Bei Fragen zur Gesundheit Ihrer Tiere konsultieren Sie bitte einen qualifizierten Tierarzt."
+    }
+  },
+
+  "fallback": {
+    "language": "en",
+    "message": "I specialize in poultry farming. How can I help you?"
+  }
+}
