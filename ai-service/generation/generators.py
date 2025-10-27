@@ -89,9 +89,17 @@ class EnhancedResponseGenerator:
         logger.info(f"🧠 Claude CoT configured: {self.claude_cot_model} (budget: {self.claude_cot_budget} tokens)")
 
         # Initialize Multi-LLM Router for cost optimization
-        from .llm_router import get_llm_router
-        self.llm_router = get_llm_router()
-        logger.info("✅ LLM Router initialized in EnhancedResponseGenerator")
+        # Option to use LLM service via HTTP instead of direct routing
+        self.use_llm_service = os.getenv("USE_LLM_SERVICE", "false").lower() == "true"
+
+        if self.use_llm_service:
+            from .llm_service_client import get_llm_service_client
+            self.llm_service_client = get_llm_service_client()
+            logger.info("✅ LLM Service HTTP client initialized (USE_LLM_SERVICE=true)")
+        else:
+            from .llm_router import get_llm_router
+            self.llm_router = get_llm_router()
+            logger.info("✅ LLM Router initialized in EnhancedResponseGenerator (USE_LLM_SERVICE=false)")
 
         # Load centralized prompts manager
         if PROMPTS_AVAILABLE:
@@ -580,24 +588,55 @@ MÉTRIQUES CLÉS BROILERS:
             logger.info(f"🔍 CoT instruction length: {len(user_prompt.split('STRUCTURE DE RÉPONSE OBLIGATOIRE:')[-1] if 'STRUCTURE DE RÉPONSE OBLIGATOIRE:' in user_prompt else '')} chars")
             logger.debug(f"🔍 Full user prompt (last 500 chars): {user_prompt[-500:]}")
 
-            # 🚀 Route query to optimal LLM provider
-            context_dicts = [self._doc_to_dict(doc) for doc in context_docs]
-            provider = self.llm_router.route_query(query, context_dicts, intent_result)
+            # 🚀 Generate response using LLM service or direct router
+            if self.use_llm_service:
+                # Use LLM service via HTTP
+                context_dicts = [self._doc_to_dict(doc) for doc in context_docs]
 
-            # Prepare messages
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ]
+                # Extract entities from enrichment
+                entities = {}
+                if enrichment and enrichment.entities:
+                    for entity in enrichment.entities:
+                        if hasattr(entity, 'type') and hasattr(entity, 'value'):
+                            entities[entity.type] = entity.value
 
-            # Generate response using routed provider
-            # Note: LLM router handles Prometheus tracking internally for all providers
-            generated_response = await self.llm_router.generate(
-                provider=provider,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=1500
-            )
+                # Call LLM service /v1/generate endpoint
+                generated_response, prompt_tokens, completion_tokens, metadata = await self.llm_service_client.generate(
+                    query=query,
+                    domain="aviculture",
+                    language=lang,
+                    entities=entities if entities else None,
+                    query_type=detected_domain,
+                    context_docs=context_dicts,
+                    temperature=0.1,
+                    max_tokens=None,  # Let LLM service calculate optimal
+                    post_process=False,  # We'll post-process in ai-service
+                    add_disclaimer=False,  # We'll add disclaimer in ai-service post-processing
+                )
+
+                logger.info(
+                    f"✅ LLM service response: provider={metadata['provider']}, "
+                    f"complexity={metadata['complexity']}, tokens={prompt_tokens + completion_tokens}"
+                )
+            else:
+                # Use direct LLM router (original behavior)
+                context_dicts = [self._doc_to_dict(doc) for doc in context_docs]
+                provider = self.llm_router.route_query(query, context_dicts, intent_result)
+
+                # Prepare messages
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ]
+
+                # Generate response using routed provider
+                # Note: LLM router handles Prometheus tracking internally for all providers
+                generated_response = await self.llm_router.generate(
+                    provider=provider,
+                    messages=messages,
+                    temperature=0.1,
+                    max_tokens=1500
+                )
 
             # 🧠 DEBUG: Log raw LLM response to check for CoT tags
             logger.info(f"🔍 Raw LLM response length: {len(generated_response)} chars")
