@@ -178,6 +178,7 @@
   let messages = [];
   let isOpen = false;
   let isLoading = false;
+  let hasShownWelcome = false;
 
   // Langues RTL (Right-to-Left)
   const RTL_LANGUAGES = ['ar', 'he', 'fa', 'ur'];
@@ -598,6 +599,14 @@
     if (isOpen) {
       button.classList.add('open');
       chat.classList.add('open');
+
+      // Afficher le message d'accueil la première fois
+      if (!hasShownWelcome) {
+        hasShownWelcome = true;
+        const welcomeText = config.welcomeMessage[config.locale] || config.welcomeMessage['en'];
+        addMessage('assistant', welcomeText);
+      }
+
       document.getElementById('intelia-widget-input').focus();
     } else {
       button.classList.remove('open');
