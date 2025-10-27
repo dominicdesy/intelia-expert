@@ -14,16 +14,25 @@ ENV BUILD_VERSION=${BUILD_VERSION} \
     BUILD_DATE=${BUILD_DATE} \
     COMMIT_SHA=${COMMIT_SHA}
 
+# Install Python for version exporter
+USER root
+RUN apk add --no-cache python3
+
 # Copy Prometheus configuration
 COPY prometheus.yml /etc/prometheus/prometheus.yml
 
-# Expose Prometheus port
-EXPOSE 9090
+# Copy version exporter and entrypoint
+COPY version_exporter.py /version_exporter.py
+COPY entrypoint.sh /entrypoint.sh
 
-# Use default Prometheus entrypoint with our config
-# Internal networking only - no public routes needed
-CMD ["--config.file=/etc/prometheus/prometheus.yml", \
-     "--storage.tsdb.path=/prometheus", \
-     "--storage.tsdb.retention.time=30d", \
-     "--web.console.libraries=/usr/share/prometheus/console_libraries", \
-     "--web.console.templates=/usr/share/prometheus/consoles"]
+# Make scripts executable
+RUN chmod +x /version_exporter.py /entrypoint.sh
+
+# Switch back to prometheus user
+USER nobody
+
+# Expose Prometheus port (9090) and version exporter port (9091)
+EXPOSE 9090 9091
+
+# Use custom entrypoint that starts both Prometheus and version exporter
+ENTRYPOINT ["/entrypoint.sh"]

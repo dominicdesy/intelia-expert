@@ -92,9 +92,9 @@ The version API reads these environment variables and returns:
 }
 ```
 
-## API Endpoint
+## API Endpoints
 
-### GET /api/v1/version
+### Backend: GET /api/v1/version
 
 Returns application version information.
 
@@ -111,6 +111,53 @@ Returns application version information.
 - `version`: Application version from VERSION file
 - `build_date`: ISO timestamp when the build was created
 - `commit`: Short Git commit SHA (7 characters)
+
+### LLM Service: GET /api/llm/version
+
+Returns LLM service version with extended metadata.
+
+**Response:**
+```json
+{
+  "version": "1.4.1",
+  "build_id": "v1.4.1-a1b2c3d",
+  "commit_sha": "a1b2c3d",
+  "commit_time": "2025-10-26T15:30:45Z",
+  "branch": "main",
+  "deployed_at": "2025-10-26T15:30:45Z",
+  "timestamp": 1730000000.0,
+  "architecture": "modular-endpoints",
+  "modules": ["health", "diagnostic", "chat", "admin", "utils"],
+  "services_count": 5,
+  "services_list": ["weaviate", "redis", "postgresql", "openai", "cohere"]
+}
+```
+
+### Prometheus: GET :9091/version
+
+Version exporter running alongside Prometheus.
+
+**Response:**
+```json
+{
+  "version": "1.4.1",
+  "build_date": "2025-10-26T15:30:45Z",
+  "commit": "a1b2c3d",
+  "commit_full": "a1b2c3d4e5f6789",
+  "service": "prometheus",
+  "timestamp": "2025-10-26T15:30:45.123456"
+}
+```
+
+**Prometheus Metrics Format** (GET :9091/metrics):
+```
+# HELP prometheus_build_info Build information about Prometheus
+# TYPE prometheus_build_info gauge
+prometheus_build_info{version="1.4.1",commit="a1b2c3d",build_date="2025-10-26T15:30:45Z"} 1
+# HELP prometheus_version_info Version information
+# TYPE prometheus_version_info gauge
+prometheus_version_info{version="1.4.1"} 1
+```
 
 ## Frontend Integration
 
@@ -171,11 +218,20 @@ GitHub Actions will:
 - `backend/Dockerfile`: Accepts and sets BUILD_VERSION, BUILD_DATE, COMMIT_SHA
 - `llm/Dockerfile`: Accepts and sets BUILD_VERSION, BUILD_DATE, COMMIT_SHA
 - `frontend/Dockerfile`: Accepts and sets BUILD_VERSION, BUILD_DATE, COMMIT_SHA
-- `prometheus-service/Dockerfile`: Accepts and sets BUILD_VERSION, BUILD_DATE, COMMIT_SHA
+- `prometheus-service/Dockerfile`: Accepts build args, installs Python, runs version exporter
+
+### Prometheus Service
+- `prometheus-service/version_exporter.py`: HTTP server exposing version info on port 9091
+- `prometheus-service/entrypoint.sh`: Starts both Prometheus (9090) and version exporter (9091)
+- Version available as JSON endpoint and Prometheus metrics format
 
 ### Backend
 - `backend/app/api/v1/version.py`: Version API endpoint
 - `backend/app/api/v1/__init__.py`: Mounts version router
+
+### LLM Service
+- `llm/version.py`: Version tracking module (reads from BUILD_VERSION env or VERSION file)
+- `llm/api/endpoints.py`: Version endpoint using VERSION_INFO
 
 ### Frontend
 - `frontend/app/about/page.tsx`: Displays dynamic version
