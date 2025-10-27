@@ -20,11 +20,16 @@ from app.utils.adaptive_length import get_adaptive_length
 from app.utils.post_processor import create_post_processor
 
 # Import domain configuration
+# Using relative import from project root
+import os
 import sys
-from pathlib import Path
-config_path = Path(__file__).parent.parent.parent / "config"
-sys.path.insert(0, str(config_path))
-from aviculture.config import get_aviculture_config
+
+# Add parent directory to path to find config module
+llm_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if llm_root not in sys.path:
+    sys.path.insert(0, llm_root)
+
+from config.aviculture.config import get_aviculture_config
 
 logger = logging.getLogger(__name__)
 
