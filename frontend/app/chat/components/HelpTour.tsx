@@ -1,7 +1,8 @@
 /**
  * Helptour
- * Version: 1.4.1
- * Last modified: 2025-10-26
+ * Version: 1.5.0
+ * Last modified: 2025-10-27
+ * Added: Voice Assistant step (conditional on premium access)
  */
 "use client";
 
@@ -18,9 +19,10 @@ interface HelpStep {
 interface HelpTourProps {
   isOpen: boolean;
   onClose: () => void;
+  canUseVoiceRealtime?: boolean;
 }
 
-export function HelpTour({ isOpen, onClose }: HelpTourProps) {
+export function HelpTour({ isOpen, onClose, canUseVoiceRealtime = false }: HelpTourProps) {
   const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null);
@@ -50,7 +52,8 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const steps: HelpStep[] = [
+  // Build steps array dynamically based on voice assistant access
+  const baseSteps: HelpStep[] = [
     {
       target: "input[placeholder*='question'], input[aria-label*='question'], .chat-input-fixed input, input[type='text']",
       title: t("help.inputTitle"),
@@ -95,6 +98,23 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
     },
   ];
 
+  // Add voice assistant step conditionally
+  const voiceAssistantStep: HelpStep = {
+    target: ".voice-realtime-button, button[aria-label*='voice assistant'], button[aria-label*='assistant vocal']",
+    title: t("help.voiceAssistantTitle"),
+    description: t("help.voiceAssistantDesc"),
+    position: "left",
+  };
+
+  // Combine steps: insert voice assistant after voice input (index 3) if available
+  const steps = canUseVoiceRealtime
+    ? [
+        ...baseSteps.slice(0, 4), // Input, Send, Camera, Voice
+        voiceAssistantStep,       // Voice Assistant
+        ...baseSteps.slice(4),    // New Chat, History, Profile
+      ]
+    : baseSteps;
+
   const updateSpotlight = useCallback(() => {
     const step = steps[currentStep];
 
@@ -131,39 +151,54 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
 
     if (isMobile) {
       // Sur mobile : positions simplifiées et optimisées
-      switch (currentStep) {
-        case 0: // Input - Au-dessus de l'input
-          top = rect.top - bubbleHeight - 80;
-          left = (window.innerWidth - bubbleWidth) / 2;
-          break;
-        case 1: // Send button - Au-dessus du bouton, bien espacé
-          top = rect.top - bubbleHeight - 120;
-          left = (window.innerWidth - bubbleWidth) / 2;
-          break;
-        case 2: // Camera button - Au-dessus, bien espacé
-          top = rect.top - bubbleHeight - 100;
-          left = (window.innerWidth - bubbleWidth) / 2;
-          break;
-        case 3: // Voice button - Au-dessus du bouton, bien espacé
-          top = rect.top - bubbleHeight - 120;
-          left = (window.innerWidth - bubbleWidth) / 2;
-          break;
-        case 4: // New conversation - En-dessous
-          top = rect.bottom + padding + 10;
-          left = Math.max(10, rect.left);
-          break;
-        case 5: // History - En-dessous
-          top = rect.bottom + padding + 10;
-          left = Math.max(10, rect.left);
-          break;
-        case 6: // User menu - En-dessous, aligné à droite
-          top = rect.bottom + padding + 10;
-          left = Math.min(window.innerWidth - bubbleWidth - 10, rect.right - bubbleWidth);
-          break;
+      const stepIndex = currentStep;
+
+      // Determine which step we're on (accounting for conditional voice assistant)
+      const isVoiceAssistant = canUseVoiceRealtime && stepIndex === 4;
+      const adjustedStep = canUseVoiceRealtime && stepIndex > 4 ? stepIndex - 1 : stepIndex;
+
+      if (isVoiceAssistant) {
+        // Voice Assistant - Bottom right, position above the button
+        top = window.innerHeight - bubbleHeight - 180;
+        left = (window.innerWidth - bubbleWidth) / 2;
+      } else {
+        switch (adjustedStep) {
+          case 0: // Input - Au-dessus de l'input
+            top = rect.top - bubbleHeight - 80;
+            left = (window.innerWidth - bubbleWidth) / 2;
+            break;
+          case 1: // Send button - Au-dessus du bouton, bien espacé
+            top = rect.top - bubbleHeight - 120;
+            left = (window.innerWidth - bubbleWidth) / 2;
+            break;
+          case 2: // Camera button - Au-dessus, bien espacé
+            top = rect.top - bubbleHeight - 100;
+            left = (window.innerWidth - bubbleWidth) / 2;
+            break;
+          case 3: // Voice button - Au-dessus du bouton, bien espacé
+            top = rect.top - bubbleHeight - 120;
+            left = (window.innerWidth - bubbleWidth) / 2;
+            break;
+          case 4: // New conversation - En-dessous
+            top = rect.bottom + padding + 10;
+            left = Math.max(10, rect.left);
+            break;
+          case 5: // History - En-dessous
+            top = rect.bottom + padding + 10;
+            left = Math.max(10, rect.left);
+            break;
+          case 6: // User menu - En-dessous, aligné à droite
+            top = rect.bottom + padding + 10;
+            left = Math.min(window.innerWidth - bubbleWidth - 10, rect.right - bubbleWidth);
+            break;
+        }
       }
     } else {
       // Desktop : logique originale avec espacement augmenté pour le bouton caméra
       const topPadding = currentStep === 2 ? 150 : padding; // Augmenté significativement pour ne pas cacher le bouton caméra
+
+      // Determine if this is the voice assistant step
+      const isVoiceAssistant = canUseVoiceRealtime && currentStep === 4;
 
       switch (step.position) {
         case "top":
@@ -175,10 +210,18 @@ export function HelpTour({ isOpen, onClose }: HelpTourProps) {
           left = rect.left + rect.width / 2 - bubbleWidth / 2;
           break;
         case "left":
-          // For voice input button (at bottom), position higher to avoid being cut off
-          const verticalOffset = currentStep === 3 ? -bubbleHeight + 30 : 0;
-          top = rect.top + rect.height / 2 - bubbleHeight / 2 + verticalOffset;
-          left = rect.left - bubbleWidth - padding;
+          // For voice input button (step 3) or voice assistant (step 4 when enabled), position higher to avoid being cut off
+          const adjustedStepForVoice = canUseVoiceRealtime ? (currentStep === 3 || currentStep === 4) : (currentStep === 3);
+          const verticalOffset = adjustedStepForVoice ? -bubbleHeight + 30 : 0;
+
+          // For voice assistant (fixed bottom right), position to the left of the button
+          if (isVoiceAssistant) {
+            top = window.innerHeight - 120; // Fixed position for floating button
+            left = window.innerWidth - bubbleWidth - 100; // To the left of the button
+          } else {
+            top = rect.top + rect.height / 2 - bubbleHeight / 2 + verticalOffset;
+            left = rect.left - bubbleWidth - padding;
+          }
           break;
         case "right":
           top = rect.top + rect.height / 2 - bubbleHeight / 2;

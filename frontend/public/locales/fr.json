@@ -279,6 +279,8 @@
   "help.sendTitle": "Bouton d'envoi",
   "help.voiceDesc": "Maintenez le bouton micro enfoncé pour poser votre question. Relâchez pour envoyer. La reconnaissance vocale s'adapte à la langue de l'interface.",
   "help.voiceTitle": "Entrée vocale",
+  "help.voiceAssistantDesc": "Conversation vocale interactive en temps réel. Parlez naturellement et recevez des réponses vocales instantanées.",
+  "help.voiceAssistantTitle": "Assistant vocal temps réel",
   "history.clear": "Effacer l'historique",
   "history.confirmClear": "Êtes-vous sûr de vouloir effacer tout l'historique ?",
   "history.confirmClearAll": "Supprimer toutes les conversations ?",

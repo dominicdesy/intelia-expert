@@ -201,7 +201,9 @@ export function VoiceRealtimeButton() {
         onDoubleClick={handleInterrupt}
         title={getTooltip()}
         disabled={state === "connecting"}
+        aria-label={getTooltip()}
         className={`
+          voice-realtime-button
           ${getButtonColor()}
           text-white
           rounded-full

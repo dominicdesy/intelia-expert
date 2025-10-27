@@ -274,6 +274,8 @@
   "help.sendTitle": "Send Button",
   "help.voiceDesc": "Hold the microphone button to speak your question. Release to send. Speech recognition adapts to your interface language.",
   "help.voiceTitle": "Voice Input",
+  "help.voiceAssistantDesc": "Interactive voice conversation in real-time. Speak naturally and receive instant voice responses.",
+  "help.voiceAssistantTitle": "Real-time voice assistant",
   "history.clear": "Clear History",
   "history.confirmClear": "Are you sure you want to clear all history?",
   "history.confirmClearAll": "Delete all conversations?",

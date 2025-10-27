@@ -1078,5 +1078,7 @@
   "widget.sendButton": "Invia",
   "widget.errorNetwork": "Errore di connessione. Riprova.",
   "widget.errorToken": "Errore di autenticazione.",
-  "widget.errorQuota": "Limite di utilizzo raggiunto."
+  "widget.errorQuota": "Limite di utilizzo raggiunto.",
+  "help.voiceAssistantTitle": "Assistente vocale in tempo reale",
+  "help.voiceAssistantDesc": "Conversazione vocale interattiva in tempo reale. Parla naturalmente e ricevi risposte vocali istantanee."
 }

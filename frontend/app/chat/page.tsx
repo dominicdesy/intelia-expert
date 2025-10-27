@@ -51,6 +51,7 @@ import { secureLog } from "@/lib/utils/secureLogger";
 import { VoiceInput } from "./components/VoiceInput";
 import { TypewriterMessage } from "./components/TypewriterMessage";
 import { VoiceRealtimeButton } from "@/components/VoiceRealtimeButton";
+import { useVoiceRealtime } from "@/lib/hooks/useVoiceRealtime";
 import { SatisfactionSurvey } from "./components/SatisfactionSurvey";
 import { AdProvider } from "@/components/AdSystem/AdProvider";
 import "./mobile-styles.css";
@@ -507,6 +508,9 @@ function ChatInterface() {
   const { t, currentLanguage } = useTranslation();
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Hook pour vérifier l'accès au Voice Assistant
+  const { canUseVoiceRealtime } = useVoiceRealtime();
 
   // Stores Zustand
   const currentConversation = useChatStore(
@@ -1849,6 +1853,7 @@ function ChatInterface() {
       <HelpTour
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
+        canUseVoiceRealtime={canUseVoiceRealtime}
       />
 
       <VoiceRealtimeButton />

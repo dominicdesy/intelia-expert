@@ -1078,5 +1078,7 @@
   "widget.sendButton": "إرسال",
   "widget.errorNetwork": "خطأ في الاتصال. يرجى المحاولة مرة أخرى.",
   "widget.errorToken": "خطأ في المصادقة.",
-  "widget.errorQuota": "تم الوصول إلى حد الاستخدام."
+  "widget.errorQuota": "تم الوصول إلى حد الاستخدام.",
+  "help.voiceAssistantTitle": "المساعد الصوتي في الوقت الفعلي",
+  "help.voiceAssistantDesc": "محادثة صوتية تفاعلية في الوقت الفعلي. تحدث بشكل طبيعي واحصل على ردود صوتية فورية."
 }

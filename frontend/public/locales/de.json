@@ -1078,5 +1078,7 @@
   "widget.sendButton": "Senden",
   "widget.errorNetwork": "Verbindungsfehler. Bitte versuchen Sie es erneut.",
   "widget.errorToken": "Authentifizierungsfehler.",
-  "widget.errorQuota": "Nutzungslimit erreicht."
+  "widget.errorQuota": "Nutzungslimit erreicht.",
+  "help.voiceAssistantTitle": "Echtzeit-Sprachassistent",
+  "help.voiceAssistantDesc": "Interaktive Sprachkonversation in Echtzeit. Sprechen Sie natürlich und erhalten Sie sofortige Sprachantworten."
 }

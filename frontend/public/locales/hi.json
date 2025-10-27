@@ -1078,5 +1078,7 @@
   "widget.sendButton": "भेजें",
   "widget.errorNetwork": "कनेक्शन त्रुटि। कृपया पुनः प्रयास करें।",
   "widget.errorToken": "प्रमाणीकरण त्रुटि।",
-  "widget.errorQuota": "उपयोग सीमा पहुंच गई।"
+  "widget.errorQuota": "उपयोग सीमा पहुंच गई।",
+  "help.voiceAssistantTitle": "रीयल-टाइम वॉयस असिस्टेंट",
+  "help.voiceAssistantDesc": "रीयल-टाइम में इंटरैक्टिव वॉयस वार्तालाप। स्वाभाविक रूप से बोलें और तत्काल वॉयस प्रतिक्रियाएं प्राप्त करें।"
 }

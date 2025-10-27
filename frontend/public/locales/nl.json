@@ -1078,5 +1078,7 @@
   "widget.sendButton": "Verzenden",
   "widget.errorNetwork": "Verbindingsfout. Probeer het opnieuw.",
   "widget.errorToken": "Authenticatiefout.",
-  "widget.errorQuota": "Gebruikslimiet bereikt."
+  "widget.errorQuota": "Gebruikslimiet bereikt.",
+  "help.voiceAssistantTitle": "Real-time spraakassistent",
+  "help.voiceAssistantDesc": "Interactief spraakgesprek in real-time. Spreek natuurlijk en ontvang directe spraakrespons."
 }
