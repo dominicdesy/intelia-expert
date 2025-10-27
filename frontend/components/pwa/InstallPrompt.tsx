@@ -1,6 +1,6 @@
 /**
  * InstallPrompt Component - PWA Installation for Android
- * Version: 1.4.1
+ * Version: 1.1.1
  * Last modified: 2025-10-26
  */
 

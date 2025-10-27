@@ -1,6 +1,6 @@
 /**
  * IOSInstallBanner Component - iOS Safari Installation Instructions
- * Version: 1.4.1
+ * Version: 1.1.1
  * Last modified: 2025-10-26
  */
 

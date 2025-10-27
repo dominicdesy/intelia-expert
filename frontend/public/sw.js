@@ -1,10 +1,10 @@
 /**
  * Service Worker for Intelia Expert PWA
- * Version: 1.4.1
+ * Version: 1.1.1
  * Last modified: 2025-10-26
  */
 
-const CACHE_NAME = 'intelia-expert-v1.4.1';
+const CACHE_NAME = 'intelia-expert-v1.1.1';
 const STATIC_CACHE = [
   '/',
   '/images/logo.png',
