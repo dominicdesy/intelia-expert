@@ -32,8 +32,8 @@ JWT_SECRET = os.getenv("WIDGET_JWT_SECRET", os.getenv("JWT_SECRET", ""))
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_MINUTES = 60
 
-# LLM API URL (réseau interne Docker - même que WhatsApp webhooks)
-LLM_API_URL = os.getenv("LLM_INTERNAL_URL", "http://intelia-llm:8080")
+# AI Service API URL (réseau interne Docker - même que WhatsApp webhooks)
+AI_SERVICE_URL = os.getenv("AI_SERVICE_INTERNAL_URL", "http://ai-service:8080")
 
 
 # ============================================
@@ -252,10 +252,10 @@ async def widget_chat(
                 # Le quota est géré au niveau client (entreprise)
             }
 
-            logger.info(f"Appel LLM API: {LLM_API_URL}/chat")
+            logger.info(f"Appel AI Service API: {AI_SERVICE_URL}/chat")
 
             response = await client.post(
-                f"{LLM_API_URL}/chat",
+                f"{AI_SERVICE_URL}/chat",
                 json=llm_payload,
                 headers={
                     "Content-Type": "application/json",
@@ -263,10 +263,10 @@ async def widget_chat(
             )
 
             if response.status_code != 200:
-                logger.error(f"LLM API error: {response.status_code} - {response.text}")
+                logger.error(f"AI Service API error: {response.status_code} - {response.text}")
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail=f"Erreur LLM API: {response.text}"
+                    detail=f"Erreur AI Service API: {response.text}"
                 )
 
             # 4. Incrémenter usage (fire-and-forget)
@@ -365,5 +365,5 @@ async def widget_health():
         "service": "widget",
         "version": "1.0.0",
         "jwt_configured": bool(JWT_SECRET),
-        "llm_api_url": LLM_API_URL
+        "ai_service_url": AI_SERVICE_URL
     }

@@ -1,7 +1,8 @@
 /**
- * SÉCURITÉ: Proxy générique pour tous les endpoints LLM
- * Version: 1.4.1
- * Last modified: 2025-10-26
+ * SÉCURITÉ: Proxy générique pour tous les endpoints AI Service
+ * Version: 1.5.0
+ * Last modified: 2025-10-27
+ * Updated: Renamed from LLM to AI Service
  */
 // app/api/llm/[...path]/route.ts
 
@@ -9,29 +10,29 @@ import { type NextRequest } from "next/server";
 import { secureLog } from "@/lib/utils/secureLogger";
 
 /**
- * SÉCURITÉ: Proxy générique pour tous les endpoints LLM
- * Redirige les requêtes /api/llm/* vers http://intelia-llm:8080/* (réseau interne)
- * Permet de bloquer l'accès public au service LLM pour une sécurité accrue
+ * SÉCURITÉ: Proxy générique pour tous les endpoints AI Service
+ * Redirige les requêtes /api/llm/* vers http://ai-service:8080/* (réseau interne)
+ * Permet de bloquer l'accès public au service AI pour une sécurité accrue
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const LLM_INTERNAL_URL =
-  process.env.LLM_INTERNAL_URL ?? "https://expert.intelia.com/llm";
+const AI_SERVICE_INTERNAL_URL =
+  process.env.AI_SERVICE_INTERNAL_URL ?? "https://expert.intelia.com/api/llm";
 
 /**
- * Proxy générique pour toutes les méthodes HTTP vers le LLM
+ * Proxy générique pour toutes les méthodes HTTP vers le AI Service
  */
-async function proxyToLLM(req: NextRequest, params: { path: string[] }) {
+async function proxyToAIService(req: NextRequest, params: { path: string[] }) {
   const { path } = params;
   const targetPath = path.join("/");
-  const targetUrl = `${LLM_INTERNAL_URL}/${targetPath}`;
+  const targetUrl = `${AI_SERVICE_INTERNAL_URL}/${targetPath}`;
 
   // Copier les query params
   const searchParams = req.nextUrl.searchParams.toString();
   const fullUrl = searchParams ? `${targetUrl}?${searchParams}` : targetUrl;
 
-  secureLog.log(`[llm-proxy] ${req.method} ${fullUrl}`);
+  secureLog.log(`[ai-service-proxy] ${req.method} ${fullUrl}`);
 
   try {
     // Copier le body si présent
@@ -48,7 +49,7 @@ async function proxyToLLM(req: NextRequest, params: { path: string[] }) {
       }
     }
 
-    // Appel au LLM interne
+    // Appel au AI Service interne
     const response = await fetch(fullUrl, {
       method: req.method,
       headers: {
@@ -84,10 +85,10 @@ async function proxyToLLM(req: NextRequest, params: { path: string[] }) {
       headers: responseHeaders,
     });
   } catch (error) {
-    secureLog.error(`[llm-proxy] Erreur: ${error}`);
+    secureLog.error(`[ai-service-proxy] Erreur: ${error}`);
     return new Response(
       JSON.stringify({
-        error: "Service LLM temporairement indisponible",
+        error: "Service AI temporairement indisponible",
         detail: String(error),
       }),
       {
@@ -99,23 +100,23 @@ async function proxyToLLM(req: NextRequest, params: { path: string[] }) {
 }
 
 export async function GET(req: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyToLLM(req, params);
+  return proxyToAIService(req, params);
 }
 
 export async function POST(req: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyToLLM(req, params);
+  return proxyToAIService(req, params);
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyToLLM(req, params);
+  return proxyToAIService(req, params);
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyToLLM(req, params);
+  return proxyToAIService(req, params);
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyToLLM(req, params);
+  return proxyToAIService(req, params);
 }
 
 export async function OPTIONS(req: NextRequest) {

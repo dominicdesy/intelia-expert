@@ -12,7 +12,7 @@ jobs:
     outputs:
       frontend-changed: ${{ steps.filter.outputs.frontend }}
       backend-changed: ${{ steps.filter.outputs.backend }}
-      llm-changed: ${{ steps.filter.outputs.llm }}
+      ai-service-changed: ${{ steps.filter.outputs.ai-service }}
       prometheus-changed: ${{ steps.filter.outputs.prometheus }}
     steps:
       - name: Checkout repository
@@ -27,8 +27,8 @@ jobs:
               - 'frontend/**'
             backend:
               - 'backend/**'
-            llm:
-              - 'llm/**'
+            ai-service:
+              - 'ai-service/**'
             prometheus:
               - 'prometheus-service/**'
 
@@ -183,11 +183,11 @@ jobs:
             registry.digitalocean.com/${{ secrets.DOCR_NAME }}/backend:latest
 
   # ======================================================
-  # LLM
+  # AI SERVICE
   # ======================================================
-  build-llm:
+  build-ai-service:
     needs: detect-changes
-    if: needs.detect-changes.outputs.llm-changed == 'true'
+    if: needs.detect-changes.outputs.ai-service-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -232,16 +232,16 @@ jobs:
         id: version
         run: echo "VERSION=$(cat VERSION)" >> $GITHUB_OUTPUT
 
-      - name: Build and push LLM image
+      - name: Build and push AI Service image
         uses: docker/build-push-action@v6
         with:
-          context: ./llm
+          context: ./ai-service
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:main
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:main-${{ github.sha }}
-          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:buildcache
-          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:buildcache,mode=max
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:main
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:main-${{ github.sha }}
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:buildcache,mode=max
           build-args: |
             BUILD_VERSION=${{ steps.version.outputs.VERSION }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
@@ -249,12 +249,12 @@ jobs:
 
       - name: Tag and push :latest
         run: |
-          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:main
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:main
           docker tag \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:main \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:main \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:latest
           docker push \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:latest
 
   # ======================================================
   # PROMETHEUS
@@ -340,7 +340,7 @@ jobs:
     needs:
       - build-frontend
       - build-backend
-      - build-llm
+      - build-ai-service
       - build-prometheus
     if: false  # Temporarily disabled until DO fixes garbage collection issue
     runs-on: ubuntu-latest
@@ -397,12 +397,12 @@ jobs:
             echo "Only $TAG_COUNT tags found, no cleanup needed (keeping all)"
           fi
 
-      - name: Cleanup old llm tags
-        if: needs.build-llm.result == 'success'
+      - name: Cleanup old ai-service tags
+        if: needs.build-ai-service.result == 'success'
         run: |
-          echo "Cleaning up old llm tags (keeping 10 most recent)..."
+          echo "Cleaning up old ai-service tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/llm --output json || echo "[]")
+          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/ai-service --output json || echo "[]")
 
           TAG_COUNT=$(echo "$TAGS" | jq '. | length')
           echo "Found $TAG_COUNT tags total"
@@ -412,7 +412,7 @@ jobs:
             echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/llm "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/ai-service "$tag" --force || true
               fi
             done
           else
@@ -451,7 +451,7 @@ jobs:
     needs:
       - build-frontend
       - build-backend
-      - build-llm
+      - build-ai-service
       - build-prometheus
       - cleanup-registry
     if: >
@@ -460,7 +460,7 @@ jobs:
       (
         needs.build-frontend.result == 'success' ||
         needs.build-backend.result == 'success' ||
-        needs.build-llm.result == 'success' ||
+        needs.build-ai-service.result == 'success' ||
         needs.build-prometheus.result == 'success'
       )
     runs-on: ubuntu-latest
@@ -481,7 +481,7 @@ jobs:
       - detect-changes
       - build-frontend
       - build-backend
-      - build-llm
+      - build-ai-service
       - build-prometheus
       - cleanup-registry
       - deploy
@@ -492,10 +492,10 @@ jobs:
         run: |
           echo "=== Deployment Summary ==="
           echo ""
-          echo "Frontend:  changed=${{ needs.detect-changes.outputs.frontend-changed }},  result=${{ needs.build-frontend.result }}"
-          echo "Backend:   changed=${{ needs.detect-changes.outputs.backend-changed }},  result=${{ needs.build-backend.result }}"
-          echo "LLM:       changed=${{ needs.detect-changes.outputs.llm-changed }},  result=${{ needs.build-llm.result }}"
-          echo "Prometheus:changed=${{ needs.detect-changes.outputs.prometheus-changed }},  result=${{ needs.build-prometheus.result }}"
+          echo "Frontend:    changed=${{ needs.detect-changes.outputs.frontend-changed }},  result=${{ needs.build-frontend.result }}"
+          echo "Backend:     changed=${{ needs.detect-changes.outputs.backend-changed }},  result=${{ needs.build-backend.result }}"
+          echo "AI Service:  changed=${{ needs.detect-changes.outputs.ai-service-changed }},  result=${{ needs.build-ai-service.result }}"
+          echo "Prometheus:  changed=${{ needs.detect-changes.outputs.prometheus-changed }},  result=${{ needs.build-prometheus.result }}"
           echo ""
           echo "Cleanup:   result=${{ needs.cleanup-registry.result }}"
           echo ""

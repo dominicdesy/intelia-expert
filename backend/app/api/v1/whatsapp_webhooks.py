@@ -64,11 +64,11 @@ TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+15075195
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-# Configuration LLM service (microservices architecture)
+# Configuration AI Service (microservices architecture)
 # Use internal URL if available (for service-to-service communication)
 # Otherwise fall back to public URL
-LLM_SERVICE_URL = os.getenv("LLM_INTERNAL_URL") or os.getenv("LLM_SERVICE_URL", "https://expert.intelia.com/llm")
-LLM_CHAT_ENDPOINT = f"{LLM_SERVICE_URL}/chat"
+AI_SERVICE_URL = os.getenv("AI_SERVICE_INTERNAL_URL") or os.getenv("AI_SERVICE_URL", "https://expert.intelia.com/api/llm")
+AI_CHAT_ENDPOINT = f"{AI_SERVICE_URL}/chat"
 
 # Initialiser le client Twilio
 twilio_client = None
@@ -81,7 +81,7 @@ if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
 else:
     logger.warning("⚠️ Twilio credentials not configured - WhatsApp disabled")
 
-logger.info(f"✅ LLM service configured at: {LLM_CHAT_ENDPOINT}")
+logger.info(f"✅ AI Service configured at: {AI_CHAT_ENDPOINT}")
 
 
 # ==================== HELPERS ====================
@@ -324,7 +324,7 @@ async def handle_text_message(
             conversation_id = generate_whatsapp_session_uuid(from_number)
 
         logger.info(f"📝 WhatsApp message from {user_email} ({user_name}): {body[:100]}...")
-        logger.info(f"🔧 Calling LLM service: {LLM_CHAT_ENDPOINT}")
+        logger.info(f"🔧 Calling AI Service: {AI_CHAT_ENDPOINT}")
 
         # Créer un JWT token pour l'utilisateur WhatsApp
         auth_token = create_whatsapp_user_token(user_info)
@@ -353,7 +353,7 @@ async def handle_text_message(
 
         # Appel HTTP au service LLM avec streaming
         async with httpx.AsyncClient(timeout=60.0) as client:
-            async with client.stream("POST", LLM_CHAT_ENDPOINT, json=payload, headers=headers) as response:
+            async with client.stream("POST", AI_CHAT_ENDPOINT, json=payload, headers=headers) as response:
                 if response.status_code != 200:
                     logger.error(f"❌ LLM service error: {response.status_code}")
                     return "Désolé, le service d'assistance n'est pas disponible actuellement. Veuillez réessayer plus tard."
@@ -731,12 +731,12 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
         }
 
         # Étape 3: Appeler l'endpoint vision du LLM
-        llm_vision_endpoint = f"{LLM_SERVICE_URL}/chat-with-image"
-        logger.info(f"🔧 Calling LLM Vision service: {llm_vision_endpoint}")
+        ai_vision_endpoint = f"{AI_SERVICE_URL}/chat-with-image"
+        logger.info(f"🔧 Calling AI Vision service: {ai_vision_endpoint}")
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             vision_response = await client.post(
-                llm_vision_endpoint,
+                ai_vision_endpoint,
                 files=files,
                 data=data,
                 headers=headers
@@ -1259,25 +1259,25 @@ async def whatsapp_status():
     """
     Retourne le statut de la configuration WhatsApp
     """
-    # Test LLM service connectivity
-    llm_service_available = False
+    # Test AI Service connectivity
+    ai_service_available = False
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{LLM_SERVICE_URL}/health")
-            llm_service_available = response.status_code == 200
+            response = await client.get(f"{AI_SERVICE_URL}/health")
+            ai_service_available = response.status_code == 200
     except Exception as e:
-        logger.warning(f"⚠️ LLM service health check failed: {e}")
+        logger.warning(f"⚠️ AI Service health check failed: {e}")
 
     return {
         "whatsapp_enabled": twilio_client is not None,
         "twilio_account_sid": TWILIO_ACCOUNT_SID[:8] + "..." if TWILIO_ACCOUNT_SID else None,
         "whatsapp_number": TWILIO_WHATSAPP_NUMBER,
         "signature_validation": request_validator is not None,
-        "llm_integration": {
+        "ai_integration": {
             "architecture": "microservices_http",
-            "llm_service_url": LLM_SERVICE_URL,
-            "llm_service_available": llm_service_available,
-            "endpoint": LLM_CHAT_ENDPOINT,
+            "ai_service_url": AI_SERVICE_URL,
+            "ai_service_available": ai_service_available,
+            "endpoint": AI_CHAT_ENDPOINT,
             "version": "2.1_microservices",
         }
     }
