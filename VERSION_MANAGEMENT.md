@@ -1,8 +1,32 @@
 # Version Management System
 
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Version Structure](#version-structure)
+3. [How It Works](#how-it-works)
+4. [API Endpoints](#api-endpoints)
+5. [Frontend Integration](#frontend-integration)
+6. [How to Update the Version](#how-to-update-the-version)
+7. [Files Modified](#files-modified)
+8. [Production Files Versioned](#production-files-versioned)
+9. [Quick Reference](#quick-reference)
+10. [Version History](#version-history)
+11. [Best Practices](#best-practices)
+12. [Troubleshooting](#troubleshooting)
+13. [Future Enhancements](#future-enhancements)
+
 ## Overview
 
 This document describes the centralized version management system for Intelia Expert. The system provides both application-level versioning and file-level versioning with full automation through GitHub Actions.
+
+**Key Features:**
+- ✅ Single source of truth: `VERSION` file at project root
+- ✅ Automatic injection via GitHub Actions
+- ✅ All 4 services synchronized (Backend, Frontend, LLM, Prometheus)
+- ✅ Works in both production and development
+- ✅ 447 production files versioned
+- ✅ Zero manual intervention required
 
 ## Version Structure
 
@@ -260,6 +284,51 @@ Total: 447 files across:
 - Documentation (`*.md`, `docs/**`)
 - Cache directories (`__pycache__/**`, `.next/**`)
 
+## Quick Reference
+
+### Check Version in Production
+
+```bash
+# Backend
+curl https://expert.intelia.com/api/v1/version
+
+# LLM Service
+curl https://expert.intelia.com/api/llm/version
+
+# Prometheus (internal only)
+curl http://intelia-prometheus:9091/version
+```
+
+### Check Version Locally
+
+```bash
+# Read VERSION file
+cat VERSION
+
+# Backend (if running)
+curl http://localhost:8080/api/v1/version
+
+# LLM (if running)
+curl http://localhost:8080/api/llm/version
+```
+
+### Update Version
+
+```bash
+# 1. Update VERSION file
+echo "1.5.0" > VERSION
+
+# 2. Update all file headers
+python add_version_headers.py --version 1.5.0
+
+# 3. Commit and push
+git add VERSION backend/ frontend/ llm/ prometheus-service/
+git commit -m "chore: Bump version to 1.5.0"
+git push origin main
+
+# 4. GitHub Actions will automatically deploy with new version
+```
+
 ## Version History
 
 | Version | Date       | Changes                                    |
@@ -292,8 +361,10 @@ Total: 447 files across:
 
 ## Future Enhancements
 
-- [ ] Add version endpoint to LLM service
 - [ ] Display build date and commit in admin dashboard
-- [ ] Create automated version bumping script
-- [ ] Add version to logs for better debugging
+- [ ] Create automated version bumping script (e.g., `bump_version.sh`)
+- [ ] Add version to application logs for better debugging
 - [ ] Track version changes in database for audit trail
+- [ ] Add version badges to README.md
+- [ ] Create health check endpoint that includes version info
+- [ ] Automated release notes generation based on version changes
