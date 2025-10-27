@@ -31,6 +31,15 @@ except Exception as e:
     logger.error("Traceback system: %s", traceback.format_exc())
     system_router = None
 
+# Version router
+try:
+    from .version import router as version_router
+
+    logger.debug("Version router importé avec %d routes", len(version_router.routes))
+except Exception as e:
+    logger.error("ERREUR import version router: %s", e)
+    version_router = None
+
 # Auth router - AVEC DEBUG COMPLET
 try:
     logger.debug("Tentative import auth router...")
@@ -484,6 +493,11 @@ if system_router:
     logger.debug("System router monté")
 else:
     logger.error("System router non monté (échec import)")
+
+# Version
+if version_router:
+    router.include_router(version_router, tags=["Version"])
+    logger.debug("Version router monté")
 
 # Auth - AVEC DEBUG COMPLET
 if auth_router:

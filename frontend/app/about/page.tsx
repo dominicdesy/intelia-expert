@@ -6,7 +6,7 @@
 // app/about/page.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/languages/i18n";
 
@@ -16,6 +16,15 @@ const InteliaLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
 
 export default function AboutPage() {
   const { t, currentLanguage } = useTranslation();
+  const [version, setVersion] = useState("1.4.1");
+
+  // Fetch version from API
+  useEffect(() => {
+    fetch("/api/v1/version")
+      .then((res) => res.json())
+      .then((data) => setVersion(data.version))
+      .catch(() => setVersion("1.4.1")); // Fallback
+  }, []);
 
   // Fix: Ensure scroll is enabled (Radix Dialog may disable it)
   useEffect(() => {
@@ -459,7 +468,7 @@ export default function AboutPage() {
                   {t("about.versionInfo")}
                 </h3>
                 <div className="text-sm text-gray-600 space-y-1">
-                  <p><span className="font-medium">{t("about.version")}:</span> 1.1.0</p>
+                  <p><span className="font-medium">{t("about.version")}:</span> {version}</p>
                   <p><span className="font-medium">{t("about.lastUpdated")}:</span> {t("about.versionDate")}</p>
                   <p><span className="font-medium">{t("about.license")}:</span> Proprietary</p>
                 </div>
