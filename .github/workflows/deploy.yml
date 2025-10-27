@@ -88,10 +88,10 @@ jobs:
           context: ./frontend
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main-${{ github.sha }}
-          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache
-          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:buildcache,mode=max
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/frontend:main
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/frontend:main-${{ github.sha }}
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/frontend:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/frontend:buildcache,mode=max
           build-args: |
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -101,12 +101,12 @@ jobs:
 
       - name: Tag and push :latest
         run: |
-          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/frontend:main
           docker tag \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:main \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/frontend:main \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/frontend:latest
           docker push \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-frontend:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/frontend:latest
 
   # ======================================================
   # BACKEND
@@ -164,10 +164,10 @@ jobs:
           context: ./backend
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main-${{ github.sha }}
-          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache
-          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:buildcache,mode=max
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/backend:main
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/backend:main-${{ github.sha }}
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/backend:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/backend:buildcache,mode=max
           build-args: |
             BUILD_VERSION=${{ steps.version.outputs.VERSION }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
@@ -175,12 +175,12 @@ jobs:
 
       - name: Tag and push :latest
         run: |
-          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/backend:main
           docker tag \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:main \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/backend:main \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/backend:latest
           docker push \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-backend:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/backend:latest
 
   # ======================================================
   # LLM
@@ -238,10 +238,10 @@ jobs:
           context: ./llm
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main-${{ github.sha }}
-          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache
-          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:buildcache,mode=max
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:main
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:main-${{ github.sha }}
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:buildcache,mode=max
           build-args: |
             BUILD_VERSION=${{ steps.version.outputs.VERSION }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
@@ -249,12 +249,12 @@ jobs:
 
       - name: Tag and push :latest
         run: |
-          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:main
           docker tag \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:main \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:main \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:latest
           docker push \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-llm:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/llm:latest
 
   # ======================================================
   # PROMETHEUS
@@ -312,10 +312,10 @@ jobs:
           context: ./prometheus-service
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main-${{ github.sha }}
-          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:buildcache
-          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:buildcache,mode=max
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/prometheus:main
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/prometheus:main-${{ github.sha }}
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/prometheus:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/prometheus:buildcache,mode=max
           build-args: |
             BUILD_VERSION=${{ steps.version.outputs.VERSION }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
@@ -323,12 +323,12 @@ jobs:
 
       - name: Tag and push :latest
         run: |
-          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/prometheus:main
           docker tag \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:main \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/prometheus:main \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/prometheus:latest
           docker push \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/intelia-prometheus:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/prometheus:latest
 
   # ======================================================
   # DEPLOY TO DIGITALOCEAN
@@ -356,7 +356,7 @@ jobs:
           echo "Cleaning up old frontend tags (keeping 10 most recent)..."
 
           # List all tags sorted by update time (newest first) in JSON format
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-frontend --output json || echo "[]")
+          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/frontend --output json || echo "[]")
 
           # Count total tags
           TAG_COUNT=$(echo "$TAGS" | jq '. | length')
@@ -368,7 +368,7 @@ jobs:
             echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-frontend "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/frontend "$tag" --force || true
               fi
             done
           else
@@ -380,7 +380,7 @@ jobs:
         run: |
           echo "Cleaning up old backend tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-backend --output json || echo "[]")
+          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/backend --output json || echo "[]")
 
           TAG_COUNT=$(echo "$TAGS" | jq '. | length')
           echo "Found $TAG_COUNT tags total"
@@ -390,7 +390,7 @@ jobs:
             echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-backend "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/backend "$tag" --force || true
               fi
             done
           else
@@ -402,7 +402,7 @@ jobs:
         run: |
           echo "Cleaning up old llm tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-llm --output json || echo "[]")
+          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/llm --output json || echo "[]")
 
           TAG_COUNT=$(echo "$TAGS" | jq '. | length')
           echo "Found $TAG_COUNT tags total"
@@ -412,7 +412,7 @@ jobs:
             echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-llm "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/llm "$tag" --force || true
               fi
             done
           else
@@ -424,7 +424,7 @@ jobs:
         run: |
           echo "Cleaning up old prometheus tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/intelia-prometheus --output json || echo "[]")
+          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/prometheus --output json || echo "[]")
 
           TAG_COUNT=$(echo "$TAGS" | jq '. | length')
           echo "Found $TAG_COUNT tags total"
@@ -434,7 +434,7 @@ jobs:
             echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/intelia-prometheus "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/prometheus "$tag" --force || true
               fi
             done
           else

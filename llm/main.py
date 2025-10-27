@@ -5,6 +5,7 @@ main.py - Intelia Expert Backend - ARCHITECTURE MODULAIRE PURE
 Point d'entrée minimaliste avec délégation complète aux modules
 
 Version: 2.2.2 - Rate limiting middleware timing fixed
+Registry: llm
 - SQLQueryNormalizer paths corrected
 - Agent RAG uses query_router fallback
 - Autodeploy workflow enabled
