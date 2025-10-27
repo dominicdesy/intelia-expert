@@ -64,14 +64,11 @@ class HuggingFaceProvider(LLMClient):
 
         self.api_key = api_key
         self.model = model
-        # Initialize client with HuggingFace Inference API
-        # The InferenceClient will use the serverless inference endpoint
-        self.client = InferenceClient(
-            model=model,
-            token=api_key
-        )
+        # Initialize client for HuggingFace Inference Providers
+        # This routes through router.huggingface.co to multiple providers (Together, Replicate, etc.)
+        self.client = InferenceClient(token=api_key)
 
-        logger.info(f"HuggingFace provider initialized: {model}")
+        logger.info(f"HuggingFace Inference Providers initialized: {model}")
 
     async def generate(
         self,
@@ -87,22 +84,20 @@ class HuggingFaceProvider(LLMClient):
         Note: Token counting is estimated (HF API doesn't return exact counts)
         """
         try:
-            logger.info(f"Calling HuggingFace API for model: {self.model}")
+            logger.info(f"Calling HuggingFace Inference Providers for model: {self.model}")
 
-            # Use text_generation with Llama 3.1 Instruct format
-            # Note: chat_completion adds /v1/chat/completions which doesn't work on Serverless API
-            prompt = self._format_messages_to_prompt(messages)
-
-            response = self.client.text_generation(
-                prompt=prompt,
+            # Use chat_completion with Inference Providers
+            # This routes through router.huggingface.co to providers like Together, Replicate, etc.
+            response = self.client.chat_completion(
+                model=self.model,
+                messages=messages,
                 temperature=temperature,
-                max_new_tokens=max_tokens,
+                max_tokens=max_tokens,
                 top_p=top_p,
-                stop_sequences=stop if stop else [],
-                return_full_text=False,
+                stop=stop if stop else [],
             )
 
-            generated_text = response
+            generated_text = response.choices[0].message.content
 
             # Estimate token counts (HF API doesn't provide exact counts)
             prompt_tokens = self._estimate_tokens(messages)
