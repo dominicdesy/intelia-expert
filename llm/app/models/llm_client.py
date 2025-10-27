@@ -84,8 +84,8 @@ class HuggingFaceProvider(LLMClient):
         try:
             logger.info(f"Calling HuggingFace API for model: {self.model}")
 
-            # Call HuggingFace Inference API
-            response = self.client.chat_completion(
+            # Call HuggingFace Inference API (updated API method)
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 temperature=temperature,
@@ -112,8 +112,8 @@ class HuggingFaceProvider(LLMClient):
     def is_available(self) -> bool:
         """Check if HuggingFace API is available"""
         try:
-            # Simple test call
-            self.client.chat_completion(
+            # Simple test call (updated API method)
+            self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": "test"}],
                 max_tokens=1,
