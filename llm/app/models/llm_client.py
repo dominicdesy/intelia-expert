@@ -64,16 +64,14 @@ class HuggingFaceProvider(LLMClient):
 
         self.api_key = api_key
         self.model = model
-        # Initialize client with new Inference Providers API (migrated from deprecated api-inference.huggingface.co)
-        # New endpoint: https://router.huggingface.co/hf-inference/models/{model}
-        # Note: base_url is an alias for model in the new API, so we use it instead of model parameter
-        model_url = f"https://router.huggingface.co/hf-inference/models/{model}"
+        # Initialize client with HuggingFace Inference API
+        # The InferenceClient will use the serverless inference endpoint
         self.client = InferenceClient(
-            base_url=model_url,
+            model=model,
             token=api_key
         )
 
-        logger.info(f"HuggingFace provider initialized: {model} (Inference Providers API)")
+        logger.info(f"HuggingFace provider initialized: {model}")
 
     async def generate(
         self,
@@ -129,7 +127,27 @@ class HuggingFaceProvider(LLMClient):
             return generated_text, prompt_tokens, completion_tokens
 
         except Exception as e:
+            error_msg = str(e)
             logger.error(f"HuggingFace API error: {e}", exc_info=True)
+
+            # Provide helpful error messages for common issues
+            if "404" in error_msg:
+                logger.error(
+                    f"Model '{self.model}' not found. "
+                    "Please verify: 1) Model exists on HuggingFace, "
+                    "2) You have accepted the model's terms, "
+                    "3) Your API key has access to this model"
+                )
+            elif "401" in error_msg or "403" in error_msg:
+                logger.error(
+                    "Authentication/Authorization failed. "
+                    "Please verify your HuggingFace API key and model access permissions"
+                )
+            elif "429" in error_msg:
+                logger.error(
+                    "Rate limit exceeded. Consider upgrading to HuggingFace Pro or using dedicated inference"
+                )
+
             raise Exception(f"HuggingFace generation failed: {str(e)}")
 
     def is_available(self) -> bool:
