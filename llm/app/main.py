@@ -9,7 +9,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.config import settings
-from app.routers import chat, models, health, generation
+from app.routers import chat, models, health
+# Temporarily disabled until config path is fixed
+# from app.routers import generation
 from app.utils.logger import setup_logging
 import logging
 import time
@@ -104,7 +106,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(models.router)
-app.include_router(generation.router)  # Intelligent generation endpoints
+# Temporarily disabled until config path is fixed
+# app.include_router(generation.router)  # Intelligent generation endpoints
 
 
 # Startup event
