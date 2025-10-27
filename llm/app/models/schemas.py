@@ -97,6 +97,8 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     timestamp: str
 
+    model_config = {"protected_namespaces": ()}
+
 
 # ============================================
 # ERROR RESPONSE

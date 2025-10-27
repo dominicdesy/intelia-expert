@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 class LLMProvider(Enum):
     """Available LLM providers with cost per 1M tokens"""
 
+    INTELIA_LLAMA = "intelia-llama"  # $0.20/1M - Domain-specific aviculture
     DEEPSEEK = "deepseek"  # $0.55/1M - Simple queries
     CLAUDE_35_SONNET = "claude"  # $3/1M - Complex RAG
     GPT_4O = "gpt4o"  # $15/1M - Edge cases
@@ -82,6 +83,14 @@ class LLMRouter:
         else:
             logger.info("ℹ️ Anthropic API key not configured, will use GPT-4o fallback")
 
+        # Initialize Intelia Llama service (internal)
+        self.llm_service_url = os.getenv("LLM_SERVICE_URL", "http://llm:8081")
+        self.llm_service_enabled = os.getenv("ENABLE_INTELIA_LLAMA", "true").lower() == "true"
+        if self.llm_service_enabled:
+            logger.info(f"✅ Intelia Llama service configured: {self.llm_service_url}")
+        else:
+            logger.info("ℹ️ Intelia Llama service disabled")
+
         # Routing configuration
         self.routing_enabled = os.getenv("ENABLE_LLM_ROUTING", "true").lower() == "true"
         self.default_provider = os.getenv(
@@ -90,6 +99,7 @@ class LLMRouter:
 
         # Cost tracking per provider
         self.usage_stats = {
+            LLMProvider.INTELIA_LLAMA.value: {"calls": 0, "tokens": 0, "cost": 0.0},
             LLMProvider.DEEPSEEK.value: {"calls": 0, "tokens": 0, "cost": 0.0},
             LLMProvider.CLAUDE_35_SONNET.value: {"calls": 0, "tokens": 0, "cost": 0.0},
             LLMProvider.GPT_4O.value: {"calls": 0, "tokens": 0, "cost": 0.0},
@@ -110,6 +120,7 @@ class LLMRouter:
         Determine optimal LLM for this query
 
         Routing logic:
+        0. Domain-specific aviculture (if available) → Intelia Llama
         1. PostgreSQL direct hit (score >0.9, simple) → DeepSeek
         2. Weaviate RAG (multiple docs, synthesis) → Claude 3.5 Sonnet
         3. Complex queries (comparative, temporal) → Claude 3.5 Sonnet
@@ -128,6 +139,11 @@ class LLMRouter:
         if not self.routing_enabled:
             logger.debug(f"🔀 Routing disabled, using default: {self.default_provider}")
             return LLMProvider(self.default_provider)
+
+        # Rule 0: Domain-specific aviculture → Intelia Llama (highest priority)
+        if self.llm_service_enabled and self._is_aviculture_query(query, intent_result):
+            logger.info("🔀 Route → Intelia Llama (domain-specific aviculture)")
+            return LLMProvider.INTELIA_LLAMA
 
         # Rule 1: PostgreSQL direct hit → DeepSeek
         if context_docs and len(context_docs) > 0:
@@ -160,6 +176,47 @@ class LLMRouter:
         # Rule 4: Default fallback → GPT-4o
         logger.info("🔀 Route → GPT-4o (default/fallback)")
         return LLMProvider.GPT_4O
+
+    def _is_aviculture_query(self, query: str, intent_result: Optional[Dict] = None) -> bool:
+        """
+        Detect if query is domain-specific aviculture
+
+        Args:
+            query: User query
+            intent_result: Intent analysis result
+
+        Returns:
+            True if query is aviculture-related
+        """
+        query_lower = query.lower()
+
+        # Domain keywords (aviculture, poultry, livestock)
+        aviculture_keywords = [
+            # French
+            "poulet", "poule", "pondeuse", "broiler", "poussin", "volaille",
+            "aviculture", "élevage", "mortalité", "ponte", "aliment", "eau",
+            "biosécurité", "vaccination", "maladie", "coccidiose", "newcastle",
+            "gumboro", "bronchite", "marek", "ventilation", "température",
+            "litière", "densité", "indice de conversion", "icv", "poids vif",
+            # English
+            "chicken", "hen", "layer", "broiler", "chick", "poultry",
+            "bird", "flock", "mortality", "egg production", "feed", "water",
+            "biosecurity", "vaccine", "disease", "coccidiosis",
+            # Spanish/Portuguese
+            "pollo", "gallina", "ave", "avicultura", "mortalidad",
+        ]
+
+        # Check if query contains aviculture keywords
+        if any(keyword in query_lower for keyword in aviculture_keywords):
+            return True
+
+        # Check domain from intent result
+        if intent_result:
+            domain = intent_result.get("domain", "")
+            if domain in ["aviculture", "poultry", "livestock"]:
+                return True
+
+        return False
 
     async def generate(
         self,
@@ -210,7 +267,9 @@ class LLMRouter:
                 logger.warning("⚠️ No query provided for adaptive length, using default 900")
 
         try:
-            if provider == LLMProvider.DEEPSEEK and self.deepseek_client:
+            if provider == LLMProvider.INTELIA_LLAMA and self.llm_service_enabled:
+                return await self._generate_intelia_llama(messages, temperature, max_tokens)
+            elif provider == LLMProvider.DEEPSEEK and self.deepseek_client:
                 return await self._generate_deepseek(messages, temperature, max_tokens)
             elif provider == LLMProvider.CLAUDE_35_SONNET and self.claude_client:
                 return await self._generate_claude(messages, temperature, max_tokens)
@@ -228,6 +287,70 @@ class LLMRouter:
             # Fallback to GPT-4o if not already using it
             if provider != LLMProvider.GPT_4O:
                 return await self._generate_gpt4o(messages, temperature, max_tokens)
+            raise
+
+    async def _generate_intelia_llama(
+        self, messages: List[Dict], temperature: float, max_tokens: int
+    ) -> str:
+        """Generate using Intelia Llama (internal service, $0.20/1M)"""
+
+        import time
+        import httpx
+
+        start_time = time.time()
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.llm_service_url}/v1/chat/completions",
+                    json={
+                        "model": "intelia-llama-3.1-8b-aviculture",
+                        "messages": messages,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                    },
+                )
+                response.raise_for_status()
+                result = response.json()
+
+            duration = time.time() - start_time
+
+            # Extract response
+            generated_text = result["choices"][0]["message"]["content"]
+
+            # Track usage
+            usage = result.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            tokens = usage.get("total_tokens", prompt_tokens + completion_tokens)
+            cost = tokens / 1_000_000 * 0.20  # $0.20 per 1M tokens
+
+            self.usage_stats[LLMProvider.INTELIA_LLAMA.value]["calls"] += 1
+            self.usage_stats[LLMProvider.INTELIA_LLAMA.value]["tokens"] += tokens
+            self.usage_stats[LLMProvider.INTELIA_LLAMA.value]["cost"] += cost
+
+            # Track Prometheus metrics
+            try:
+                from monitoring.prometheus_metrics import track_llm_call
+                track_llm_call(
+                    model="llama-3.1-8b-instruct",
+                    provider="intelia-llama",
+                    feature="chat",
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    cost_usd=cost,
+                    duration=duration,
+                    status="success"
+                )
+            except Exception as e:
+                logger.debug(f"Failed to track Prometheus metrics: {e}")
+
+            logger.info(f"✅ Intelia Llama: {tokens} tokens, ${cost:.4f}, {duration:.2f}s")
+
+            return generated_text
+
+        except Exception as e:
+            logger.error(f"❌ Intelia Llama service error: {e}")
             raise
 
     async def _generate_deepseek(
@@ -418,6 +541,7 @@ class LLMRouter:
             },
             "routing_enabled": self.routing_enabled,
             "providers_available": {
+                "intelia_llama": self.llm_service_enabled,
                 "deepseek": self.deepseek_client is not None,
                 "claude": self.claude_client is not None,
                 "gpt4o": True,
