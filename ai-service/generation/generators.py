@@ -1335,6 +1335,14 @@ Style professionnel et structuré avec recommandations actionnables.""",
         # 9. S'assurer qu'il y a un espace après les bullet points
         response = re.sub(r"^-([^ ])", r"- \1", response, flags=re.MULTILINE)
 
+        # 10. Nettoyer les virgules orphelines en début de ligne (souvent après liste à puces)
+        # Transforme ", En mettant..." en "En mettant..." et ajoute paragraphe avant
+        response = re.sub(r"\n\s*,\s+", r"\n\n", response)
+
+        # 11. Nettoyer les virgules orphelines en fin de liste à puces
+        # Transforme "- Item\n, " en "- Item\n\n"
+        response = re.sub(r"(^-\s+[^\n]+)\n\s*,\s*$", r"\1\n\n", response, flags=re.MULTILINE)
+
         # ⚠️ DISABLED FOR FAITHFULNESS OPTIMIZATION
         # Veterinary disclaimers reduce Faithfulness score by 20-30%
         # Re-enable only for critical medical questions if needed
