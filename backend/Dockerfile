@@ -1,8 +1,17 @@
 FROM python:3.11-slim
 
+# Build arguments for version tracking
+ARG BUILD_VERSION=unknown
+ARG BUILD_DATE=unknown
+ARG COMMIT_SHA=unknown
+
+# Set as environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    BUILD_VERSION=${BUILD_VERSION} \
+    BUILD_DATE=${BUILD_DATE} \
+    COMMIT_SHA=${COMMIT_SHA}
 
 WORKDIR /app
 

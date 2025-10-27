@@ -31,10 +31,19 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
 # Stage 2: Runtime minimal (inchangé)
 FROM python:3.11-slim
 
+# Build arguments for version tracking
+ARG BUILD_VERSION=unknown
+ARG BUILD_DATE=unknown
+ARG COMMIT_SHA=unknown
+
+# Set as environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/opt/venv \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/opt/venv/bin:$PATH" \
+    BUILD_VERSION=${BUILD_VERSION} \
+    BUILD_DATE=${BUILD_DATE} \
+    COMMIT_SHA=${COMMIT_SHA}
 
 WORKDIR /app
 

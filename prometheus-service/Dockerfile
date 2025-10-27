@@ -4,6 +4,16 @@
 
 FROM prom/prometheus:latest
 
+# Build arguments for version tracking
+ARG BUILD_VERSION=unknown
+ARG BUILD_DATE=unknown
+ARG COMMIT_SHA=unknown
+
+# Set as environment variables
+ENV BUILD_VERSION=${BUILD_VERSION} \
+    BUILD_DATE=${BUILD_DATE} \
+    COMMIT_SHA=${COMMIT_SHA}
+
 # Copy Prometheus configuration
 COPY prometheus.yml /etc/prometheus/prometheus.yml
 
