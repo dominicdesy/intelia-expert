@@ -85,19 +85,34 @@ class HuggingFaceProvider(LLMClient):
         try:
             logger.info(f"Calling HuggingFace API for model: {self.model}")
 
-            # Call HuggingFace Inference API using native method
-            # Note: client.chat.completions.create() is an alias but requires huggingface_hub >= 0.22
-            # Model is already set in InferenceClient init, no need to pass it again
-            response = self.client.chat_completion(
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_p=top_p,
-                stop=stop if stop else [],
-            )
+            # Try chat_completion first (for models that support it)
+            try:
+                response = self.client.chat_completion(
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    top_p=top_p,
+                    stop=stop if stop else [],
+                )
+                generated_text = response.choices[0].message.content
 
-            # Extract generated text
-            generated_text = response.choices[0].message.content
+            except Exception as chat_error:
+                # Fallback to text_generation for models that don't support chat_completion
+                logger.warning(f"chat_completion failed ({chat_error}), falling back to text_generation")
+
+                # Format messages into a single prompt (Llama 3.1 Instruct format)
+                prompt = self._format_messages_to_prompt(messages)
+
+                response = self.client.text_generation(
+                    prompt=prompt,
+                    temperature=temperature,
+                    max_new_tokens=max_tokens,
+                    top_p=top_p,
+                    stop_sequences=stop if stop else [],
+                    return_full_text=False,
+                )
+
+                generated_text = response
 
             # Estimate token counts (HF API doesn't provide exact counts)
             prompt_tokens = self._estimate_tokens(messages)
@@ -124,6 +139,30 @@ class HuggingFaceProvider(LLMClient):
         except Exception as e:
             logger.warning(f"HuggingFace availability check failed: {e}")
             return False
+
+    def _format_messages_to_prompt(self, messages: List[Dict[str, str]]) -> str:
+        """
+        Format chat messages into Llama 3.1 Instruct prompt format
+
+        Format:
+        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        {system_message}<|eot_id|>
+        <|start_header_id|>user<|end_header_id|>
+        {user_message}<|eot_id|>
+        <|start_header_id|>assistant<|end_header_id|>
+        """
+        prompt_parts = ["<|begin_of_text|>"]
+
+        for msg in messages:
+            role = msg["role"]
+            content = msg["content"]
+
+            prompt_parts.append(f"<|start_header_id|>{role}<|end_header_id|>\n{content}<|eot_id|>")
+
+        # Add assistant header to prompt completion
+        prompt_parts.append("<|start_header_id|>assistant<|end_header_id|>\n")
+
+        return "".join(prompt_parts)
 
     def _estimate_tokens(self, messages: List[Dict[str, str]]) -> int:
         """
