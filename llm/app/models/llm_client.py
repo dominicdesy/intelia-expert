@@ -64,10 +64,15 @@ class HuggingFaceProvider(LLMClient):
 
         self.api_key = api_key
         self.model = model
-        # Initialize client with model specified (cleaner than passing model to each call)
-        self.client = InferenceClient(model=model, token=api_key)
+        # Initialize client with new Inference Providers API (migrated from deprecated api-inference.huggingface.co)
+        # New endpoint: https://router.huggingface.co/hf-inference/
+        self.client = InferenceClient(
+            model=model,
+            token=api_key,
+            base_url="https://router.huggingface.co/hf-inference"
+        )
 
-        logger.info(f"HuggingFace provider initialized with model: {model}")
+        logger.info(f"HuggingFace provider initialized with model: {model} (Inference Providers API)")
 
     async def generate(
         self,
