@@ -89,34 +89,20 @@ class HuggingFaceProvider(LLMClient):
         try:
             logger.info(f"Calling HuggingFace API for model: {self.model}")
 
-            # Try chat_completion first (for models that support it)
-            try:
-                response = self.client.chat_completion(
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    top_p=top_p,
-                    stop=stop if stop else [],
-                )
-                generated_text = response.choices[0].message.content
+            # Use text_generation with Llama 3.1 Instruct format
+            # Note: chat_completion adds /v1/chat/completions which doesn't work on Serverless API
+            prompt = self._format_messages_to_prompt(messages)
 
-            except Exception as chat_error:
-                # Fallback to text_generation for models that don't support chat_completion
-                logger.warning(f"chat_completion failed ({chat_error}), falling back to text_generation")
+            response = self.client.text_generation(
+                prompt=prompt,
+                temperature=temperature,
+                max_new_tokens=max_tokens,
+                top_p=top_p,
+                stop_sequences=stop if stop else [],
+                return_full_text=False,
+            )
 
-                # Format messages into a single prompt (Llama 3.1 Instruct format)
-                prompt = self._format_messages_to_prompt(messages)
-
-                response = self.client.text_generation(
-                    prompt=prompt,
-                    temperature=temperature,
-                    max_new_tokens=max_tokens,
-                    top_p=top_p,
-                    stop_sequences=stop if stop else [],
-                    return_full_text=False,
-                )
-
-                generated_text = response
+            generated_text = response
 
             # Estimate token counts (HF API doesn't provide exact counts)
             prompt_tokens = self._estimate_tokens(messages)
