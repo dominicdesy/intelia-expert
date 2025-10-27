@@ -206,14 +206,48 @@ class LLMRouter:
             "pollo", "gallina", "ave", "avicultura", "mortalidad",
         ]
 
+        # Breed names (strong indicators of aviculture queries)
+        breed_keywords = [
+            "ross", "cobb", "hubbard", "isa", "lohmann", "hy-line",
+            "aviagen", "novogen", "dekalb", "shaver", "bovans",
+        ]
+
+        # Performance metrics (when combined with age/sex, indicate aviculture)
+        metric_keywords = [
+            "weight", "poids", "fcr", "feed conversion", "indice de conversion",
+            "egg production", "ponte", "mortality", "mortalité",
+            "body weight", "poids vif", "gain de poids",
+        ]
+
         # Check if query contains aviculture keywords
         if any(keyword in query_lower for keyword in aviculture_keywords):
+            return True
+
+        # Check for breed names (strong indicator)
+        if any(breed in query_lower for breed in breed_keywords):
+            logger.debug(f"🐔 Breed name detected in query → aviculture")
+            return True
+
+        # Check for performance metrics with age indicators
+        has_metric = any(metric in query_lower for metric in metric_keywords)
+        has_age = any(age_term in query_lower for age_term in ["day", "days", "week", "weeks", "jours", "jour", "semaine"])
+        if has_metric and has_age:
+            logger.debug(f"🐔 Metric + age detected in query → aviculture")
             return True
 
         # Check domain from intent result
         if intent_result:
             domain = intent_result.get("domain", "")
-            if domain in ["aviculture", "poultry", "livestock"]:
+            intent_type = intent_result.get("intent", "")
+
+            # Check for aviculture-related domains
+            if domain in ["aviculture", "poultry", "livestock", "genetics_performance", "nutrition", "health", "housing"]:
+                logger.debug(f"🐔 Domain '{domain}' detected → aviculture")
+                return True
+
+            # Check for performance-related intents
+            if intent_type in ["performance_query", "genetics_query", "nutrition_query", "health_query"]:
+                logger.debug(f"🐔 Intent '{intent_type}' detected → aviculture")
                 return True
 
         return False
