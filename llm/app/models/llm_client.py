@@ -64,7 +64,8 @@ class HuggingFaceProvider(LLMClient):
 
         self.api_key = api_key
         self.model = model
-        self.client = InferenceClient(token=api_key)
+        # Initialize client with model specified (cleaner than passing model to each call)
+        self.client = InferenceClient(model=model, token=api_key)
 
         logger.info(f"HuggingFace provider initialized with model: {model}")
 
@@ -84,9 +85,10 @@ class HuggingFaceProvider(LLMClient):
         try:
             logger.info(f"Calling HuggingFace API for model: {self.model}")
 
-            # Call HuggingFace Inference API (updated API method)
-            response = self.client.chat.completions.create(
-                model=self.model,
+            # Call HuggingFace Inference API using native method
+            # Note: client.chat.completions.create() is an alias but requires huggingface_hub >= 0.22
+            # Model is already set in InferenceClient init, no need to pass it again
+            response = self.client.chat_completion(
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -112,9 +114,9 @@ class HuggingFaceProvider(LLMClient):
     def is_available(self) -> bool:
         """Check if HuggingFace API is available"""
         try:
-            # Simple test call (updated API method)
-            self.client.chat.completions.create(
-                model=self.model,
+            # Simple test call using native method
+            # Model is already set in InferenceClient init
+            self.client.chat_completion(
                 messages=[{"role": "user", "content": "test"}],
                 max_tokens=1,
             )
