@@ -1094,21 +1094,22 @@
   "help.voiceAssistantDesc": "Gerçek zamanlı etkileşimli sesli konuşma. Doğal şekilde konuşun ve anında sesli yanıtlar alın.",
   "chat": {
     "satisfactionThankYou": {
-      "satisfied": [
-        "Bunu duymak harika! Paylaştığınız için teşekkürler.",
-        "Cognito'yu beğenmenize sevindik!",
-        "Bu çok şey ifade ediyor. Teşekkürler!"
-      ],
-      "neutral": [
-        "Dürüst geri bildiriminiz için teşekkürler.",
-        "Anlaşıldı. Katkınızı takdir ediyoruz.",
-        "Geri bildiriminiz daha iyi olmamıza yardımcı oluyor."
-      ],
-      "unsatisfied": [
-        "Beklentileri karşılamadığı için üzgünüz. Bize bildirdiğiniz için teşekkürler.",
-        "Dürüstlüğünüz için teşekkürler. Üzerinde çalışacağız.",
-        "Paylaşmak için zaman ayırdığınız için minnettarız."
-      ]
+      "satisfied": {
+        "0": "Bunu duymak harika! Paylaştığınız için teşekkürler.",
+        "1": "Cognito'yu beğenmenize sevindik!",
+        "2": "Bu çok şey ifade ediyor. Teşekkürler!"
+      },
+      "neutral": {
+        "0": "Dürüst geri bildiriminiz için teşekkürler.",
+        "1": "Anlaşıldı. Katkınızı takdir ediyoruz.",
+        "2": "Geri bildiriminiz daha iyi olmamıza yardımcı oluyor."
+      },
+      "unsatisfied": {
+        "0": "Beklentileri karşılamadığı için üzgünüz. Bize bildirdiğiniz için teşekkürler.",
+        "1": "Dürüstlüğünüz için teşekkürler. Üzerinde çalışacağız.",
+        "2": "Paylaşmak için zaman ayırdığınız için minnettarız."
+      },
+      "default": "Thank you for your feedback!"
     }
   },
   "billing": {
@@ -1129,5 +1130,10 @@
   "chat.imageQuotaExceeded": "Aylık görsel kotası doldu ({used}/{limit}). Kotanız gelecek ay sıfırlanacak veya sınırsız görseller için Elite planına yükseltin.",
   "chat.imageQuotaPlanNotAllowed": "'{plan}' planınız görsel yüklemeye izin vermiyor. Ayda 50 görsele kadar yüklemek için Pro planına yükseltin.",
   "chat.imageQuotaNoPlan": "Abonelik planı bulunamadı. Görsel yüklemek için lütfen bir plana abone olun.",
-  "chat.imageQuotaCheckError": "Kota kontrolünde hata oluştu. Lütfen tekrar deneyin."
+  "chat.imageQuotaCheckError": "Kota kontrolünde hata oluştu. Lütfen tekrar deneyin.",
+  "stripe": {
+    "portal": {
+      "error": "Error accessing customer portal"
+    }
+  }
 }

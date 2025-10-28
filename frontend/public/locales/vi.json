@@ -1094,21 +1094,22 @@
   "help.voiceAssistantDesc": "Cuộc trò chuyện tương tác bằng giọng nói theo thời gian thực. Nói tự nhiên và nhận phản hồi giọng nói ngay lập tức.",
   "chat": {
     "satisfactionThankYou": {
-      "satisfied": [
-        "Rất vui khi nghe điều đó! Cảm ơn bạn đã chia sẻ.",
-        "Vui vì bạn thích Cognito!",
-        "Điều đó có ý nghĩa rất lớn. Cảm ơn!"
-      ],
-      "neutral": [
-        "Cảm ơn phản hồi trung thực của bạn.",
-        "Đã hiểu. Chúng tôi đánh giá cao ý kiến của bạn.",
-        "Phản hồi của bạn giúp chúng tôi làm tốt hơn."
-      ],
-      "unsatisfied": [
-        "Chúng tôi xin lỗi vì không đáp ứng được mong đợi. Cảm ơn bạn đã cho chúng tôi biết.",
-        "Cảm ơn sự thành thật của bạn. Chúng tôi sẽ cải thiện.",
-        "Chúng tôi đánh giá cao việc bạn dành thời gian chia sẻ."
-      ]
+      "satisfied": {
+        "0": "Rất vui khi nghe điều đó! Cảm ơn bạn đã chia sẻ.",
+        "1": "Vui vì bạn thích Cognito!",
+        "2": "Điều đó có ý nghĩa rất lớn. Cảm ơn!"
+      },
+      "neutral": {
+        "0": "Cảm ơn phản hồi trung thực của bạn.",
+        "1": "Đã hiểu. Chúng tôi đánh giá cao ý kiến của bạn.",
+        "2": "Phản hồi của bạn giúp chúng tôi làm tốt hơn."
+      },
+      "unsatisfied": {
+        "0": "Chúng tôi xin lỗi vì không đáp ứng được mong đợi. Cảm ơn bạn đã cho chúng tôi biết.",
+        "1": "Cảm ơn sự thành thật của bạn. Chúng tôi sẽ cải thiện.",
+        "2": "Chúng tôi đánh giá cao việc bạn dành thời gian chia sẻ."
+      },
+      "default": "Thank you for your feedback!"
     }
   },
   "billing": {
@@ -1129,5 +1130,10 @@
   "chat.imageQuotaExceeded": "Đã đạt hạn ngạch hình ảnh hàng tháng ({used}/{limit}). Hạn ngạch của bạn sẽ được đặt lại vào tháng sau hoặc nâng cấp lên gói Elite để có hình ảnh không giới hạn.",
   "chat.imageQuotaPlanNotAllowed": "Gói '{plan}' của bạn không cho phép tải lên hình ảnh. Nâng cấp lên gói Pro để tải lên tối đa 50 hình ảnh/tháng.",
   "chat.imageQuotaNoPlan": "Không tìm thấy gói đăng ký. Vui lòng đăng ký gói để tải lên hình ảnh.",
-  "chat.imageQuotaCheckError": "Lỗi khi kiểm tra hạn ngạch. Vui lòng thử lại."
+  "chat.imageQuotaCheckError": "Lỗi khi kiểm tra hạn ngạch. Vui lòng thử lại.",
+  "stripe": {
+    "portal": {
+      "error": "Error accessing customer portal"
+    }
+  }
 }

@@ -1094,21 +1094,22 @@
   "help.voiceAssistantDesc": "Percakapan suara interaktif secara real-time. Bicaralah secara alami dan terima respons suara instan.",
   "chat": {
     "satisfactionThankYou": {
-      "satisfied": [
-        "Senang mendengarnya! Terima kasih telah berbagi.",
-        "Senang Anda menikmati Cognito!",
-        "Itu sangat berarti. Terima kasih!"
-      ],
-      "neutral": [
-        "Terima kasih atas umpan balik jujur Anda.",
-        "Mengerti. Kami menghargai masukan Anda.",
-        "Umpan balik Anda membantu kami menjadi lebih baik."
-      ],
-      "unsatisfied": [
-        "Kami minta maaf tidak sesuai harapan. Terima kasih telah memberi tahu kami.",
-        "Terima kasih atas kejujuran Anda. Kami akan mengusahakannya.",
-        "Kami menghargai Anda telah meluangkan waktu untuk berbagi."
-      ]
+      "satisfied": {
+        "0": "Senang mendengarnya! Terima kasih telah berbagi.",
+        "1": "Senang Anda menikmati Cognito!",
+        "2": "Itu sangat berarti. Terima kasih!"
+      },
+      "neutral": {
+        "0": "Terima kasih atas umpan balik jujur Anda.",
+        "1": "Mengerti. Kami menghargai masukan Anda.",
+        "2": "Umpan balik Anda membantu kami menjadi lebih baik."
+      },
+      "unsatisfied": {
+        "0": "Kami minta maaf tidak sesuai harapan. Terima kasih telah memberi tahu kami.",
+        "1": "Terima kasih atas kejujuran Anda. Kami akan mengusahakannya.",
+        "2": "Kami menghargai Anda telah meluangkan waktu untuk berbagi."
+      },
+      "default": "Thank you for your feedback!"
     }
   },
   "billing": {
@@ -1129,5 +1130,10 @@
   "chat.imageQuotaExceeded": "Kuota gambar bulanan tercapai ({used}/{limit}). Kuota Anda akan direset bulan depan atau tingkatkan ke paket Elite untuk gambar tak terbatas.",
   "chat.imageQuotaPlanNotAllowed": "Paket '{plan}' Anda tidak mengizinkan pengunggahan gambar. Tingkatkan ke paket Pro untuk mengunggah hingga 50 gambar/bulan.",
   "chat.imageQuotaNoPlan": "Paket langganan tidak ditemukan. Silakan berlangganan paket untuk mengunggah gambar.",
-  "chat.imageQuotaCheckError": "Kesalahan memeriksa kuota. Silakan coba lagi."
+  "chat.imageQuotaCheckError": "Kesalahan memeriksa kuota. Silakan coba lagi.",
+  "stripe": {
+    "portal": {
+      "error": "Error accessing customer portal"
+    }
+  }
 }

@@ -1094,21 +1094,22 @@
   "help.voiceAssistantDesc": "Interaktywna rozmowa głosowa w czasie rzeczywistym. Mów naturalnie i otrzymuj natychmiastowe odpowiedzi głosowe.",
   "chat": {
     "satisfactionThankYou": {
-      "satisfied": [
-        "Wspaniale to słyszeć! Dziękujemy za podzielenie się.",
-        "Cieszymy się, że podoba Ci się Cognito!",
-        "To dla nas wiele znaczy. Dziękujemy!"
-      ],
-      "neutral": [
-        "Dziękujemy za szczerą opinię.",
-        "Rozumiemy. Doceniamy Twój wkład.",
-        "Twoja opinia pomaga nam się poprawiać."
-      ],
-      "unsatisfied": [
-        "Przykro nam, że nie spełniło oczekiwań. Dziękujemy za poinformowanie nas.",
-        "Dziękujemy za szczerość. Będziemy nad tym pracować.",
-        "Doceniamy, że poświęciłeś czas na podzielenie się."
-      ]
+      "satisfied": {
+        "0": "Wspaniale to słyszeć! Dziękujemy za podzielenie się.",
+        "1": "Cieszymy się, że podoba Ci się Cognito!",
+        "2": "To dla nas wiele znaczy. Dziękujemy!"
+      },
+      "neutral": {
+        "0": "Dziękujemy za szczerą opinię.",
+        "1": "Rozumiemy. Doceniamy Twój wkład.",
+        "2": "Twoja opinia pomaga nam się poprawiać."
+      },
+      "unsatisfied": {
+        "0": "Przykro nam, że nie spełniło oczekiwań. Dziękujemy za poinformowanie nas.",
+        "1": "Dziękujemy za szczerość. Będziemy nad tym pracować.",
+        "2": "Doceniamy, że poświęciłeś czas na podzielenie się."
+      },
+      "default": "Thank you for your feedback!"
     }
   },
   "billing": {
@@ -1129,5 +1130,10 @@
   "chat.imageQuotaExceeded": "Osiągnięto miesięczny limit obrazów ({used}/{limit}). Twój limit zostanie zresetowany w przyszłym miesiącu lub uaktualnij do planu Elite, aby uzyskać nieograniczone obrazy.",
   "chat.imageQuotaPlanNotAllowed": "Twój plan '{plan}' nie pozwala na przesyłanie obrazów. Uaktualnij do planu Pro, aby przesłać do 50 obrazów/miesiąc.",
   "chat.imageQuotaNoPlan": "Nie znaleziono planu subskrypcji. Proszę zasubskrybować plan, aby przesyłać obrazy.",
-  "chat.imageQuotaCheckError": "Błąd podczas sprawdzania limitu. Spróbuj ponownie."
+  "chat.imageQuotaCheckError": "Błąd podczas sprawdzania limitu. Spróbuj ponownie.",
+  "stripe": {
+    "portal": {
+      "error": "Error accessing customer portal"
+    }
+  }
 }

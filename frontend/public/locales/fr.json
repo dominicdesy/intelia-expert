@@ -1112,21 +1112,22 @@
   "widget.errorQuota": "Limite d'utilisation atteinte.",
   "chat": {
     "satisfactionThankYou": {
-      "satisfied": [
-        "Ravi de l'entendre ! Merci de l'avoir partagé.",
-        "Content que vous appréciiez Cognito !",
-        "Cela compte beaucoup. Merci !"
-      ],
-      "neutral": [
-        "Merci pour votre retour honnête.",
-        "Compris. Nous apprécions votre contribution.",
-        "Vos commentaires nous aident à nous améliorer."
-      ],
-      "unsatisfied": [
-        "Nous sommes désolés que cela n'ait pas été à la hauteur. Merci de nous l'avoir fait savoir.",
-        "Merci pour votre honnêteté. Nous allons y travailler.",
-        "Nous apprécions que vous ayez pris le temps de partager."
-      ]
+      "satisfied": {
+        "0": "Ravi de l'entendre ! Merci de l'avoir partagé.",
+        "1": "Content que vous appréciiez Cognito !",
+        "2": "Cela compte beaucoup. Merci !"
+      },
+      "neutral": {
+        "0": "Merci pour votre retour honnête.",
+        "1": "Compris. Nous apprécions votre contribution.",
+        "2": "Vos commentaires nous aident à nous améliorer."
+      },
+      "unsatisfied": {
+        "0": "Nous sommes désolés que cela n'ait pas été à la hauteur. Merci de nous l'avoir fait savoir.",
+        "1": "Merci pour votre honnêteté. Nous allons y travailler.",
+        "2": "Nous apprécions que vous ayez pris le temps de partager."
+      },
+      "default": "Thank you for your feedback!"
     }
   },
   "billing": {
@@ -1141,5 +1142,10 @@
   },
   "common": {
     "goBack": "Retour"
+  },
+  "stripe": {
+    "portal": {
+      "error": "Error accessing customer portal"
+    }
   }
 }

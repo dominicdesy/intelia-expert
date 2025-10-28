@@ -1094,21 +1094,22 @@
   "help.voiceAssistantDesc": "Interactief spraakgesprek in real-time. Spreek natuurlijk en ontvang directe spraakrespons.",
   "chat": {
     "satisfactionThankYou": {
-      "satisfied": [
-        "Geweldig om te horen! Bedankt voor het delen.",
-        "Blij dat je van Cognito geniet!",
-        "Dat betekent veel. Bedankt!"
-      ],
-      "neutral": [
-        "Bedankt voor je eerlijke feedback.",
-        "Begrepen. We waarderen je input.",
-        "Je feedback helpt ons beter te worden."
-      ],
-      "unsatisfied": [
-        "Het spijt ons dat het niet aan de verwachtingen voldeed. Bedankt dat je het ons liet weten.",
-        "Bedankt voor je eerlijkheid. We gaan eraan werken.",
-        "We waarderen dat je de tijd hebt genomen om te delen."
-      ]
+      "satisfied": {
+        "0": "Geweldig om te horen! Bedankt voor het delen.",
+        "1": "Blij dat je van Cognito geniet!",
+        "2": "Dat betekent veel. Bedankt!"
+      },
+      "neutral": {
+        "0": "Bedankt voor je eerlijke feedback.",
+        "1": "Begrepen. We waarderen je input.",
+        "2": "Je feedback helpt ons beter te worden."
+      },
+      "unsatisfied": {
+        "0": "Het spijt ons dat het niet aan de verwachtingen voldeed. Bedankt dat je het ons liet weten.",
+        "1": "Bedankt voor je eerlijkheid. We gaan eraan werken.",
+        "2": "We waarderen dat je de tijd hebt genomen om te delen."
+      },
+      "default": "Thank you for your feedback!"
     }
   },
   "billing": {
@@ -1129,5 +1130,10 @@
   "chat.imageQuotaExceeded": "Maandelijks afbeeldingsquotum bereikt ({used}/{limit}). Uw quotum wordt volgende maand gereset of upgrade naar het Elite-plan voor onbeperkte afbeeldingen.",
   "chat.imageQuotaPlanNotAllowed": "Uw '{plan}'-plan staat geen afbeelding uploads toe. Upgrade naar het Pro-plan om tot 50 afbeeldingen/maand te uploaden.",
   "chat.imageQuotaNoPlan": "Geen abonnementsplan gevonden. Neem een abonnement om afbeeldingen te uploaden.",
-  "chat.imageQuotaCheckError": "Fout bij het controleren van het quotum. Probeer het opnieuw."
+  "chat.imageQuotaCheckError": "Fout bij het controleren van het quotum. Probeer het opnieuw.",
+  "stripe": {
+    "portal": {
+      "error": "Error accessing customer portal"
+    }
+  }
 }

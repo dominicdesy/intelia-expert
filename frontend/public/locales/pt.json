@@ -1094,21 +1094,22 @@
   "help.voiceAssistantDesc": "Conversa de voz interativa em tempo real. Fale naturalmente e receba respostas de voz instantâneas.",
   "chat": {
     "satisfactionThankYou": {
-      "satisfied": [
-        "Ótimo saber! Obrigado por compartilhar.",
-        "Que bom que está gostando do Cognito!",
-        "Isso significa muito. Obrigado!"
-      ],
-      "neutral": [
-        "Obrigado pelo seu feedback honesto.",
-        "Entendido. Agradecemos sua opinião.",
-        "Seu feedback nos ajuda a melhorar."
-      ],
-      "unsatisfied": [
-        "Lamentamos não ter atendido suas expectativas. Obrigado por nos avisar.",
-        "Obrigado pela sua honestidade. Vamos trabalhar nisso.",
-        "Agradecemos por ter dedicado tempo para compartilhar."
-      ]
+      "satisfied": {
+        "0": "Ótimo saber! Obrigado por compartilhar.",
+        "1": "Que bom que está gostando do Cognito!",
+        "2": "Isso significa muito. Obrigado!"
+      },
+      "neutral": {
+        "0": "Obrigado pelo seu feedback honesto.",
+        "1": "Entendido. Agradecemos sua opinião.",
+        "2": "Seu feedback nos ajuda a melhorar."
+      },
+      "unsatisfied": {
+        "0": "Lamentamos não ter atendido suas expectativas. Obrigado por nos avisar.",
+        "1": "Obrigado pela sua honestidade. Vamos trabalhar nisso.",
+        "2": "Agradecemos por ter dedicado tempo para compartilhar."
+      },
+      "default": "Thank you for your feedback!"
     }
   },
   "billing": {
@@ -1129,5 +1130,10 @@
   "chat.imageQuotaExceeded": "Cota mensal de imagens atingida ({used}/{limit}). Sua cota será redefinida no próximo mês ou faça upgrade para o plano Elite para imagens ilimitadas.",
   "chat.imageQuotaPlanNotAllowed": "Seu plano '{plan}' não permite upload de imagens. Faça upgrade para o plano Pro para fazer upload de até 50 imagens/mês.",
   "chat.imageQuotaNoPlan": "Nenhum plano de assinatura encontrado. Por favor assine um plano para fazer upload de imagens.",
-  "chat.imageQuotaCheckError": "Erro ao verificar a cota. Por favor tente novamente."
+  "chat.imageQuotaCheckError": "Erro ao verificar a cota. Por favor tente novamente.",
+  "stripe": {
+    "portal": {
+      "error": "Error accessing customer portal"
+    }
+  }
 }

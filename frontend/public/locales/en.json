@@ -1112,21 +1112,22 @@
   "widget.errorQuota": "Usage limit reached.",
   "chat": {
     "satisfactionThankYou": {
-      "satisfied": [
-        "Great to hear that! Thanks for sharing.",
-        "Glad you're enjoying Cognito!",
-        "That means a lot. Thanks!"
-      ],
-      "neutral": [
-        "Thanks for your honest feedback.",
-        "Got it. We appreciate your input.",
-        "Your feedback helps us do better."
-      ],
-      "unsatisfied": [
-        "We're sorry it didn't hit the mark. Thanks for letting us know.",
-        "Thanks for your honesty. We'll work on it.",
-        "We appreciate you taking the time to share."
-      ]
+      "satisfied": {
+        "0": "Great to hear that! Thanks for sharing.",
+        "1": "Glad you're enjoying Cognito!",
+        "2": "That means a lot. Thanks!"
+      },
+      "neutral": {
+        "0": "Thanks for your honest feedback.",
+        "1": "Got it. We appreciate your input.",
+        "2": "Your feedback helps us do better."
+      },
+      "unsatisfied": {
+        "0": "We're sorry it didn't hit the mark. Thanks for letting us know.",
+        "1": "Thanks for your honesty. We'll work on it.",
+        "2": "We appreciate you taking the time to share."
+      },
+      "default": "Thank you for your feedback!"
     }
   },
   "billing": {
@@ -1141,5 +1142,10 @@
   },
   "common": {
     "goBack": "Go Back"
+  },
+  "stripe": {
+    "portal": {
+      "error": "Error accessing customer portal"
+    }
   }
 }

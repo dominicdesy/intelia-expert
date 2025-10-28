@@ -1094,21 +1094,22 @@
   "help.voiceAssistantDesc": "Conversación de voz interactiva en tiempo real. Hable naturalmente y reciba respuestas de voz instantáneas.",
   "chat": {
     "satisfactionThankYou": {
-      "satisfied": [
-        "¡Me alegra escuchar eso! Gracias por compartir.",
-        "¡Me alegra que disfrutes de Cognito!",
-        "Eso significa mucho. ¡Gracias!"
-      ],
-      "neutral": [
-        "Gracias por tus comentarios honestos.",
-        "Entendido. Apreciamos tu opinión.",
-        "Tus comentarios nos ayudan a mejorar."
-      ],
-      "unsatisfied": [
-        "Lamentamos que no haya cumplido tus expectativas. Gracias por hacérnoslo saber.",
-        "Gracias por tu honestidad. Trabajaremos en ello.",
-        "Apreciamos que te hayas tomado el tiempo para compartir."
-      ]
+      "satisfied": {
+        "0": "¡Me alegra escuchar eso! Gracias por compartir.",
+        "1": "¡Me alegra que disfrutes de Cognito!",
+        "2": "Eso significa mucho. ¡Gracias!"
+      },
+      "neutral": {
+        "0": "Gracias por tus comentarios honestos.",
+        "1": "Entendido. Apreciamos tu opinión.",
+        "2": "Tus comentarios nos ayudan a mejorar."
+      },
+      "unsatisfied": {
+        "0": "Lamentamos que no haya cumplido tus expectativas. Gracias por hacérnoslo saber.",
+        "1": "Gracias por tu honestidad. Trabajaremos en ello.",
+        "2": "Apreciamos que te hayas tomado el tiempo para compartir."
+      },
+      "default": "Thank you for your feedback!"
     }
   },
   "billing": {
@@ -1129,5 +1130,10 @@
   "chat.imageQuotaExceeded": "Cuota mensual de imágenes alcanzada ({used}/{limit}). Tu cuota se restablecerá el próximo mes o actualiza al plan Elite para imágenes ilimitadas.",
   "chat.imageQuotaPlanNotAllowed": "Tu plan '{plan}' no permite subir imágenes. Actualiza al plan Pro para subir hasta 50 imágenes/mes.",
   "chat.imageQuotaNoPlan": "No se encontró ningún plan de suscripción. Por favor suscríbete a un plan para subir imágenes.",
-  "chat.imageQuotaCheckError": "Error al verificar la cuota. Por favor intenta de nuevo."
+  "chat.imageQuotaCheckError": "Error al verificar la cuota. Por favor intenta de nuevo.",
+  "stripe": {
+    "portal": {
+      "error": "Error accessing customer portal"
+    }
+  }
 }

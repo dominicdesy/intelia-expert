@@ -1094,21 +1094,22 @@
   "help.voiceAssistantDesc": "实时互动语音对话。自然说话，即时获得语音回复。",
   "chat": {
     "satisfactionThankYou": {
-      "satisfied": [
-        "很高兴听到这个！谢谢分享。",
-        "很高兴您喜欢Cognito！",
-        "这对我们意义重大。谢谢！"
-      ],
-      "neutral": [
-        "感谢您的诚实反馈。",
-        "明白了。我们感谢您的意见。",
-        "您的反馈帮助我们做得更好。"
-      ],
-      "unsatisfied": [
-        "很抱歉没有达到预期。感谢您告诉我们。",
-        "感谢您的诚实。我们会改进的。",
-        "感谢您花时间分享。"
-      ]
+      "satisfied": {
+        "0": "很高兴听到这个！谢谢分享。",
+        "1": "很高兴您喜欢Cognito！",
+        "2": "这对我们意义重大。谢谢！"
+      },
+      "neutral": {
+        "0": "感谢您的诚实反馈。",
+        "1": "明白了。我们感谢您的意见。",
+        "2": "您的反馈帮助我们做得更好。"
+      },
+      "unsatisfied": {
+        "0": "很抱歉没有达到预期。感谢您告诉我们。",
+        "1": "感谢您的诚实。我们会改进的。",
+        "2": "感谢您花时间分享。"
+      },
+      "default": "Thank you for your feedback!"
     }
   },
   "billing": {
@@ -1129,5 +1130,10 @@
   "chat.imageQuotaExceeded": "已达到每月图片配额 ({used}/{limit})。您的配额将在下个月重置，或升级到精英计划以获得无限图片。",
   "chat.imageQuotaPlanNotAllowed": "您的'{plan}'计划不允许上传图片。升级到专业计划可每月上传多达50张图片。",
   "chat.imageQuotaNoPlan": "未找到订阅计划。请订阅计划以上传图片。",
-  "chat.imageQuotaCheckError": "检查配额时出错。请重试。"
+  "chat.imageQuotaCheckError": "检查配额时出错。请重试。",
+  "stripe": {
+    "portal": {
+      "error": "Error accessing customer portal"
+    }
+  }
 }

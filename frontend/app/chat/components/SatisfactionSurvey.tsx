@@ -22,7 +22,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useTranslation } from "@/lib/languages/i18n";
+import { useTranslation, TranslationKeys } from "@/lib/languages/i18n";
 
 interface SatisfactionSurveyProps {
   conversationId: string;
@@ -49,30 +49,35 @@ export const SatisfactionSurvey: React.FC<SatisfactionSurveyProps> = ({
 
   // Get random thank you message based on satisfaction level
   const getRandomThankYouMessage = (rating: string): string => {
-    let messageKey = "";
+    // Randomly select one of 3 possible messages (0, 1, or 2)
+    const randomIndex = Math.floor(Math.random() * 3);
 
-    // Map rating to message category
+    // Map rating to specific message keys
     if (rating === "satisfied") {
-      messageKey = "satisfied"; // positive
+      const keys: (keyof TranslationKeys)[] = [
+        "chat.satisfactionThankYou.satisfied.0",
+        "chat.satisfactionThankYou.satisfied.1",
+        "chat.satisfactionThankYou.satisfied.2"
+      ];
+      return t(keys[randomIndex]);
     } else if (rating === "neutral") {
-      messageKey = "neutral";
+      const keys: (keyof TranslationKeys)[] = [
+        "chat.satisfactionThankYou.neutral.0",
+        "chat.satisfactionThankYou.neutral.1",
+        "chat.satisfactionThankYou.neutral.2"
+      ];
+      return t(keys[randomIndex]);
     } else if (rating === "unsatisfied") {
-      messageKey = "unsatisfied"; // negative
+      const keys: (keyof TranslationKeys)[] = [
+        "chat.satisfactionThankYou.unsatisfied.0",
+        "chat.satisfactionThankYou.unsatisfied.1",
+        "chat.satisfactionThankYou.unsatisfied.2"
+      ];
+      return t(keys[randomIndex]);
     }
 
-    // Get array of possible messages for this level
-    const messages = t(`chat.satisfactionThankYou.${messageKey}`, {
-      returnObjects: true,
-    }) as string[] | string;
-
-    // If it's an array, select random message
-    if (Array.isArray(messages) && messages.length > 0) {
-      const randomIndex = Math.floor(Math.random() * messages.length);
-      return messages[randomIndex];
-    }
-
-    // Fallback to string if not array
-    return typeof messages === "string" ? messages : "Thank you for your feedback!";
+    // Fallback
+    return t("chat.satisfactionThankYou.default");
   };
 
   const handleRatingClick = async (rating: string) => {
