@@ -10,10 +10,12 @@ OpenAI-compatible LLM inference API for Intelia, providing specialized AI for an
 ## Features
 
 - ✅ **OpenAI-compatible API** - Drop-in replacement for OpenAI client libraries
+- ✅ **Intelligent Terminology Injection** - 1,580 technical terms with contextual loading
+- ✅ **Domain-Aware Configuration** - Specialized prompts for different query types
 - ✅ **Provider abstraction** - Seamless migration from HuggingFace API to self-hosted vLLM
 - ✅ **Prometheus metrics** - Full observability for monitoring and alerting
 - ✅ **Health checks** - Ready for production deployment
-- ✅ **Fine-tuning ready** - Support for custom Llama 3.1 8B models
+- ✅ **Multilingual support** - EN/FR (expandable to 16 languages)
 
 ---
 
@@ -152,6 +154,54 @@ response = client.chat.completions.create(
 
 print(response.choices[0].message.content)
 ```
+
+---
+
+## Terminology Enrichment System
+
+The LLM service features an **intelligent terminology injection system** with **1,580 technical terms**.
+
+### Key Features
+
+- **1,580 Terms**: Comprehensive poultry terminology database
+  - 1,476 terms from PDF glossaries
+  - 104 value chain terms
+  - 10 base multilingual terms
+- **9 Categories**: hatchery, processing, nutrition, health, breeding, layers, management, anatomy, general
+- **1,679 Keywords**: Indexed for fast matching
+- **Contextual Loading**: Only relevant terms injected per query
+- **Token-Aware**: Respects budget (~400-500 tokens added)
+- **Multilingual**: EN/FR support
+
+### How It Works
+
+```
+Query → Keyword Extraction → Category Detection → Term Matching →
+Relevance Ranking → Top 10-15 Selected → Injected into Prompt → LLM
+```
+
+**Example**:
+
+```bash
+# Query about FCR (Feed Conversion Ratio)
+curl -X POST http://localhost:8081/v1/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How to improve FCR in broilers?",
+    "domain": "aviculture",
+    "language": "en"
+  }'
+```
+
+The system automatically:
+1. Detects category: `nutrition_feed`
+2. Matches keywords: "fcr", "broilers", "improve"
+3. Injects relevant terms: Feed Conversion Ratio, metabolizable energy, crude protein, etc.
+4. Generates response with precise technical vocabulary
+
+### Documentation
+
+See [TERMINOLOGY_ENRICHMENT.md](TERMINOLOGY_ENRICHMENT.md) for complete details.
 
 ---
 

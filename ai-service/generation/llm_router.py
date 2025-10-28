@@ -302,7 +302,16 @@ class LLMRouter:
 
         try:
             if provider == LLMProvider.INTELIA_LLAMA and self.llm_service_enabled:
-                return await self._generate_intelia_llama(messages, temperature, max_tokens)
+                return await self._generate_intelia_llama(
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    query=query,
+                    entities=entities,
+                    query_type=query_type,
+                    context_docs=context_docs,
+                    domain=domain or "aviculture"
+                )
             elif provider == LLMProvider.DEEPSEEK and self.deepseek_client:
                 return await self._generate_deepseek(messages, temperature, max_tokens)
             elif provider == LLMProvider.CLAUDE_35_SONNET and self.claude_client:
@@ -324,39 +333,52 @@ class LLMRouter:
             raise
 
     async def _generate_intelia_llama(
-        self, messages: List[Dict], temperature: float, max_tokens: int
+        self, messages: List[Dict], temperature: float, max_tokens: int,
+        query: Optional[str] = None, entities: Optional[Dict] = None,
+        query_type: Optional[str] = None, context_docs: Optional[List[Dict]] = None,
+        domain: str = "aviculture", language: str = "en"
     ) -> str:
-        """Generate using Intelia Llama (internal service, $0.20/1M)"""
+        """
+        Generate using Intelia Llama (internal service with terminology injection, $0.20/1M)
+
+        This method now uses the LLMServiceClient to call /v1/generate endpoint
+        which includes intelligent terminology injection (1,580 terms).
+        """
 
         import time
-        import httpx
+        from generation.llm_service_client import get_llm_service_client
 
         start_time = time.time()
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.llm_service_url}/v1/chat/completions",
-                    json={
-                        "model": "intelia-llama-3.1-8b-aviculture",
-                        "messages": messages,
-                        "temperature": temperature,
-                        "max_tokens": max_tokens,
-                    },
-                )
-                response.raise_for_status()
-                result = response.json()
+            # Get LLM service client
+            llm_client = get_llm_service_client(base_url=self.llm_service_url)
+
+            # Extract query from messages if not provided
+            if query is None and messages:
+                # Get last user message as query
+                user_messages = [m for m in messages if m["role"] == "user"]
+                if user_messages:
+                    query = user_messages[-1]["content"]
+
+            # Call /v1/generate with terminology injection
+            generated_text, prompt_tokens, completion_tokens, metadata = await llm_client.generate(
+                query=query or "",
+                domain=domain,
+                language=language,
+                entities=entities,
+                query_type=query_type,
+                context_docs=context_docs,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                post_process=True,
+                add_disclaimer=True
+            )
 
             duration = time.time() - start_time
 
-            # Extract response
-            generated_text = result["choices"][0]["message"]["content"]
-
-            # Track usage
-            usage = result.get("usage", {})
-            prompt_tokens = usage.get("prompt_tokens", 0)
-            completion_tokens = usage.get("completion_tokens", 0)
-            tokens = usage.get("total_tokens", prompt_tokens + completion_tokens)
+            # Calculate cost and track usage
+            tokens = prompt_tokens + completion_tokens
             cost = tokens / 1_000_000 * 0.20  # $0.20 per 1M tokens
 
             self.usage_stats[LLMProvider.INTELIA_LLAMA.value]["calls"] += 1
@@ -367,7 +389,7 @@ class LLMRouter:
             try:
                 from monitoring.prometheus_metrics import track_llm_call
                 track_llm_call(
-                    model="llama-3.1-8b-instruct",
+                    model=metadata.get("model", "llama-3.1-8b-instruct"),
                     provider="intelia-llama",
                     feature="chat",
                     prompt_tokens=prompt_tokens,
@@ -379,7 +401,10 @@ class LLMRouter:
             except Exception as e:
                 logger.debug(f"Failed to track Prometheus metrics: {e}")
 
-            logger.info(f"✅ Intelia Llama: {tokens} tokens, ${cost:.4f}, {duration:.2f}s")
+            logger.info(
+                f"✅ Intelia Llama: {tokens} tokens, ${cost:.4f}, {duration:.2f}s "
+                f"(terminology: {metadata.get('terminology_injected', False)})"
+            )
 
             return generated_text
 

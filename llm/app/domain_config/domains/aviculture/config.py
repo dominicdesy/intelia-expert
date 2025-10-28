@@ -9,6 +9,10 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional
+from functools import cached_property
+
+# Import terminology injector
+from app.domain_config.terminology_injector import get_terminology_injector
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,9 @@ class AvicultureConfig:
         self.value_chain_terminology = self._load_json("value_chain_terminology.json")
         self.veterinary_terms = self._load_json("veterinary_terms.json")
         self.languages = self._load_json("languages.json")
+
+        # Initialize terminology injector
+        self.terminology_injector = get_terminology_injector()
 
         # Aviculture-specific breed keywords
         self.breed_keywords = [
@@ -122,16 +129,26 @@ class AvicultureConfig:
             logger.error(f"Invalid JSON in {file_path}: {e}")
             return {}
 
-    def get_system_prompt(self, query_type: str = "general_poultry", language: str = "en") -> str:
+    def get_system_prompt(
+        self,
+        query_type: str = "general_poultry",
+        language: str = "en",
+        query: str = None,
+        inject_terminology: bool = True,
+        max_terminology_tokens: int = 1000
+    ) -> str:
         """
-        Get system prompt for a specific query type
+        Get system prompt for a specific query type with optional terminology injection
 
         Args:
             query_type: Type of query (general_poultry, nutrition_query, health_diagnosis, etc.)
             language: Response language code (fr, en, es, etc.)
+            query: User query text (required for terminology injection)
+            inject_terminology: Whether to inject relevant terminology
+            max_terminology_tokens: Maximum tokens to use for terminology
 
         Returns:
-            Formatted system prompt with language directive
+            Formatted system prompt with language directive and optional terminology
         """
         # Get base prompts
         expert_identity = self.system_prompts.get("base_prompts", {}).get("expert_identity", "")
@@ -146,6 +163,19 @@ class AvicultureConfig:
         # Combine prompts
         full_prompt = f"{expert_identity}\n\n{response_guidelines}\n\n{specialized}"
 
+        # Inject terminology if requested and query is provided
+        if inject_terminology and query:
+            try:
+                terminology_section = self.terminology_injector.format_terminology_for_prompt(
+                    query=query,
+                    max_tokens=max_terminology_tokens,
+                    language=language
+                )
+                if terminology_section:
+                    full_prompt = f"{full_prompt}\n\n{terminology_section}"
+            except Exception as e:
+                logger.warning(f"Failed to inject terminology: {e}")
+
         # Format with language name
         language_names = {
             "fr": "French", "en": "English", "es": "Spanish",
@@ -156,6 +186,28 @@ class AvicultureConfig:
         language_name = language_names.get(language, "English")
 
         return full_prompt.format(language_name=language_name)
+
+    @cached_property
+    def post_processor(self):
+        """
+        Get cached PostProcessor instance for this domain.
+
+        Using cached_property saves ~2ms per request by avoiding repeated instantiation.
+        The PostProcessor is initialized once with pre-compiled regex patterns and
+        veterinary keyword sets for optimal performance.
+
+        Returns:
+            ResponsePostProcessor instance configured for aviculture domain
+        """
+        from app.utils.post_processor import create_post_processor
+
+        processor = create_post_processor(
+            veterinary_terms=self.veterinary_terms,
+            language_messages=self.languages
+        )
+
+        logger.info("⚡ PostProcessor cached for aviculture domain")
+        return processor
 
     def get_formatting_rules(self) -> List[str]:
         """

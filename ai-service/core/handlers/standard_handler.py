@@ -122,11 +122,36 @@ class StandardQueryHandler(BaseQueryHandler):
         """Process standard query with intelligent routing"""
         # Extract data from preprocessed_data if available
         if preprocessed_data:
-            query = preprocessed_data.get("normalized_query", query)
+            # ⚡ OPTIMIZATION Phase 1B: Hybrid Intelligent Architecture
+            # Priority: original_query (native language) > normalized_query (potentially translated)
+            #
+            # RATIONALE:
+            # - Preserves user query nuances and context for optimal LLM processing
+            # - LLMs (GPT-4, Claude 3.5) excel at multilingual input with EN system prompts
+            # - Architecture: EN prompts + native query + EN docs → direct native response
+            #
+            # See: MULTILINGUAL_STRATEGY_REPORT.md for full analysis
+            original_query_candidate = preprocessed_data.get("original_query")
+            normalized_query = preprocessed_data.get("normalized_query", query)
+
+            if original_query_candidate:
+                query = original_query_candidate
+                logger.info(
+                    f"✅ Phase 1B: Using original_query (native language) for LLM generation: "
+                    f"'{query[:50]}...'"
+                )
+            else:
+                query = normalized_query
+                logger.info(
+                    f"ℹ️ Using normalized_query (no original available): '{query[:50]}...'"
+                )
+
             entities = preprocessed_data.get("entities", entities)
             routing_hint = preprocessed_data.get("routing_hint")
             is_optimization = preprocessed_data.get("is_optimization", False)
             language = preprocessed_data.get("language", language)
+
+            # Keep original_query for potential future use
             if original_query is None:
                 original_query = preprocessed_data.get("original_query", query)
         elif preprocessing_result:

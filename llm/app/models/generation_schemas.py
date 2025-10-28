@@ -49,6 +49,7 @@ class GenerateResponse(BaseModel):
     calculated_max_tokens: Optional[int] = Field(None, description="Auto-calculated max_tokens")
     post_processed: bool = Field(default=False, description="Whether post-processing was applied")
     disclaimer_added: bool = Field(default=False, description="Whether disclaimer was added")
+    cached: bool = Field(default=False, description="Whether response was served from cache")
 
 
 # ============================================
