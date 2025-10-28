@@ -10,6 +10,10 @@ from typing import Literal
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
+    model_config = {
+        "protected_namespaces": ()  # Disable model_ namespace protection
+    }
+
     # Service info
     service_name: str = "llm"
     version: str = "1.0.0"
