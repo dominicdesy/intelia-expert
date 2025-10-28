@@ -144,6 +144,7 @@ Gestion de projet, TODOs et guides de décision.
 
 - [TODOs en Suspens](./planning/TODOS_EN_SUSPENS.md) - Inventaire des tâches en attente
 - [Guide de Décision TODOs](./planning/TODOS_DECISION_GUIDE.md) - Guide pour prioriser les tâches
+- [Plan de Complétion Multilingue](./planning/MULTILINGUAL_COMPLETION_PLAN.md) - Plan pour aligner les 4 services sur 16 langues
 
 ### 📘 [Guidelines](./guidelines/)
 Directives et conventions pour le développement.
