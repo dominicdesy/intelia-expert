@@ -60,9 +60,9 @@ async def generate(
     ```
     """
     try:
-        logger.info(f"📝 Generate request: domain={request.domain}, query_len={len(request.query)}")
+        logger.info(f"[GEN] Generate request: domain={request.domain}, query_len={len(request.query)}")
 
-        # ⚡ OPTIMIZATION Phase 1: Check semantic cache first
+        # [FAST] OPTIMIZATION Phase 1: Check semantic cache first
         semantic_cache = get_semantic_cache(
             redis_host=settings.redis_host if hasattr(settings, 'redis_host') else "localhost",
             redis_port=settings.redis_port if hasattr(settings, 'redis_port') else 6379,
@@ -82,7 +82,7 @@ async def generate(
 
         if cache_entry:
             # Cache hit - return cached response immediately (5ms vs 5000ms!)
-            logger.info(f"⚡ CACHE HIT: Returning cached response (~5ms vs ~5000ms LLM call)")
+            logger.info(f"[FAST] CACHE HIT: Returning cached response (~5ms vs ~5000ms LLM call)")
             return GenerateResponse(
                 generated_text=cache_entry.response,
                 provider=settings.llm_provider,
@@ -146,7 +146,7 @@ async def generate(
         temperature = request.temperature or domain_reqs.get("temperature", 0.7)
         top_p = request.top_p or 1.0
 
-        # ⚡ OPTIMIZATION Option 3: Intelligent Model Routing (3B vs 8B)
+        # [FAST] OPTIMIZATION Option 3: Intelligent Model Routing (3B vs 8B)
         model_used = settings.huggingface_model  # Default
         routing_decision = None
 
@@ -184,7 +184,7 @@ async def generate(
                 routing_decision = "8b"
 
             routing_time = int((time.time() - routing_start) * 1000)
-            logger.info(f"🧭 Model routing: {complexity.value} → {routing_decision} ({routing_time}ms)")
+            logger.info(f" Model routing: {complexity.value} → {routing_decision} ({routing_time}ms)")
 
             # Create new LLM client with selected model (if different from default)
             if model_used != llm_client.model:
@@ -195,7 +195,7 @@ async def generate(
                 )
 
         # Generate completion
-        logger.info(f"🤖 Generating with model={model_used}, max_tokens={max_tokens}, temperature={temperature}")
+        logger.info(f" Generating with model={model_used}, max_tokens={max_tokens}, temperature={temperature}")
         import time
         gen_start = time.time()
 
@@ -218,7 +218,7 @@ async def generate(
         # Post-process if requested
         disclaimer_added = False
         if request.post_process:
-            # ⚡ Use cached PostProcessor from domain config (saves ~2ms per request)
+            # [FAST] Use cached PostProcessor from domain config (saves ~2ms per request)
             original_length = len(generated_text)
             generated_text = domain_config.post_processor.post_process_response(
                 response=generated_text,
@@ -231,9 +231,9 @@ async def generate(
             if len(generated_text) > original_length:
                 disclaimer_added = True
 
-            logger.info(f"✨ Post-processing applied (disclaimer_added={disclaimer_added})")
+            logger.info(f"[CLEAN] Post-processing applied (disclaimer_added={disclaimer_added})")
 
-        # ⚡ OPTIMIZATION Phase 1: Store in cache for future requests
+        # [FAST] OPTIMIZATION Phase 1: Store in cache for future requests
         await semantic_cache.set(
             query=request.query,
             response=generated_text,
@@ -260,7 +260,7 @@ async def generate(
         )
 
     except Exception as e:
-        logger.error(f"❌ Generation failed: {e}", exc_info=True)
+        logger.error(f"[ERROR] Generation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -276,7 +276,7 @@ async def generate_stream(
     """
     Generate LLM completion with streaming (Server-Sent Events)
 
-    ⚡ OPTIMIZATION: Streaming reduces perceived latency by 90%+
+    [FAST] OPTIMIZATION: Streaming reduces perceived latency by 90%+
     - First token: 300-500ms (vs 5000ms for complete response)
     - User sees progress in real-time
     - Better UX for long responses
@@ -315,7 +315,7 @@ async def generate_stream(
 
     async def event_generator():
         try:
-            logger.info(f"📝 Generate-stream request: domain={request.domain}, query_len={len(request.query)}")
+            logger.info(f"[GEN] Generate-stream request: domain={request.domain}, query_len={len(request.query)}")
 
             # Get domain configuration
             if request.domain == "aviculture":
@@ -376,7 +376,7 @@ async def generate_stream(
             }
             yield f"event: start\ndata: {json.dumps(start_data)}\n\n"
 
-            logger.info(f"🤖 Streaming generation with max_tokens={max_tokens}, temperature={temperature}")
+            logger.info(f" Streaming generation with max_tokens={max_tokens}, temperature={temperature}")
 
             # Stream generation
             full_text = ""
@@ -422,7 +422,7 @@ async def generate_stream(
                     chunk_data = {"content": added_content}
                     yield f"event: chunk\ndata: {json.dumps(chunk_data)}\n\n"
 
-                logger.info(f"✨ Post-processing applied (disclaimer_added={disclaimer_added})")
+                logger.info(f"[CLEAN] Post-processing applied (disclaimer_added={disclaimer_added})")
 
             # Send END event with final metadata
             end_data = {
@@ -437,10 +437,10 @@ async def generate_stream(
             }
             yield f"event: end\ndata: {json.dumps(end_data)}\n\n"
 
-            logger.info(f"✅ Streaming complete: {completion_tokens} tokens generated")
+            logger.info(f"[OK] Streaming complete: {completion_tokens} tokens generated")
 
         except Exception as e:
-            logger.error(f"❌ Streaming generation failed: {e}", exc_info=True)
+            logger.error(f"[ERROR] Streaming generation failed: {e}", exc_info=True)
             error_data = {"error": str(e)}
             yield f"event: error\ndata: {json.dumps(error_data)}\n\n"
 
@@ -477,7 +477,7 @@ async def route(request: RouteRequest) -> RouteResponse:
     Returns provider recommendation (e.g., "intelia_llama" for aviculture queries)
     """
     try:
-        logger.info(f"🧭 Route request: domain={request.domain}, query={request.query[:50]}...")
+        logger.info(f" Route request: domain={request.domain}, query={request.query[:50]}...")
 
         # Get domain configuration
         if request.domain == "aviculture":
@@ -514,7 +514,7 @@ async def route(request: RouteRequest) -> RouteResponse:
             reason = "General query outside domain expertise"
             confidence = 0.9
 
-        logger.info(f"✅ Routed to {provider}: {reason}")
+        logger.info(f"[OK] Routed to {provider}: {reason}")
 
         return RouteResponse(
             provider=provider,
@@ -525,7 +525,7 @@ async def route(request: RouteRequest) -> RouteResponse:
         )
 
     except Exception as e:
-        logger.error(f"❌ Routing failed: {e}", exc_info=True)
+        logger.error(f"[ERROR] Routing failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -553,7 +553,7 @@ async def calculate_tokens(request: CalculateTokensRequest) -> CalculateTokensRe
     Returns calculated max_tokens and complexity analysis.
     """
     try:
-        logger.info(f"🔢 Calculate tokens: query_len={len(request.query)}")
+        logger.info(f" Calculate tokens: query_len={len(request.query)}")
 
         adaptive_calc = get_adaptive_length()
         complexity_info = adaptive_calc.get_complexity_info(
@@ -564,7 +564,7 @@ async def calculate_tokens(request: CalculateTokensRequest) -> CalculateTokensRe
             domain=request.domain
         )
 
-        logger.info(f"✅ Calculated: {complexity_info['max_tokens']} tokens (complexity={complexity_info['complexity']})")
+        logger.info(f"[OK] Calculated: {complexity_info['max_tokens']} tokens (complexity={complexity_info['complexity']})")
 
         return CalculateTokensResponse(
             max_tokens=complexity_info["max_tokens"],
@@ -574,7 +574,7 @@ async def calculate_tokens(request: CalculateTokensRequest) -> CalculateTokensRe
         )
 
     except Exception as e:
-        logger.error(f"❌ Token calculation failed: {e}", exc_info=True)
+        logger.error(f"[ERROR] Token calculation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -602,7 +602,7 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
     Returns cleaned response with disclaimer if health-related.
     """
     try:
-        logger.info(f"🧹 Post-process request: response_len={len(request.response)}")
+        logger.info(f" Post-process request: response_len={len(request.response)}")
 
         # Get domain configuration
         if request.domain == "aviculture":
@@ -610,7 +610,7 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported domain: {request.domain}")
 
-        # ⚡ OPTIMIZATION: Use cached PostProcessor from domain config (saves ~2ms per request)
+        # [FAST] OPTIMIZATION: Use cached PostProcessor from domain config (saves ~2ms per request)
         # The PostProcessor is cached with @cached_property and includes pre-compiled regex patterns
         post_processor = domain_config.post_processor
 
@@ -632,7 +632,7 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
         # Check if disclaimer was added
         disclaimer_added = request.add_disclaimer and len(processed_text) > original_length
 
-        logger.info(f"✅ Post-processed (veterinary={is_veterinary}, disclaimer={disclaimer_added})")
+        logger.info(f"[OK] Post-processed (veterinary={is_veterinary}, disclaimer={disclaimer_added})")
 
         return PostProcessResponse(
             processed_text=processed_text,
@@ -641,7 +641,7 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
         )
 
     except Exception as e:
-        logger.error(f"❌ Post-processing failed: {e}", exc_info=True)
+        logger.error(f"[ERROR] Post-processing failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -692,12 +692,12 @@ async def get_model_routing_stats():
         model_router = get_model_router()
         stats = model_router.get_stats()
 
-        logger.info(f"📊 Model routing stats requested: {stats['total_requests']} requests")
+        logger.info(f" Model routing stats requested: {stats['total_requests']} requests")
 
         return stats
 
     except Exception as e:
-        logger.error(f"❌ Failed to get routing stats: {e}", exc_info=True)
+        logger.error(f"[ERROR] Failed to get routing stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -731,7 +731,7 @@ async def reset_model_routing_stats():
         model_router = get_model_router()
         model_router.reset_stats()
 
-        logger.info("📊 Model routing stats reset")
+        logger.info(" Model routing stats reset")
 
         return {
             "status": "success",
@@ -739,5 +739,5 @@ async def reset_model_routing_stats():
         }
 
     except Exception as e:
-        logger.error(f"❌ Failed to reset routing stats: {e}", exc_info=True)
+        logger.error(f"[ERROR] Failed to reset routing stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

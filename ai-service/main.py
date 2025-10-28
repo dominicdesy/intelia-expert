@@ -42,8 +42,8 @@ from version import get_version_string
 # === DEBUG DEPLOYMENT - MESSAGES VISIBLES ===
 print("=" * 80)
 print("INTELIA EXPERT BACKEND - MAIN MODULE LOADED")
-print(f"🔧 {get_version_string()}")
-print(f"⏰ TIMESTAMP CHARGEMENT: {time.time()}")
+print(f"[CONFIG] {get_version_string()}")
+print(f"[TIME] TIMESTAMP CHARGEMENT: {time.time()}")
 print("=" * 80)
 
 # Configuration
@@ -445,7 +445,12 @@ except Exception as e:
 initial_router = create_router({})  # Router vide au démarrage
 app.include_router(initial_router)
 
+# MONITORING ROUTER: Endpoints pour le monitoring des services
+from api.monitoring_routes import router as monitoring_router
+app.include_router(monitoring_router)
+
 logger.info(" ROUTER INITIAL AJOUTÉ - TOUS ENDPOINTS DANS LE ROUTER ")
+logger.info(" MONITORING ROUTER AJOUTÉ - Endpoints: /monitoring/*")
 
 # ============================================================================
 # POINT D'ENTRÉE

@@ -16,7 +16,7 @@ COST OPTIMIZATION: -70% via intelligent routing
 
 import os
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, AsyncGenerator
 from enum import Enum
 from openai import AsyncOpenAI
 
@@ -331,6 +331,182 @@ class LLMRouter:
             if provider != LLMProvider.GPT_4O:
                 return await self._generate_gpt4o(messages, temperature, max_tokens)
             raise
+
+    async def generate_stream(
+        self,
+        provider: LLMProvider,
+        messages: List[Dict],
+        temperature: float = 0.1,
+        max_tokens: Optional[int] = None,
+        query: Optional[str] = None,
+        entities: Optional[Dict] = None,
+        query_type: Optional[str] = None,
+        context_docs: Optional[List[Dict]] = None,
+        domain: Optional[str] = None,
+        language: str = "en",
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Generate response using specified LLM provider with streaming (Server-Sent Events)
+
+        Args:
+            provider: LLM provider to use
+            messages: Chat messages (OpenAI format)
+            temperature: Generation temperature
+            max_tokens: Max tokens to generate (if None, will use adaptive calculation)
+            query: User query (for adaptive length calculation)
+            entities: Extracted entities (for adaptive length)
+            query_type: Type of query (for adaptive length)
+            context_docs: Retrieved context documents (for adaptive length)
+            domain: Query domain (for adaptive length)
+            language: Response language
+
+        Yields:
+            Dict events from streaming endpoint (start, chunk, end, error)
+        """
+
+        # Calculate adaptive max_tokens if not explicitly provided
+        if max_tokens is None:
+            if query is not None:
+                max_tokens = self.adaptive_length.calculate_max_tokens(
+                    query=query,
+                    entities=entities or {},
+                    query_type=query_type or "standard",
+                    context_docs=context_docs or [],
+                    domain=domain,
+                )
+                logger.info(f"[RULE] Adaptive max_tokens: {max_tokens}")
+            else:
+                max_tokens = 900  # Default fallback
+                logger.warning("[WARNING] No query provided for adaptive length, using default 900")
+
+        try:
+            # Currently only Intelia Llama supports streaming
+            if provider == LLMProvider.INTELIA_LLAMA and self.llm_service_enabled:
+                async for event in self._generate_intelia_llama_stream(
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    query=query,
+                    entities=entities,
+                    query_type=query_type,
+                    context_docs=context_docs,
+                    domain=domain or "aviculture",
+                    language=language
+                ):
+                    yield event
+            else:
+                # Fallback: use non-streaming generation and yield as single chunk
+                logger.warning(f"[WARNING] {provider.value} does not support streaming, falling back to non-streaming")
+                text = await self.generate(
+                    provider=provider,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    query=query,
+                    entities=entities,
+                    query_type=query_type,
+                    context_docs=context_docs,
+                    domain=domain
+                )
+                # Yield single event with full text
+                yield {"event": "chunk", "content": text}
+                yield {"event": "end", "total_tokens": 0}
+
+        except Exception as e:
+            logger.error(f"[ERROR] {provider.value} streaming failed: {e}")
+            yield {"event": "error", "error": str(e)}
+
+    async def _generate_intelia_llama_stream(
+        self, messages: List[Dict], temperature: float, max_tokens: int,
+        query: Optional[str] = None, entities: Optional[Dict] = None,
+        query_type: Optional[str] = None, context_docs: Optional[List[Dict]] = None,
+        domain: str = "aviculture", language: str = "en"
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Generate using Intelia Llama with streaming (Server-Sent Events)
+
+        Yields event dictionaries with:
+        - event="start": Generation started with metadata
+        - event="chunk": Token chunk with content
+        - event="end": Generation complete with final metadata
+        - event="error": Error occurred
+        """
+        import time
+        from generation.llm_service_client import get_llm_service_client
+
+        start_time = time.time()
+
+        try:
+            # Get LLM service client
+            llm_client = get_llm_service_client(base_url=self.llm_service_url)
+
+            # Extract query from messages if not provided
+            if query is None and messages:
+                # Get last user message as query
+                user_messages = [m for m in messages if m["role"] == "user"]
+                if user_messages:
+                    query = user_messages[-1]["content"]
+
+            # Stream from /v1/generate-stream with terminology injection
+            total_chunks = 0
+            prompt_tokens = 0
+            completion_tokens = 0
+
+            async for event in llm_client.generate_stream(
+                query=query or "",
+                domain=domain,
+                language=language,
+                entities=entities,
+                query_type=query_type,
+                context_docs=context_docs,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                post_process=True,
+                add_disclaimer=True
+            ):
+                total_chunks += 1
+
+                # Track token counts from events
+                if event.get("event") == "start":
+                    prompt_tokens = event.get("prompt_tokens", 0)
+                elif event.get("event") == "end":
+                    completion_tokens = event.get("completion_tokens", 0)
+
+                yield event
+
+            duration = time.time() - start_time
+
+            # Calculate cost and track usage
+            tokens = prompt_tokens + completion_tokens
+            cost = tokens / 1_000_000 * 0.20  # $0.20 per 1M tokens
+
+            self.usage_stats[LLMProvider.INTELIA_LLAMA.value]["calls"] += 1
+            self.usage_stats[LLMProvider.INTELIA_LLAMA.value]["tokens"] += tokens
+            self.usage_stats[LLMProvider.INTELIA_LLAMA.value]["cost"] += cost
+
+            # Track Prometheus metrics
+            try:
+                from monitoring.prometheus_metrics import track_llm_call
+                track_llm_call(
+                    model="llama-3.1-8b-instruct",
+                    provider="intelia-llama",
+                    feature="chat-stream",
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    cost_usd=cost,
+                    duration=duration,
+                    status="success"
+                )
+            except Exception as e:
+                logger.debug(f"Failed to track Prometheus metrics: {e}")
+
+            logger.info(
+                f"[OK] Intelia Llama Stream: {tokens} tokens, ${cost:.4f}, {duration:.2f}s, {total_chunks} chunks"
+            )
+
+        except Exception as e:
+            logger.error(f"[ERROR] Intelia Llama streaming error: {e}")
+            yield {"event": "error", "error": str(e)}
 
     async def _generate_intelia_llama(
         self, messages: List[Dict], temperature: float, max_tokens: int,

@@ -45,10 +45,10 @@ class ResponsePostProcessor:
         # Flatten veterinary keywords for detection
         self.veterinary_keywords = self._load_veterinary_keywords()
 
-        # ⚡ Pre-compile regex patterns for performance (saves ~6ms per request)
+        # [FAST] Pre-compile regex patterns for performance (saves ~6ms per request)
         self._compile_cleanup_patterns()
 
-        logger.info(f"✅ ResponsePostProcessor initialized with {len(self.veterinary_keywords)} veterinary terms")
+        logger.info(f"[OK] ResponsePostProcessor initialized with {len(self.veterinary_keywords)} veterinary terms")
 
     def _load_veterinary_keywords(self) -> List[str]:
         """
@@ -73,7 +73,7 @@ class ResponsePostProcessor:
         # Remove duplicates and convert to lowercase
         keywords = list(set([kw.lower() for kw in keywords]))
 
-        # ⚡ Also create a set for O(1) lookup performance (saves ~1.5ms per request)
+        # [FAST] Also create a set for O(1) lookup performance (saves ~1.5ms per request)
         self.veterinary_keywords_set = set(keywords)
 
         return keywords
@@ -97,7 +97,7 @@ class ResponsePostProcessor:
             (re.compile(r"^\s*:\s*$", re.MULTILINE), ""),
             # 6. Fix broken titles
             (re.compile(r"^([A-ZÀ-Ý][^\n]{5,60}[a-zà-ÿ])\n([a-zà-ÿ])", re.MULTILINE), r"\1 \2"),
-            # 7. Clean multiple empty lines (3+ → 2)
+            # 7. Clean multiple empty lines (3+ -> 2)
             (re.compile(r"\n{3,}"), "\n\n"),
             # 8. Remove trailing spaces
             (re.compile(r" +$", re.MULTILINE), ""),
@@ -137,7 +137,7 @@ class ResponsePostProcessor:
         """
         response = response.strip()
 
-        # ⚡ Apply pre-compiled regex patterns (optimized from 9ms to ~3ms)
+        # [FAST] Apply pre-compiled regex patterns (optimized from 9ms to ~3ms)
         for pattern, replacement in self.cleanup_patterns:
             response = pattern.sub(replacement, response)
 
@@ -146,7 +146,7 @@ class ResponsePostProcessor:
             disclaimer = self.get_veterinary_disclaimer(language)
             if disclaimer:  # Only if disclaimer is not empty
                 response = response + disclaimer
-                logger.info(f"🏥 Veterinary disclaimer added (language: {language})")
+                logger.info(f" Veterinary disclaimer added (language: {language})")
 
         return response
 
@@ -166,7 +166,7 @@ class ResponsePostProcessor:
 
         query_lower = query.lower()
 
-        # ⚡ Use set intersection for O(1) lookup instead of linear search (optimized from 2ms to ~0.5ms)
+        # [FAST] Use set intersection for O(1) lookup instead of linear search (optimized from 2ms to ~0.5ms)
         # Extract words from query
         query_words = set(re.findall(r'\b\w+\b', query_lower))
 

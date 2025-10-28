@@ -339,4 +339,150 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 status_code=500, content={"error": f"Erreur traitement: {str(e)}"}
             )
 
+    @router.post(f"{BASE_PATH}/chat/stream")
+    async def chat_stream(request: Request):
+        """
+        Chat endpoint with real LLM streaming support (NEW)
+
+        This endpoint uses LLM service's streaming endpoint to provide
+        real-time token-by-token generation instead of chunking a complete response.
+
+        VERSION 1.0.0:
+        - Direct call to LLM router's generate_stream()
+        - Server-Sent Events (SSE) streaming
+        - No RAG processing (simplified flow for initial implementation)
+        """
+        import json
+        from generation.llm_router import get_llm_router, LLMProvider
+
+        total_start_time = time.time()
+
+        try:
+            # Parse request
+            try:
+                body = await request.json()
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+
+            message = body.get("message", "").strip()
+            tenant_id = body.get("tenant_id", str(uuid.uuid4())[:8])
+            conversation_id = body.get("conversation_id")
+
+            # Basic validation
+            if not message:
+                raise HTTPException(status_code=400, detail="Empty message")
+
+            if len(message) > MAX_REQUEST_SIZE:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Message too long (max {MAX_REQUEST_SIZE})",
+                )
+
+            # Detect language
+            language_result = detect_language_enhanced(message)
+            detected_language: str = (
+                language_result.language
+                if hasattr(language_result, "language")
+                else str(language_result)
+            )
+
+            logger.info(
+                f"[STREAM] BUILD={BUILD_ID} | "
+                f"Language: {detected_language}, tenant={tenant_id}"
+            )
+
+            # Get LLM router
+            llm_router = get_llm_router()
+
+            # Build messages (simplified - no RAG context for now)
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are an expert in aviculture and poultry farming. "
+                               "Provide clear, technical, and accurate answers."
+                },
+                {
+                    "role": "user",
+                    "content": message
+                }
+            ]
+
+            async def stream_generator():
+                """Generator for SSE streaming"""
+                try:
+                    # Stream from LLM
+                    full_response = ""
+                    async for event in llm_router.generate_stream(
+                        provider=LLMProvider.INTELIA_LLAMA,
+                        messages=messages,
+                        temperature=0.1,
+                        query=message,
+                        domain="aviculture",
+                        language=detected_language
+                    ):
+                        event_type = event.get("event", "chunk")
+
+                        # Forward LLM events to client
+                        if event_type == "start":
+                            # Send START event with metadata
+                            yield f"event: start\n"
+                            yield f"data: {json.dumps(event)}\n\n"
+
+                        elif event_type == "chunk":
+                            # Accumulate full response and forward chunk
+                            content = event.get("content", "")
+                            full_response += content
+                            yield f"event: chunk\n"
+                            yield f"data: {json.dumps({'content': content})}\n\n"
+
+                        elif event_type == "end":
+                            # Send END event with final metadata
+                            total_time = time.time() - total_start_time
+                            event["total_time"] = total_time
+                            yield f"event: end\n"
+                            yield f"data: {json.dumps(event)}\n\n"
+
+                        elif event_type == "error":
+                            # Send ERROR event
+                            yield f"event: error\n"
+                            yield f"data: {json.dumps(event)}\n\n"
+                            break
+
+                    # Track metrics
+                    total_time = time.time() - total_start_time
+                    metrics_collector.record_query(
+                        tenant_id=tenant_id,
+                        query=message,
+                        response_time=total_time,
+                        status="success",
+                        source="llm-stream",
+                        confidence=1.0,
+                        language=detected_language,
+                        use_json_search=False,
+                    )
+
+                except Exception as e:
+                    logger.error(f"[ERROR] Stream generation failed: {e}", exc_info=True)
+                    yield f"event: error\n"
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+            return StreamingResponse(
+                stream_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",  # Disable nginx buffering
+                }
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[ERROR] Chat stream endpoint: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Processing error: {str(e)}"}
+            )
+
     return router

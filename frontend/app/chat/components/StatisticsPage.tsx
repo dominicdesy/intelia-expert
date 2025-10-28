@@ -13,6 +13,7 @@ import { QualityIssuesTab } from "./QualityIssuesTab";
 import { SatisfactionStatsTab } from "./SatisfactionStatsTab";
 import PrometheusMetrics from "./PrometheusMetrics";
 import BusinessAnalytics from "./BusinessAnalytics";
+import { MonitoringTab } from "./MonitoringTab";
 import { secureLog } from "@/lib/utils/secureLogger";
 
 // ✅ HOOK SIMPLIFIÉ - Plus de fallback localStorage/Supabase
@@ -261,7 +262,7 @@ export const StatisticsPage: React.FC = () => {
     "day" | "week" | "month" | "year"
   >("month");
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "questions" | "invitations" | "quality" | "satisfaction" | "metrics" | "business"
+    "dashboard" | "questions" | "invitations" | "quality" | "satisfaction" | "metrics" | "business" | "monitoring"
   >("dashboard");
   const [questionFilters, setQuestionFilters] = useState({
     search: "",
@@ -988,6 +989,16 @@ export const StatisticsPage: React.FC = () => {
                 >
                   Business
                 </button>
+                <button
+                  onClick={() => handleTabChange("monitoring")}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    activeTab === "monitoring"
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Monitoring
+                </button>
               </div>
             </div>
 
@@ -1157,6 +1168,8 @@ export const StatisticsPage: React.FC = () => {
           <PrometheusMetrics />
         ) : activeTab === "business" ? (
           <BusinessAnalytics />
+        ) : activeTab === "monitoring" ? (
+          <MonitoringTab />
         ) : null}
 
         {/* Modal de détail de question */}

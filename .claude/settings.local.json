@@ -44,7 +44,21 @@
       "Bash(Version: 1.4.1)",
       "Bash(Last modified: 2025-10-26)",
       "Bash(test:*)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(docker-compose up:*)",
+      "WebFetch(domain:aviagen.com)",
+      "WebFetch(domain:afs.mgcafe.uky.edu)",
+      "WebFetch(domain:academic.oup.com)",
+      "Read(//c/**)",
+      "Bash(pip install:*)",
+      "Bash(redis-cli ping:*)",
+      "Bash(timeout 3 echo:*)",
+      "Bash(timeout 5 echo:*)",
+      "Bash(timeout 4 echo:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill /F /PID 30864)",
+      "Bash(powershell -Command \"Stop-Process -Id 30864 -Force\")"
     ],
     "deny": [],
     "ask": []

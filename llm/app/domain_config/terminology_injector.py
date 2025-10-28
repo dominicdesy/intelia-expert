@@ -46,7 +46,7 @@ class TerminologyInjector:
         else:
             logger.warning(f"Value chain terminology not found at {value_chain_path}")
 
-        logger.info(f"✅ TerminologyInjector initialized with {len(self.extended_glossary)} extended terms")
+        logger.info(f"[OK] TerminologyInjector initialized with {len(self.extended_glossary)} extended terms")
 
     def _load_extended_glossary(self, path: Path):
         """Load extended glossary from JSON"""
@@ -95,7 +95,7 @@ class TerminologyInjector:
                             'category': category_key
                         }
 
-            # ⚡ OPTIMIZATION Phase 2: Build keyword index for O(1) value chain lookup (saves ~4ms)
+            # [FAST] OPTIMIZATION Phase 2: Build keyword index for O(1) value chain lookup (saves ~4ms)
             # Instead of linear search through 100+ terms, we index by keywords
             self.value_chain_index = {}
             for vc_key, vc_data in self.value_chain_terms.items():
@@ -204,7 +204,7 @@ class TerminologyInjector:
                         current_data, current_score = matching_terms[term_key]
                         matching_terms[term_key] = (current_data, current_score + 5)
 
-        # 2. Category-based loading (score: 5) - ⚡ OPTIMIZATION: Reduced from 20 to 10 per category
+        # 2. Category-based loading (score: 5) - [FAST] OPTIMIZATION: Reduced from 20 to 10 per category
         relevant_categories = self.detect_relevant_categories(query)
         for category in relevant_categories[:2]:  # Top 2 categories only (reduced from 3)
             if category in self.category_index:
@@ -212,7 +212,7 @@ class TerminologyInjector:
                     if term_key not in matching_terms:
                         matching_terms[term_key] = (self.extended_glossary[term_key], 5)
 
-        # 3. Add value chain terms using indexed lookup (⚡ saves ~4ms vs linear search)
+        # 3. Add value chain terms using indexed lookup ([FAST] saves ~4ms vs linear search)
         for word in query_words:
             if word in self.value_chain_index:
                 for vc_key in self.value_chain_index[word]:
@@ -229,7 +229,7 @@ class TerminologyInjector:
     def format_terminology_for_prompt(
         self,
         query: str,
-        max_tokens: int = 600,  # ⚡ OPTIMIZATION: Reduced from 1000 to 600 tokens (~400 token savings)
+        max_tokens: int = 600,  # [FAST] OPTIMIZATION: Reduced from 1000 to 600 tokens (~400 token savings)
         language: str = 'en'
     ) -> str:
         """
@@ -243,7 +243,7 @@ class TerminologyInjector:
         Returns:
             Formatted terminology string ready for prompt injection
         """
-        # Find matching terms (⚡ OPTIMIZATION: Reduced from 50 to 20 terms)
+        # Find matching terms ([FAST] OPTIMIZATION: Reduced from 50 to 20 terms)
         matching_terms = self.find_matching_terms(query, max_terms=20)
 
         if not matching_terms:
@@ -293,7 +293,7 @@ class TerminologyInjector:
         lines.append("")
 
         result = '\n'.join(lines)
-        logger.info(f"📖 Injected {terms_added} terminology terms (~{len(result)} chars)")
+        logger.info(f"[BOOK] Injected {terms_added} terminology terms (~{len(result)} chars)")
 
         return result
 

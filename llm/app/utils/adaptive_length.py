@@ -8,8 +8,8 @@ Migrated from ai-service to llm service
 """
 Dynamically determines optimal max_tokens based on query complexity.
 
-Simple question → Simple answer (300-500 tokens)
-Complex question → Detailed answer (800-1500 tokens)
+Simple question -> Simple answer (300-500 tokens)
+Complex question -> Detailed answer (800-1500 tokens)
 """
 
 import logging
@@ -126,7 +126,7 @@ class AdaptiveResponseLength:
             ],
         }
 
-        logger.info("✅ AdaptiveResponseLength initialized")
+        logger.info("[OK] AdaptiveResponseLength initialized")
 
     def calculate_max_tokens(
         self,
@@ -165,7 +165,7 @@ class AdaptiveResponseLength:
         )
 
         logger.info(
-            f"📏 Adaptive length: {final_tokens} tokens "
+            f"[RULE] Adaptive length: {final_tokens} tokens "
             f"(complexity={complexity.value}, query_len={len(query.split())} words)"
         )
 

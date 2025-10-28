@@ -89,7 +89,7 @@ class SemanticCache:
         self.ttl = ttl
 
         if not enabled:
-            logger.info("⚠️ SemanticCache disabled")
+            logger.info("[WARNING] SemanticCache disabled")
             self.redis_client = None
             return
 
@@ -105,9 +105,9 @@ class SemanticCache:
             )
             # Test connection
             self.redis_client.ping()
-            logger.info(f"✅ SemanticCache connected to Redis at {redis_host}:{redis_port}")
+            logger.info(f"[OK] SemanticCache connected to Redis at {redis_host}:{redis_port}")
         except Exception as e:
-            logger.warning(f"⚠️ Redis connection failed: {e}. Cache disabled.")
+            logger.warning(f"[WARNING] Redis connection failed: {e}. Cache disabled.")
             self.enabled = False
             self.redis_client = None
 
@@ -206,14 +206,14 @@ class SemanticCache:
                 age_seconds = time.time() - cache_entry.timestamp
 
                 logger.info(
-                    f"✅ CACHE HIT: '{query[:60]}...' "
+                    f"[OK] CACHE HIT: '{query[:60]}...' "
                     f"(age: {int(age_seconds)}s, lang: {language}, "
                     f"entities: {len(entities) if entities else 0})"
                 )
 
                 return cache_entry
             else:
-                logger.debug(f"❌ Cache miss: '{query[:60]}...'")
+                logger.debug(f"[ERROR] Cache miss: '{query[:60]}...'")
                 return None
 
         except Exception as e:
@@ -277,7 +277,7 @@ class SemanticCache:
             self.redis_client.setex(cache_key, self.ttl, cache_data)
 
             logger.info(
-                f"💾 CACHE SET: '{query[:60]}...' "
+                f"[CACHE] CACHE SET: '{query[:60]}...' "
                 f"(ttl: {self.ttl}s, size: {len(cache_data)} bytes)"
             )
 
@@ -312,7 +312,7 @@ class SemanticCache:
             if keys:
                 # Delete keys
                 self.redis_client.delete(*keys)
-                logger.info(f"🗑️ Cleared {len(keys)} cache entries (pattern: {pattern})")
+                logger.info(f"️ Cleared {len(keys)} cache entries (pattern: {pattern})")
             else:
                 logger.info(f"ℹ️ No cache entries to clear (pattern: {pattern})")
 

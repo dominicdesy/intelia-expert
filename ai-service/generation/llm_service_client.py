@@ -6,8 +6,9 @@ Client to communicate with the LLM service for intelligent generation
 
 import logging
 import httpx
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, AsyncGenerator
 import os
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,120 @@ class LLMServiceClient:
         except Exception as e:
             logger.error(f"❌ LLM service client error: {e}", exc_info=True)
             raise
+
+
+    async def generate_stream(
+        self,
+        query: str,
+        domain: str = "aviculture",
+        language: str = "en",
+        entities: Optional[Dict[str, Any]] = None,
+        query_type: Optional[str] = None,
+        context_docs: Optional[List[Dict]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        post_process: bool = True,
+        add_disclaimer: bool = True,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Generate intelligent LLM response with streaming (Server-Sent Events)
+        
+        This method streams the response chunks as they are generated,
+        providing a better user experience with reduced perceived latency.
+        
+        Args:
+            query: User query
+            domain: Domain for configuration
+            language: Response language
+            entities: Extracted entities
+            query_type: Query type (standard, comparative, etc.)
+            context_docs: Context documents
+            temperature: Sampling temperature (optional, uses domain default)
+            max_tokens: Max tokens (optional, auto-calculated if not provided)
+            top_p: Nucleus sampling (optional)
+            post_process: Apply post-processing
+            add_disclaimer: Add veterinary disclaimer if applicable
+            
+        Yields:
+            Dictionary with event data:
+            - event="start": {"status": "generating", "complexity": "simple", ...}
+            - event="chunk": {"content": "text chunk..."}
+            - event="end": {"prompt_tokens": 100, "completion_tokens": 50, ...}
+            - event="error": {"error": "error message"}
+        """
+        try:
+            request_data = {
+                "query": query,
+                "domain": domain,
+                "language": language,
+                "post_process": post_process,
+                "add_disclaimer": add_disclaimer,
+            }
+            
+            # Add optional parameters
+            if entities:
+                request_data["entities"] = entities
+            if query_type:
+                request_data["query_type"] = query_type
+            if context_docs:
+                request_data["context_docs"] = context_docs
+            if temperature is not None:
+                request_data["temperature"] = temperature
+            if max_tokens is not None:
+                request_data["max_tokens"] = max_tokens
+            if top_p is not None:
+                request_data["top_p"] = top_p
+                
+            logger.info(f"[STREAM] Calling LLM service /v1/generate-stream for domain={domain}")
+            
+            async with self.client.stream(
+                "POST",
+                f"{self.base_url}/v1/generate-stream",
+                json=request_data,
+                timeout=120.0
+            ) as response:
+                response.raise_for_status()
+                
+                current_event = None
+                async for line in response.aiter_lines():
+                    if not line or line.startswith(":"):
+                        continue
+                        
+                    # Parse SSE format
+                    if line.startswith("event:"):
+                        current_event = line.split(":", 1)[1].strip()
+                        
+                    elif line.startswith("data:"):
+                        data_str = line.split(":", 1)[1].strip()
+                        
+                        try:
+                            event_data = json.loads(data_str)
+                            event_data["event"] = current_event or "chunk"
+                            yield event_data
+                            
+                        except json.JSONDecodeError:
+                            logger.warning(f"[STREAM] Invalid JSON in SSE: {data_str}")
+                            continue
+                            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"[ERROR] LLM service streaming HTTP error: {e.response.status_code}")
+            yield {
+                "event": "error",
+                "error": f"LLM service error: {e.response.status_code}"
+            }
+        except httpx.RequestError as e:
+            logger.error(f"[ERROR] LLM service streaming connection error: {e}")
+            yield {
+                "event": "error",
+                "error": f"Cannot connect to LLM service at {self.base_url}"
+            }
+        except Exception as e:
+            logger.error(f"[ERROR] LLM service streaming client error: {e}", exc_info=True)
+            yield {
+                "event": "error",
+                "error": str(e)
+            }
 
     async def route(
         self,

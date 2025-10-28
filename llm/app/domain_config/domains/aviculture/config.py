@@ -206,7 +206,7 @@ class AvicultureConfig:
             language_messages=self.languages
         )
 
-        logger.info("⚡ PostProcessor cached for aviculture domain")
+        logger.info("[FAST] PostProcessor cached for aviculture domain")
         return processor
 
     def get_formatting_rules(self) -> List[str]:
@@ -254,19 +254,19 @@ class AvicultureConfig:
 
         # Check for breed names (strong indicator)
         if any(breed in query_lower for breed in self.breed_keywords):
-            logger.debug(f"🐔 Breed name detected in query → aviculture")
+            logger.debug(f" Breed name detected in query -> aviculture")
             return True
 
         # Check for performance metrics with age indicators
         has_metric = any(metric in query_lower for metric in self.metric_keywords)
         has_age = any(age_term in query_lower for age_term in ["day", "days", "week", "weeks", "jours", "jour", "semaine"])
         if has_metric and has_age:
-            logger.debug(f"🐔 Metric + age detected in query → aviculture")
+            logger.debug(f" Metric + age detected in query -> aviculture")
             return True
 
         # Check aviculture keywords
         if any(keyword in query_lower for keyword in self.aviculture_keywords):
-            logger.debug(f"🐔 Aviculture keyword detected")
+            logger.debug(f" Aviculture keyword detected")
             return True
 
         # Check domain from intent result
@@ -276,11 +276,11 @@ class AvicultureConfig:
 
             if domain in ["aviculture", "poultry", "livestock", "genetics_performance",
                          "nutrition", "health", "housing"]:
-                logger.debug(f"🐔 Domain '{domain}' detected → aviculture")
+                logger.debug(f" Domain '{domain}' detected -> aviculture")
                 return True
 
             if intent_type in ["performance_query", "genetics_query", "nutrition_query", "health_query"]:
-                logger.debug(f"🐔 Intent '{intent_type}' detected → aviculture")
+                logger.debug(f" Intent '{intent_type}' detected -> aviculture")
                 return True
 
         return False

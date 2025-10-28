@@ -59,14 +59,14 @@ async def log_requests(request: Request, call_next):
     """Log all requests with timing"""
     start_time = time.time()
 
-    logger.info(f"→ {request.method} {request.url.path}")
+    logger.info(f"-> {request.method} {request.url.path}")
 
     try:
         response = await call_next(request)
         duration = time.time() - start_time
 
         logger.info(
-            f"← {request.method} {request.url.path} "
+            f"<- {request.method} {request.url.path} "
             f"- Status: {response.status_code} "
             f"- Duration: {duration:.3f}s"
         )
@@ -75,7 +75,7 @@ async def log_requests(request: Request, call_next):
     except Exception as e:
         duration = time.time() - start_time
         logger.error(
-            f"✗ {request.method} {request.url.path} "
+            f"[X] {request.method} {request.url.path} "
             f"- Error: {str(e)} "
             f"- Duration: {duration:.3f}s",
             exc_info=True
@@ -112,13 +112,13 @@ app.include_router(generation.router)  # Intelligent generation endpoints
 async def startup_event():
     """Run on application startup"""
     logger.info("=" * 60)
-    logger.info(f"🚀 Intelia LLM Service v{settings.version}")
+    logger.info(f" Intelia LLM Service v{settings.version}")
     logger.info("=" * 60)
     logger.info(f"Provider: {settings.llm_provider}")
 
     if settings.llm_provider == "huggingface":
         logger.info(f"Model: {settings.huggingface_model}")
-        logger.info(f"HuggingFace API Key: {'✓ Configured' if settings.huggingface_api_key else '✗ Missing'}")
+        logger.info(f"HuggingFace API Key: {'[OK] Configured' if settings.huggingface_api_key else '[X] Missing'}")
     elif settings.llm_provider == "vllm":
         logger.info(f"vLLM URL: {settings.vllm_url}")
 
@@ -130,9 +130,9 @@ async def startup_event():
     try:
         from app.dependencies import get_llm_client
         client = get_llm_client()
-        logger.info("✓ LLM client initialized successfully")
+        logger.info("[OK] LLM client initialized successfully")
     except Exception as e:
-        logger.error(f"✗ Failed to initialize LLM client: {e}")
+        logger.error(f"[X] Failed to initialize LLM client: {e}")
         logger.error("Service may not work correctly. Check configuration.")
 
 
