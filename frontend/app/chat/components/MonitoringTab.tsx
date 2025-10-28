@@ -33,6 +33,14 @@ interface MonitoringSummary {
   last_update: string;
 }
 
+interface LogsResponse {
+  logs: LogEntry[];
+}
+
+interface ServicesResponse {
+  services: ServiceHealth[];
+}
+
 export const MonitoringTab: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [services, setServices] = useState<ServiceHealth[]>([]);
@@ -57,14 +65,13 @@ export const MonitoringTab: React.FC = () => {
       if (filterService) params.append("service", filterService);
       if (filterLevel) params.append("level", filterLevel);
 
-      const response = await apiClient.get(`/monitoring/logs?${params.toString()}`);
+      const response = await apiClient.get<LogsResponse>(`/monitoring/logs?${params.toString()}`);
 
-      if (response.ok) {
-        const data = await response.json();
-        setLogs(data.logs || []);
+      if (response.success && response.data) {
+        setLogs(response.data.logs || []);
         setError(null);
       } else {
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error(response.error?.message || "Failed to fetch logs");
       }
     } catch (err) {
       secureLog.error("[MonitoringTab] Error fetching logs:", err);
@@ -75,11 +82,10 @@ export const MonitoringTab: React.FC = () => {
   // Fonction pour récupérer l'état des services
   const fetchServices = async () => {
     try {
-      const response = await apiClient.get("/monitoring/services");
+      const response = await apiClient.get<ServicesResponse>("/monitoring/services");
 
-      if (response.ok) {
-        const data = await response.json();
-        setServices(data.services || []);
+      if (response.success && response.data) {
+        setServices(response.data.services || []);
       }
     } catch (err) {
       secureLog.error("[MonitoringTab] Error fetching services:", err);
@@ -89,11 +95,10 @@ export const MonitoringTab: React.FC = () => {
   // Fonction pour récupérer le résumé
   const fetchSummary = async () => {
     try {
-      const response = await apiClient.get("/monitoring/summary");
+      const response = await apiClient.get<MonitoringSummary>("/monitoring/summary");
 
-      if (response.ok) {
-        const data = await response.json();
-        setSummary(data);
+      if (response.success && response.data) {
+        setSummary(response.data);
       }
     } catch (err) {
       secureLog.error("[MonitoringTab] Error fetching summary:", err);

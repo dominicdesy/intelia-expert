@@ -379,7 +379,7 @@ export const StatisticsPage: React.FC = () => {
 
   // Reset des références quand on change d'onglet
   const handleTabChange = (
-    newTab: "dashboard" | "questions" | "invitations" | "quality" | "satisfaction" | "metrics" | "business",
+    newTab: "dashboard" | "questions" | "invitations" | "quality" | "satisfaction" | "metrics" | "business" | "monitoring",
   ) => {
     if (newTab !== activeTab) {
       secureLog.log(`[StatisticsPage] Changement onglet: ${activeTab} -> ${newTab} `);
