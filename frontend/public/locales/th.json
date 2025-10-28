@@ -1091,5 +1091,37 @@
   "widget.errorToken": "ข้อผิดพลาดในการตรวจสอบสิทธิ์",
   "widget.errorQuota": "ถึงขีดจำกัดการใช้งานแล้ว",
   "help.voiceAssistantTitle": "ผู้ช่วยเสียงแบบเรียลไทม์",
-  "help.voiceAssistantDesc": "การสนทนาด้วยเสียงแบบโต้ตอบแบบเรียลไทม์ พูดอย่างเป็นธรรมชาติและรับการตอบกลับด้วยเสียงทันที"
+  "help.voiceAssistantDesc": "การสนทนาด้วยเสียงแบบโต้ตอบแบบเรียลไทม์ พูดอย่างเป็นธรรมชาติและรับการตอบกลับด้วยเสียงทันที",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "ยินดีที่ได้ยินเช่นนั้น! ขอบคุณที่แบ่งปัน",
+        "ดีใจที่คุณชอบ Cognito!",
+        "มันมีความหมายมาก ขอบคุณ!"
+      ],
+      "neutral": [
+        "ขอบคุณสำหรับความคิดเห็นที่ซื่อสัตย์ของคุณ",
+        "เข้าใจแล้ว เราขอบคุณสำหรับความคิดเห็นของคุณ",
+        "ความคิดเห็นของคุณช่วยให้เราดีขึ้น"
+      ],
+      "unsatisfied": [
+        "เราขออภัยที่ไม่เป็นไปตามที่คาดหวัง ขอบคุณที่แจ้งให้เราทราบ",
+        "ขอบคุณสำหรับความซื่อสัตย์ของคุณ เราจะทำงานในเรื่องนี้",
+        "เราขอบคุณที่คุณใช้เวลาแบ่งปัน"
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "สกุลเงินถูกตั้งค่าแล้ว",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "กลับ"
+  }
 }

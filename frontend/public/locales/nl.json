@@ -1091,5 +1091,37 @@
   "widget.errorToken": "Authenticatiefout.",
   "widget.errorQuota": "Gebruikslimiet bereikt.",
   "help.voiceAssistantTitle": "Real-time spraakassistent",
-  "help.voiceAssistantDesc": "Interactief spraakgesprek in real-time. Spreek natuurlijk en ontvang directe spraakrespons."
+  "help.voiceAssistantDesc": "Interactief spraakgesprek in real-time. Spreek natuurlijk en ontvang directe spraakrespons.",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "Geweldig om te horen! Bedankt voor het delen.",
+        "Blij dat je van Cognito geniet!",
+        "Dat betekent veel. Bedankt!"
+      ],
+      "neutral": [
+        "Bedankt voor je eerlijke feedback.",
+        "Begrepen. We waarderen je input.",
+        "Je feedback helpt ons beter te worden."
+      ],
+      "unsatisfied": [
+        "Het spijt ons dat het niet aan de verwachtingen voldeed. Bedankt dat je het ons liet weten.",
+        "Bedankt voor je eerlijkheid. We gaan eraan werken.",
+        "We waarderen dat je de tijd hebt genomen om te delen."
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "Valuta al ingesteld",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "Terug"
+  }
 }

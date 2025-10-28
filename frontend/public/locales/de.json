@@ -1091,5 +1091,37 @@
   "widget.errorToken": "Authentifizierungsfehler.",
   "widget.errorQuota": "Nutzungslimit erreicht.",
   "help.voiceAssistantTitle": "Echtzeit-Sprachassistent",
-  "help.voiceAssistantDesc": "Interaktive Sprachkonversation in Echtzeit. Sprechen Sie natürlich und erhalten Sie sofortige Sprachantworten."
+  "help.voiceAssistantDesc": "Interaktive Sprachkonversation in Echtzeit. Sprechen Sie natürlich und erhalten Sie sofortige Sprachantworten.",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "Großartig! Danke fürs Teilen.",
+        "Schön, dass Ihnen Cognito gefällt!",
+        "Das bedeutet uns viel. Danke!"
+      ],
+      "neutral": [
+        "Danke für Ihr ehrliches Feedback.",
+        "Verstanden. Wir schätzen Ihre Meinung.",
+        "Ihr Feedback hilft uns, besser zu werden."
+      ],
+      "unsatisfied": [
+        "Es tut uns leid, dass es nicht passte. Danke, dass Sie es uns mitgeteilt haben.",
+        "Danke für Ihre Ehrlichkeit. Wir werden daran arbeiten.",
+        "Wir schätzen, dass Sie sich die Zeit genommen haben."
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "Währung bereits festgelegt",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "Zurück"
+  }
 }

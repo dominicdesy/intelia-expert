@@ -139,12 +139,14 @@
   "common.and": "et",
   "common.appName": "Intelia Cognito",
   "common.apply": "Appliquer",
+  "common.cancel": "Annuler",
   "common.clear": "Effacer",
   "common.confirm": "Confirmer",
   "common.delete": "Supprimer",
   "common.edit": "Modifier",
   "common.error": "Erreur",
   "common.filter": "Filtrer",
+  "common.goBack": "Retour",
   "common.loading": "Chargement...",
   "common.notSpecified": "Non spécifié",
   "common.optional": "optionnel",
@@ -884,9 +886,19 @@
   "billing.current": "Actuelle",
   "billing.suggested": "Suggérée",
   "billing.notSetYet": "Pas encore définie",
+  "billing.currencyRequired": "Devise de facturation requise",
+  "billing.currencyRequiredDescription": "Veuillez sélectionner votre devise de facturation avant de passer à un forfait payant. Cela garantit une tarification et une facturation précises.",
   "billing.currencyRequiredForUpgrade": "Vous devez sélectionner une devise de facturation avant de passer à un forfait payant",
   "billing.changeCurrency": "Modifier",
   "billing.selectCurrency": "Sélectionnez votre devise de facturation",
+  "billing.selectYourCurrency": "Sélectionnez votre devise de facturation",
+  "billing.currencyDescription": "Choisissez votre devise préférée pour la facturation et les factures",
+  "billing.currentCurrency": "Devise actuelle",
+  "billing.suggestedBasedOnLocation": "Suggérée selon votre localisation",
+  "billing.canSelectDifferent": "Vous pouvez sélectionner une autre devise si vous préférez",
+  "billing.errorTitle": "Erreur",
+  "billing.errorLoadingCurrency": "Impossible de charger les informations de devise",
+  "billing.currencyAlreadySet": "Devise déjà configurée",
   "billing.loadingCurrency": "Chargement des informations de devise...",
   "billing.currencyUpdated": "Devise de facturation mise à jour avec succès",
   "billing.currencyUpdateFailed": "Échec de la mise à jour de la devise de facturation",
@@ -1091,5 +1103,37 @@
   "widget.sendButton": "Envoyer",
   "widget.errorNetwork": "Erreur de connexion. Veuillez réessayer.",
   "widget.errorToken": "Erreur d'authentification.",
-  "widget.errorQuota": "Limite d'utilisation atteinte."
+  "widget.errorQuota": "Limite d'utilisation atteinte.",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "Ravi de l'entendre ! Merci de l'avoir partagé.",
+        "Content que vous appréciiez Cognito !",
+        "Cela compte beaucoup. Merci !"
+      ],
+      "neutral": [
+        "Merci pour votre retour honnête.",
+        "Compris. Nous apprécions votre contribution.",
+        "Vos commentaires nous aident à nous améliorer."
+      ],
+      "unsatisfied": [
+        "Nous sommes désolés que cela n'ait pas été à la hauteur. Merci de nous l'avoir fait savoir.",
+        "Merci pour votre honnêteté. Nous allons y travailler.",
+        "Nous apprécions que vous ayez pris le temps de partager."
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "Devise déjà définie",
+    "errorLoadingCurrency": "Erreur de chargement de la devise",
+    "errorTitle": "Erreur",
+    "selectYourCurrency": "Sélectionnez votre devise",
+    "currencyDescription": "Choisissez votre devise de facturation préférée",
+    "currentCurrency": "Devise actuelle",
+    "suggestedBasedOnLocation": "Suggéré selon votre localisation",
+    "canSelectDifferent": "Vous pouvez sélectionner une autre devise"
+  },
+  "common": {
+    "goBack": "Retour"
+  }
 }

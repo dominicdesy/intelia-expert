@@ -1091,5 +1091,37 @@
   "widget.errorToken": "Lỗi xác thực.",
   "widget.errorQuota": "Đã đạt giới hạn sử dụng.",
   "help.voiceAssistantTitle": "Trợ lý giọng nói thời gian thực",
-  "help.voiceAssistantDesc": "Cuộc trò chuyện tương tác bằng giọng nói theo thời gian thực. Nói tự nhiên và nhận phản hồi giọng nói ngay lập tức."
+  "help.voiceAssistantDesc": "Cuộc trò chuyện tương tác bằng giọng nói theo thời gian thực. Nói tự nhiên và nhận phản hồi giọng nói ngay lập tức.",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "Rất vui khi nghe điều đó! Cảm ơn bạn đã chia sẻ.",
+        "Vui vì bạn thích Cognito!",
+        "Điều đó có ý nghĩa rất lớn. Cảm ơn!"
+      ],
+      "neutral": [
+        "Cảm ơn phản hồi trung thực của bạn.",
+        "Đã hiểu. Chúng tôi đánh giá cao ý kiến của bạn.",
+        "Phản hồi của bạn giúp chúng tôi làm tốt hơn."
+      ],
+      "unsatisfied": [
+        "Chúng tôi xin lỗi vì không đáp ứng được mong đợi. Cảm ơn bạn đã cho chúng tôi biết.",
+        "Cảm ơn sự thành thật của bạn. Chúng tôi sẽ cải thiện.",
+        "Chúng tôi đánh giá cao việc bạn dành thời gian chia sẻ."
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "Tiền tệ đã được thiết lập",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "Quay lại"
+  }
 }

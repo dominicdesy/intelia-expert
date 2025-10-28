@@ -1091,5 +1091,37 @@
   "widget.errorToken": "認証エラー。",
   "widget.errorQuota": "使用制限に達しました。",
   "help.voiceAssistantTitle": "リアルタイム音声アシスタント",
-  "help.voiceAssistantDesc": "リアルタイムでインタラクティブな音声会話。自然に話すと即座に音声で返答が得られます。"
+  "help.voiceAssistantDesc": "リアルタイムでインタラクティブな音声会話。自然に話すと即座に音声で返答が得られます。",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "それを聞けて嬉しいです！共有してくれてありがとう。",
+        "Cognitoを楽しんでいただけて嬉しいです！",
+        "それは大きな意味があります。ありがとう！"
+      ],
+      "neutral": [
+        "正直なフィードバックをありがとうございます。",
+        "了解しました。ご意見に感謝します。",
+        "あなたのフィードバックは私たちの改善に役立ちます。"
+      ],
+      "unsatisfied": [
+        "期待に応えられず申し訳ございません。お知らせいただきありがとうございます。",
+        "正直にお伝えいただきありがとうございます。改善に取り組みます。",
+        "お時間を割いて共有していただきありがとうございます。"
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "通貨は既に設定されています",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "戻る"
+  }
 }

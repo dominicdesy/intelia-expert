@@ -1091,5 +1091,37 @@
   "widget.errorToken": "प्रमाणीकरण त्रुटि।",
   "widget.errorQuota": "उपयोग सीमा पहुंच गई।",
   "help.voiceAssistantTitle": "रीयल-टाइम वॉयस असिस्टेंट",
-  "help.voiceAssistantDesc": "रीयल-टाइम में इंटरैक्टिव वॉयस वार्तालाप। स्वाभाविक रूप से बोलें और तत्काल वॉयस प्रतिक्रियाएं प्राप्त करें।"
+  "help.voiceAssistantDesc": "रीयल-टाइम में इंटरैक्टिव वॉयस वार्तालाप। स्वाभाविक रूप से बोलें और तत्काल वॉयस प्रतिक्रियाएं प्राप्त करें।",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "यह सुनकर बहुत अच्छा लगा! साझा करने के लिए धन्यवाद।",
+        "खुशी है कि आप Cognito का आनंद ले रहे हैं!",
+        "इसका बहुत मतलब है। धन्यवाद!"
+      ],
+      "neutral": [
+        "आपकी ईमानदार प्रतिक्रिया के लिए धन्यवाद।",
+        "समझ गए। हम आपके इनपुट की सराहना करते हैं।",
+        "आपकी प्रतिक्रिया हमें बेहतर बनाने में मदद करती है।"
+      ],
+      "unsatisfied": [
+        "हमें खेद है कि यह अपेक्षाओं पर खरा नहीं उतरा। हमें बताने के लिए धन्यवाद।",
+        "आपकी ईमानदारी के लिए धन्यवाद। हम इस पर काम करेंगे।",
+        "हम साझा करने के लिए समय निकालने की सराहना करते हैं।"
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "मुद्रा पहले से सेट है",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "वापस जाएं"
+  }
 }

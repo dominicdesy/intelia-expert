@@ -1091,5 +1091,37 @@
   "widget.errorToken": "خطأ في المصادقة.",
   "widget.errorQuota": "تم الوصول إلى حد الاستخدام.",
   "help.voiceAssistantTitle": "المساعد الصوتي في الوقت الفعلي",
-  "help.voiceAssistantDesc": "محادثة صوتية تفاعلية في الوقت الفعلي. تحدث بشكل طبيعي واحصل على ردود صوتية فورية."
+  "help.voiceAssistantDesc": "محادثة صوتية تفاعلية في الوقت الفعلي. تحدث بشكل طبيعي واحصل على ردود صوتية فورية.",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "سعيد بسماع ذلك! شكراً على المشاركة.",
+        "سعداء بأنك تستمتع بـ Cognito!",
+        "هذا يعني الكثير. شكراً!"
+      ],
+      "neutral": [
+        "شكراً على ملاحظاتك الصادقة.",
+        "مفهوم. نحن نقدر مدخلاتك.",
+        "ملاحظاتك تساعدنا على التحسن."
+      ],
+      "unsatisfied": [
+        "نأسف لأننا لم نلبي التوقعات. شكراً لإعلامنا.",
+        "شكراً على صراحتك. سنعمل على ذلك.",
+        "نقدر لك الوقت الذي خصصته للمشاركة."
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "تم تعيين العملة بالفعل",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "العودة"
+  }
 }

@@ -1103,5 +1103,37 @@
   "widget.sendButton": "Send",
   "widget.errorNetwork": "Connection error. Please try again.",
   "widget.errorToken": "Authentication error.",
-  "widget.errorQuota": "Usage limit reached."
+  "widget.errorQuota": "Usage limit reached.",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "Great to hear that! Thanks for sharing.",
+        "Glad you're enjoying Cognito!",
+        "That means a lot. Thanks!"
+      ],
+      "neutral": [
+        "Thanks for your honest feedback.",
+        "Got it. We appreciate your input.",
+        "Your feedback helps us do better."
+      ],
+      "unsatisfied": [
+        "We're sorry it didn't hit the mark. Thanks for letting us know.",
+        "Thanks for your honesty. We'll work on it.",
+        "We appreciate you taking the time to share."
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "Currency already set",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "Go Back"
+  }
 }

@@ -134,6 +134,7 @@ export interface TranslationKeys {
   "common.reset": string;
   "common.apply": string;
   "common.update": string;
+  "common.goBack": string;
 
   // ===========================================
   // LOGIN FORM
@@ -310,6 +311,11 @@ export interface TranslationKeys {
   "chat.satisfactionCommentPlaceholder": string;
   "chat.satisfactionSkip": string;
   "chat.satisfactionThanks": string;
+  "chat.satisfactionThankYou": {
+    satisfied: string[];
+    neutral: string[];
+    unsatisfied: string[];
+  };
   "chat.submit": string;
   "chat.noConversations": string;
   "chat.loading": string;
@@ -520,6 +526,14 @@ export interface TranslationKeys {
   "billing.loadingCurrency": string;
   "billing.currencyUpdated": string;
   "billing.currencyUpdateFailed": string;
+  "billing.currencyAlreadySet": string;
+  "billing.errorLoadingCurrency": string;
+  "billing.errorTitle": string;
+  "billing.selectYourCurrency": string;
+  "billing.currencyDescription": string;
+  "billing.currentCurrency": string;
+  "billing.suggestedBasedOnLocation": string;
+  "billing.canSelectDifferent": string;
   "billing.monthly": string;
   "billing.yearly": string;
   "billing.discount15": string;

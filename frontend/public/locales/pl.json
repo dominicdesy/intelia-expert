@@ -1091,5 +1091,37 @@
   "widget.errorToken": "Błąd uwierzytelniania.",
   "widget.errorQuota": "Osiągnięto limit użycia.",
   "help.voiceAssistantTitle": "Asystent głosowy w czasie rzeczywistym",
-  "help.voiceAssistantDesc": "Interaktywna rozmowa głosowa w czasie rzeczywistym. Mów naturalnie i otrzymuj natychmiastowe odpowiedzi głosowe."
+  "help.voiceAssistantDesc": "Interaktywna rozmowa głosowa w czasie rzeczywistym. Mów naturalnie i otrzymuj natychmiastowe odpowiedzi głosowe.",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "Wspaniale to słyszeć! Dziękujemy za podzielenie się.",
+        "Cieszymy się, że podoba Ci się Cognito!",
+        "To dla nas wiele znaczy. Dziękujemy!"
+      ],
+      "neutral": [
+        "Dziękujemy za szczerą opinię.",
+        "Rozumiemy. Doceniamy Twój wkład.",
+        "Twoja opinia pomaga nam się poprawiać."
+      ],
+      "unsatisfied": [
+        "Przykro nam, że nie spełniło oczekiwań. Dziękujemy za poinformowanie nas.",
+        "Dziękujemy za szczerość. Będziemy nad tym pracować.",
+        "Doceniamy, że poświęciłeś czas na podzielenie się."
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "Waluta już ustawiona",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "Wróć"
+  }
 }

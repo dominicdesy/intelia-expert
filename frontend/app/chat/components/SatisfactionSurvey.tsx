@@ -1,7 +1,8 @@
 /**
  * SatisfactionSurvey Component
- * Version: 1.4.1
- * Last modified: 2025-10-26
+ * Version: 1.5.0
+ * Last modified: 2025-10-28
+ * Changes: Added random thank you messages based on satisfaction level
  */
 /**
  * SatisfactionSurvey Component
@@ -44,6 +45,35 @@ export const SatisfactionSurvey: React.FC<SatisfactionSurveyProps> = ({
   const [showComment, setShowComment] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [thankYouMessage, setThankYouMessage] = useState("");
+
+  // Get random thank you message based on satisfaction level
+  const getRandomThankYouMessage = (rating: string): string => {
+    let messageKey = "";
+
+    // Map rating to message category
+    if (rating === "satisfied") {
+      messageKey = "satisfied"; // positive
+    } else if (rating === "neutral") {
+      messageKey = "neutral";
+    } else if (rating === "unsatisfied") {
+      messageKey = "unsatisfied"; // negative
+    }
+
+    // Get array of possible messages for this level
+    const messages = t(`chat.satisfactionThankYou.${messageKey}`, {
+      returnObjects: true,
+    }) as string[] | string;
+
+    // If it's an array, select random message
+    if (Array.isArray(messages) && messages.length > 0) {
+      const randomIndex = Math.floor(Math.random() * messages.length);
+      return messages[randomIndex];
+    }
+
+    // Fallback to string if not array
+    return typeof messages === "string" ? messages : "Thank you for your feedback!";
+  };
 
   const handleRatingClick = async (rating: string) => {
     setSelectedRating(rating);
@@ -80,7 +110,9 @@ export const SatisfactionSurvey: React.FC<SatisfactionSurveyProps> = ({
         throw new Error("Failed to submit survey");
       }
 
-      // Succès - Afficher message de remerciement
+      // Succès - Get random thank you message and display
+      const message = getRandomThankYouMessage(rating);
+      setThankYouMessage(message);
       setIsSuccess(true);
 
       // Disparaître après 3 secondes
@@ -102,17 +134,14 @@ export const SatisfactionSurvey: React.FC<SatisfactionSurveyProps> = ({
     }
   };
 
-  // Message de succès
+  // Message de succès avec message aléatoire
   if (isSuccess) {
     return (
       <div className="mb-3 p-4 bg-green-50 border border-green-200 rounded-lg shadow-sm animate-fade-in">
         <div className="text-center">
           <div className="text-2xl mb-2">✅</div>
           <div className="text-green-800 font-medium">
-            {t("chat.satisfactionThanks") || "Thank you for your feedback!"}
-          </div>
-          <div className="text-green-600 text-sm mt-1">
-            {t("chat.satisfactionHelpful") || "Your rating helps us improve Intelia Expert."}
+            {thankYouMessage || t("chat.satisfactionThanks") || "Thank you for your feedback!"}
           </div>
         </div>
       </div>

@@ -1091,5 +1091,37 @@
   "widget.errorToken": "Kesalahan autentikasi.",
   "widget.errorQuota": "Batas penggunaan tercapai.",
   "help.voiceAssistantTitle": "Asisten suara waktu nyata",
-  "help.voiceAssistantDesc": "Percakapan suara interaktif secara real-time. Bicaralah secara alami dan terima respons suara instan."
+  "help.voiceAssistantDesc": "Percakapan suara interaktif secara real-time. Bicaralah secara alami dan terima respons suara instan.",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "Senang mendengarnya! Terima kasih telah berbagi.",
+        "Senang Anda menikmati Cognito!",
+        "Itu sangat berarti. Terima kasih!"
+      ],
+      "neutral": [
+        "Terima kasih atas umpan balik jujur Anda.",
+        "Mengerti. Kami menghargai masukan Anda.",
+        "Umpan balik Anda membantu kami menjadi lebih baik."
+      ],
+      "unsatisfied": [
+        "Kami minta maaf tidak sesuai harapan. Terima kasih telah memberi tahu kami.",
+        "Terima kasih atas kejujuran Anda. Kami akan mengusahakannya.",
+        "Kami menghargai Anda telah meluangkan waktu untuk berbagi."
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "Mata uang sudah diatur",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "Kembali"
+  }
 }

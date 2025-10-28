@@ -32,8 +32,8 @@
   "pwa.ios.subtitle": "将应用添加到主屏幕",
   "pwa.ios.instructions": "要安装此应用:",
   "pwa.ios.step1": "点击分享按钮",
-  "pwa.ios.step2": "选择"添加到主屏幕"",
-  "pwa.ios.step3": "点击"添加"以确认",
+  "pwa.ios.step2": "选择\"添加到主屏幕\"",
+  "pwa.ios.step3": "点击\"添加\"以确认",
   "pwa.ios.close": "关闭",
   "auth.accountCreated": "账户已创建！",
   "auth.connecting": "连接中...",
@@ -1091,5 +1091,37 @@
   "widget.errorToken": "认证错误。",
   "widget.errorQuota": "已达到使用限制。",
   "help.voiceAssistantTitle": "实时语音助手",
-  "help.voiceAssistantDesc": "实时互动语音对话。自然说话，即时获得语音回复。"
+  "help.voiceAssistantDesc": "实时互动语音对话。自然说话，即时获得语音回复。",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "很高兴听到这个！谢谢分享。",
+        "很高兴您喜欢Cognito！",
+        "这对我们意义重大。谢谢！"
+      ],
+      "neutral": [
+        "感谢您的诚实反馈。",
+        "明白了。我们感谢您的意见。",
+        "您的反馈帮助我们做得更好。"
+      ],
+      "unsatisfied": [
+        "很抱歉没有达到预期。感谢您告诉我们。",
+        "感谢您的诚实。我们会改进的。",
+        "感谢您花时间分享。"
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "货币已设置",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "返回"
+  }
 }

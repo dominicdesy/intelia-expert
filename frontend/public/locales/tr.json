@@ -1091,5 +1091,37 @@
   "widget.errorToken": "Kimlik doğrulama hatası.",
   "widget.errorQuota": "Kullanım sınırına ulaşıldı.",
   "help.voiceAssistantTitle": "Gerçek zamanlı sesli asistan",
-  "help.voiceAssistantDesc": "Gerçek zamanlı etkileşimli sesli konuşma. Doğal şekilde konuşun ve anında sesli yanıtlar alın."
+  "help.voiceAssistantDesc": "Gerçek zamanlı etkileşimli sesli konuşma. Doğal şekilde konuşun ve anında sesli yanıtlar alın.",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "Bunu duymak harika! Paylaştığınız için teşekkürler.",
+        "Cognito'yu beğenmenize sevindik!",
+        "Bu çok şey ifade ediyor. Teşekkürler!"
+      ],
+      "neutral": [
+        "Dürüst geri bildiriminiz için teşekkürler.",
+        "Anlaşıldı. Katkınızı takdir ediyoruz.",
+        "Geri bildiriminiz daha iyi olmamıza yardımcı oluyor."
+      ],
+      "unsatisfied": [
+        "Beklentileri karşılamadığı için üzgünüz. Bize bildirdiğiniz için teşekkürler.",
+        "Dürüstlüğünüz için teşekkürler. Üzerinde çalışacağız.",
+        "Paylaşmak için zaman ayırdığınız için minnettarız."
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "Para birimi zaten ayarlandı",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "Geri Dön"
+  }
 }

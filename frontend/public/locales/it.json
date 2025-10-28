@@ -1091,5 +1091,37 @@
   "widget.errorToken": "Errore di autenticazione.",
   "widget.errorQuota": "Limite di utilizzo raggiunto.",
   "help.voiceAssistantTitle": "Assistente vocale in tempo reale",
-  "help.voiceAssistantDesc": "Conversazione vocale interattiva in tempo reale. Parla naturalmente e ricevi risposte vocali istantanee."
+  "help.voiceAssistantDesc": "Conversazione vocale interattiva in tempo reale. Parla naturalmente e ricevi risposte vocali istantanee.",
+  "chat": {
+    "satisfactionThankYou": {
+      "satisfied": [
+        "Ottimo! Grazie per aver condiviso.",
+        "Felici che ti piaccia Cognito!",
+        "Significa molto. Grazie!"
+      ],
+      "neutral": [
+        "Grazie per il tuo feedback onesto.",
+        "Capito. Apprezziamo il tuo contributo.",
+        "Il tuo feedback ci aiuta a migliorare."
+      ],
+      "unsatisfied": [
+        "Ci dispiace non aver soddisfatto le aspettative. Grazie per averci informato.",
+        "Grazie per la tua onestà. Ci lavoreremo.",
+        "Apprezziamo che tu abbia dedicato del tempo per condividere."
+      ]
+    }
+  },
+  "billing": {
+    "currencyAlreadySet": "Valuta già impostata",
+    "errorLoadingCurrency": "Error loading currency",
+    "errorTitle": "Error",
+    "selectYourCurrency": "Select Your Currency",
+    "currencyDescription": "Choose your preferred billing currency",
+    "currentCurrency": "Current currency",
+    "suggestedBasedOnLocation": "Suggested based on your location",
+    "canSelectDifferent": "You can select a different currency"
+  },
+  "common": {
+    "goBack": "Torna indietro"
+  }
 }
