@@ -46,7 +46,7 @@ From `docs/guides/RAGAS_ANALYSIS_REPORT.md`:
 
 **Configuration:**
 ```bash
-COHERE_API_KEY=rak9nV8ygzsI0bMDqQCKdxOHIS1xHVVtJcnB2CCo
+COHERE_API_KEY=your_cohere_api_key_here
 COHERE_RERANK_MODEL=rerank-multilingual-v3.0
 COHERE_RERANK_TOP_N=3
 ```
