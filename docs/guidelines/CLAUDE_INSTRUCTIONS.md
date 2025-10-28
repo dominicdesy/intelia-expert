@@ -32,8 +32,13 @@ C:\intelia_gpt\intelia-expert\docs\
 ```
 docs/
 ├── README.md                          # Index principal de la documentation
-├── CLAUDE_INSTRUCTIONS.md            # Ce fichier - Instructions pour Claude
-├── DOCS_REORGANIZATION_PLAN.md       # Plan de réorganisation
+│
+├── guidelines/                       # Directives et conventions
+│   └── CLAUDE_INSTRUCTIONS.md        # Ce fichier - Instructions pour Claude
+│
+├── planning/                         # Gestion de projet et TODOs
+│   ├── TODOS_EN_SUSPENS.md          # Inventaire des tâches en attente
+│   └── TODOS_DECISION_GUIDE.md      # Guide de décision pour prioriser
 │
 ├── security/                         # Audits et rapports de sécurité
 │   ├── SECURITY_FINAL_SUMMARY.md
@@ -57,10 +62,12 @@ docs/
 │   ├── MIGRATION_GUIDE.md
 │   └── MIGRATION_COMPLETED.md
 │
+├── implementation/                   # Documentation d'implémentation
 ├── analysis/                         # Analyses techniques
 ├── configuration/                    # Guides de configuration
 ├── guides/                           # Guides développeur
 ├── reports/                          # Rapports d'implémentation
+├── frontend/                         # Documentation frontend
 └── archive/                          # Documentation obsolète
 ```
 
@@ -156,9 +163,13 @@ Frontend (Next.js)
    - `deployment/` → Guides de déploiement
    - `operations/` → Documentation opérationnelle
    - `migration/` → Archives de migration
+   - `implementation/` → Documentation d'implémentation
    - `analysis/` → Analyses techniques
    - `guides/` → Guides développeur
    - `reports/` → Rapports d'implémentation
+   - `planning/` → Gestion de projet et TODOs
+   - `guidelines/` → Directives et conventions
+   - `frontend/` → Documentation frontend
 
 2. **Nommage des fichiers:**
    - `*_REPORT.md` → Rapports
@@ -345,7 +356,7 @@ Ce fichier doit être mis à jour lorsque :
 - Des directives importantes sont ajoutées
 - La structure de documentation évolue
 
-**Dernière révision:** 2025-10-12
+**Dernière révision:** 2025-10-28
 
 ---
 

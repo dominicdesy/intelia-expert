@@ -2,7 +2,7 @@
 
 Bienvenue dans la documentation complète du projet Intelia Expert.
 
-> **📌 Instructions Claude Code:** [CLAUDE_INSTRUCTIONS.md](./CLAUDE_INSTRUCTIONS.md) - Guide pour les interactions avec Claude Code (conventions, architecture, workflow)
+> **📌 Instructions Claude Code:** [guidelines/CLAUDE_INSTRUCTIONS.md](./guidelines/CLAUDE_INSTRUCTIONS.md) - Guide pour les interactions avec Claude Code (conventions, architecture, workflow)
 
 ## 📚 Structure de la Documentation
 
@@ -139,6 +139,17 @@ Archives de migration et historique de changements importants.
 - [Execute Now](./migration/EXECUTE_NOW.md) - Exécution migration
 - [Q&A Page Fix](./migration/Q&A_PAGE_FIX.md) - Correction page Q&A
 
+### 📋 [Planning](./planning/)
+Gestion de projet, TODOs et guides de décision.
+
+- [TODOs en Suspens](./planning/TODOS_EN_SUSPENS.md) - Inventaire des tâches en attente
+- [Guide de Décision TODOs](./planning/TODOS_DECISION_GUIDE.md) - Guide pour prioriser les tâches
+
+### 📘 [Guidelines](./guidelines/)
+Directives et conventions pour le développement.
+
+- [Claude Code Instructions](./guidelines/CLAUDE_INSTRUCTIONS.md) - Instructions pour Claude Code (architecture, conventions, workflow)
+
 ### 📦 [Archive](./archive/)
 Documentation historique et fichiers obsolètes.
 
@@ -204,6 +215,8 @@ intelia-expert/
 │   ├── deployment/         # 🚀 Guides de déploiement
 │   ├── operations/         # ⚡ Documentation opérationnelle
 │   ├── migration/          # 📜 Archives de migration
+│   ├── planning/           # 📋 Gestion de projet et TODOs
+│   ├── guidelines/         # 📘 Directives et conventions
 │   └── archive/            # Documentation historique
 ├── llm/                    # 🧠 Module LLM principal
 │   ├── scripts/           # Scripts utilitaires
@@ -252,6 +265,8 @@ Pour ajouter de la documentation:
    - `deployment/` → Guides de déploiement
    - `operations/` → Documentation opérationnelle
    - `migration/` → Archives de migration
+   - `planning/` → Gestion de projet et TODOs
+   - `guidelines/` → Directives et conventions
    - `archive/` → Documentation obsolète
 
 2. **Suivre les conventions** de nommage ci-dessus
