@@ -1,0 +1,551 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Complete poultry value chain terminology - from breeding to processing",
+    "last_updated": "2025-10-28",
+    "source": "Extracted from University of Kentucky Poultry Glossary, Hy-Line guides, industry standards",
+    "coverage": ["hatcheries", "processing", "layer_production", "breeding_genetics", "nutrition", "health", "farm_management"],
+    "languages": ["en", "fr"]
+  },
+
+  "hatchery_incubation": {
+    "air_cell": {
+      "en": "air cell, air space",
+      "fr": "chambre à air, cellule d'air",
+      "description": "The air space between the two shell membranes, usually at the large end of the egg"
+    },
+    "candling": {
+      "en": "candling, egg candling",
+      "fr": "mirage, mirage des œufs",
+      "description": "Using a light source (candler) to examine the contents of an egg to assess fertility and embryo development"
+    },
+    "setter": {
+      "en": "setter, incubator setter",
+      "fr": "éclosoir, couveuse",
+      "description": "Incubation equipment where eggs are placed for the first 18 days of incubation"
+    },
+    "hatcher": {
+      "en": "hatcher, hatching cabinet",
+      "fr": "éclosoir final, armoire d'éclosion",
+      "description": "Equipment where eggs are transferred on day 18 for final incubation and hatching"
+    },
+    "hatchability": {
+      "en": "hatchability, hatch rate",
+      "fr": "taux d'éclosion, éclosabilité",
+      "description": "The percentage of fertile eggs that successfully hatch when incubated"
+    },
+    "pip": {
+      "en": "pip, external pip",
+      "fr": "bêchage, perçage de la coquille",
+      "description": "When a chick breaks through the shell prior to hatching"
+    },
+    "embryology": {
+      "en": "embryology, embryonic development",
+      "fr": "embryologie, développement embryonnaire",
+      "description": "The study of the formation and development of embryos"
+    },
+    "germinal_disc": {
+      "en": "germinal disc, blastoderm",
+      "fr": "disque germinatif, blastoderme",
+      "description": "The site of fertilization in an egg where embryo development begins"
+    },
+    "chick_quality": {
+      "en": "chick quality, day-old chick quality",
+      "fr": "qualité poussin, qualité du poussin d'un jour",
+      "description": "Assessment of newly hatched chicks using scoring systems like Pasgar or Tona method"
+    },
+    "egg_storage": {
+      "en": "egg storage, hatching egg storage",
+      "fr": "stockage des œufs, conservation des œufs à couver",
+      "description": "Holding fertile eggs at controlled temperature and humidity before incubation"
+    },
+    "turning": {
+      "en": "egg turning, rotation",
+      "fr": "retournement des œufs, rotation",
+      "description": "Periodic rotation of eggs during incubation to prevent embryo adhesion"
+    },
+    "forced_air_incubator": {
+      "en": "forced-air incubator, fan-ventilated incubator",
+      "fr": "incubateur à air pulsé, couveuse ventilée",
+      "description": "Incubation equipment with a fan to circulate warm air uniformly"
+    },
+    "fumigation": {
+      "en": "fumigation, egg fumigation",
+      "fr": "fumigation, fumigation des œufs",
+      "description": "Sanitation process using formaldehyde or hydrogen peroxide to disinfect eggs and equipment"
+    },
+    "breakout_analysis": {
+      "en": "breakout analysis, egg breakout",
+      "fr": "analyse de cassage, examen post-éclosion",
+      "description": "Post-hatch examination of unhatched eggs to diagnose fertility and embryo mortality issues"
+    },
+    "embryonic_mortality": {
+      "en": "embryonic mortality, dead-in-shell",
+      "fr": "mortalité embryonnaire, mort dans l'œuf",
+      "description": "Death of embryos during incubation, classified as early (1-7 days), mid (8-14 days), or late (15-21 days)"
+    }
+  },
+
+  "processing_meat_quality": {
+    "stunning": {
+      "en": "stunning, electrical stunning, controlled atmosphere stunning",
+      "fr": "étourdissement, étourdissement électrique, étourdissement atmosphère contrôlée",
+      "description": "Process of rendering birds unconscious before slaughter using electrical current or gas"
+    },
+    "scalding": {
+      "en": "scalding, scald tank",
+      "fr": "échaudage, bain d'échaudage",
+      "description": "Hot water treatment to loosen feathers before plucking"
+    },
+    "evisceration": {
+      "en": "evisceration, gutting",
+      "fr": "éviscération, vidage",
+      "description": "Removal of internal organs during processing"
+    },
+    "carcass_yield": {
+      "en": "carcass yield, dressing percentage",
+      "fr": "rendement carcasse, pourcentage de carcasse",
+      "description": "Percentage of live weight remaining after slaughter and processing"
+    },
+    "ultimate_ph": {
+      "en": "ultimate pH, final pH",
+      "fr": "pH ultime, pH final",
+      "description": "Final pH of meat measured 24 hours post-mortem, indicator of meat quality (target: 5.7-5.9)"
+    },
+    "drip_loss": {
+      "en": "drip loss, purge",
+      "fr": "perte par exsudation, perte de jus",
+      "description": "Loss of moisture from meat during storage, indicator of water holding capacity"
+    },
+    "breast_yield": {
+      "en": "breast yield, pectoralis yield",
+      "fr": "rendement de poitrine, rendement pectoral",
+      "description": "Weight of breast meat as percentage of carcass weight (modern broilers: 25-28%)"
+    },
+    "woody_breast": {
+      "en": "woody breast, hardness",
+      "fr": "syndrome du muscle blanc strié, poitrine dure",
+      "description": "Meat quality defect characterized by abnormally hard breast meat texture"
+    },
+    "white_striping": {
+      "en": "white striping",
+      "fr": "stries blanches",
+      "description": "Visible white striations parallel to muscle fibers in breast meat, quality defect"
+    },
+    "pse_meat": {
+      "en": "PSE meat, pale soft exudative",
+      "fr": "viande PSE, pâle molle exsudative",
+      "description": "Meat quality defect: pale color, soft texture, high drip loss (pH < 5.7)"
+    },
+    "dfd_meat": {
+      "en": "DFD meat, dark firm dry",
+      "fr": "viande DFD, sombre ferme sèche",
+      "description": "Meat quality defect: dark color, firm texture, dry surface (pH > 6.2)"
+    },
+    "giblets": {
+      "en": "giblets, edible offal",
+      "fr": "abats, abattis",
+      "description": "Edible internal organs: heart, gizzard, and liver"
+    },
+    "chilling": {
+      "en": "chilling, carcass cooling",
+      "fr": "refroidissement, refroidissement de carcasse",
+      "description": "Rapid cooling of carcasses post-processing (air chilling or water chilling)"
+    },
+    "deboning": {
+      "en": "deboning, boning out",
+      "fr": "désossage",
+      "description": "Removal of bones from meat cuts"
+    },
+    "haccp": {
+      "en": "HACCP, Hazard Analysis Critical Control Points",
+      "fr": "HACCP, Analyse des dangers et points critiques",
+      "description": "Food safety management system identifying and controlling hazards in processing"
+    }
+  },
+
+  "layer_production_egg_quality": {
+    "point_of_lay": {
+      "en": "point of lay, POL",
+      "fr": "entrée en ponte, âge à la ponte",
+      "description": "Age when pullets begin laying eggs (typically 16-20 weeks)"
+    },
+    "hen_day_production": {
+      "en": "hen-day production, hen-day percentage",
+      "fr": "production poule-jour, pourcentage poule-jour",
+      "description": "Eggs produced per hen per day, expressed as percentage (peak: 95-98%)"
+    },
+    "hen_housed_production": {
+      "en": "hen-housed production",
+      "fr": "production poule logée",
+      "description": "Total eggs divided by number of hens placed, accounting for mortality"
+    },
+    "haugh_unit": {
+      "en": "Haugh unit, HU",
+      "fr": "unité Haugh, UH",
+      "description": "Measure of egg freshness based on albumen height and egg weight (target: >72 for AA grade)"
+    },
+    "shell_strength": {
+      "en": "shell strength, breaking strength",
+      "fr": "résistance de la coquille, force de rupture",
+      "description": "Force required to break eggshell, measured in Newtons (target: >35-40 N)"
+    },
+    "shell_thickness": {
+      "en": "shell thickness",
+      "fr": "épaisseur de coquille",
+      "description": "Thickness of eggshell measured in micrometers (target: 330-350 µm)"
+    },
+    "yolk_color": {
+      "en": "yolk color, Roche fan score",
+      "fr": "couleur du jaune, score fan Roche",
+      "description": "Intensity of yolk pigmentation measured on Roche color fan scale (1-15, target varies by market)"
+    },
+    "laying_persistency": {
+      "en": "laying persistency, persistence of lay",
+      "fr": "persistance de ponte",
+      "description": "Ability of hens to maintain egg production over time without significant decline"
+    },
+    "peak_production": {
+      "en": "peak production",
+      "fr": "pic de ponte",
+      "description": "Maximum egg production rate achieved by a flock (typically 95-98% at 24-28 weeks)"
+    },
+    "molt": {
+      "en": "molt, molting",
+      "fr": "mue",
+      "description": "Natural or induced period when hens stop laying and renew feathers"
+    },
+    "induced_molt": {
+      "en": "induced molt, forced molt",
+      "fr": "mue provoquée, mue forcée",
+      "description": "Deliberate triggering of molt to extend productive life of laying hens"
+    },
+    "blood_spot": {
+      "en": "blood spot, meat spot",
+      "fr": "tache de sang, tache de viande",
+      "description": "Small blood or tissue inclusion in egg, causing downgrading"
+    },
+    "dirty_eggs": {
+      "en": "dirty eggs, soiled eggs",
+      "fr": "œufs sales, œufs souillés",
+      "description": "Eggs with fecal matter or debris on shell, requiring cleaning or downgrading"
+    },
+    "cracked_eggs": {
+      "en": "cracked eggs, checks",
+      "fr": "œufs fêlés, œufs cassés",
+      "description": "Eggs with shell cracks, unsuitable for sale as shell eggs"
+    },
+    "egg_weight": {
+      "en": "egg weight, average egg weight",
+      "fr": "poids de l'œuf, poids moyen des œufs",
+      "description": "Mass of individual egg (target varies by age: 50-65g depending on strain and week)"
+    }
+  },
+
+  "breeding_genetics": {
+    "heritability": {
+      "en": "heritability, h-squared",
+      "fr": "héritabilité, h-carré",
+      "description": "Proportion of phenotypic variance due to genetic factors (0.0-1.0 scale)"
+    },
+    "breeding_value": {
+      "en": "breeding value, estimated breeding value, EBV",
+      "fr": "valeur génétique, valeur d'élevage estimée",
+      "description": "Genetic merit of an individual for a trait, estimated from performance data"
+    },
+    "selection_intensity": {
+      "en": "selection intensity, selection pressure",
+      "fr": "intensité de sélection, pression de sélection",
+      "description": "Proportion of individuals selected as parents for next generation"
+    },
+    "genetic_gain": {
+      "en": "genetic gain, genetic progress",
+      "fr": "progrès génétique, gain génétique",
+      "description": "Improvement in trait performance per generation due to selection"
+    },
+    "inbreeding": {
+      "en": "inbreeding, inbreeding coefficient",
+      "fr": "consanguinité, coefficient de consanguinité",
+      "description": "Mating of related individuals, increasing homozygosity (should be <1% per generation)"
+    },
+    "crossbreeding": {
+      "en": "crossbreeding, hybridization",
+      "fr": "croisement, hybridation",
+      "description": "Mating individuals from different genetic lines or breeds"
+    },
+    "heterosis": {
+      "en": "heterosis, hybrid vigor",
+      "fr": "hétérosis, vigueur hybride",
+      "description": "Superior performance of crossbred offspring compared to purebred parents"
+    },
+    "selection_index": {
+      "en": "selection index, multi-trait index",
+      "fr": "indice de sélection, indice multi-caractère",
+      "description": "Weighted combination of multiple traits for simultaneous selection"
+    },
+    "generation_interval": {
+      "en": "generation interval",
+      "fr": "intervalle de génération",
+      "description": "Average age of parents when their offspring are born (shorter = faster genetic progress)"
+    },
+    "genomic_selection": {
+      "en": "genomic selection, marker-assisted selection",
+      "fr": "sélection génomique, sélection assistée par marqueurs",
+      "description": "Selection using DNA markers to predict breeding values"
+    },
+    "snp": {
+      "en": "SNP, single nucleotide polymorphism",
+      "fr": "SNP, polymorphisme nucléotidique simple",
+      "description": "Single base-pair variation in DNA sequence used as genetic marker"
+    },
+    "pedigree": {
+      "en": "pedigree, ancestry",
+      "fr": "pedigree, ascendance",
+      "description": "Record of an individual's ancestry and genetic relationships"
+    },
+    "progeny_test": {
+      "en": "progeny test, progeny testing",
+      "fr": "test sur descendance",
+      "description": "Evaluation of breeding value based on performance of offspring"
+    },
+    "genetic_correlation": {
+      "en": "genetic correlation",
+      "fr": "corrélation génétique",
+      "description": "Relationship between genetic values of two different traits (-1.0 to +1.0)"
+    },
+    "phenotype": {
+      "en": "phenotype, observed performance",
+      "fr": "phénotype, performance observée",
+      "description": "Observable characteristics of an individual (genetic + environmental effects)"
+    },
+    "genotype": {
+      "en": "genotype, genetic makeup",
+      "fr": "génotype, composition génétique",
+      "description": "Genetic constitution of an individual"
+    }
+  },
+
+  "nutrition_feed": {
+    "starter_feed": {
+      "en": "starter feed, chick starter",
+      "fr": "aliment démarrage, starter",
+      "description": "High-protein feed for chicks 0-10 days (22-24% crude protein)"
+    },
+    "grower_feed": {
+      "en": "grower feed",
+      "fr": "aliment croissance, grower",
+      "description": "Intermediate protein feed for growing birds 11-24 days (20-22% CP)"
+    },
+    "finisher_feed": {
+      "en": "finisher feed",
+      "fr": "aliment finition, finisher",
+      "description": "Lower protein feed for final growth phase 25+ days (18-20% CP)"
+    },
+    "metabolizable_energy": {
+      "en": "metabolizable energy, ME",
+      "fr": "énergie métabolisable, EM",
+      "description": "Energy available to bird after accounting for fecal and urinary losses (kcal/kg)"
+    },
+    "crude_protein": {
+      "en": "crude protein, CP",
+      "fr": "protéine brute, PB",
+      "description": "Total nitrogen content of feed multiplied by 6.25, expressed as percentage"
+    },
+    "lysine": {
+      "en": "lysine, digestible lysine",
+      "fr": "lysine, lysine digestible",
+      "description": "Essential amino acid, first limiting in poultry diets (requirement: 1.0-1.3% of diet)"
+    },
+    "methionine": {
+      "en": "methionine, digestible methionine",
+      "fr": "méthionine, méthionine digestible",
+      "description": "Essential sulfur-containing amino acid (requirement: 0.45-0.55% of diet)"
+    },
+    "calcium": {
+      "en": "calcium, Ca",
+      "fr": "calcium, Ca",
+      "description": "Essential mineral for bone development and eggshell formation (requirement: 0.9-4.0% depending on type)"
+    },
+    "phosphorus": {
+      "en": "phosphorus, available phosphorus",
+      "fr": "phosphore, phosphore disponible",
+      "description": "Essential mineral for bone formation (requirement: 0.4-0.6% available P)"
+    },
+    "feed_conversion_ratio": {
+      "en": "feed conversion ratio, FCR",
+      "fr": "indice de consommation, IC",
+      "description": "Kg feed required per kg body weight gain (modern broilers: 1.4-1.7)"
+    },
+    "pellets": {
+      "en": "pellets, pelleted feed",
+      "fr": "granulés, aliment granulé",
+      "description": "Feed compressed into bite-sized cylindrical pieces"
+    },
+    "crumbles": {
+      "en": "crumbles, crumbled pellets",
+      "fr": "miettes, granulés émiettés",
+      "description": "Pellets broken into smaller pieces suitable for young chicks"
+    },
+    "mash": {
+      "en": "mash, meal feed",
+      "fr": "farine, aliment fariné",
+      "description": "Unprocessed ground feed mixture"
+    },
+    "phytase": {
+      "en": "phytase enzyme",
+      "fr": "phytase, enzyme phytase",
+      "description": "Enzyme added to feed to release phosphorus from phytic acid"
+    },
+    "coccidiostat": {
+      "en": "coccidiostat, anticoccidial",
+      "fr": "coccidiostatique, anticoccidien",
+      "description": "Feed additive to prevent coccidiosis infection"
+    }
+  },
+
+  "health_disease": {
+    "coccidiosis": {
+      "en": "coccidiosis",
+      "fr": "coccidiose",
+      "description": "Parasitic disease caused by Eimeria protozoa affecting intestinal tract"
+    },
+    "newcastle_disease": {
+      "en": "Newcastle disease, ND",
+      "fr": "maladie de Newcastle, pseudo-peste aviaire",
+      "description": "Highly contagious viral disease affecting respiratory, nervous, and digestive systems"
+    },
+    "infectious_bronchitis": {
+      "en": "infectious bronchitis, IB",
+      "fr": "bronchite infectieuse",
+      "description": "Highly contagious viral respiratory disease"
+    },
+    "avian_influenza": {
+      "en": "avian influenza, AI, bird flu",
+      "fr": "influenza aviaire, grippe aviaire",
+      "description": "Viral disease with high and low pathogenic strains (HPAI, LPAI)"
+    },
+    "marek_disease": {
+      "en": "Marek's disease",
+      "fr": "maladie de Marek",
+      "description": "Viral disease causing tumors and immunosuppression in chickens"
+    },
+    "gumboro_disease": {
+      "en": "Gumboro disease, infectious bursal disease, IBD",
+      "fr": "maladie de Gumboro, bursite infectieuse",
+      "description": "Viral disease affecting bursa of Fabricius, causing immunosuppression"
+    },
+    "ascites": {
+      "en": "ascites, water belly",
+      "fr": "ascite, syndrome d'ascite",
+      "description": "Accumulation of fluid in abdominal cavity, often in fast-growing broilers"
+    },
+    "necrotic_enteritis": {
+      "en": "necrotic enteritis, NE",
+      "fr": "entérite nécrotique",
+      "description": "Bacterial disease caused by Clostridium perfringens affecting intestines"
+    },
+    "colibacillosis": {
+      "en": "colibacillosis, E. coli infection",
+      "fr": "colibacillose, infection à E. coli",
+      "description": "Bacterial disease caused by pathogenic Escherichia coli strains"
+    },
+    "biosecurity": {
+      "en": "biosecurity, disease prevention",
+      "fr": "biosécurité, prévention des maladies",
+      "description": "Set of preventive measures to reduce disease introduction and spread"
+    },
+    "vaccination": {
+      "en": "vaccination, immunization",
+      "fr": "vaccination, immunisation",
+      "description": "Administration of vaccines to stimulate immune response against diseases"
+    },
+    "mortality": {
+      "en": "mortality, death rate",
+      "fr": "mortalité, taux de mortalité",
+      "description": "Percentage of birds that die during a production cycle (target: <5% broilers, <8% layers)"
+    },
+    "culling": {
+      "en": "culling, selective removal",
+      "fr": "réforme, élimination sélective",
+      "description": "Removal of unproductive or diseased birds from flock"
+    },
+    "necropsy": {
+      "en": "necropsy, post-mortem examination",
+      "fr": "nécropsie, examen post-mortem",
+      "description": "Examination of dead bird to determine cause of death"
+    }
+  },
+
+  "farm_management_equipment": {
+    "stocking_density": {
+      "en": "stocking density, bird density",
+      "fr": "densité d'élevage, densité de peuplement",
+      "description": "Number of birds per square meter (typical: 10-15 birds/m² for broilers)"
+    },
+    "ventilation_rate": {
+      "en": "ventilation rate, air exchange",
+      "fr": "taux de ventilation, renouvellement d'air",
+      "description": "Volume of fresh air provided per bird per unit time (m³/hour/bird)"
+    },
+    "tunnel_ventilation": {
+      "en": "tunnel ventilation",
+      "fr": "ventilation tunnel",
+      "description": "Longitudinal airflow system for cooling in hot weather"
+    },
+    "evaporative_cooling": {
+      "en": "evaporative cooling, cooling pads",
+      "fr": "refroidissement évaporatif, pads de refroidissement",
+      "description": "Cooling system using water evaporation to reduce air temperature"
+    },
+    "nipple_drinker": {
+      "en": "nipple drinker, nipple waterer",
+      "fr": "abreuvoir à tétine, pipette",
+      "description": "Automated watering system with individual drinking points"
+    },
+    "bell_drinker": {
+      "en": "bell drinker, circular drinker",
+      "fr": "abreuvoir cloche, abreuvoir circulaire",
+      "description": "Open circular water container suspended above floor"
+    },
+    "chain_feeder": {
+      "en": "chain feeder, pan feeder",
+      "fr": "chaîne d'alimentation, nourrisseur à chaîne",
+      "description": "Automated feeding system with chain-driven feed distribution"
+    },
+    "litter": {
+      "en": "litter, bedding",
+      "fr": "litière",
+      "description": "Absorbent floor material (wood shavings, rice hulls, straw)"
+    },
+    "ammonia_level": {
+      "en": "ammonia level, NH3 concentration",
+      "fr": "niveau d'ammoniac, concentration NH3",
+      "description": "Concentration of ammonia gas in poultry house (target: <25 ppm)"
+    },
+    "light_intensity": {
+      "en": "light intensity, illumination",
+      "fr": "intensité lumineuse, éclairement",
+      "description": "Amount of light measured in lux (requirement varies: 5-60 lux depending on age/type)"
+    },
+    "photoperiod": {
+      "en": "photoperiod, day length",
+      "fr": "photopériode, durée d'éclairement",
+      "description": "Hours of light per 24-hour period (affects growth and laying)"
+    },
+    "heat_stress": {
+      "en": "heat stress, thermal stress",
+      "fr": "stress thermique, coup de chaleur",
+      "description": "Physiological stress when birds cannot dissipate excess body heat (>30°C)"
+    },
+    "cold_stress": {
+      "en": "cold stress",
+      "fr": "stress au froid",
+      "description": "Stress from inadequate temperature for age (<18°C for young chicks)"
+    },
+    "brooding_temperature": {
+      "en": "brooding temperature, brooder temp",
+      "fr": "température d'élevage, température de démarrage",
+      "description": "Temperature for newly hatched chicks (32-35°C first week, decreasing weekly)"
+    }
+  }
+}

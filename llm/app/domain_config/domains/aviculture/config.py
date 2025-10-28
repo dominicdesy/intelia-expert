@@ -37,6 +37,7 @@ class AvicultureConfig:
         # Load configuration files
         self.system_prompts = self._load_json("system_prompts.json")
         self.terminology = self._load_json("poultry_terminology.json")
+        self.value_chain_terminology = self._load_json("value_chain_terminology.json")
         self.veterinary_terms = self._load_json("veterinary_terms.json")
         self.languages = self._load_json("languages.json")
 
@@ -46,17 +47,64 @@ class AvicultureConfig:
             "aviagen", "novogen", "dekalb", "shaver", "bovans",
         ]
 
-        # Domain-specific metrics
+        # Layer-specific breeds
+        self.layer_breeds = [
+            "hy-line", "lohmann", "isa brown", "dekalb", "shaver",
+            "hisex", "bovans", "hendrix", "novogen",
+        ]
+
+        # Domain-specific metrics (extended)
         self.metric_keywords = [
             "weight", "poids", "fcr", "feed conversion", "indice de conversion",
             "egg production", "ponte", "mortality", "mortalité",
+            "haugh unit", "shell strength", "breast yield", "carcass yield",
+            "hatchability", "hen-day", "laying persistency",
         ]
 
-        # Aviculture-specific keywords (from llm_router)
+        # Hatchery keywords
+        self.hatchery_keywords = [
+            "hatchery", "incubation", "incubateur", "setter", "hatcher",
+            "candling", "mirage", "egg storage", "hatchability", "éclosabilité",
+            "embryo", "pip", "chick quality", "breakout", "fumigation",
+        ]
+
+        # Processing keywords
+        self.processing_keywords = [
+            "processing", "slaughter", "abattage", "stunning", "étourdissement",
+            "evisceration", "scalding", "carcass yield", "breast yield",
+            "meat quality", "pH", "drip loss", "woody breast", "white striping",
+            "chilling", "deboning", "haccp",
+        ]
+
+        # Layer production keywords
+        self.layer_keywords = [
+            "layer", "pondeuse", "egg", "œuf", "laying", "ponte",
+            "haugh unit", "shell strength", "yolk color", "hen-day",
+            "point of lay", "peak production", "molt", "mue",
+            "egg weight", "persistency",
+        ]
+
+        # Breeding & genetics keywords
+        self.breeding_keywords = [
+            "breeding", "génétique", "heritability", "héritabilité",
+            "selection", "sélection", "crossbreeding", "hybrid", "heterosis",
+            "breeding value", "genetic gain", "genomic selection",
+            "inbreeding", "pedigree", "progeny test",
+        ]
+
+        # Aviculture-specific keywords (from llm_router) - extended
         self.aviculture_keywords = [
             "poulet", "poule", "pondeuse", "broiler", "poussin", "volaille",
             "aviculture", "élevage", "mortalité", "ponte", "aliment", "eau",
             "nutrition", "santé", "maladie", "vaccin", "température", "ventilation",
+            # Hatchery terms
+            "incubation", "hatchery", "couvoir", "éclosion",
+            # Processing terms
+            "abattage", "processing", "rendement", "yield",
+            # Layer terms
+            "œuf", "egg", "coquille", "shell",
+            # Breeding terms
+            "génétique", "sélection", "breeding",
         ]
 
         logger.info(f"Aviculture configuration loaded from {config_dir}")
