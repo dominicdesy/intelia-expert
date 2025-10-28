@@ -10,7 +10,7 @@ cause massive economic losses in poultry production.
 
 import re
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -131,7 +131,7 @@ class PoultryMetricsValidator:
         ],
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the validator"""
         logger.info(f"[OK] PoultryMetricsValidator initialized with {len(self.VALID_RANGES)} metric ranges")
 
@@ -140,7 +140,7 @@ class PoultryMetricsValidator:
         text: str,
         language: str = "en",
         strict_mode: bool = True
-    ) -> Dict:
+    ) -> Dict[str, Any]:
         """
         Validate a generated response for metric hallucinations
 
@@ -296,7 +296,7 @@ class PoultryMetricsValidator:
                 f"Review these values for accuracy before presenting to users."
             )
 
-    def _warning_to_dict(self, warning: ValidationWarning) -> Dict:
+    def _warning_to_dict(self, warning: ValidationWarning) -> Dict[str, Any]:
         """Convert ValidationWarning to dict for JSON serialization"""
         return {
             "metric": warning.metric,

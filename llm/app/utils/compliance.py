@@ -9,7 +9,7 @@ and tone based on user role (veterinarian vs producer vs management).
 """
 
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class ComplianceWrapper:
     - Regulatory queries include compliance notes
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize compliance wrapper"""
         # Biosecurity keywords that trigger reinforced disclaimers
         self.biosecurity_keywords = {
@@ -263,7 +263,7 @@ class ComplianceWrapper:
         user_category: Optional[str],
         is_veterinary_query: bool,
         language: str = "en"
-    ) -> Tuple[str, Dict]:
+    ) -> Tuple[str, Dict[str, Any]]:
         """
         Wrap response with compliance disclaimers
 

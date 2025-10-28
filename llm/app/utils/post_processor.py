@@ -16,7 +16,7 @@ This module provides methods to:
 
 import logging
 import re
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 
 from app.utils.domain_validators import get_poultry_validator
 from app.utils.compliance import get_compliance_wrapper
@@ -34,7 +34,7 @@ class ResponsePostProcessor:
     - Remove unwanted formatting artifacts
     """
 
-    def __init__(self, veterinary_terms: Optional[Dict] = None, language_messages: Optional[Dict] = None):
+    def __init__(self, veterinary_terms: Optional[Dict] = None, language_messages: Optional[Dict] = None) -> None:
         """
         Initialize post-processor
 
@@ -121,7 +121,7 @@ class ResponsePostProcessor:
         language: str = "en",
         context_docs: Optional[List[Dict]] = None,
         user_category: Optional[str] = None,
-    ) -> Tuple[str, Dict]:
+    ) -> Tuple[str, Dict[str, Any]]:
         """
         Post-processes response with automatic compliance disclaimers.
 

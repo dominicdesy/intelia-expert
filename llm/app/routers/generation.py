@@ -7,7 +7,7 @@ import logging
 import json
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
-from typing import Dict, List
+from typing import Dict, List, Any
 
 from app.models.generation_schemas import (
     GenerateRequest, GenerateResponse,
@@ -278,7 +278,7 @@ async def generate(
 async def generate_stream(
     request: GenerateRequest,
     llm_client: LLMClient = Depends(get_llm_client)
-):
+) -> StreamingResponse:
     """
     Generate LLM completion with streaming (Server-Sent Events)
 
@@ -670,7 +670,7 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
 # ============================================
 
 @router.get("/model-routing/stats")
-async def get_model_routing_stats():
+async def get_model_routing_stats() -> Dict[str, Any]:
     """
     Get model routing statistics and A/B test metrics
 
@@ -726,7 +726,7 @@ async def get_model_routing_stats():
 # ============================================
 
 @router.post("/model-routing/reset")
-async def reset_model_routing_stats():
+async def reset_model_routing_stats() -> Dict[str, Any]:
     """
     Reset model routing statistics
 

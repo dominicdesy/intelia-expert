@@ -14,7 +14,7 @@ Complex question -> Detailed answer (800-1500 tokens)
 
 import logging
 import re
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ class AdaptiveResponseLength:
         # Returns: 400 (simple query)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize adaptive length calculator"""
 
         # Token ranges per complexity level
@@ -294,7 +294,7 @@ class AdaptiveResponseLength:
 
         return complexity
 
-    def _check_complexity_keywords(self, query: str) -> tuple[int, List[str]]:
+    def _check_complexity_keywords(self, query: str) -> Tuple[int, List[str]]:
         """
         Check for complexity keywords in query
 
