@@ -14,7 +14,7 @@ if sys.platform == "win32":
 
 sys.path.insert(0, ".")
 
-from config.aviculture.config import get_aviculture_config
+from app.domain_config.domains.aviculture.config import get_aviculture_config
 from app.utils.adaptive_length import get_adaptive_length
 from app.utils.post_processor import create_post_processor
 

@@ -19,17 +19,8 @@ from app.models.llm_client import LLMClient
 from app.utils.adaptive_length import get_adaptive_length
 from app.utils.post_processor import create_post_processor
 
-# Import domain configuration
-# Using relative import from project root
-import os
-import sys
-
-# Add parent directory to path to find config module
-llm_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if llm_root not in sys.path:
-    sys.path.insert(0, llm_root)
-
-from config.aviculture.config import get_aviculture_config
+# Import domain configuration (now properly within app package)
+from app.domain_config.domains.aviculture.config import get_aviculture_config
 
 logger = logging.getLogger(__name__)
 
