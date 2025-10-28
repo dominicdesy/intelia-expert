@@ -106,6 +106,7 @@ class PostProcessRequest(BaseModel):
     language: str = Field(default="en", description="Response language")
     domain: str = Field(default="aviculture", description="Domain")
     context_docs: Optional[List[Dict]] = Field(None, description="Context documents")
+    user_category: Optional[str] = Field(None, description="User expertise level (health_veterinary, farm_operations, etc.)")
     add_disclaimer: bool = Field(default=True, description="Add disclaimer if applicable")
 
 

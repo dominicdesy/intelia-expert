@@ -219,21 +219,25 @@ async def generate(
 
         # Post-process if requested
         disclaimer_added = False
+        compliance_metadata = {}
         if request.post_process:
             # [FAST] Use cached PostProcessor from domain config (saves ~2ms per request)
-            original_length = len(generated_text)
-            generated_text = domain_config.post_processor.post_process_response(
+            generated_text, post_metadata = domain_config.post_processor.post_process_response(
                 response=generated_text,
                 query=request.query,
                 language=request.language,
-                context_docs=request.context_docs
+                context_docs=request.context_docs,
+                user_category=request.user_category
             )
 
-            # Check if disclaimer was added
-            if len(generated_text) > original_length:
-                disclaimer_added = True
+            # Extract compliance metadata
+            disclaimer_added = post_metadata.get("disclaimer_added", False)
+            compliance_metadata = post_metadata
 
-            logger.info(f"[CLEAN] Post-processing applied (disclaimer_added={disclaimer_added})")
+            logger.info(
+                f"[CLEAN] Post-processing applied: compliance={post_metadata.get('compliance_level')}, "
+                f"disclaimer={disclaimer_added}"
+            )
 
         # [FAST] OPTIMIZATION Phase 1: Store in cache for future requests
         await semantic_cache.set(
@@ -410,23 +414,31 @@ async def generate_stream(
             # Post-process if requested
             final_text = full_text
             disclaimer_added = False
+            compliance_metadata = {}
             if request.post_process:
                 original_length = len(full_text)
-                final_text = domain_config.post_processor.post_process_response(
+                final_text, post_metadata = domain_config.post_processor.post_process_response(
                     response=full_text,
                     query=request.query,
                     language=request.language,
-                    context_docs=request.context_docs
+                    context_docs=request.context_docs,
+                    user_category=request.user_category
                 )
+
+                # Extract compliance metadata
+                disclaimer_added = post_metadata.get("disclaimer_added", False)
+                compliance_metadata = post_metadata
 
                 # If post-processing added content (disclaimer), send it as additional chunk
                 if len(final_text) > original_length:
-                    disclaimer_added = True
                     added_content = final_text[original_length:]
                     chunk_data = {"content": added_content}
                     yield f"event: chunk\ndata: {json.dumps(chunk_data)}\n\n"
 
-                logger.info(f"[CLEAN] Post-processing applied (disclaimer_added={disclaimer_added})")
+                logger.info(
+                    f"[CLEAN] Post-processing applied: compliance={post_metadata.get('compliance_level')}, "
+                    f"disclaimer={disclaimer_added}"
+                )
 
             # Send END event with final metadata
             end_data = {
@@ -624,19 +636,23 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
             context_docs=request.context_docs
         )
 
-        # Process response
-        original_length = len(request.response)
-        processed_text = post_processor.post_process_response(
+        # Process response with compliance wrapper
+        processed_text, post_metadata = post_processor.post_process_response(
             response=request.response,
             query=request.query,
             language=request.language,
-            context_docs=request.context_docs
+            context_docs=request.context_docs,
+            user_category=request.user_category
         )
 
-        # Check if disclaimer was added
-        disclaimer_added = request.add_disclaimer and len(processed_text) > original_length
+        # Extract metadata
+        disclaimer_added = post_metadata.get("disclaimer_added", False)
+        compliance_level = post_metadata.get("compliance_level", "minimal")
 
-        logger.info(f"[OK] Post-processed (veterinary={is_veterinary}, disclaimer={disclaimer_added})")
+        logger.info(
+            f"[OK] Post-processed: veterinary={is_veterinary}, "
+            f"compliance={compliance_level}, disclaimer={disclaimer_added}"
+        )
 
         return PostProcessResponse(
             processed_text=processed_text,
