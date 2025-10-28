@@ -1,6 +1,6 @@
 """
 Monitoring API Routes - Endpoints pour le monitoring des services
-Version: 1.0.0
+Version: 1.0.1 - Fixed deprecation warnings
 """
 
 import asyncio
@@ -52,7 +52,6 @@ async def periodic_health_check():
         await asyncio.sleep(30)
 
 
-@router.on_event("startup")
 async def start_health_checks():
     """Démarre les health checks périodiques au démarrage"""
     global _health_check_task, _health_check_running
@@ -63,7 +62,6 @@ async def start_health_checks():
         logger.info("[MONITORING] Health check task started")
 
 
-@router.on_event("shutdown")
 async def stop_health_checks():
     """Arrête les health checks au shutdown"""
     global _health_check_task, _health_check_running

@@ -329,6 +329,15 @@ async def lifespan(app: FastAPI):
         logger.critical(" APPLICATION VERSION FINALE PRÊTE - ARCHITECTURE CENTRALISÉE ")
         print("INTELIA EXPERT BACKEND - MAIN MODULE LOADED")
 
+        # 11. Démarrer les health checks du monitoring
+        logger.info("Démarrage des health checks du monitoring...")
+        try:
+            from api.monitoring_routes import start_health_checks
+            await start_health_checks()
+            logger.info("[OK] Health checks du monitoring démarrés")
+        except Exception as e:
+            logger.warning(f"Warning: Erreur démarrage monitoring health checks: {e}")
+
         yield
 
     except asyncio.TimeoutError:
@@ -353,6 +362,14 @@ async def lifespan(app: FastAPI):
     finally:
         # Nettoyage amélioré
         logger.info(" Nettoyage des ressources...")
+
+        # Arrêter les health checks du monitoring
+        try:
+            from api.monitoring_routes import stop_health_checks
+            await stop_health_checks()
+            logger.info("[OK] Health checks du monitoring arrêtés")
+        except Exception as e:
+            logger.warning(f"Warning: Erreur arrêt monitoring health checks: {e}")
         logger.info(" SHUTDOWN VERSION FINALE ")
 
         try:
