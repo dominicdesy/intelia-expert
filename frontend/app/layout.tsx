@@ -51,21 +51,28 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.json",
   icons: {
-    icon: "/images/favicon.png",
+    icon: [
+      { url: "/images/favicon.png", sizes: "any" },
+      { url: "/images/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/images/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
     shortcut: "/images/favicon.png",
-    apple: "/images/favicon.png",
+    apple: [
+      { url: "/images/icon-152x152.png", sizes: "152x152", type: "image/png" },
+      { url: "/images/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
     other: [
       {
         rel: "icon",
         type: "image/png",
-        sizes: "32x32",
-        url: "/images/favicon.png",
+        sizes: "96x96",
+        url: "/images/icon-96x96.png",
       },
       {
         rel: "icon",
         type: "image/png",
-        sizes: "16x16",
-        url: "/images/favicon.png",
+        sizes: "144x144",
+        url: "/images/icon-144x144.png",
       },
     ],
   },
