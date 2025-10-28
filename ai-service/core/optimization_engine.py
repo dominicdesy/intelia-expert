@@ -394,5 +394,131 @@ class OptimizationEngine:
         Returns:
             Dict avec comparaison détaillée
         """
-        # TODO: Implémenter comparaison multi-scénarios
-        return {"error": "Fonction non implémentée", "scenarios_count": len(scenarios)}
+        if not scenarios or len(scenarios) < 2:
+            return {
+                "error": "Au moins 2 scénarios sont requis pour la comparaison",
+                "scenarios_count": len(scenarios)
+            }
+
+        try:
+            results = []
+
+            async with self.db_pool.acquire() as conn:
+                # Analyser chaque scénario
+                for idx, scenario in enumerate(scenarios):
+                    scenario_id = scenario.get("id", f"scenario_{idx + 1}")
+                    breed = scenario.get("breed", "Ross 308")
+                    sex = scenario.get("sex", "mixed")
+                    age_days = scenario.get("age_days", 42)
+
+                    # Récupérer les performances pour ce scénario
+                    query = """
+                        SELECT
+                            age_days,
+                            body_weight,
+                            feed_conversion_ratio,
+                            daily_gain,
+                            mortality_rate
+                        FROM performance_standards
+                        WHERE LOWER(breed) = LOWER($1)
+                        AND LOWER(sex) = LOWER($2)
+                        AND age_days = $3
+                        LIMIT 1
+                    """
+
+                    row = await conn.fetchrow(query, breed, sex, age_days)
+
+                    if row:
+                        # Calculer indicateurs économiques
+                        weight = row["body_weight"]
+                        fcr = row["feed_conversion_ratio"]
+                        daily_gain = row["daily_gain"]
+                        mortality = row["mortality_rate"] or 0.0
+
+                        # Coût aliment estimé (prix moyen: 0.35€/kg)
+                        feed_cost = weight * fcr * 0.00035  # 0.35€/kg converti en €/g
+
+                        # Efficacité économique (poids/coût)
+                        efficiency = weight / feed_cost if feed_cost > 0 else 0
+
+                        # Score composite (pondéré)
+                        # FCR: 40%, Poids: 30%, Gain: 20%, Mortalité: 10%
+                        fcr_score = max(0, 100 - (fcr - 1.0) * 100)
+                        weight_score = min(100, weight / 30)
+                        gain_score = min(100, daily_gain / 0.7)
+                        mortality_score = max(0, 100 - mortality * 10)
+
+                        composite_score = (
+                            fcr_score * 0.4 +
+                            weight_score * 0.3 +
+                            gain_score * 0.2 +
+                            mortality_score * 0.1
+                        )
+
+                        results.append({
+                            "scenario_id": scenario_id,
+                            "breed": breed,
+                            "sex": sex,
+                            "age_days": age_days,
+                            "metrics": {
+                                "body_weight": round(weight, 1),
+                                "fcr": round(fcr, 2),
+                                "daily_gain": round(daily_gain, 1),
+                                "mortality_rate": round(mortality, 2),
+                            },
+                            "economics": {
+                                "feed_cost_per_bird": round(feed_cost, 2),
+                                "efficiency_score": round(efficiency, 1),
+                            },
+                            "scores": {
+                                "fcr_score": round(fcr_score, 1),
+                                "weight_score": round(weight_score, 1),
+                                "gain_score": round(gain_score, 1),
+                                "mortality_score": round(mortality_score, 1),
+                                "composite_score": round(composite_score, 1),
+                            }
+                        })
+                    else:
+                        results.append({
+                            "scenario_id": scenario_id,
+                            "breed": breed,
+                            "sex": sex,
+                            "age_days": age_days,
+                            "error": "Données non disponibles pour ce scénario"
+                        })
+
+            # Trier par score composite (meilleur en premier)
+            valid_results = [r for r in results if "error" not in r]
+            if valid_results:
+                valid_results.sort(key=lambda x: x["scores"]["composite_score"], reverse=True)
+
+                # Identifier le meilleur scénario
+                best_scenario = valid_results[0]
+
+                # Calculer différences relatives avec le meilleur
+                for result in valid_results[1:]:
+                    result["vs_best"] = {
+                        "weight_diff_pct": round(
+                            (result["metrics"]["body_weight"] - best_scenario["metrics"]["body_weight"]) /
+                            best_scenario["metrics"]["body_weight"] * 100, 1
+                        ),
+                        "fcr_diff": round(result["metrics"]["fcr"] - best_scenario["metrics"]["fcr"], 2),
+                        "score_diff": round(
+                            result["scores"]["composite_score"] - best_scenario["scores"]["composite_score"], 1
+                        ),
+                    }
+
+            return {
+                "comparison": results,
+                "best_scenario_id": valid_results[0]["scenario_id"] if valid_results else None,
+                "scenarios_analyzed": len(scenarios),
+                "valid_scenarios": len(valid_results),
+                "ranking": [r["scenario_id"] for r in valid_results],
+            }
+
+        except Exception as e:
+            logger.error(f"Erreur comparaison scénarios: {e}")
+            return {
+                "error": f"Erreur lors de la comparaison: {str(e)}",
+                "scenarios_count": len(scenarios)
+            }

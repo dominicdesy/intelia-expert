@@ -311,8 +311,77 @@ class DataValidator:
         """
         issues = []
 
-        # TODO: Implémenter validation séquentielle des gains
-        # Nécessite données temporelles multiples
+        # Validation séquentielle des gains si données temporelles disponibles
+        if "time_series" in data and isinstance(data["time_series"], list):
+            time_series = data["time_series"]
+
+            # Vérifier progression cohérente des poids
+            for i in range(len(time_series) - 1):
+                current = time_series[i]
+                next_point = time_series[i + 1]
+
+                if "weight" in current and "weight" in next_point and "age_days" in current and "age_days" in next_point:
+                    weight_gain = next_point["weight"] - current["weight"]
+                    days_diff = next_point["age_days"] - current["age_days"]
+
+                    if days_diff > 0:
+                        avg_daily_gain = weight_gain / days_diff
+
+                        # Vérifier plage acceptable (10-120g/jour)
+                        if avg_daily_gain < self.EXPECTED_RANGES["daily_gain"]["min"]:
+                            issues.append(
+                                ValidationIssue(
+                                    severity="warning",
+                                    issue_type="low_daily_gain",
+                                    message=f"Gain quotidien faible entre J{current['age_days']} et J{next_point['age_days']}: {avg_daily_gain:.1f}g/jour",
+                                    expected=self.EXPECTED_RANGES["daily_gain"]["min"],
+                                    actual=avg_daily_gain,
+                                )
+                            )
+                        elif avg_daily_gain > self.EXPECTED_RANGES["daily_gain"]["max"]:
+                            issues.append(
+                                ValidationIssue(
+                                    severity="warning",
+                                    issue_type="high_daily_gain",
+                                    message=f"Gain quotidien élevé entre J{current['age_days']} et J{next_point['age_days']}: {avg_daily_gain:.1f}g/jour",
+                                    expected=self.EXPECTED_RANGES["daily_gain"]["max"],
+                                    actual=avg_daily_gain,
+                                )
+                            )
+
+                        # Vérifier perte de poids (anormal)
+                        if weight_gain < 0:
+                            issues.append(
+                                ValidationIssue(
+                                    severity="error",
+                                    issue_type="negative_weight_gain",
+                                    message=f"Perte de poids détectée entre J{current['age_days']} et J{next_point['age_days']}: {weight_gain:.1f}g",
+                                    expected=0.0,
+                                    actual=weight_gain,
+                                )
+                            )
+
+        # Validation simple si seulement daily_gain et weight disponibles
+        elif "daily_gain" in data and "weight" in data and "age_days" in data:
+            daily_gain = data["daily_gain"]
+            weight = data["weight"]
+            age_days = data["age_days"]
+
+            # Vérifier cohérence: poids ≈ poids naissance + (gain quotidien × âge)
+            expected_weight = 50 + (daily_gain * age_days)  # 50g = poids naissance moyen
+            tolerance_pct = self.WEIGHT_GAIN_TOLERANCE
+
+            if abs(weight - expected_weight) / expected_weight > tolerance_pct:
+                issues.append(
+                    ValidationIssue(
+                        severity="warning",
+                        issue_type="weight_gain_inconsistency",
+                        message=f"Incohérence entre poids ({weight}g) et gain quotidien ({daily_gain}g/j) à J{age_days}",
+                        expected=expected_weight,
+                        actual=weight,
+                        tolerance=tolerance_pct,
+                    )
+                )
 
         return issues
 

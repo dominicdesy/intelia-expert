@@ -380,7 +380,7 @@ class LLMRouter:
                 logger.warning("[WARNING] No query provided for adaptive length, using default 900")
 
         try:
-            # Currently only Intelia Llama supports streaming
+            # Route to appropriate streaming provider
             if provider == LLMProvider.INTELIA_LLAMA and self.llm_service_enabled:
                 async for event in self._generate_intelia_llama_stream(
                     messages=messages,
@@ -394,6 +394,28 @@ class LLMRouter:
                     language=language
                 ):
                     yield event
+
+            elif provider == LLMProvider.DEEPSEEK:
+                logger.info("[STREAM] Using DeepSeek streaming")
+                yield {"event": "start", "provider": "deepseek"}
+                async for chunk in self._generate_deepseek_stream(messages, temperature, max_tokens):
+                    yield {"event": "chunk", "content": chunk}
+                yield {"event": "end", "total_tokens": 0}
+
+            elif provider == LLMProvider.CLAUDE_35_SONNET:
+                logger.info("[STREAM] Using Claude 3.5 Sonnet streaming")
+                yield {"event": "start", "provider": "claude"}
+                async for chunk in self._generate_claude_stream(messages, temperature, max_tokens):
+                    yield {"event": "chunk", "content": chunk}
+                yield {"event": "end", "total_tokens": 0}
+
+            elif provider == LLMProvider.GPT_4O:
+                logger.info("[STREAM] Using GPT-4o streaming")
+                yield {"event": "start", "provider": "gpt4o"}
+                async for chunk in self._generate_gpt4o_stream(messages, temperature, max_tokens):
+                    yield {"event": "chunk", "content": chunk}
+                yield {"event": "end", "total_tokens": 0}
+
             else:
                 # Fallback: use non-streaming generation and yield as single chunk
                 logger.warning(f"[WARNING] {provider.value} does not support streaming, falling back to non-streaming")
@@ -738,6 +760,145 @@ class LLMRouter:
         logger.info(f"✅ GPT-4o: {tokens} tokens, ${cost:.4f}")
 
         return response.choices[0].message.content
+
+    async def _generate_deepseek_stream(
+        self, messages: List[Dict], temperature: float, max_tokens: int
+    ):
+        """Generate using DeepSeek with streaming"""
+        import time
+        start_time = time.time()
+
+        try:
+            stream = await self.deepseek_client.chat.completions.create(
+                model="deepseek-chat",
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+
+            full_text = ""
+            prompt_tokens = 0
+            completion_tokens = 0
+
+            async for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, 'content') and delta.content:
+                        content = delta.content
+                        full_text += content
+                        completion_tokens += 1
+                        yield content
+
+            duration = time.time() - start_time
+
+            # Estimate tokens (no usage info in streaming)
+            tokens = len(full_text.split()) * 1.3  # Rough estimate
+            cost = tokens / 1_000_000 * 0.55
+
+            self.usage_stats[LLMProvider.DEEPSEEK.value]["calls"] += 1
+            self.usage_stats[LLMProvider.DEEPSEEK.value]["tokens"] += int(tokens)
+            self.usage_stats[LLMProvider.DEEPSEEK.value]["cost"] += cost
+
+            logger.info(f"✅ DeepSeek (streaming): ~{int(tokens)} tokens, ${cost:.4f}")
+
+        except Exception as e:
+            logger.error(f"DeepSeek streaming error: {e}")
+            raise
+
+    async def _generate_claude_stream(
+        self, messages: List[Dict], temperature: float, max_tokens: int
+    ):
+        """Generate using Claude 3.5 Sonnet with streaming"""
+        import time
+        start_time = time.time()
+
+        try:
+            # Convert OpenAI format to Anthropic format
+            system_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
+            user_messages = [
+                {"role": m["role"], "content": m["content"]}
+                for m in messages
+                if m["role"] != "system"
+            ]
+
+            model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
+
+            async with self.claude_client.messages.stream(
+                model=model,
+                system=system_msg,
+                messages=user_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            ) as stream:
+                full_text = ""
+                async for text in stream.text_stream:
+                    full_text += text
+                    yield text
+
+                # Get final message for usage stats
+                final_message = await stream.get_final_message()
+                prompt_tokens = final_message.usage.input_tokens
+                completion_tokens = final_message.usage.output_tokens
+                tokens = prompt_tokens + completion_tokens
+                cost = tokens / 1_000_000 * 3.0
+
+                duration = time.time() - start_time
+
+                self.usage_stats[LLMProvider.CLAUDE_35_SONNET.value]["calls"] += 1
+                self.usage_stats[LLMProvider.CLAUDE_35_SONNET.value]["tokens"] += tokens
+                self.usage_stats[LLMProvider.CLAUDE_35_SONNET.value]["cost"] += cost
+
+                logger.info(f"✅ Claude 3.5 Sonnet (streaming): {tokens} tokens, ${cost:.4f}")
+
+        except Exception as e:
+            logger.error(f"Claude streaming error: {e}")
+            raise
+
+    async def _generate_gpt4o_stream(
+        self, messages: List[Dict], temperature: float, max_tokens: int
+    ):
+        """Generate using GPT-4o with streaming"""
+        import time
+        start_time = time.time()
+
+        try:
+            stream = await self.openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+
+            full_text = ""
+            prompt_tokens = 0
+            completion_tokens = 0
+
+            async for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, 'content') and delta.content:
+                        content = delta.content
+                        full_text += content
+                        completion_tokens += 1
+                        yield content
+
+            duration = time.time() - start_time
+
+            # Estimate tokens (no usage info in streaming)
+            tokens = len(full_text.split()) * 1.3  # Rough estimate
+            cost = tokens / 1_000_000 * 15.0
+
+            self.usage_stats[LLMProvider.GPT_4O.value]["calls"] += 1
+            self.usage_stats[LLMProvider.GPT_4O.value]["tokens"] += int(tokens)
+            self.usage_stats[LLMProvider.GPT_4O.value]["cost"] += cost
+
+            logger.info(f"✅ GPT-4o (streaming): ~{int(tokens)} tokens, ${cost:.4f}")
+
+        except Exception as e:
+            logger.error(f"GPT-4o streaming error: {e}")
+            raise
 
     def get_stats(self) -> Dict[str, Any]:
         """

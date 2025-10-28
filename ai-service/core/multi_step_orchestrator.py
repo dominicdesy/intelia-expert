@@ -532,9 +532,77 @@ class MultiStepOrchestrator:
         return 0.0
 
     def _extract_scenario_modifications(self, query: str, base_entities: Dict) -> Dict:
-        """Extrait les modifications de scénario"""
-        # TODO: Parser les modifications demandées
+        """Extrait les modifications de scénario demandées dans la requête"""
+        import re
+
         modified = base_entities.copy()
+        query_lower = query.lower()
+
+        # Parser les modifications de souche/breed
+        breed_patterns = [
+            r"(?:avec|pour|utilise[rz]?)\s+(?:la souche|le breed)?\s*([A-Za-z]+\s*\d+)",
+            r"(?:chang(?:er|ez)|modifi(?:er|ez)|remplace[rz]?)\s+(?:par|avec|pour)\s+([A-Za-z]+\s*\d+)",
+            r"(?:si|avec)\s+([A-Za-z]+\s*\d+)\s+(?:à la place|au lieu)"
+        ]
+        for pattern in breed_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                modified["breed"] = match.group(1).strip()
+                break
+
+        # Parser les modifications de sexe
+        if re.search(r"\b(?:mâles?|males?|coqs?)\b", query_lower):
+            modified["sex"] = "male"
+        elif re.search(r"\b(?:femelles?|poules?|poulettes?)\b", query_lower):
+            modified["sex"] = "female"
+        elif re.search(r"\b(?:mixt?es?|ensemble)\b", query_lower):
+            modified["sex"] = "mixed"
+
+        # Parser les modifications d'âge
+        age_patterns = [
+            r"à\s+(\d+)\s+jours?",
+            r"(\d+)\s+jours?",
+            r"J\s*(\d+)",
+            r"semaine\s+(\d+)",  # Convertir semaines en jours
+        ]
+        for i, pattern in enumerate(age_patterns):
+            match = re.search(pattern, query)
+            if match:
+                age = int(match.group(1))
+                # Convertir semaines en jours si nécessaire
+                if i == 3:
+                    age *= 7
+                modified["age_days"] = age
+                break
+
+        # Parser les modifications de température/conditions
+        temp_match = re.search(r"(\d+)\s*[°C]", query)
+        if temp_match:
+            modified["temperature"] = int(temp_match.group(1))
+
+        # Parser les modifications de densité
+        density_patterns = [
+            r"(\d+)\s*(?:oiseaux?|poulets?|sujets?)\s*(?:par|/)\s*m[²2]",
+            r"densité\s*(?:de)?\s*(\d+)"
+        ]
+        for pattern in density_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                modified["density"] = int(match.group(1))
+                break
+
+        # Parser les modifications de régime alimentaire
+        if re.search(r"\b(?:sans|pas de)\s+(?:antibiotique|atb)\b", query_lower):
+            modified["antibiotic_free"] = True
+        if re.search(r"\bavec\s+(?:antibiotique|atb)\b", query_lower):
+            modified["antibiotic_free"] = False
+
+        # Parser les modifications de formulation
+        if re.search(r"\b(?:maïs|corn)\b", query_lower):
+            modified["feed_base"] = "corn"
+        elif re.search(r"\b(?:blé|wheat)\b", query_lower):
+            modified["feed_base"] = "wheat"
+
         return modified
 
     def _extract_multiple_metrics(self, query: str) -> List[str]:
@@ -558,6 +626,112 @@ class MultiStepOrchestrator:
         return objectives if objectives else ["fcr"]
 
     def _extract_constraints(self, query: str) -> Dict:
-        """Extrait les contraintes"""
-        # TODO: Parser contraintes complexes
-        return {}
+        """Extrait les contraintes complexes de la requête"""
+        import re
+
+        constraints = {}
+        query_lower = query.lower()
+
+        # Contraintes de poids (min/max)
+        weight_patterns = [
+            (r"poids\s+(?:mini(?:mum|mal)?|min)\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*(?:kg|g)?", "min_weight"),
+            (r"poids\s+(?:maxi(?:mum|mal)?|max)\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*(?:kg|g)?", "max_weight"),
+            (r"au moins\s+(\d+(?:\.\d+)?)\s*(?:kg|g)", "min_weight"),
+            (r"maximum\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*(?:kg|g)", "max_weight"),
+        ]
+        for pattern, key in weight_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                value = float(match.group(1))
+                # Convertir kg en g si nécessaire
+                if "kg" in match.group(0).lower():
+                    value *= 1000
+                constraints[key] = value
+
+        # Contraintes de FCR (IC)
+        fcr_patterns = [
+            (r"ic\s+(?:inférieur|inf|<)\s+(?:à\s+)?(\d+(?:\.\d+)?)", "max_fcr"),
+            (r"ic\s+(?:supérieur|sup|>)\s+(?:à\s+)?(\d+(?:\.\d+)?)", "min_fcr"),
+            (r"fcr\s+(?:below|under|<)\s+(\d+(?:\.\d+)?)", "max_fcr"),
+            (r"fcr\s+(?:above|over|>)\s+(\d+(?:\.\d+)?)", "min_fcr"),
+            (r"meilleur que\s+(\d+(?:\.\d+)?)", "max_fcr"),
+        ]
+        for pattern, key in fcr_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                constraints[key] = float(match.group(1))
+
+        # Contraintes de mortalité
+        mortality_patterns = [
+            (r"mortalité\s+(?:max|maximum|inférieure?)\s+(?:à|de)?\s+(\d+(?:\.\d+)?)\s*%", "max_mortality"),
+            (r"(?:moins|max)\s+(\d+(?:\.\d+)?)\s*%\s+(?:de\s+)?mortalité", "max_mortality"),
+        ]
+        for pattern, key in mortality_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                constraints[key] = float(match.group(1))
+
+        # Contraintes de gain quotidien
+        gain_patterns = [
+            (r"gain\s+(?:quotidien|journalier)\s+(?:min|minimum)\s+(?:de\s+)?(\d+(?:\.\d+)?)", "min_daily_gain"),
+            (r"gain\s+(?:quotidien|journalier)\s+(?:max|maximum)\s+(?:de\s+)?(\d+(?:\.\d+)?)", "max_daily_gain"),
+            (r"(?:au moins|minimum)\s+(\d+(?:\.\d+)?)\s*g?/j(?:our)?", "min_daily_gain"),
+        ]
+        for pattern, key in gain_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                constraints[key] = float(match.group(1))
+
+        # Contraintes d'âge
+        age_patterns = [
+            (r"avant\s+(\d+)\s+jours?", "max_age"),
+            (r"après\s+(\d+)\s+jours?", "min_age"),
+            (r"entre\s+(\d+)\s+et\s+(\d+)\s+jours?", "age_range"),
+            (r"(?:moins|max)\s+de\s+(\d+)\s+jours?", "max_age"),
+        ]
+        for pattern, key in age_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                if key == "age_range":
+                    constraints["min_age"] = int(match.group(1))
+                    constraints["max_age"] = int(match.group(2))
+                else:
+                    constraints[key] = int(match.group(1))
+
+        # Contraintes budgétaires/économiques
+        budget_patterns = [
+            (r"budget\s+(?:max|maximum)\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*€", "max_budget"),
+            (r"coût\s+(?:max|maximum)\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*€", "max_cost"),
+            (r"moins de\s+(\d+(?:\.\d+)?)\s*€", "max_budget"),
+        ]
+        for pattern, key in budget_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                constraints[key] = float(match.group(1))
+
+        # Contraintes de température
+        temp_patterns = [
+            (r"température\s+(?:min|minimum)\s+(?:de\s+)?(\d+)\s*°?C?", "min_temperature"),
+            (r"température\s+(?:max|maximum)\s+(?:de\s+)?(\d+)\s*°?C?", "max_temperature"),
+            (r"entre\s+(\d+)\s+et\s+(\d+)\s*°?C", "temp_range"),
+        ]
+        for pattern, key in temp_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                if key == "temp_range":
+                    constraints["min_temperature"] = int(match.group(1))
+                    constraints["max_temperature"] = int(match.group(2))
+                else:
+                    constraints[key] = int(match.group(1))
+
+        # Contraintes de densité
+        density_patterns = [
+            (r"densité\s+(?:max|maximum)\s+(?:de\s+)?(\d+)", "max_density"),
+            (r"(?:maximum|max)\s+(\d+)\s+(?:oiseaux?|poulets?)\s*(?:/|par)\s*m[²2]", "max_density"),
+        ]
+        for pattern, key in density_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                constraints[key] = int(match.group(1))
+
+        return constraints
