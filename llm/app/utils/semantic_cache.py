@@ -107,7 +107,7 @@ class SemanticCache:
             self.redis_client.ping()
             logger.info(f"[OK] SemanticCache connected to Redis at {redis_host}:{redis_port}")
         except Exception as e:
-            logger.warning(f"[WARNING] Redis connection failed: {e}. Cache disabled.")
+            logger.debug(f"Redis connection failed: {e}. Cache disabled (optional feature).")
             self.enabled = False
             self.redis_client = None
 

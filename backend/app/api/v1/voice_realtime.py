@@ -124,17 +124,13 @@ class WeaviateRAGService:
     """Service pour pré-charger contexte Weaviate pendant parole utilisateur"""
 
     def __init__(self):
-        self.enabled = bool(WEAVIATE_URL)
-        if self.enabled:
-            try:
-                # Import dynamique pour ne pas casser si module absent
-                # Les modules du LLM ne sont pas disponibles dans le backend
-                # On désactive le RAG pour Voice Realtime dans le backend
-                logger.info("ℹ️ Weaviate RAG not available in backend context - Voice Realtime will work without RAG pre-loading (this is expected)")
-                self.enabled = False
-            except Exception as e:
-                logger.error(f"❌ Weaviate initialization failed: {e}")
-                self.enabled = False
+        # Voice Realtime RAG is handled by the ai-service, not the backend
+        # Backend only provides the WebSocket endpoint
+        self.enabled = False
+
+        # Log only in debug mode if needed
+        if WEAVIATE_URL:
+            logger.debug("Voice Realtime RAG handled by ai-service (backend provides WebSocket only)")
 
     async def query_context(self, query: str, limit: int = 5) -> Optional[str]:
         """Query Weaviate pour contexte RAG (async)"""

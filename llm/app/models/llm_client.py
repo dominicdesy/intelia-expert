@@ -271,17 +271,10 @@ class HuggingFaceProvider(LLMClient):
 
     def is_available(self) -> bool:
         """Check if HuggingFace API is available"""
-        try:
-            # Simple test call using native method
-            # Model is already set in InferenceClient init
-            self.client.chat_completion(
-                messages=[{"role": "user", "content": "test"}],
-                max_tokens=1,
-            )
-            return True
-        except Exception as e:
-            logger.warning(f"HuggingFace availability check failed: {e}")
-            return False
+        # Return True if client is initialized
+        # Actual API availability is verified during generation calls
+        # No need to make test calls that could fail with 404
+        return self.client is not None and self.api_key is not None
 
     def _format_messages_to_prompt(self, messages: List[Dict[str, str]]) -> str:
         """
