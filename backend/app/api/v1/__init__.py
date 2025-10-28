@@ -228,6 +228,15 @@ except Exception as e:
     logger.error("ERREUR import health router: %s", e)
     health_router = None
 
+# Monitoring router
+try:
+    from .monitoring import router as monitoring_router
+
+    logger.debug("Monitoring router importé avec %d routes", len(monitoring_router.routes))
+except Exception as e:
+    logger.error("ERREUR import monitoring router: %s", e)
+    monitoring_router = None
+
 # Invitations router (MAINTENANT AVEC FONCTIONS D'AUTH INTÉGRÉES)
 try:
     from .invitations import router as invitations_router
@@ -578,6 +587,11 @@ if admin_router:
 if health_router:
     router.include_router(health_router, tags=["Health"])
     logger.debug("Health router monté")
+
+# Monitoring
+if monitoring_router:
+    router.include_router(monitoring_router, tags=["Monitoring"])
+    logger.debug("Monitoring router monté")
 
 # Invitations (MAINTENANT UNIFIÉ AVEC AUTH INVITATIONS)
 if invitations_router:
