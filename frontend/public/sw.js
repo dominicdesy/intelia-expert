@@ -1,10 +1,10 @@
 /**
  * Service Worker for Intelia Expert PWA
- * Version: 1.1.1
- * Last modified: 2025-10-26
+ * Version: 1.1.2
+ * Last modified: 2025-10-28
  */
 
-const CACHE_NAME = 'intelia-expert-v1.1.1';
+const CACHE_NAME = 'intelia-expert-v1.1.2';
 const STATIC_CACHE = [
   '/',
   '/images/logo.png',
@@ -41,13 +41,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip non-GET requests (POST, PUT, DELETE, etc.) - they cannot be cached
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
         // Clone the response before caching
         const responseClone = response.clone();
 
-        // Cache successful responses
+        // Cache successful responses for GET requests only
         if (response.status === 200) {
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseClone);
