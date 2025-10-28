@@ -32,8 +32,8 @@ JWT_SECRET = os.getenv("WIDGET_JWT_SECRET", os.getenv("JWT_SECRET", ""))
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_MINUTES = 60
 
-# AI Service API URL (réseau interne Docker - même que WhatsApp webhooks)
-AI_SERVICE_URL = os.getenv("AI_SERVICE_INTERNAL_URL", "http://ai-service:8080")
+# RAG Service API URL (réseau interne Docker - même que WhatsApp webhooks)
+RAG_URL = os.getenv("RAG_INTERNAL_URL", "http://rag:8080")
 
 
 # ============================================
@@ -252,10 +252,10 @@ async def widget_chat(
                 # Le quota est géré au niveau client (entreprise)
             }
 
-            logger.info(f"Appel AI Service API: {AI_SERVICE_URL}/chat")
+            logger.info(f"Appel AI Service API: {RAG_URL}/chat")
 
             response = await client.post(
-                f"{AI_SERVICE_URL}/chat",
+                f"{RAG_URL}/chat",
                 json=llm_payload,
                 headers={
                     "Content-Type": "application/json",
@@ -365,5 +365,5 @@ async def widget_health():
         "service": "widget",
         "version": "1.0.0",
         "jwt_configured": bool(JWT_SECRET),
-        "ai_service_url": AI_SERVICE_URL
+        "ai_service_url": RAG_URL
     }

@@ -64,11 +64,11 @@ TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+15075195
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-# Configuration AI Service (microservices architecture)
+# Configuration RAG Service (microservices architecture)
 # Use internal URL if available (for service-to-service communication)
 # Otherwise fall back to public URL
-AI_SERVICE_URL = os.getenv("AI_SERVICE_INTERNAL_URL") or os.getenv("AI_SERVICE_URL", "https://expert.intelia.com/api/llm")
-AI_CHAT_ENDPOINT = f"{AI_SERVICE_URL}/chat"
+RAG_URL = os.getenv("RAG_INTERNAL_URL", "http://rag:8080")
+RAG_CHAT_ENDPOINT = f"{RAG_URL}/chat"
 
 # Initialiser le client Twilio
 twilio_client = None
@@ -81,7 +81,7 @@ if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
 else:
     logger.warning("⚠️ Twilio credentials not configured - WhatsApp disabled")
 
-logger.info(f"✅ AI Service configured at: {AI_CHAT_ENDPOINT}")
+logger.info(f"✅ AI Service configured at: {RAG_CHAT_ENDPOINT}")
 
 
 # ==================== HELPERS ====================
@@ -324,7 +324,7 @@ async def handle_text_message(
             conversation_id = generate_whatsapp_session_uuid(from_number)
 
         logger.info(f"📝 WhatsApp message from {user_email} ({user_name}): {body[:100]}...")
-        logger.info(f"🔧 Calling AI Service: {AI_CHAT_ENDPOINT}")
+        logger.info(f"🔧 Calling AI Service: {RAG_CHAT_ENDPOINT}")
 
         # Créer un JWT token pour l'utilisateur WhatsApp
         auth_token = create_whatsapp_user_token(user_info)
@@ -353,7 +353,7 @@ async def handle_text_message(
 
         # Appel HTTP au service LLM avec streaming
         async with httpx.AsyncClient(timeout=60.0) as client:
-            async with client.stream("POST", AI_CHAT_ENDPOINT, json=payload, headers=headers) as response:
+            async with client.stream("POST", RAG_CHAT_ENDPOINT, json=payload, headers=headers) as response:
                 if response.status_code != 200:
                     logger.error(f"❌ LLM service error: {response.status_code}")
                     return "Désolé, le service d'assistance n'est pas disponible actuellement. Veuillez réessayer plus tard."
@@ -1277,7 +1277,7 @@ async def whatsapp_status():
             "architecture": "microservices_http",
             "ai_service_url": AI_SERVICE_URL,
             "ai_service_available": ai_service_available,
-            "endpoint": AI_CHAT_ENDPOINT,
+            "endpoint": RAG_CHAT_ENDPOINT,
             "version": "2.1_microservices",
         }
     }

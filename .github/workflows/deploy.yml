@@ -12,7 +12,7 @@ jobs:
     outputs:
       frontend-changed: ${{ steps.filter.outputs.frontend }}
       backend-changed: ${{ steps.filter.outputs.backend }}
-      ai-service-changed: ${{ steps.filter.outputs.ai-service }}
+      rag-changed: ${{ steps.filter.outputs.rag }}
       llm-changed: ${{ steps.filter.outputs.llm }}
       prometheus-changed: ${{ steps.filter.outputs.prometheus }}
     steps:
@@ -28,8 +28,8 @@ jobs:
               - 'frontend/**'
             backend:
               - 'backend/**'
-            ai-service:
-              - 'ai-service/**'
+            rag:
+              - 'rag/**'
             llm:
               - 'llm/**'
             prometheus:
@@ -186,9 +186,9 @@ jobs:
   # ======================================================
   # AI SERVICE
   # ======================================================
-  build-ai-service:
+  build-rag:
     needs: detect-changes
-    if: needs.detect-changes.outputs.ai-service-changed == 'true'
+    if: needs.detect-changes.outputs.rag-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -235,13 +235,13 @@ jobs:
       - name: Build and push AI Service image
         uses: docker/build-push-action@v6
         with:
-          context: ./ai-service
+          context: ./rag
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:main
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:main-${{ github.sha }}
-          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:buildcache
-          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:buildcache,mode=max
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/rag:main
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/rag:main-${{ github.sha }}
+          cache-from: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/rag:buildcache
+          cache-to: type=registry,ref=registry.digitalocean.com/${{ secrets.DOCR_NAME }}/rag:buildcache,mode=max
           build-args: |
             BUILD_VERSION=${{ steps.version.outputs.VERSION }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
@@ -249,12 +249,12 @@ jobs:
 
       - name: Tag and push :latest
         run: |
-          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:main
+          docker pull registry.digitalocean.com/${{ secrets.DOCR_NAME }}/rag:main
           docker tag \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:main \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/rag:main \
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/rag:latest
           docker push \
-            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/ai-service:latest
+            registry.digitalocean.com/${{ secrets.DOCR_NAME }}/rag:latest
 
   # ======================================================
   # LLM SERVICE
@@ -387,7 +387,7 @@ jobs:
     needs:
       - build-frontend
       - build-backend
-      - build-ai-service
+      - build-rag
       - build-llm
       - build-prometheus
     if: always()
@@ -446,7 +446,7 @@ jobs:
           fi
 
       - name: Cleanup old ai-service tags
-        if: needs.build-ai-service.result == 'success'
+        if: needs.build-rag.result == 'success'
         run: |
           echo "Cleaning up old ai-service tags (keeping 10 most recent)..."
 
@@ -521,7 +521,7 @@ jobs:
     needs:
       - build-frontend
       - build-backend
-      - build-ai-service
+      - build-rag
       - build-llm
       - build-prometheus
       - cleanup-registry
@@ -531,7 +531,7 @@ jobs:
       (
         needs.build-frontend.result == 'success' ||
         needs.build-backend.result == 'success' ||
-        needs.build-ai-service.result == 'success' ||
+        needs.build-rag.result == 'success' ||
         needs.build-llm.result == 'success' ||
         needs.build-prometheus.result == 'success'
       )
@@ -553,7 +553,7 @@ jobs:
       - detect-changes
       - build-frontend
       - build-backend
-      - build-ai-service
+      - build-rag
       - build-llm
       - build-prometheus
       - cleanup-registry
@@ -567,7 +567,7 @@ jobs:
           echo ""
           echo "Frontend:    changed=${{ needs.detect-changes.outputs.frontend-changed }},  result=${{ needs.build-frontend.result }}"
           echo "Backend:     changed=${{ needs.detect-changes.outputs.backend-changed }},  result=${{ needs.build-backend.result }}"
-          echo "AI Service:  changed=${{ needs.detect-changes.outputs.ai-service-changed }},  result=${{ needs.build-ai-service.result }}"
+          echo "AI Service:  changed=${{ needs.detect-changes.outputs.rag-changed }},  result=${{ needs.build-rag.result }}"
           echo "LLM Service: changed=${{ needs.detect-changes.outputs.llm-changed }},  result=${{ needs.build-llm.result }}"
           echo "Prometheus:  changed=${{ needs.detect-changes.outputs.prometheus-changed }},  result=${{ needs.build-prometheus.result }}"
           echo ""
