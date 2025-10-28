@@ -50,68 +50,170 @@ class AvicultureConfig:
 
         # Aviculture-specific breed keywords
         self.breed_keywords = [
-            "ross", "cobb", "hubbard", "isa", "lohmann", "hy-line",
-            "aviagen", "novogen", "dekalb", "shaver", "bovans",
+            "ross",
+            "cobb",
+            "hubbard",
+            "isa",
+            "lohmann",
+            "hy-line",
+            "aviagen",
+            "novogen",
+            "dekalb",
+            "shaver",
+            "bovans",
         ]
 
         # Layer-specific breeds
         self.layer_breeds = [
-            "hy-line", "lohmann", "isa brown", "dekalb", "shaver",
-            "hisex", "bovans", "hendrix", "novogen",
+            "hy-line",
+            "lohmann",
+            "isa brown",
+            "dekalb",
+            "shaver",
+            "hisex",
+            "bovans",
+            "hendrix",
+            "novogen",
         ]
 
         # Domain-specific metrics (extended)
         self.metric_keywords = [
-            "weight", "poids", "fcr", "feed conversion", "indice de conversion",
-            "egg production", "ponte", "mortality", "mortalité",
-            "haugh unit", "shell strength", "breast yield", "carcass yield",
-            "hatchability", "hen-day", "laying persistency",
+            "weight",
+            "poids",
+            "fcr",
+            "feed conversion",
+            "indice de conversion",
+            "egg production",
+            "ponte",
+            "mortality",
+            "mortalité",
+            "haugh unit",
+            "shell strength",
+            "breast yield",
+            "carcass yield",
+            "hatchability",
+            "hen-day",
+            "laying persistency",
         ]
 
         # Hatchery keywords
         self.hatchery_keywords = [
-            "hatchery", "incubation", "incubateur", "setter", "hatcher",
-            "candling", "mirage", "egg storage", "hatchability", "éclosabilité",
-            "embryo", "pip", "chick quality", "breakout", "fumigation",
+            "hatchery",
+            "incubation",
+            "incubateur",
+            "setter",
+            "hatcher",
+            "candling",
+            "mirage",
+            "egg storage",
+            "hatchability",
+            "éclosabilité",
+            "embryo",
+            "pip",
+            "chick quality",
+            "breakout",
+            "fumigation",
         ]
 
         # Processing keywords
         self.processing_keywords = [
-            "processing", "slaughter", "abattage", "stunning", "étourdissement",
-            "evisceration", "scalding", "carcass yield", "breast yield",
-            "meat quality", "pH", "drip loss", "woody breast", "white striping",
-            "chilling", "deboning", "haccp",
+            "processing",
+            "slaughter",
+            "abattage",
+            "stunning",
+            "étourdissement",
+            "evisceration",
+            "scalding",
+            "carcass yield",
+            "breast yield",
+            "meat quality",
+            "pH",
+            "drip loss",
+            "woody breast",
+            "white striping",
+            "chilling",
+            "deboning",
+            "haccp",
         ]
 
         # Layer production keywords
         self.layer_keywords = [
-            "layer", "pondeuse", "egg", "œuf", "laying", "ponte",
-            "haugh unit", "shell strength", "yolk color", "hen-day",
-            "point of lay", "peak production", "molt", "mue",
-            "egg weight", "persistency",
+            "layer",
+            "pondeuse",
+            "egg",
+            "œuf",
+            "laying",
+            "ponte",
+            "haugh unit",
+            "shell strength",
+            "yolk color",
+            "hen-day",
+            "point of lay",
+            "peak production",
+            "molt",
+            "mue",
+            "egg weight",
+            "persistency",
         ]
 
         # Breeding & genetics keywords
         self.breeding_keywords = [
-            "breeding", "génétique", "heritability", "héritabilité",
-            "selection", "sélection", "crossbreeding", "hybrid", "heterosis",
-            "breeding value", "genetic gain", "genomic selection",
-            "inbreeding", "pedigree", "progeny test",
+            "breeding",
+            "génétique",
+            "heritability",
+            "héritabilité",
+            "selection",
+            "sélection",
+            "crossbreeding",
+            "hybrid",
+            "heterosis",
+            "breeding value",
+            "genetic gain",
+            "genomic selection",
+            "inbreeding",
+            "pedigree",
+            "progeny test",
         ]
 
         # Aviculture-specific keywords (from llm_router) - extended
         self.aviculture_keywords = [
-            "poulet", "poule", "pondeuse", "broiler", "poussin", "volaille",
-            "aviculture", "élevage", "mortalité", "ponte", "aliment", "eau",
-            "nutrition", "santé", "maladie", "vaccin", "température", "ventilation",
+            "poulet",
+            "poule",
+            "pondeuse",
+            "broiler",
+            "poussin",
+            "volaille",
+            "aviculture",
+            "élevage",
+            "mortalité",
+            "ponte",
+            "aliment",
+            "eau",
+            "nutrition",
+            "santé",
+            "maladie",
+            "vaccin",
+            "température",
+            "ventilation",
             # Hatchery terms
-            "incubation", "hatchery", "couvoir", "éclosion",
+            "incubation",
+            "hatchery",
+            "couvoir",
+            "éclosion",
             # Processing terms
-            "abattage", "processing", "rendement", "yield",
+            "abattage",
+            "processing",
+            "rendement",
+            "yield",
             # Layer terms
-            "œuf", "egg", "coquille", "shell",
+            "œuf",
+            "egg",
+            "coquille",
+            "shell",
             # Breeding terms
-            "génétique", "sélection", "breeding",
+            "génétique",
+            "sélection",
+            "breeding",
         ]
 
         logger.info(f"Aviculture configuration loaded from {config_dir}")
@@ -135,7 +237,7 @@ class AvicultureConfig:
         language: str = "en",
         query: str = None,
         inject_terminology: bool = True,
-        max_terminology_tokens: int = 1000
+        max_terminology_tokens: int = 1000,
     ) -> str:
         """
         Get system prompt for a specific query type with optional terminology injection
@@ -151,13 +253,19 @@ class AvicultureConfig:
             Formatted system prompt with language directive and optional terminology
         """
         # Get base prompts
-        expert_identity = self.system_prompts.get("base_prompts", {}).get("expert_identity", "")
-        response_guidelines = self.system_prompts.get("base_prompts", {}).get("response_guidelines", "")
+        expert_identity = self.system_prompts.get("base_prompts", {}).get(
+            "expert_identity", ""
+        )
+        response_guidelines = self.system_prompts.get("base_prompts", {}).get(
+            "response_guidelines", ""
+        )
 
         # Get specialized prompt
         specialized = self.system_prompts.get("specialized_prompts", {}).get(
             query_type,
-            self.system_prompts.get("specialized_prompts", {}).get("general_poultry", "")
+            self.system_prompts.get("specialized_prompts", {}).get(
+                "general_poultry", ""
+            ),
         )
 
         # Combine prompts
@@ -166,10 +274,12 @@ class AvicultureConfig:
         # Inject terminology if requested and query is provided
         if inject_terminology and query:
             try:
-                terminology_section = self.terminology_injector.format_terminology_for_prompt(
-                    query=query,
-                    max_tokens=max_terminology_tokens,
-                    language=language
+                terminology_section = (
+                    self.terminology_injector.format_terminology_for_prompt(
+                        query=query,
+                        max_tokens=max_terminology_tokens,
+                        language=language,
+                    )
                 )
                 if terminology_section:
                     full_prompt = f"{full_prompt}\n\n{terminology_section}"
@@ -178,10 +288,22 @@ class AvicultureConfig:
 
         # Format with language name
         language_names = {
-            "fr": "French", "en": "English", "es": "Spanish",
-            "de": "German", "it": "Italian", "pt": "Portuguese",
-            "ar": "Arabic", "zh": "Chinese", "ja": "Japanese",
-            "ko": "Korean", "th": "Thai", "vi": "Vietnamese"
+            "ar": "Arabic",
+            "de": "German",
+            "en": "English",
+            "es": "Spanish",
+            "fr": "French",
+            "hi": "Hindi",
+            "id": "Indonesian",
+            "it": "Italian",
+            "ja": "Japanese",
+            "nl": "Dutch",
+            "pl": "Polish",
+            "pt": "Portuguese",
+            "th": "Thai",
+            "tr": "Turkish",
+            "vi": "Vietnamese",
+            "zh": "Chinese",
         }
         language_name = language_names.get(language, "English")
 
@@ -202,8 +324,7 @@ class AvicultureConfig:
         from app.utils.post_processor import create_post_processor
 
         processor = create_post_processor(
-            veterinary_terms=self.veterinary_terms,
-            language_messages=self.languages
+            veterinary_terms=self.veterinary_terms, language_messages=self.languages
         )
 
         logger.info("[FAST] PostProcessor cached for aviculture domain")
@@ -221,7 +342,7 @@ class AvicultureConfig:
             "add_veterinary_disclaimer",
             "use_metric_units",
             "remove_source_mentions",
-            "clean_verbatim_copying"
+            "clean_verbatim_copying",
         ]
 
     def get_requirements(self) -> Dict[str, str]:
@@ -254,19 +375,22 @@ class AvicultureConfig:
 
         # Check for breed names (strong indicator)
         if any(breed in query_lower for breed in self.breed_keywords):
-            logger.debug(f" Breed name detected in query -> aviculture")
+            logger.debug(" Breed name detected in query -> aviculture")
             return True
 
         # Check for performance metrics with age indicators
         has_metric = any(metric in query_lower for metric in self.metric_keywords)
-        has_age = any(age_term in query_lower for age_term in ["day", "days", "week", "weeks", "jours", "jour", "semaine"])
+        has_age = any(
+            age_term in query_lower
+            for age_term in ["day", "days", "week", "weeks", "jours", "jour", "semaine"]
+        )
         if has_metric and has_age:
-            logger.debug(f" Metric + age detected in query -> aviculture")
+            logger.debug(" Metric + age detected in query -> aviculture")
             return True
 
         # Check aviculture keywords
         if any(keyword in query_lower for keyword in self.aviculture_keywords):
-            logger.debug(f" Aviculture keyword detected")
+            logger.debug(" Aviculture keyword detected")
             return True
 
         # Check domain from intent result
@@ -274,12 +398,24 @@ class AvicultureConfig:
             domain = intent_result.get("domain", "")
             intent_type = intent_result.get("intent", "")
 
-            if domain in ["aviculture", "poultry", "livestock", "genetics_performance",
-                         "nutrition", "health", "housing"]:
+            if domain in [
+                "aviculture",
+                "poultry",
+                "livestock",
+                "genetics_performance",
+                "nutrition",
+                "health",
+                "housing",
+            ]:
                 logger.debug(f" Domain '{domain}' detected -> aviculture")
                 return True
 
-            if intent_type in ["performance_query", "genetics_query", "nutrition_query", "health_query"]:
+            if intent_type in [
+                "performance_query",
+                "genetics_query",
+                "nutrition_query",
+                "health_query",
+            ]:
                 logger.debug(f" Intent '{intent_type}' detected -> aviculture")
                 return True
 
@@ -301,7 +437,9 @@ class AvicultureConfig:
 
     def get_supported_languages(self) -> List[str]:
         """Get list of supported language codes"""
-        return self.system_prompts.get("metadata", {}).get("languages_supported", ["en", "fr"])
+        return self.system_prompts.get("metadata", {}).get(
+            "languages_supported", ["en", "fr"]
+        )
 
     def validate_query(self, query: str) -> Dict[str, any]:
         """
@@ -313,16 +451,14 @@ class AvicultureConfig:
         Returns:
             Validation result with suggestions
         """
-        result = {
-            "valid": True,
-            "suggestions": [],
-            "missing_info": []
-        }
+        result = {"valid": True, "suggestions": [], "missing_info": []}
 
         # Check for minimum query length
         if len(query.strip()) < 5:
             result["valid"] = False
-            result["suggestions"].append("Query is too short. Please provide more details.")
+            result["suggestions"].append(
+                "Query is too short. Please provide more details."
+            )
 
         # Check for breed mention in performance queries
         if any(metric in query.lower() for metric in self.metric_keywords):
@@ -370,8 +506,15 @@ class AvicultureConfig:
         vet_terms = self.veterinary_terms
 
         # Check all veterinary categories
-        for category in ["diseases", "symptoms", "treatments", "pathogens", "diagnosis",
-                        "veterinary_questions", "health_issues"]:
+        for category in [
+            "diseases",
+            "symptoms",
+            "treatments",
+            "pathogens",
+            "diagnosis",
+            "veterinary_questions",
+            "health_issues",
+        ]:
             terms = vet_terms.get(category, {}).get(language, [])
             if any(term in query_lower for term in terms):
                 return True
@@ -396,6 +539,7 @@ class AvicultureConfig:
 
 # Singleton instance for easy access
 _aviculture_config = None
+
 
 def get_aviculture_config() -> AvicultureConfig:
     """Get singleton instance of aviculture configuration"""

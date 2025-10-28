@@ -1,9 +1,10 @@
 {
   "metadata": {
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "Messages système multilingues pour Intelia Expert - Système expert avicole",
-    "supported_languages": ["de", "en", "es", "fr", "hi", "id", "it", "nl", "pl", "pt", "th", "zh"],
+    "supported_languages": ["ar", "de", "en", "es", "fr", "hi", "id", "it", "ja", "nl", "pl", "pt", "th", "tr", "vi", "zh"],
     "language_names": {
+      "ar": "ARABIC / العربية",
       "de": "GERMAN / DEUTSCH",
       "en": "ENGLISH",
       "es": "SPANISH / ESPAÑOL",
@@ -11,10 +12,13 @@
       "hi": "HINDI / हिन्दी",
       "id": "INDONESIAN / BAHASA INDONESIA",
       "it": "ITALIAN / ITALIANO",
+      "ja": "JAPANESE / 日本語",
       "nl": "DUTCH / NEDERLANDS",
       "pl": "POLISH / POLSKI",
       "pt": "PORTUGUESE / PORTUGUÊS",
       "th": "THAI / ไทย",
+      "tr": "TURKISH / TÜRKÇE",
+      "vi": "VIETNAMESE / TIẾNG VIỆT",
       "zh": "CHINESE / 中文"
     },
     "message_types": [
@@ -33,7 +37,7 @@
       "feedback_request",
       "veterinary_disclaimer"
     ],
-    "last_updated": "2025-01-15",
+    "last_updated": "2025-10-28",
     "encoding": "utf-8"
   },
 
@@ -244,6 +248,78 @@
       "feedback_thanks": "ขอบคุณสำหรับความคิดเห็นของคุณ! มันช่วยให้เราปรับปรุง Intelia Expert ได้",
       "feedback_request": "คำตอบนี้มีประโยชน์หรือไม่? ความคิดเห็นของคุณช่วยให้เราปรับปรุงได้",
       "veterinary_disclaimer": "**สำคัญ**: ข้อมูลนี้จัดทำขึ้นเพื่อการศึกษาเท่านั้น สำหรับคำถามเกี่ยวกับสุขภาพของสัตว์ กรุณาปรึกษาสัตวแพทย์ที่มีคุณสมบัติ"
+    },
+
+    "ar": {
+      "out_of_domain": "Intelia Expert هو نظام خبير متخصص في إنتاج الدواجن ولا يمكنه المساعدة في الأسئلة خارج هذا المجال. أنا هنا لدعمك في جميع جوانب تربية الدواجن. كيف يمكنني مساعدتك في تربية الدواجن؟",
+      "error_generic": "حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى بعد لحظات.",
+      "error_connection": "خطأ في الاتصال بالنظام. يرجى التحقق من اتصال الإنترنت الخاص بك والمحاولة مرة أخرى.",
+      "error_timeout": "استغرق الطلب وقتًا طويلاً. يرجى إعادة صياغة سؤالك أو المحاولة مرة أخرى.",
+      "error_not_found": "لم يتم العثور على المعلومات في قاعدة معارف الدواجن لدينا.",
+      "welcome": "مرحبا! أنا Intelia Expert، مساعدك المتخصص في تربية الدواجن. كيف يمكنني مساعدتك اليوم؟",
+      "clarification_needed": "هل يمكنك توضيح سؤالك حتى أتمكن من تقديم إجابة أكثر دقة؟",
+      "followup_clarification": "ممتاز! كيف يمكنني مساعدتك؟",
+      "no_results": "لم أجد معلومات ذات صلة في قاعدة معارف الدواجن الخاصة بي. هل يمكنك إعادة صياغة سؤالك؟",
+      "processing": "جاري معالجة طلبك، يرجى الانتظار لحظات قليلة...",
+      "farewell": "وداعا! لا تتردد في العودة إذا كان لديك المزيد من الأسئلة حول الدواجن.",
+      "success_generic": "تمت العملية بنجاح.",
+      "feedback_thanks": "شكرا لتعليقك! يساعدنا ذلك في تحسين Intelia Expert.",
+      "feedback_request": "هل كانت هذه الإجابة مفيدة؟ ملاحظاتك تساعدنا على التحسين.",
+      "veterinary_disclaimer": "**مهم**: يتم توفير هذه المعلومات لأغراض تعليمية. لأي أسئلة تتعلق بصحة حيواناتك، استشر طبيبًا بيطريًا مؤهلاً."
+    },
+
+    "ja": {
+      "out_of_domain": "Intelia Expertは養鶏生産に特化した専門システムであり、この分野以外の質問には対応できません。私は養鶏のあらゆる側面であなたをサポートするためにここにいます。養鶏についてどのようにお手伝いできますか？",
+      "error_generic": "リクエストの処理中にエラーが発生しました。しばらくしてからもう一度お試しください。",
+      "error_connection": "システムへの接続エラー。インターネット接続を確認して、もう一度お試しください。",
+      "error_timeout": "リクエストに時間がかかりすぎました。質問を言い換えるか、もう一度お試しください。",
+      "error_not_found": "養鶏知識ベースに情報が見つかりませんでした。",
+      "welcome": "こんにちは！私はIntelia Expert、養鶏の専門アシスタントです。今日はどのようにお手伝いできますか？",
+      "clarification_needed": "より正確な回答を提供できるよう、質問を明確にしていただけますか？",
+      "followup_clarification": "素晴らしい！どのようにお手伝いできますか？",
+      "no_results": "養鶏知識ベースで関連情報が見つかりませんでした。質問を言い換えていただけますか？",
+      "processing": "リクエストを処理中です。しばらくお待ちください...",
+      "farewell": "さようなら！養鶏について他に質問がある場合は、お気軽にお戻りください。",
+      "success_generic": "操作が正常に完了しました。",
+      "feedback_thanks": "フィードバックありがとうございます！Intelia Expertの改善に役立ちます。",
+      "feedback_request": "この回答は役に立ちましたか？あなたのフィードバックは私たちの改善に役立ちます。",
+      "veterinary_disclaimer": "**重要**：この情報は教育目的で提供されています。動物の健康に関する質問については、資格のある獣医師にご相談ください。"
+    },
+
+    "tr": {
+      "out_of_domain": "Intelia Expert, kümes hayvanları üretimine özelleşmiş bir uzman sistem olup bu alan dışındaki sorularda yardımcı olamaz. Kümes hayvancılığının tüm yönlerinde size destek olmak için buradayım. Kümes hayvancılığı konusunda size nasıl yardımcı olabilirim?",
+      "error_generic": "İsteğiniz işlenirken bir hata oluştu. Lütfen birkaç dakika sonra tekrar deneyin.",
+      "error_connection": "Sisteme bağlantı hatası. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.",
+      "error_timeout": "İstek çok uzun sürdü. Lütfen sorunuzu yeniden ifade edin veya tekrar deneyin.",
+      "error_not_found": "Kümes hayvanları bilgi tabanımızda bilgi bulunamadı.",
+      "welcome": "Merhaba! Ben Intelia Expert, kümes hayvancılığı konusunda uzmanlaşmış asistanınızım. Bugün size nasıl yardımcı olabilirim?",
+      "clarification_needed": "Daha doğru bir cevap verebilmem için sorunuzu açıklayabilir misiniz?",
+      "followup_clarification": "Harika! Size nasıl yardımcı olabilirim?",
+      "no_results": "Kümes hayvanları bilgi tabanımda ilgili bilgi bulamadım. Sorunuzu yeniden ifade edebilir misiniz?",
+      "processing": "İsteğiniz işleniyor, lütfen birkaç dakika bekleyin...",
+      "farewell": "Hoşça kalın! Kümes hayvancılığı hakkında daha fazla sorunuz olursa geri gelmekten çekinmeyin.",
+      "success_generic": "İşlem başarıyla tamamlandı.",
+      "feedback_thanks": "Geri bildiriminiz için teşekkürler! Intelia Expert'i geliştirmemize yardımcı oluyor.",
+      "feedback_request": "Bu cevap yardımcı oldu mu? Geri bildiriminiz gelişmemize yardımcı oluyor.",
+      "veterinary_disclaimer": "**Önemli**: Bu bilgiler eğitim amaçlıdır. Hayvanlarınızın sağlığıyla ilgili herhangi bir soru için kalifiye bir veterinere danışın."
+    },
+
+    "vi": {
+      "out_of_domain": "Intelia Expert là hệ thống chuyên gia chuyên về sản xuất gia cầm và không thể hỗ trợ các câu hỏi ngoài lĩnh vực này. Tôi ở đây để hỗ trợ bạn về mọi khía cạnh của chăn nuôi gia cầm. Tôi có thể giúp gì cho bạn về gia cầm?",
+      "error_generic": "Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại sau vài phút.",
+      "error_connection": "Lỗi kết nối với hệ thống. Vui lòng kiểm tra kết nối internet và thử lại.",
+      "error_timeout": "Yêu cầu mất quá nhiều thời gian. Vui lòng diễn đạt lại câu hỏi hoặc thử lại.",
+      "error_not_found": "Không tìm thấy thông tin trong cơ sở kiến thức gia cầm của chúng tôi.",
+      "welcome": "Xin chào! Tôi là Intelia Expert, trợ lý chuyên môn của bạn về chăn nuôi gia cầm. Hôm nay tôi có thể giúp gì cho bạn?",
+      "clarification_needed": "Bạn có thể làm rõ câu hỏi của mình để tôi có thể cung cấp câu trả lời chính xác hơn không?",
+      "followup_clarification": "Tuyệt vời! Tôi có thể giúp gì cho bạn?",
+      "no_results": "Tôi không tìm thấy thông tin liên quan trong cơ sở kiến thức gia cầm của mình. Bạn có thể diễn đạt lại câu hỏi không?",
+      "processing": "Đang xử lý yêu cầu của bạn, vui lòng đợi vài phút...",
+      "farewell": "Tạm biệt! Đừng ngần ngại quay lại nếu bạn có thêm câu hỏi về gia cầm.",
+      "success_generic": "Thao tác hoàn thành thành công.",
+      "feedback_thanks": "Cảm ơn phản hồi của bạn! Nó giúp chúng tôi cải thiện Intelia Expert.",
+      "feedback_request": "Câu trả lời này có hữu ích không? Phản hồi của bạn giúp chúng tôi cải thiện.",
+      "veterinary_disclaimer": "**Quan trọng**: Thông tin này được cung cấp cho mục đích giáo dục. Đối với bất kỳ câu hỏi nào liên quan đến sức khỏe động vật của bạn, hãy tham khảo ý kiến bác sĩ thú y có trình độ."
     }
   },
 

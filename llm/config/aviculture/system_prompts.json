@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "English-only system prompts with dynamic language directive for multilingual responses",
-    "last_updated": "2025-10-06",
-    "languages_supported": ["fr", "en", "es", "de", "it", "pt", "ar", "zh", "ja", "ko", "th", "vi"]
+    "last_updated": "2025-10-28",
+    "languages_supported": ["ar", "de", "en", "es", "fr", "hi", "id", "it", "ja", "nl", "pl", "pt", "th", "tr", "vi", "zh"]
   },
   "base_prompts": {
     "expert_identity": "You are a recognized poultry expert with deep expertise in poultry production.\n\nCRITICAL: Respond EXCLUSIVELY in {language_name}.",

@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "language": "vi",
+    "language_name": "Vietnamese",
+    "native_name": "Tiếng Việt",
+    "version": "1.0.0",
+    "last_updated": "2025-10-28",
+    "term_count": 0,
+    "description": "Vietnamese terminology dictionary for poultry domain - Google Translate fallback enabled",
+    "translator": "Google Translate API",
+    "encoding": "utf-8",
+    "notes": "Initial empty dictionary - terms will be translated dynamically via Google Translate API"
+  },
+  "terms": {
+  }
+}

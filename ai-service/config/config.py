@@ -40,9 +40,9 @@ if LANGSMITH_ENABLED and not LANGSMITH_API_KEY:
     )
 
 # ===== NOUVEAU: CONFIGURATION MULTILINGUE =====
-# Langues supportées (12 langues ISO 639-1) - Seulement celles avec dictionnaires
+# Langues supportées (16 langues ISO 639-1) - Toutes avec dictionnaires ou Google Translate fallback
 SUPPORTED_LANGUAGES = {
-    # "ar",  # Arabe - dictionnaire manquant
+    "ar",  # Arabe - Google Translate fallback
     "de",  # Allemand
     "en",  # Anglais
     "es",  # Espagnol
@@ -50,13 +50,13 @@ SUPPORTED_LANGUAGES = {
     "hi",  # Hindi
     "id",  # Indonésien
     "it",  # Italien
-    # "ja",  # Japonais - dictionnaire manquant
+    "ja",  # Japonais - Google Translate fallback
     "nl",  # Néerlandais
     "pl",  # Polonais
     "pt",  # Portugais
     "th",  # Thaï
-    # "tr",  # Turc - dictionnaire manquant
-    # "vi",  # Vietnamien - dictionnaire manquant
+    "tr",  # Turc - Google Translate fallback
+    "vi",  # Vietnamien - Google Translate fallback
     "zh",  # Chinois
 }
 DEFAULT_LANGUAGE = "fr"
@@ -123,12 +123,16 @@ DEFAULT_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.6"))
 # Query-driven document ingestion from external scientific sources
 ENABLE_EXTERNAL_SOURCES = os.getenv("ENABLE_EXTERNAL_SOURCES", "true").lower() == "true"
 EXTERNAL_SEARCH_THRESHOLD = float(os.getenv("EXTERNAL_SEARCH_THRESHOLD", "0.7"))
-EXTERNAL_SOURCES_LOG_DIR = os.getenv("EXTERNAL_SOURCES_LOG_DIR", "/app/logs/external_sources")
+EXTERNAL_SOURCES_LOG_DIR = os.getenv(
+    "EXTERNAL_SOURCES_LOG_DIR", "/app/logs/external_sources"
+)
 
 # External sources settings
 EXTERNAL_SOURCES_ENABLED_BY_DEFAULT = True  # Auto-enable if Weaviate available
 EXTERNAL_SOURCES_PARALLEL_SEARCH = True  # Search all sources simultaneously
-EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE = int(os.getenv("EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE", "5"))
+EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE = int(
+    os.getenv("EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE", "5")
+)
 EXTERNAL_SOURCES_MIN_YEAR = int(os.getenv("EXTERNAL_SOURCES_MIN_YEAR", "2015"))
 
 # Individual source toggles
@@ -325,10 +329,14 @@ DO_APP_TIER = os.getenv("DO_APP_TIER", "basic")
 
 # Configuration dynamique selon l'environnement DO
 if DO_APP_TIER == "professional":
-    RAG_SIMILARITY_TOP_K = 135  # INCREASED: Was 120, now 135 (sweet spot: performance vs latency)
+    RAG_SIMILARITY_TOP_K = (
+        135  # INCREASED: Was 120, now 135 (sweet spot: performance vs latency)
+    )
     RRF_CACHE_SIZE = 2000
 elif DO_APP_TIER == "basic":
-    RAG_SIMILARITY_TOP_K = 135  # INCREASED: Was 120, now 135 (sweet spot: performance vs latency)
+    RAG_SIMILARITY_TOP_K = (
+        135  # INCREASED: Was 120, now 135 (sweet spot: performance vs latency)
+    )
     RRF_CACHE_SIZE = 500
 
 

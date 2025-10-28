@@ -42,21 +42,52 @@ class AvicultureConfig:
 
         # Aviculture-specific breed keywords
         self.breed_keywords = [
-            "ross", "cobb", "hubbard", "isa", "lohmann", "hy-line",
-            "aviagen", "novogen", "dekalb", "shaver", "bovans",
+            "ross",
+            "cobb",
+            "hubbard",
+            "isa",
+            "lohmann",
+            "hy-line",
+            "aviagen",
+            "novogen",
+            "dekalb",
+            "shaver",
+            "bovans",
         ]
 
         # Domain-specific metrics
         self.metric_keywords = [
-            "weight", "poids", "fcr", "feed conversion", "indice de conversion",
-            "egg production", "ponte", "mortality", "mortalité",
+            "weight",
+            "poids",
+            "fcr",
+            "feed conversion",
+            "indice de conversion",
+            "egg production",
+            "ponte",
+            "mortality",
+            "mortalité",
         ]
 
         # Aviculture-specific keywords (from llm_router)
         self.aviculture_keywords = [
-            "poulet", "poule", "pondeuse", "broiler", "poussin", "volaille",
-            "aviculture", "élevage", "mortalité", "ponte", "aliment", "eau",
-            "nutrition", "santé", "maladie", "vaccin", "température", "ventilation",
+            "poulet",
+            "poule",
+            "pondeuse",
+            "broiler",
+            "poussin",
+            "volaille",
+            "aviculture",
+            "élevage",
+            "mortalité",
+            "ponte",
+            "aliment",
+            "eau",
+            "nutrition",
+            "santé",
+            "maladie",
+            "vaccin",
+            "température",
+            "ventilation",
         ]
 
         logger.info(f"Aviculture configuration loaded from {config_dir}")
@@ -74,7 +105,9 @@ class AvicultureConfig:
             logger.error(f"Invalid JSON in {file_path}: {e}")
             return {}
 
-    def get_system_prompt(self, query_type: str = "general_poultry", language: str = "en") -> str:
+    def get_system_prompt(
+        self, query_type: str = "general_poultry", language: str = "en"
+    ) -> str:
         """
         Get system prompt for a specific query type
 
@@ -86,13 +119,19 @@ class AvicultureConfig:
             Formatted system prompt with language directive
         """
         # Get base prompts
-        expert_identity = self.system_prompts.get("base_prompts", {}).get("expert_identity", "")
-        response_guidelines = self.system_prompts.get("base_prompts", {}).get("response_guidelines", "")
+        expert_identity = self.system_prompts.get("base_prompts", {}).get(
+            "expert_identity", ""
+        )
+        response_guidelines = self.system_prompts.get("base_prompts", {}).get(
+            "response_guidelines", ""
+        )
 
         # Get specialized prompt
         specialized = self.system_prompts.get("specialized_prompts", {}).get(
             query_type,
-            self.system_prompts.get("specialized_prompts", {}).get("general_poultry", "")
+            self.system_prompts.get("specialized_prompts", {}).get(
+                "general_poultry", ""
+            ),
         )
 
         # Combine prompts
@@ -100,10 +139,22 @@ class AvicultureConfig:
 
         # Format with language name
         language_names = {
-            "fr": "French", "en": "English", "es": "Spanish",
-            "de": "German", "it": "Italian", "pt": "Portuguese",
-            "ar": "Arabic", "zh": "Chinese", "ja": "Japanese",
-            "ko": "Korean", "th": "Thai", "vi": "Vietnamese"
+            "ar": "Arabic",
+            "de": "German",
+            "en": "English",
+            "es": "Spanish",
+            "fr": "French",
+            "hi": "Hindi",
+            "id": "Indonesian",
+            "it": "Italian",
+            "ja": "Japanese",
+            "nl": "Dutch",
+            "pl": "Polish",
+            "pt": "Portuguese",
+            "th": "Thai",
+            "tr": "Turkish",
+            "vi": "Vietnamese",
+            "zh": "Chinese",
         }
         language_name = language_names.get(language, "English")
 
@@ -121,7 +172,7 @@ class AvicultureConfig:
             "add_veterinary_disclaimer",
             "use_metric_units",
             "remove_source_mentions",
-            "clean_verbatim_copying"
+            "clean_verbatim_copying",
         ]
 
     def get_requirements(self) -> Dict[str, str]:
@@ -154,19 +205,22 @@ class AvicultureConfig:
 
         # Check for breed names (strong indicator)
         if any(breed in query_lower for breed in self.breed_keywords):
-            logger.debug(f"🐔 Breed name detected in query → aviculture")
+            logger.debug("🐔 Breed name detected in query → aviculture")
             return True
 
         # Check for performance metrics with age indicators
         has_metric = any(metric in query_lower for metric in self.metric_keywords)
-        has_age = any(age_term in query_lower for age_term in ["day", "days", "week", "weeks", "jours", "jour", "semaine"])
+        has_age = any(
+            age_term in query_lower
+            for age_term in ["day", "days", "week", "weeks", "jours", "jour", "semaine"]
+        )
         if has_metric and has_age:
-            logger.debug(f"🐔 Metric + age detected in query → aviculture")
+            logger.debug("🐔 Metric + age detected in query → aviculture")
             return True
 
         # Check aviculture keywords
         if any(keyword in query_lower for keyword in self.aviculture_keywords):
-            logger.debug(f"🐔 Aviculture keyword detected")
+            logger.debug("🐔 Aviculture keyword detected")
             return True
 
         # Check domain from intent result
@@ -174,12 +228,24 @@ class AvicultureConfig:
             domain = intent_result.get("domain", "")
             intent_type = intent_result.get("intent", "")
 
-            if domain in ["aviculture", "poultry", "livestock", "genetics_performance",
-                         "nutrition", "health", "housing"]:
+            if domain in [
+                "aviculture",
+                "poultry",
+                "livestock",
+                "genetics_performance",
+                "nutrition",
+                "health",
+                "housing",
+            ]:
                 logger.debug(f"🐔 Domain '{domain}' detected → aviculture")
                 return True
 
-            if intent_type in ["performance_query", "genetics_query", "nutrition_query", "health_query"]:
+            if intent_type in [
+                "performance_query",
+                "genetics_query",
+                "nutrition_query",
+                "health_query",
+            ]:
                 logger.debug(f"🐔 Intent '{intent_type}' detected → aviculture")
                 return True
 
@@ -201,7 +267,9 @@ class AvicultureConfig:
 
     def get_supported_languages(self) -> List[str]:
         """Get list of supported language codes"""
-        return self.system_prompts.get("metadata", {}).get("languages_supported", ["en", "fr"])
+        return self.system_prompts.get("metadata", {}).get(
+            "languages_supported", ["en", "fr"]
+        )
 
     def validate_query(self, query: str) -> Dict[str, any]:
         """
@@ -213,16 +281,14 @@ class AvicultureConfig:
         Returns:
             Validation result with suggestions
         """
-        result = {
-            "valid": True,
-            "suggestions": [],
-            "missing_info": []
-        }
+        result = {"valid": True, "suggestions": [], "missing_info": []}
 
         # Check for minimum query length
         if len(query.strip()) < 5:
             result["valid"] = False
-            result["suggestions"].append("Query is too short. Please provide more details.")
+            result["suggestions"].append(
+                "Query is too short. Please provide more details."
+            )
 
         # Check for breed mention in performance queries
         if any(metric in query.lower() for metric in self.metric_keywords):
@@ -270,8 +336,15 @@ class AvicultureConfig:
         vet_terms = self.veterinary_terms
 
         # Check all veterinary categories
-        for category in ["diseases", "symptoms", "treatments", "pathogens", "diagnosis",
-                        "veterinary_questions", "health_issues"]:
+        for category in [
+            "diseases",
+            "symptoms",
+            "treatments",
+            "pathogens",
+            "diagnosis",
+            "veterinary_questions",
+            "health_issues",
+        ]:
             terms = vet_terms.get(category, {}).get(language, [])
             if any(term in query_lower for term in terms):
                 return True
@@ -296,6 +369,7 @@ class AvicultureConfig:
 
 # Singleton instance for easy access
 _aviculture_config = None
+
 
 def get_aviculture_config() -> AvicultureConfig:
     """Get singleton instance of aviculture configuration"""
