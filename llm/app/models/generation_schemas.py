@@ -22,6 +22,7 @@ class GenerateRequest(BaseModel):
     entities: Optional[Dict[str, Any]] = Field(None, description="Extracted entities")
     query_type: Optional[str] = Field(None, description="Query type (standard, comparative, etc.)")
     context_docs: Optional[List[Dict]] = Field(None, description="Context documents")
+    user_category: Optional[str] = Field(None, description="User expertise level (health_veterinary, farm_operations, etc.)")
 
     # Generation parameters (optional, will use domain defaults)
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Sampling temperature")

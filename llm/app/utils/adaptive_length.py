@@ -135,6 +135,7 @@ class AdaptiveResponseLength:
         query_type: Optional[str] = None,
         context_docs: Optional[List[Dict]] = None,
         domain: Optional[str] = None,
+        user_category: Optional[str] = None,
         **kwargs,
     ) -> int:
         """
@@ -146,6 +147,7 @@ class AdaptiveResponseLength:
             query_type: Query type (standard, comparative, temporal)
             context_docs: Retrieved context documents
             domain: Query domain
+            user_category: User expertise level (health_veterinary, farm_operations, etc.)
 
         Returns:
             Optimal max_tokens (200-1500)
@@ -164,9 +166,12 @@ class AdaptiveResponseLength:
             query, entities, query_type, context_docs, min_tokens, max_tokens
         )
 
+        # 🎯 ROLE-BASED ADJUSTMENT: Veterinarians need longer, technical responses
+        final_tokens = self._adjust_for_user_role(final_tokens, user_category, complexity)
+
         logger.info(
-            f"[RULE] Adaptive length: {final_tokens} tokens "
-            f"(complexity={complexity.value}, query_len={len(query.split())} words)"
+            f"📏 Adaptive length: {final_tokens} tokens "
+            f"(complexity={complexity.value}, role={user_category or 'unknown'}, query_len={len(query.split())} words)"
         )
 
         return final_tokens
@@ -380,6 +385,62 @@ class AdaptiveResponseLength:
 
         return tokens
 
+    def _adjust_for_user_role(
+        self,
+        base_tokens: int,
+        user_category: Optional[str],
+        complexity: QueryComplexity
+    ) -> int:
+        """
+        Adjust token count based on user expertise level
+
+        Veterinarians/technical users need longer, detailed responses
+        Producers need concise, actionable responses
+
+        Args:
+            base_tokens: Base token count from complexity
+            user_category: User category (health_veterinary, farm_operations, etc.)
+            complexity: Query complexity level
+
+        Returns:
+            Adjusted token count
+        """
+        if not user_category:
+            return base_tokens
+
+        # 🎯 VETERINARY/TECHNICAL PROFESSIONALS: +30-50% tokens
+        if user_category in ['health_veterinary', 'feed_nutrition', 'breeding_hatchery']:
+            multiplier = 1.5  # 50% more tokens for detailed technical responses
+            adjusted = int(base_tokens * multiplier)
+
+            logger.debug(
+                f"🔬 Technical role ({user_category}): {base_tokens} -> {adjusted} tokens (+{multiplier-1:.0%})"
+            )
+
+            # Cap at 2000 tokens for very complex queries
+            return min(adjusted, 2000)
+
+        # 📊 MANAGEMENT/STRATEGIC: +20-30% tokens (need analysis + recommendations)
+        elif user_category in ['management_oversight', 'equipment_technology', 'processing']:
+            multiplier = 1.3
+            adjusted = int(base_tokens * multiplier)
+
+            logger.debug(
+                f"📊 Management role ({user_category}): {base_tokens} -> {adjusted} tokens (+{multiplier-1:.0%})"
+            )
+
+            return min(adjusted, 1800)
+
+        # 👨‍🌾 FARM OPERATORS: Keep concise and actionable (no adjustment)
+        elif user_category == 'farm_operations':
+            logger.debug(
+                f"👨‍🌾 Producer role: keeping concise at {base_tokens} tokens"
+            )
+            return base_tokens
+
+        # Generic/unknown: no adjustment
+        return base_tokens
+
     def get_complexity_info(
         self,
         query: str,
@@ -387,6 +448,7 @@ class AdaptiveResponseLength:
         query_type: Optional[str] = None,
         context_docs: Optional[List[Dict]] = None,
         domain: Optional[str] = None,
+        user_category: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Get detailed complexity analysis (for debugging/monitoring)
@@ -402,7 +464,8 @@ class AdaptiveResponseLength:
                     "query_type": "standard",
                     "doc_count": 4,
                     "keywords": ["procedural"],
-                    "domain": "health"
+                    "domain": "health",
+                    "user_category": "health_veterinary"
                 }
             }
         """
@@ -412,7 +475,7 @@ class AdaptiveResponseLength:
         )
         token_range = self.token_ranges[complexity]
         max_tokens = self.calculate_max_tokens(
-            query, entities, query_type, context_docs, domain
+            query, entities, query_type, context_docs, domain, user_category
         )
 
         keyword_score, keyword_types = self._check_complexity_keywords(query)
@@ -429,6 +492,7 @@ class AdaptiveResponseLength:
                 "keywords": keyword_types,
                 "domain": domain or "unknown",
                 "expects_list": self._expects_list(query),
+                "user_category": user_category or "unknown",
             },
         }
 

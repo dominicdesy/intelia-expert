@@ -18,6 +18,8 @@ import logging
 import re
 from typing import List, Dict, Optional
 
+from app.utils.domain_validators import get_poultry_validator
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +50,10 @@ class ResponsePostProcessor:
         # [FAST] Pre-compile regex patterns for performance (saves ~6ms per request)
         self._compile_cleanup_patterns()
 
-        logger.info(f"[OK] ResponsePostProcessor initialized with {len(self.veterinary_keywords)} veterinary terms")
+        # Initialize metrics validator for garde-fous
+        self.metrics_validator = get_poultry_validator()
+
+        logger.info(f"[OK] ResponsePostProcessor initialized with {len(self.veterinary_keywords)} veterinary terms + metrics validator")
 
     def _load_veterinary_keywords(self) -> List[str]:
         """
@@ -140,6 +145,30 @@ class ResponsePostProcessor:
         # [FAST] Apply pre-compiled regex patterns (optimized from 9ms to ~3ms)
         for pattern, replacement in self.cleanup_patterns:
             response = pattern.sub(replacement, response)
+
+        # GARDE-FOUS: Validate poultry metrics to prevent dangerous hallucinations
+        validation_result = self.metrics_validator.validate_response(response, language=language)
+
+        if validation_result["blocked"]:
+            # CRITICAL: Response contains dangerous metric hallucinations
+            logger.error(
+                f"[BLOCKED] Response contains {len(validation_result['warnings'])} critical metric hallucination(s). "
+                f"Suggestion: {validation_result['suggestion']}"
+            )
+            # Return safe fallback message instead of hallucinated response
+            safe_messages = {
+                "en": "I apologize, but I detected potentially incorrect numerical values in my response. For accurate information about this topic, please consult a veterinarian or poultry specialist.",
+                "fr": "Je m'excuse, mais j'ai détecté des valeurs numériques potentiellement incorrectes dans ma réponse. Pour des informations précises sur ce sujet, veuillez consulter un vétérinaire ou un spécialiste avicole.",
+                "es": "Me disculpo, pero he detectado valores numéricos potencialmente incorrectos en mi respuesta. Para obtener información precisa sobre este tema, consulte a un veterinario o especialista avícola."
+            }
+            return safe_messages.get(language, safe_messages["en"])
+
+        # Log warnings even if not blocked
+        if validation_result["warnings"]:
+            logger.warning(
+                f"[VALIDATION] {len(validation_result['warnings'])} metric warning(s) detected: "
+                f"{validation_result['suggestion']}"
+            )
 
         # Add veterinary disclaimer if the question concerns health/disease
         if query and self.is_veterinary_query(query, context_docs):

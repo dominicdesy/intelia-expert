@@ -103,14 +103,15 @@ async def generate(
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported domain: {request.domain}")
 
-        # Calculate max_tokens if not provided
+        # Calculate max_tokens if not provided (with user_category for role-based adjustment)
         adaptive_calc = get_adaptive_length()
         calculated_max_tokens = adaptive_calc.calculate_max_tokens(
             query=request.query,
             entities=request.entities,
             query_type=request.query_type,
             context_docs=request.context_docs,
-            domain=request.domain
+            domain=request.domain,
+            user_category=request.user_category
         )
         max_tokens = request.max_tokens or calculated_max_tokens
 
@@ -120,7 +121,8 @@ async def generate(
             entities=request.entities,
             query_type=request.query_type,
             context_docs=request.context_docs,
-            domain=request.domain
+            domain=request.domain,
+            user_category=request.user_category
         )
 
         # Build messages
@@ -323,14 +325,15 @@ async def generate_stream(
             else:
                 raise HTTPException(status_code=400, detail=f"Unsupported domain: {request.domain}")
 
-            # Calculate max_tokens if not provided
+            # Calculate max_tokens if not provided (with user_category for role-based adjustment)
             adaptive_calc = get_adaptive_length()
             calculated_max_tokens = adaptive_calc.calculate_max_tokens(
                 query=request.query,
                 entities=request.entities,
                 query_type=request.query_type,
                 context_docs=request.context_docs,
-                domain=request.domain
+                domain=request.domain,
+                user_category=request.user_category
             )
             max_tokens = request.max_tokens or calculated_max_tokens
 
@@ -340,7 +343,8 @@ async def generate_stream(
                 entities=request.entities,
                 query_type=request.query_type,
                 context_docs=request.context_docs,
-                domain=request.domain
+                domain=request.domain,
+                user_category=request.user_category
             )
 
             # Build messages
