@@ -49,7 +49,7 @@ class LLMRouter:
         response = await router.generate(provider, messages)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize LLM clients and routing configuration"""
 
         # Initialize OpenAI client for GPT-4o
@@ -763,7 +763,7 @@ class LLMRouter:
 
     async def _generate_deepseek_stream(
         self, messages: List[Dict], temperature: float, max_tokens: int
-    ):
+    ) -> AsyncGenerator[str, None]:
         """Generate using DeepSeek with streaming"""
         import time
         start_time = time.time()
@@ -808,7 +808,7 @@ class LLMRouter:
 
     async def _generate_claude_stream(
         self, messages: List[Dict], temperature: float, max_tokens: int
-    ):
+    ) -> AsyncGenerator[str, None]:
         """Generate using Claude 3.5 Sonnet with streaming"""
         import time
         start_time = time.time()
@@ -857,7 +857,7 @@ class LLMRouter:
 
     async def _generate_gpt4o_stream(
         self, messages: List[Dict], temperature: float, max_tokens: int
-    ):
+    ) -> AsyncGenerator[str, None]:
         """Generate using GPT-4o with streaming"""
         import time
         start_time = time.time()

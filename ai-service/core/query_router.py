@@ -114,7 +114,7 @@ class ConfigManager:
         self._load_all_configs()
         self._build_indexes()
 
-    def _load_all_configs(self):
+    def _load_all_configs(self) -> None:
         """Loads ALL configuration files"""
 
         # 1. INTENTS.JSON - Main source of truth
@@ -180,7 +180,7 @@ class ConfigManager:
         else:
             logger.warning(f"domain_keywords.json not found: {domain_path}")
 
-    def _build_indexes(self):
+    def _build_indexes(self) -> None:
         """Builds indexes for fast O(1) lookup"""
 
         # INDEX BREEDS - All aliases from intents.json
@@ -434,7 +434,7 @@ class QueryRouter:
             "✅ QueryRouter initialized (100% config-driven + hybrid extraction + LLM classification)"
         )
 
-    def _compile_patterns(self):
+    def _compile_patterns(self) -> None:
         """Compiles regex from configs for performance"""
 
         # BREEDS - Dynamic pattern from index
@@ -527,7 +527,7 @@ class QueryRouter:
 
         return prompt_key
 
-    def _apply_priority_rules(self, domain_scores: Dict, current_prompt: str) -> str:
+    def _apply_priority_rules(self, domain_scores: Dict[str, Any], current_prompt: str) -> str:
         """
         Applies priority rules between domains
 
@@ -903,7 +903,7 @@ class QueryRouter:
 
         return entities
 
-    def _calculate_confidence(self, entities: Dict) -> float:
+    def _calculate_confidence(self, entities: Dict[str, Any]) -> float:
         """Calculates extraction confidence"""
         score = 0.0
 
@@ -940,7 +940,7 @@ class QueryRouter:
 
     def _validate_completeness(
         self, entities: Dict[str, Any], query: str, language: str
-    ) -> Tuple[bool, List[str], Dict]:
+    ) -> Tuple[bool, List[str], Dict[str, Any]]:
         """
         Validation based on LLM classification (replaces fragile regex patterns)
 
@@ -1154,7 +1154,7 @@ class QueryRouter:
         return missing
 
     def _determine_destination(
-        self, query: str, entities: Dict[str, Any], language: str, validation_details: Dict[str, Any] = None
+        self, query: str, entities: Dict[str, Any], language: str, validation_details: Optional[Dict[str, Any]] = None
     ) -> Tuple[str, str]:
         """
         Intelligent routing based on LLM classifier (priority) then keyword fallback
@@ -1238,7 +1238,7 @@ class QueryRouter:
         else:
             return "standard"
 
-    def clear_context(self, user_id: str):
+    def clear_context(self, user_id: str) -> None:
         """Clears user's conversational context"""
         if user_id in self.context_store:
             del self.context_store[user_id]
@@ -1248,7 +1248,7 @@ class QueryRouter:
         """Retrieves conversational context"""
         return self.context_store.get(user_id)
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> Dict[str, Any]:
         """Router statistics"""
         active_contexts = sum(
             1 for ctx in self.context_store.values() if not ctx.is_expired()
@@ -1276,7 +1276,7 @@ def create_query_router(config_dir: str = "config") -> QueryRouter:
     return QueryRouter(config_dir)
 
 
-def test_query_router():
+def test_query_router() -> None:
     """Integrated unit tests"""
 
     print("=" * 70)
