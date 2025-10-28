@@ -1,0 +1,321 @@
+{
+  "test_10_requests": [
+    {
+      "request_id": 1,
+      "status": "success",
+      "latency_ms": 2598,
+      "cached": true,
+      "tokens": 1722,
+      "query": "What is the FCR of Ross 308?",
+      "language": "en"
+    },
+    {
+      "request_id": 2,
+      "status": "success",
+      "latency_ms": 7600,
+      "cached": false,
+      "tokens": 739,
+      "query": "Quel est le poids de Cobb 500 \u00e0 35 jours?",
+      "language": "fr"
+    },
+    {
+      "request_id": 3,
+      "status": "success",
+      "latency_ms": 1329,
+      "cached": true,
+      "tokens": 1339,
+      "query": "What is the ideal temperature for broilers?",
+      "language": "en"
+    },
+    {
+      "request_id": 4,
+      "status": "success",
+      "latency_ms": 7210,
+      "cached": false,
+      "tokens": 611,
+      "query": "Comment am\u00e9liorer le GMQ?",
+      "language": "fr"
+    },
+    {
+      "request_id": 5,
+      "status": "success",
+      "latency_ms": 6453,
+      "cached": false,
+      "tokens": 1592,
+      "query": "What is the average weight of Ross 308 at 21 days?",
+      "language": "en"
+    },
+    {
+      "request_id": 6,
+      "status": "success",
+      "latency_ms": 10258,
+      "cached": false,
+      "tokens": 914,
+      "query": "Quelle est la diff\u00e9rence entre brooding et rearing",
+      "language": "fr"
+    },
+    {
+      "request_id": 7,
+      "status": "success",
+      "latency_ms": 8233,
+      "cached": false,
+      "tokens": 1398,
+      "query": "How to reduce mortality in broiler chickens?",
+      "language": "en"
+    },
+    {
+      "request_id": 8,
+      "status": "success",
+      "latency_ms": 9061,
+      "cached": false,
+      "tokens": 941,
+      "query": "Quel est le taux de conversion alimentaire optimal",
+      "language": "fr"
+    },
+    {
+      "request_id": 9,
+      "status": "success",
+      "latency_ms": 8599,
+      "cached": false,
+      "tokens": 1633,
+      "query": "What vaccinations are needed for day-old chicks?",
+      "language": "en"
+    },
+    {
+      "request_id": 10,
+      "status": "success",
+      "latency_ms": 9217,
+      "cached": false,
+      "tokens": 748,
+      "query": "Comment contr\u00f4ler la temp\u00e9rature dans le poulaille",
+      "language": "fr"
+    }
+  ],
+  "test_25_requests": [
+    {
+      "request_id": 1,
+      "status": "success",
+      "latency_ms": 849,
+      "cached": true,
+      "tokens": 1722,
+      "query": "What is the FCR of Ross 308?",
+      "language": "en"
+    },
+    {
+      "request_id": 2,
+      "status": "success",
+      "latency_ms": 441,
+      "cached": true,
+      "tokens": 739,
+      "query": "Quel est le poids de Cobb 500 \u00e0 35 jours?",
+      "language": "fr"
+    },
+    {
+      "request_id": 3,
+      "status": "success",
+      "latency_ms": 442,
+      "cached": true,
+      "tokens": 1339,
+      "query": "What is the ideal temperature for broilers?",
+      "language": "en"
+    },
+    {
+      "request_id": 4,
+      "status": "success",
+      "latency_ms": 440,
+      "cached": true,
+      "tokens": 611,
+      "query": "Comment am\u00e9liorer le GMQ?",
+      "language": "fr"
+    },
+    {
+      "request_id": 5,
+      "status": "success",
+      "latency_ms": 440,
+      "cached": true,
+      "tokens": 1592,
+      "query": "What is the average weight of Ross 308 at 21 days?",
+      "language": "en"
+    },
+    {
+      "request_id": 6,
+      "status": "success",
+      "latency_ms": 847,
+      "cached": true,
+      "tokens": 914,
+      "query": "Quelle est la diff\u00e9rence entre brooding et rearing",
+      "language": "fr"
+    },
+    {
+      "request_id": 7,
+      "status": "success",
+      "latency_ms": 439,
+      "cached": true,
+      "tokens": 1398,
+      "query": "How to reduce mortality in broiler chickens?",
+      "language": "en"
+    },
+    {
+      "request_id": 8,
+      "status": "success",
+      "latency_ms": 445,
+      "cached": true,
+      "tokens": 941,
+      "query": "Quel est le taux de conversion alimentaire optimal",
+      "language": "fr"
+    },
+    {
+      "request_id": 9,
+      "status": "success",
+      "latency_ms": 848,
+      "cached": true,
+      "tokens": 1633,
+      "query": "What vaccinations are needed for day-old chicks?",
+      "language": "en"
+    },
+    {
+      "request_id": 10,
+      "status": "success",
+      "latency_ms": 846,
+      "cached": true,
+      "tokens": 748,
+      "query": "Comment contr\u00f4ler la temp\u00e9rature dans le poulaille",
+      "language": "fr"
+    },
+    {
+      "request_id": 11,
+      "status": "success",
+      "latency_ms": 846,
+      "cached": true,
+      "tokens": 1722,
+      "query": "What is the FCR of Ross 308?",
+      "language": "en"
+    },
+    {
+      "request_id": 12,
+      "status": "success",
+      "latency_ms": 847,
+      "cached": true,
+      "tokens": 739,
+      "query": "Quel est le poids de Cobb 500 \u00e0 35 jours?",
+      "language": "fr"
+    },
+    {
+      "request_id": 13,
+      "status": "success",
+      "latency_ms": 440,
+      "cached": true,
+      "tokens": 1339,
+      "query": "What is the ideal temperature for broilers?",
+      "language": "en"
+    },
+    {
+      "request_id": 14,
+      "status": "success",
+      "latency_ms": 439,
+      "cached": true,
+      "tokens": 611,
+      "query": "Comment am\u00e9liorer le GMQ?",
+      "language": "fr"
+    },
+    {
+      "request_id": 15,
+      "status": "success",
+      "latency_ms": 847,
+      "cached": true,
+      "tokens": 1592,
+      "query": "What is the average weight of Ross 308 at 21 days?",
+      "language": "en"
+    },
+    {
+      "request_id": 16,
+      "status": "success",
+      "latency_ms": 440,
+      "cached": true,
+      "tokens": 914,
+      "query": "Quelle est la diff\u00e9rence entre brooding et rearing",
+      "language": "fr"
+    },
+    {
+      "request_id": 17,
+      "status": "success",
+      "latency_ms": 846,
+      "cached": true,
+      "tokens": 1398,
+      "query": "How to reduce mortality in broiler chickens?",
+      "language": "en"
+    },
+    {
+      "request_id": 18,
+      "status": "success",
+      "latency_ms": 438,
+      "cached": true,
+      "tokens": 941,
+      "query": "Quel est le taux de conversion alimentaire optimal",
+      "language": "fr"
+    },
+    {
+      "request_id": 19,
+      "status": "success",
+      "latency_ms": 846,
+      "cached": true,
+      "tokens": 1633,
+      "query": "What vaccinations are needed for day-old chicks?",
+      "language": "en"
+    },
+    {
+      "request_id": 20,
+      "status": "success",
+      "latency_ms": 439,
+      "cached": true,
+      "tokens": 748,
+      "query": "Comment contr\u00f4ler la temp\u00e9rature dans le poulaille",
+      "language": "fr"
+    },
+    {
+      "request_id": 21,
+      "status": "success",
+      "latency_ms": 845,
+      "cached": true,
+      "tokens": 1722,
+      "query": "What is the FCR of Ross 308?",
+      "language": "en"
+    },
+    {
+      "request_id": 22,
+      "status": "success",
+      "latency_ms": 845,
+      "cached": true,
+      "tokens": 739,
+      "query": "Quel est le poids de Cobb 500 \u00e0 35 jours?",
+      "language": "fr"
+    },
+    {
+      "request_id": 23,
+      "status": "success",
+      "latency_ms": 845,
+      "cached": true,
+      "tokens": 1339,
+      "query": "What is the ideal temperature for broilers?",
+      "language": "en"
+    },
+    {
+      "request_id": 24,
+      "status": "success",
+      "latency_ms": 436,
+      "cached": true,
+      "tokens": 611,
+      "query": "Comment am\u00e9liorer le GMQ?",
+      "language": "fr"
+    },
+    {
+      "request_id": 25,
+      "status": "success",
+      "latency_ms": 846,
+      "cached": true,
+      "tokens": 1592,
+      "query": "What is the average weight of Ross 308 at 21 days?",
+      "language": "en"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# This file has been DEPRECATED and moved to the LLM service
+#
+# Location: llm/app/domain_config/domains/aviculture/poultry_terminology.json
+#
+# The LLM service now contains:
+# - poultry_terminology.json (enhanced version with more acronyms)
+# - value_chain_terminology.json (100+ terms covering full poultry value chain)
+# - extended_glossary.json (1,476 terms extracted from PDF glossaries)
+#
+# Total: 1,580 terminology terms available in the LLM service
+#
+# Migration date: 2025-10-27
+#
+# If you need terminology data, please use the LLM service at:
+# http://localhost:8081/v1/generate
+#
+# DO NOT USE THIS FILE - IT IS OUTDATED

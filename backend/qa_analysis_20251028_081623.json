@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "analysis_date": "2025-10-28T08:16:23.614821",
+    "min_score_threshold": 7.0,
+    "analyzer_version": "1.0.0"
+  },
+  "statistics": {
+    "total_analyzed": 46,
+    "total_scored": 44,
+    "total_excluded": 2,
+    "total_candidates": 0,
+    "avg_score": 4.7,
+    "max_score": 5.1,
+    "min_score": 4.3,
+    "exclusion_reasons": {
+      "Confidence trop faible (0.00)": 2
+    }
+  },
+  "top_candidates": [],
+  "excluded_sample": [
+    {
+      "question": "Que peux-je faire pour améliorer le taux de ponte de mes poules?",
+      "reason": "Confidence trop faible (0.00)"
+    },
+    {
+      "question": "Quel est le poids d'un Cobb 500 femelle de 8 jours ?",
+      "reason": "Confidence trop faible (0.00)"
+    }
+  ]
+}

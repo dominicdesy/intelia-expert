@@ -130,7 +130,7 @@ class WeaviateRAGService:
                 # Import dynamique pour ne pas casser si module absent
                 # Les modules du LLM ne sont pas disponibles dans le backend
                 # On désactive le RAG pour Voice Realtime dans le backend
-                logger.warning("⚠️ Weaviate RAG not available in backend context - Voice Realtime will work without RAG pre-loading")
+                logger.info("ℹ️ Weaviate RAG not available in backend context - Voice Realtime will work without RAG pre-loading (this is expected)")
                 self.enabled = False
             except Exception as e:
                 logger.error(f"❌ Weaviate initialization failed: {e}")

@@ -58,7 +58,10 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(taskkill /F /PID 30864)",
-      "Bash(powershell -Command \"Stop-Process -Id 30864 -Force\")"
+      "Bash(powershell -Command \"Stop-Process -Id 30864 -Force\")",
+      "Bash(timeout 5 python:*)",
+      "Bash(dir:*)",
+      "Bash(is unsupported\" error by adding method check to skip non-GET requests.\n\nChanges:\n- Added check to skip POST/PUT/DELETE requests before caching\n- Only GET requests are now cached (as per Cache API spec)\n- Updated Service Worker version to 1.1.2 to force refresh\n\nThis resolves the console error when the SW tried to cache\nAPI POST requests like /api/v1/monitoring endpoints.\n\nGenerated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []

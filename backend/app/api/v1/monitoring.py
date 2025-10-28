@@ -38,10 +38,11 @@ class SystemMetrics(BaseModel):
 
 class ServiceStatus(BaseModel):
     """Service health status"""
-    name: str = Field(..., description="Service name")
+    service: str = Field(..., description="Service name")  # Changed from 'name' to 'service'
     status: str = Field(..., description="Status: healthy, unhealthy, unknown")
     response_time_ms: Optional[float] = Field(None, description="Response time in milliseconds")
-    error: Optional[str] = Field(None, description="Error message if unhealthy")
+    last_check: str = Field(..., description="Last check timestamp")
+    error_message: Optional[str] = Field(None, description="Error message if unhealthy")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional service details")
 
 
@@ -56,9 +57,20 @@ class MonitoringSummary(BaseModel):
 class LogEntry(BaseModel):
     """Application log entry"""
     timestamp: str = Field(..., description="Log timestamp")
+    service: str = Field(..., description="Service name")
     level: str = Field(..., description="Log level")
     message: str = Field(..., description="Log message")
-    source: Optional[str] = Field(None, description="Log source/module")
+    context: Optional[Dict[str, Any]] = Field(None, description="Additional log context")
+
+
+class LogsResponse(BaseModel):
+    """Response wrapper for logs endpoint"""
+    logs: List[LogEntry] = Field(..., description="List of log entries")
+
+
+class ServicesResponse(BaseModel):
+    """Response wrapper for services endpoint"""
+    services: List[ServiceStatus] = Field(..., description="List of service statuses")
 
 
 # ============================================================================
@@ -119,18 +131,20 @@ async def check_database_health() -> ServiceStatus:
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
 
         return ServiceStatus(
-            name="PostgreSQL",
+            service="PostgreSQL",
             status="healthy",
-            response_time_ms=round(response_time, 2)
+            response_time_ms=round(response_time, 2),
+            last_check=datetime.utcnow().isoformat()
         )
     except Exception as e:
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
         logger.error(f"PostgreSQL health check failed: {e}")
         return ServiceStatus(
-            name="PostgreSQL",
+            service="PostgreSQL",
             status="unhealthy",
             response_time_ms=round(response_time, 2),
-            error=str(e)
+            last_check=datetime.utcnow().isoformat(),
+            error_message=str(e)
         )
 
 
@@ -148,18 +162,20 @@ async def check_supabase_health() -> ServiceStatus:
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
 
         return ServiceStatus(
-            name="Supabase",
+            service="Supabase",
             status="healthy",
-            response_time_ms=round(response_time, 2)
+            response_time_ms=round(response_time, 2),
+            last_check=datetime.utcnow().isoformat()
         )
     except Exception as e:
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
         logger.error(f"Supabase health check failed: {e}")
         return ServiceStatus(
-            name="Supabase",
+            service="Supabase",
             status="unhealthy",
             response_time_ms=round(response_time, 2),
-            error=str(e)
+            last_check=datetime.utcnow().isoformat(),
+            error_message=str(e)
         )
 
 
@@ -178,19 +194,21 @@ async def check_llm_service_health() -> ServiceStatus:
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
 
         return ServiceStatus(
-            name="LLM Service",
+            service="LLM Service",
             status="healthy",
             response_time_ms=round(response_time, 2),
+            last_check=datetime.utcnow().isoformat(),
             details={"url": llm_service_url}
         )
     except Exception as e:
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
         logger.error(f"LLM service health check failed: {e}")
         return ServiceStatus(
-            name="LLM Service",
+            service="LLM Service",
             status="unhealthy",
             response_time_ms=round(response_time, 2),
-            error=str(e),
+            last_check=datetime.utcnow().isoformat(),
+            error_message=str(e),
             details={"url": llm_service_url}
         )
 
@@ -210,19 +228,21 @@ async def check_ai_service_health() -> ServiceStatus:
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
 
         return ServiceStatus(
-            name="AI Service",
+            service="AI Service",
             status="healthy",
             response_time_ms=round(response_time, 2),
+            last_check=datetime.utcnow().isoformat(),
             details={"url": ai_service_url}
         )
     except Exception as e:
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
         logger.error(f"AI service health check failed: {e}")
         return ServiceStatus(
-            name="AI Service",
+            service="AI Service",
             status="unhealthy",
             response_time_ms=round(response_time, 2),
-            error=str(e),
+            last_check=datetime.utcnow().isoformat(),
+            error_message=str(e),
             details={"url": ai_service_url}
         )
 
@@ -273,9 +293,10 @@ async def get_monitoring_summary():
                 # If service check raised exception, create error status
                 service_names = ["PostgreSQL", "Supabase", "LLM Service", "AI Service"]
                 valid_services.append(ServiceStatus(
-                    name=service_names[i],
+                    service=service_names[i],
                     status="unhealthy",
-                    error=str(service) if isinstance(service, Exception) else "Unknown error"
+                    last_check=datetime.utcnow().isoformat(),
+                    error_message=str(service) if isinstance(service, Exception) else "Unknown error"
                 ))
 
         # Determine overall status
@@ -292,13 +313,13 @@ async def get_monitoring_summary():
         raise HTTPException(status_code=500, detail=f"Failed to generate monitoring summary: {str(e)}")
 
 
-@router.get("/services", response_model=List[ServiceStatus])
+@router.get("/services", response_model=ServicesResponse)
 async def get_services_status():
     """
     Get health status of all services.
 
     Returns:
-        List[ServiceStatus]: List of service health statuses
+        ServicesResponse: Object containing list of service health statuses
     """
     try:
         # Check all services concurrently
@@ -319,18 +340,19 @@ async def get_services_status():
                 # If service check raised exception, create error status
                 service_names = ["PostgreSQL", "Supabase", "LLM Service", "AI Service"]
                 valid_services.append(ServiceStatus(
-                    name=service_names[i],
+                    service=service_names[i],
                     status="unhealthy",
-                    error=str(service) if isinstance(service, Exception) else "Unknown error"
+                    last_check=datetime.utcnow().isoformat(),
+                    error_message=str(service) if isinstance(service, Exception) else "Unknown error"
                 ))
 
-        return valid_services
+        return ServicesResponse(services=valid_services)
     except Exception as e:
         logger.error(f"Error checking services: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to check services: {str(e)}")
 
 
-@router.get("/logs", response_model=List[LogEntry])
+@router.get("/logs", response_model=LogsResponse)
 async def get_application_logs(
     limit: int = Query(default=100, ge=1, le=1000, description="Maximum number of logs to return"),
     level: Optional[str] = Query(None, description="Filter by log level (INFO, WARNING, ERROR, etc.)")
@@ -343,7 +365,7 @@ async def get_application_logs(
         level: Optional log level filter
 
     Returns:
-        List[LogEntry]: List of log entries
+        LogsResponse: Object containing list of log entries
     """
     try:
         # For now, return mock logs
@@ -352,15 +374,15 @@ async def get_application_logs(
         mock_logs = [
             LogEntry(
                 timestamp=datetime.utcnow().isoformat(),
+                service="backend",
                 level="INFO",
-                message="Monitoring endpoint accessed",
-                source="monitoring.api"
+                message="Monitoring endpoint accessed"
             ),
             LogEntry(
                 timestamp=datetime.utcnow().isoformat(),
+                service="backend",
                 level="INFO",
-                message="System health check completed",
-                source="monitoring.health"
+                message="System health check completed"
             )
         ]
 
@@ -368,7 +390,7 @@ async def get_application_logs(
         if level:
             mock_logs = [log for log in mock_logs if log.level.upper() == level.upper()]
 
-        return mock_logs[:limit]
+        return LogsResponse(logs=mock_logs[:limit])
     except Exception as e:
         logger.error(f"Error retrieving logs: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve logs: {str(e)}")

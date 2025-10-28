@@ -1,0 +1,397 @@
+================================================================================
+RAPPORT D'ANALYSE DE QUALITÉ DES Q&A
+================================================================================
+
+Date: 2025-10-28T08:16:59.428208
+Version: 1.0.0
+Seuil minimum: 4.5/10
+
+--------------------------------------------------------------------------------
+STATISTIQUES GLOBALES
+--------------------------------------------------------------------------------
+Total analysé:        46
+Total scoré:          44
+Total exclu:          2
+Total candidates:     42
+
+Score moyen:          4.7/10
+Score maximum:        5.1/10
+Score minimum:        4.3/10
+
+--------------------------------------------------------------------------------
+RAISONS D'EXCLUSION
+--------------------------------------------------------------------------------
+Confidence trop faible (0.00)                2
+
+================================================================================
+TOP 20 CANDIDATES
+================================================================================
+
+[1] SCORE: 5.10/10
+--------------------------------------------------------------------------------
+Question:    De quoi doit-être composée une moulée pour pondeuse ?
+Réponse:     Un aliment pour poules pondeuses devrait contenir:
+
+- Un niveau élevé de calcium (3,5 à 4,5%) pour assurer une bonne qualité de coquille d'œuf.
+- Un t...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-21
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  9.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[2] SCORE: 5.00/10
+--------------------------------------------------------------------------------
+Question:    Comment réduire la mortalité de mes poulets de chair?
+Réponse:     {"answer": "Pour r\u00e9duire la mortalit\u00e9 de vos poulets de chair, il est essentiel de se concentrer sur plusieurs aspects cl\u00e9s de la gesti...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-27
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  8.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[3] SCORE: 5.00/10
+--------------------------------------------------------------------------------
+Question:    Comment réduire la mortalité de mes poulets de chair ?
+Réponse:     Pour réduire la mortalité de vos poulets de chair, il est essentiel de se concentrer sur plusieurs aspects clés de la gestion de l'élevage :
+
+-  Assur...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-27
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  8.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[4] SCORE: 5.00/10
+--------------------------------------------------------------------------------
+Question:    Quelle est la meilleur séquence d'abatage
+Réponse:     La meilleure séquence d'abattage pour les poulets de chair dépend de plusieurs facteurs, notamment la lignée, le poids cible, et les conditions du mar...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-23
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  8.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[5] SCORE: 5.00/10
+--------------------------------------------------------------------------------
+Question:    Quel est le poid idéal pour un poulet de rotisserie
+Réponse:     Le poids idéal pour un poulet de rôtisserie se situe généralement entre 1,5 kg et 2,5 kg. Ce poids permet d'assurer une cuisson uniforme et un goût op...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-23
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  8.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[6] SCORE: 4.90/10
+--------------------------------------------------------------------------------
+Question:    S'il fait trop froid dans mon poulailler, est-ce que ca effecte la mortalité ?
+Réponse:     Oui, une température trop froide dans le poulailler peut affecter la mortalité des poulets de chair. Lorsque la température de la litière et de l'air ...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-27
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  7.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[7] SCORE: 4.90/10
+--------------------------------------------------------------------------------
+Question:    Quel est l'impact de l'amoniaque sur les poulets
+Réponse:     L'ammoniac a un impact significatif sur la santé et la performance des poulets de chair. Voici les principaux effets :
+
+-  Des niveaux élevés d'ammoni...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-23
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  7.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[8] SCORE: 4.90/10
+--------------------------------------------------------------------------------
+Question:    Quels sont les parametres environnementale clé pour maximiser la production
+Réponse:     Pour maximiser la production de poulets de chair, il est crucial de contrôler plusieurs paramètres environnementaux clés :
+
+-  Maintenir une températu...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-23
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  7.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[9] SCORE: 4.90/10
+--------------------------------------------------------------------------------
+Question:    Quelle est la maladie la plus courante chez le broiler ?
+Réponse:     {"answer": "La coccidiose est l'une des maladies les plus courantes chez les poulets de chair. Elle est caus\u00e9e par des parasites protozoaires et ...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-21
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  7.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[10] SCORE: 4.90/10
+--------------------------------------------------------------------------------
+Question:    Comment maximiser la croissance de mes broiler ?
+Réponse:     Pour maximiser la croissance de vos poulets de chair, suivez ces recommandations:
+
+-  Utilisez des régimes alimentaires bien formulés, riches en acide...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-21
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  7.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[11] SCORE: 4.90/10
+--------------------------------------------------------------------------------
+Question:    Comment maximiser la croissance de mes broiler ?
+Réponse:     Pour maximiser la croissance de vos poulets de chair, il est essentiel de se concentrer sur plusieurs aspects clés:
+
+-  Formulez des régimes alimentai...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-21
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  7.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[12] SCORE: 4.85/10
+--------------------------------------------------------------------------------
+Question:    Can intelia's product help my production
+Réponse:     Intelia Expert peut certainement vous aider à optimiser votre production de poulets de chair. Voici comment :
+
+-  Intelia Expert fournit des recommand...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-23
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  7.00/10 (poids: 10%)
+  - clarity        :  3.00/10 (poids: 5%)
+
+[13] SCORE: 4.70/10
+--------------------------------------------------------------------------------
+Question:    Comment maximiser le taux de ponte des mes poules ?
+Réponse:     Pour maximiser le taux de production d'œufs de vos poules pondeuses, plusieurs facteurs clés doivent être pris en compte :
+
+-  Assurez-vous que l'alim...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-27
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  5.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[14] SCORE: 4.70/10
+--------------------------------------------------------------------------------
+Question:    Quel est l'impact d'une mauvaise moulée sur mes poulets ?
+Réponse:     Une alimentation de mauvaise qualité peut avoir plusieurs impacts négatifs sur vos poulets de chair :
+
+-  Les poulets peuvent ne pas atteindre leur po...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-26
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  5.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[15] SCORE: 4.70/10
+--------------------------------------------------------------------------------
+Question:    Quelle est l'impact d'un mauvais programme de biosécurité ?
+Réponse:     Un programme de biosécurité insuffisant dans une exploitation avicole peut avoir plusieurs impacts négatifs significatifs :
+
+-  Un manque de mesures d...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-26
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  5.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[16] SCORE: 4.70/10
+--------------------------------------------------------------------------------
+Question:    Comment bien implanter la biosécurité sur ma ferme ?
+Réponse:     Pour mettre en œuvre efficacement la biosécurité sur votre ferme, il est essentiel de suivre plusieurs mesures clés :
+
+-  Limitez les visiteurs non es...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-25
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  5.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[17] SCORE: 4.70/10
+--------------------------------------------------------------------------------
+Question:    Quel est le taux d'ammonic maximum à ne pas dépasser
+Réponse:     Le niveau maximal d'ammoniac qui ne doit pas être dépassé dans un bâtiment d'élevage de poulets de chair est généralement de 25 ppm (parties par milli...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-23
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  5.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[18] SCORE: 4.70/10
+--------------------------------------------------------------------------------
+Question:    Quel est le meilleur séquence d'alimentation afin d'assurer une production maximal
+Réponse:     Pour assurer une production maximale de poulets de chair, un programme d'alimentation optimal est essentiel. Voici quelques recommandations clés :
+
+- ...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-23
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  5.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[19] SCORE: 4.70/10
+--------------------------------------------------------------------------------
+Question:    Comment ralentir la croissance de mes broilers ?
+Réponse:     Pour ralentir la croissance de vos poulets de chair, vous pouvez envisager plusieurs stratégies :
+
+-  Introduire du blé entier en supplément peut rédu...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-22
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  5.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
+
+[20] SCORE: 4.70/10
+--------------------------------------------------------------------------------
+Question:    Comment faire pour maximiser le poids de mes broilers ?
+Réponse:     Pour maximiser le poids de vos poulets de chair, il est essentiel de se concentrer sur plusieurs aspects clés de la gestion de l'élevage.
+
+-  Assurez-...
+Langue:      fr
+Confidence:  0.85
+Feedback:    Aucun
+Date:        2025-10-22
+
+Scores détaillés:
+  - feedback       :  5.00/10 (poids: 30%)
+  - confidence     :  8.00/10 (poids: 25%)
+  - popularity     :  0.00/10 (poids: 20%)
+  - freshness      :  5.00/10 (poids: 10%)
+  - completeness   :  5.00/10 (poids: 10%)
+  - clarity        :  4.00/10 (poids: 5%)
