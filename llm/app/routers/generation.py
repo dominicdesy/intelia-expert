@@ -7,19 +7,22 @@ import logging
 import json
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
-from typing import Dict, List, Any
+from typing import Dict, Any
 
 from app.models.generation_schemas import (
-    GenerateRequest, GenerateResponse,
-    RouteRequest, RouteResponse,
-    CalculateTokensRequest, CalculateTokensResponse,
-    PostProcessRequest, PostProcessResponse
+    GenerateRequest,
+    GenerateResponse,
+    RouteRequest,
+    RouteResponse,
+    CalculateTokensRequest,
+    CalculateTokensResponse,
+    PostProcessRequest,
+    PostProcessResponse,
 )
 from app.config import settings
 from app.dependencies import get_llm_client
 from app.models.llm_client import LLMClient
 from app.utils.adaptive_length import get_adaptive_length
-from app.utils.post_processor import create_post_processor
 from app.utils.semantic_cache import get_semantic_cache
 from app.utils.model_router import get_model_router, ModelSize
 
@@ -35,10 +38,10 @@ router = APIRouter(prefix="/v1", tags=["generation"])
 # POST /v1/generate - Intelligent Generation
 # ============================================
 
+
 @router.post("/generate", response_model=GenerateResponse)
 async def generate(
-    request: GenerateRequest,
-    llm_client: LLMClient = Depends(get_llm_client)
+    request: GenerateRequest, llm_client: LLMClient = Depends(get_llm_client)
 ) -> GenerateResponse:
     """
     Generate LLM completion with domain-aware configuration
@@ -60,16 +63,26 @@ async def generate(
     ```
     """
     try:
-        logger.info(f"[GEN] Generate request: domain={request.domain}, query_len={len(request.query)}")
+        logger.info(
+            f"[GEN] Generate request: domain={request.domain}, query_len={len(request.query)}"
+        )
 
         # [FAST] OPTIMIZATION Phase 1: Check semantic cache first
         semantic_cache = get_semantic_cache(
-            redis_host=settings.redis_host if hasattr(settings, 'redis_host') else "localhost",
-            redis_port=settings.redis_port if hasattr(settings, 'redis_port') else 6379,
-            redis_db=settings.redis_db if hasattr(settings, 'redis_db') else 0,
-            redis_password=settings.redis_password if hasattr(settings, 'redis_password') and settings.redis_password else None,
-            ttl=settings.cache_ttl if hasattr(settings, 'cache_ttl') else 3600,
-            enabled=settings.cache_enabled if hasattr(settings, 'cache_enabled') else True
+            redis_host=(
+                settings.redis_host if hasattr(settings, "redis_host") else "localhost"
+            ),
+            redis_port=settings.redis_port if hasattr(settings, "redis_port") else 6379,
+            redis_db=settings.redis_db if hasattr(settings, "redis_db") else 0,
+            redis_password=(
+                settings.redis_password
+                if hasattr(settings, "redis_password") and settings.redis_password
+                else None
+            ),
+            ttl=settings.cache_ttl if hasattr(settings, "cache_ttl") else 3600,
+            enabled=(
+                settings.cache_enabled if hasattr(settings, "cache_enabled") else True
+            ),
         )
 
         cache_entry = await semantic_cache.get(
@@ -77,16 +90,22 @@ async def generate(
             entities=request.entities,
             language=request.language,
             domain=request.domain,
-            query_type=request.query_type
+            query_type=request.query_type,
         )
 
         if cache_entry:
             # Cache hit - return cached response immediately (5ms vs 5000ms!)
-            logger.info(f"[FAST] CACHE HIT: Returning cached response (~5ms vs ~5000ms LLM call)")
+            logger.info(
+                "[FAST] CACHE HIT: Returning cached response (~5ms vs ~5000ms LLM call)"
+            )
             return GenerateResponse(
                 generated_text=cache_entry.response,
                 provider=settings.llm_provider,
-                model=settings.huggingface_model if settings.llm_provider == "huggingface" else "vllm",
+                model=(
+                    settings.huggingface_model
+                    if settings.llm_provider == "huggingface"
+                    else "vllm"
+                ),
                 prompt_tokens=cache_entry.prompt_tokens,
                 completion_tokens=cache_entry.completion_tokens,
                 total_tokens=cache_entry.prompt_tokens + cache_entry.completion_tokens,
@@ -94,14 +113,16 @@ async def generate(
                 calculated_max_tokens=0,  # Not recalculated for cache hits
                 post_processed=True,  # Cached responses are already post-processed
                 disclaimer_added=False,  # Already included in cached response
-                cached=True  # Indicate this is a cached response
+                cached=True,  # Indicate this is a cached response
             )
 
         # Get domain configuration
         if request.domain == "aviculture":
             domain_config = get_aviculture_config()
         else:
-            raise HTTPException(status_code=400, detail=f"Unsupported domain: {request.domain}")
+            raise HTTPException(
+                status_code=400, detail=f"Unsupported domain: {request.domain}"
+            )
 
         # Calculate max_tokens if not provided (with user_category for role-based adjustment)
         adaptive_calc = get_adaptive_length()
@@ -111,7 +132,7 @@ async def generate(
             query_type=request.query_type,
             context_docs=request.context_docs,
             domain=request.domain,
-            user_category=request.user_category
+            user_category=request.user_category,
         )
         max_tokens = request.max_tokens or calculated_max_tokens
 
@@ -122,7 +143,7 @@ async def generate(
             query_type=request.query_type,
             context_docs=request.context_docs,
             domain=request.domain,
-            user_category=request.user_category
+            user_category=request.user_category,
         )
 
         # Build messages
@@ -135,12 +156,12 @@ async def generate(
                 language=request.language,
                 query=request.query,  # Pass query for terminology matching
                 inject_terminology=True,  # Enable terminology injection
-                max_terminology_tokens=1000  # Limit terminology to 1000 tokens
+                max_terminology_tokens=1000,  # Limit terminology to 1000 tokens
             )
 
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": request.query}
+                {"role": "user", "content": request.query},
             ]
 
         # Get generation parameters from domain config if not provided
@@ -155,26 +176,24 @@ async def generate(
         if settings.enable_model_routing and settings.llm_provider == "huggingface":
             # Determine query complexity and select optimal model
             import time
+
             routing_start = time.time()
 
             model_router = get_model_router(
-                ab_test_ratio=settings.ab_test_ratio,
-                enable_routing=True
+                ab_test_ratio=settings.ab_test_ratio, enable_routing=True
             )
 
             # Determine complexity
-            from app.utils.model_router import QueryComplexity
             complexity = model_router.determine_complexity(
                 query=request.query,
                 query_type=request.query_type,
                 entities=request.entities,
-                context_docs=request.context_docs
+                context_docs=request.context_docs,
             )
 
             # Select model
             model_size = model_router.select_model(
-                complexity=complexity,
-                query=request.query
+                complexity=complexity, query=request.query
             )
 
             # Get model name
@@ -186,19 +205,24 @@ async def generate(
                 routing_decision = "8b"
 
             routing_time = int((time.time() - routing_start) * 1000)
-            logger.info(f" Model routing: {complexity.value} → {routing_decision} ({routing_time}ms)")
+            logger.info(
+                f" Model routing: {complexity.value} → {routing_decision} ({routing_time}ms)"
+            )
 
             # Create new LLM client with selected model (if different from default)
             if model_used != llm_client.model:
                 from app.models.llm_client import HuggingFaceProvider
+
                 llm_client = HuggingFaceProvider(
-                    api_key=settings.huggingface_api_key,
-                    model=model_used
+                    api_key=settings.huggingface_api_key, model=model_used
                 )
 
         # Generate completion
-        logger.info(f" Generating with model={model_used}, max_tokens={max_tokens}, temperature={temperature}")
+        logger.info(
+            f" Generating with model={model_used}, max_tokens={max_tokens}, temperature={temperature}"
+        )
         import time
+
         gen_start = time.time()
 
         generated_text, prompt_tokens, completion_tokens = await llm_client.generate(
@@ -206,7 +230,7 @@ async def generate(
             temperature=temperature,
             max_tokens=max_tokens,
             top_p=top_p,
-            stop=None
+            stop=None,
         )
 
         gen_time = int((time.time() - gen_start) * 1000)
@@ -214,25 +238,27 @@ async def generate(
         # Record routing stats
         if settings.enable_model_routing and routing_decision:
             model_router = get_model_router()
-            model_size = ModelSize.SMALL if routing_decision == "3b" else ModelSize.LARGE
+            model_size = (
+                ModelSize.SMALL if routing_decision == "3b" else ModelSize.LARGE
+            )
             model_router.record_usage(model_size, gen_time)
 
         # Post-process if requested
         disclaimer_added = False
-        compliance_metadata = {}
         if request.post_process:
             # [FAST] Use cached PostProcessor from domain config (saves ~2ms per request)
-            generated_text, post_metadata = domain_config.post_processor.post_process_response(
-                response=generated_text,
-                query=request.query,
-                language=request.language,
-                context_docs=request.context_docs,
-                user_category=request.user_category
+            generated_text, post_metadata = (
+                domain_config.post_processor.post_process_response(
+                    response=generated_text,
+                    query=request.query,
+                    language=request.language,
+                    context_docs=request.context_docs,
+                    user_category=request.user_category,
+                )
             )
 
             # Extract compliance metadata
             disclaimer_added = post_metadata.get("disclaimer_added", False)
-            compliance_metadata = post_metadata
 
             logger.info(
                 f"[CLEAN] Post-processing applied: compliance={post_metadata.get('compliance_level')}, "
@@ -249,7 +275,7 @@ async def generate(
             query_type=request.query_type or "general",
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
-            complexity=complexity_info["complexity"]
+            complexity=complexity_info["complexity"],
         )
 
         return GenerateResponse(
@@ -262,7 +288,7 @@ async def generate(
             complexity=complexity_info["complexity"],
             calculated_max_tokens=calculated_max_tokens,
             post_processed=request.post_process,
-            disclaimer_added=disclaimer_added
+            disclaimer_added=disclaimer_added,
         )
 
     except Exception as e:
@@ -274,10 +300,10 @@ async def generate(
 # POST /v1/generate-stream - Streaming Generation
 # ============================================
 
+
 @router.post("/generate-stream")
 async def generate_stream(
-    request: GenerateRequest,
-    llm_client: LLMClient = Depends(get_llm_client)
+    request: GenerateRequest, llm_client: LLMClient = Depends(get_llm_client)
 ) -> StreamingResponse:
     """
     Generate LLM completion with streaming (Server-Sent Events)
@@ -321,13 +347,17 @@ async def generate_stream(
 
     async def event_generator():
         try:
-            logger.info(f"[GEN] Generate-stream request: domain={request.domain}, query_len={len(request.query)}")
+            logger.info(
+                f"[GEN] Generate-stream request: domain={request.domain}, query_len={len(request.query)}"
+            )
 
             # Get domain configuration
             if request.domain == "aviculture":
                 domain_config = get_aviculture_config()
             else:
-                raise HTTPException(status_code=400, detail=f"Unsupported domain: {request.domain}")
+                raise HTTPException(
+                    status_code=400, detail=f"Unsupported domain: {request.domain}"
+                )
 
             # Calculate max_tokens if not provided (with user_category for role-based adjustment)
             adaptive_calc = get_adaptive_length()
@@ -337,7 +367,7 @@ async def generate_stream(
                 query_type=request.query_type,
                 context_docs=request.context_docs,
                 domain=request.domain,
-                user_category=request.user_category
+                user_category=request.user_category,
             )
             max_tokens = request.max_tokens or calculated_max_tokens
 
@@ -348,7 +378,7 @@ async def generate_stream(
                 query_type=request.query_type,
                 context_docs=request.context_docs,
                 domain=request.domain,
-                user_category=request.user_category
+                user_category=request.user_category,
             )
 
             # Build messages
@@ -361,12 +391,12 @@ async def generate_stream(
                     language=request.language,
                     query=request.query,
                     inject_terminology=True,
-                    max_terminology_tokens=1000
+                    max_terminology_tokens=1000,
                 )
 
                 messages = [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": request.query}
+                    {"role": "user", "content": request.query},
                 ]
 
             # Get generation parameters
@@ -380,11 +410,17 @@ async def generate_stream(
                 "complexity": complexity_info["complexity"],
                 "max_tokens": max_tokens,
                 "provider": settings.llm_provider,
-                "model": settings.huggingface_model if settings.llm_provider == "huggingface" else "vllm"
+                "model": (
+                    settings.huggingface_model
+                    if settings.llm_provider == "huggingface"
+                    else "vllm"
+                ),
             }
             yield f"event: start\ndata: {json.dumps(start_data)}\n\n"
 
-            logger.info(f" Streaming generation with max_tokens={max_tokens}, temperature={temperature}")
+            logger.info(
+                f" Streaming generation with max_tokens={max_tokens}, temperature={temperature}"
+            )
 
             # Stream generation
             full_text = ""
@@ -396,7 +432,7 @@ async def generate_stream(
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=top_p,
-                stop=None
+                stop=None,
             ):
                 if is_final:
                     # Final chunk - extract metadata
@@ -414,20 +450,20 @@ async def generate_stream(
             # Post-process if requested
             final_text = full_text
             disclaimer_added = False
-            compliance_metadata = {}
             if request.post_process:
                 original_length = len(full_text)
-                final_text, post_metadata = domain_config.post_processor.post_process_response(
-                    response=full_text,
-                    query=request.query,
-                    language=request.language,
-                    context_docs=request.context_docs,
-                    user_category=request.user_category
+                final_text, post_metadata = (
+                    domain_config.post_processor.post_process_response(
+                        response=full_text,
+                        query=request.query,
+                        language=request.language,
+                        context_docs=request.context_docs,
+                        user_category=request.user_category,
+                    )
                 )
 
                 # Extract compliance metadata
                 disclaimer_added = post_metadata.get("disclaimer_added", False)
-                compliance_metadata = post_metadata
 
                 # If post-processing added content (disclaimer), send it as additional chunk
                 if len(final_text) > original_length:
@@ -449,11 +485,13 @@ async def generate_stream(
                 "complexity": complexity_info["complexity"],
                 "calculated_max_tokens": calculated_max_tokens,
                 "post_processed": request.post_process,
-                "disclaimer_added": disclaimer_added
+                "disclaimer_added": disclaimer_added,
             }
             yield f"event: end\ndata: {json.dumps(end_data)}\n\n"
 
-            logger.info(f"[OK] Streaming complete: {completion_tokens} tokens generated")
+            logger.info(
+                f"[OK] Streaming complete: {completion_tokens} tokens generated"
+            )
 
         except Exception as e:
             logger.error(f"[ERROR] Streaming generation failed: {e}", exc_info=True)
@@ -466,13 +504,14 @@ async def generate_stream(
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
-        }
+        },
     )
 
 
 # ============================================
 # POST /v1/route - Provider Routing
 # ============================================
+
 
 @router.post("/route", response_model=RouteResponse)
 async def route(request: RouteRequest) -> RouteResponse:
@@ -493,18 +532,21 @@ async def route(request: RouteRequest) -> RouteResponse:
     Returns provider recommendation (e.g., "intelia_llama" for aviculture queries)
     """
     try:
-        logger.info(f" Route request: domain={request.domain}, query={request.query[:50]}...")
+        logger.info(
+            f" Route request: domain={request.domain}, query={request.query[:50]}..."
+        )
 
         # Get domain configuration
         if request.domain == "aviculture":
             domain_config = get_aviculture_config()
         else:
-            raise HTTPException(status_code=400, detail=f"Unsupported domain: {request.domain}")
+            raise HTTPException(
+                status_code=400, detail=f"Unsupported domain: {request.domain}"
+            )
 
         # Check if query is domain-specific
         is_domain_query = domain_config.is_domain_query(
-            query=request.query,
-            intent_result=request.intent_result
+            query=request.query, intent_result=request.intent_result
         )
 
         # Get provider preferences
@@ -513,7 +555,10 @@ async def route(request: RouteRequest) -> RouteResponse:
         # Route based on domain detection
         if is_domain_query:
             # Use domain-preferred provider
-            if "intelia_llama" in provider_prefs and provider_prefs["intelia_llama"] > 0.8:
+            if (
+                "intelia_llama" in provider_prefs
+                and provider_prefs["intelia_llama"] > 0.8
+            ):
                 provider = "intelia_llama"
                 model = settings.huggingface_model
                 reason = f"Domain-specific query detected ({request.domain})"
@@ -537,7 +582,7 @@ async def route(request: RouteRequest) -> RouteResponse:
             model=model,
             reason=reason,
             is_aviculture=is_domain_query,
-            confidence=confidence
+            confidence=confidence,
         )
 
     except Exception as e:
@@ -548,6 +593,7 @@ async def route(request: RouteRequest) -> RouteResponse:
 # ============================================
 # POST /v1/calculate-tokens - Token Calculation
 # ============================================
+
 
 @router.post("/calculate-tokens", response_model=CalculateTokensResponse)
 async def calculate_tokens(request: CalculateTokensRequest) -> CalculateTokensResponse:
@@ -577,16 +623,18 @@ async def calculate_tokens(request: CalculateTokensRequest) -> CalculateTokensRe
             entities=request.entities,
             query_type=request.query_type,
             context_docs=request.context_docs,
-            domain=request.domain
+            domain=request.domain,
         )
 
-        logger.info(f"[OK] Calculated: {complexity_info['max_tokens']} tokens (complexity={complexity_info['complexity']})")
+        logger.info(
+            f"[OK] Calculated: {complexity_info['max_tokens']} tokens (complexity={complexity_info['complexity']})"
+        )
 
         return CalculateTokensResponse(
             max_tokens=complexity_info["max_tokens"],
             complexity=complexity_info["complexity"],
             token_range=complexity_info["token_range"],
-            factors=complexity_info["factors"]
+            factors=complexity_info["factors"],
         )
 
     except Exception as e:
@@ -597,6 +645,7 @@ async def calculate_tokens(request: CalculateTokensRequest) -> CalculateTokensRe
 # ============================================
 # POST /v1/post-process - Response Post-Processing
 # ============================================
+
 
 @router.post("/post-process", response_model=PostProcessResponse)
 async def post_process(request: PostProcessRequest) -> PostProcessResponse:
@@ -624,7 +673,9 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
         if request.domain == "aviculture":
             domain_config = get_aviculture_config()
         else:
-            raise HTTPException(status_code=400, detail=f"Unsupported domain: {request.domain}")
+            raise HTTPException(
+                status_code=400, detail=f"Unsupported domain: {request.domain}"
+            )
 
         # [FAST] OPTIMIZATION: Use cached PostProcessor from domain config (saves ~2ms per request)
         # The PostProcessor is cached with @cached_property and includes pre-compiled regex patterns
@@ -632,8 +683,7 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
 
         # Check if veterinary before processing
         is_veterinary = post_processor.is_veterinary_query(
-            query=request.query,
-            context_docs=request.context_docs
+            query=request.query, context_docs=request.context_docs
         )
 
         # Process response with compliance wrapper
@@ -642,7 +692,7 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
             query=request.query,
             language=request.language,
             context_docs=request.context_docs,
-            user_category=request.user_category
+            user_category=request.user_category,
         )
 
         # Extract metadata
@@ -657,7 +707,7 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
         return PostProcessResponse(
             processed_text=processed_text,
             disclaimer_added=disclaimer_added,
-            is_veterinary=is_veterinary
+            is_veterinary=is_veterinary,
         )
 
     except Exception as e:
@@ -668,6 +718,7 @@ async def post_process(request: PostProcessRequest) -> PostProcessResponse:
 # ============================================
 # GET /v1/model-routing/stats - A/B Test Metrics
 # ============================================
+
 
 @router.get("/model-routing/stats")
 async def get_model_routing_stats() -> Dict[str, Any]:
@@ -706,13 +757,15 @@ async def get_model_routing_stats() -> Dict[str, Any]:
         if not settings.enable_model_routing:
             return {
                 "routing_enabled": False,
-                "message": "Model routing is disabled. Set ENABLE_MODEL_ROUTING=true to enable."
+                "message": "Model routing is disabled. Set ENABLE_MODEL_ROUTING=true to enable.",
             }
 
         model_router = get_model_router()
         stats = model_router.get_stats()
 
-        logger.info(f" Model routing stats requested: {stats['total_requests']} requests")
+        logger.info(
+            f" Model routing stats requested: {stats['total_requests']} requests"
+        )
 
         return stats
 
@@ -724,6 +777,7 @@ async def get_model_routing_stats() -> Dict[str, Any]:
 # ============================================
 # POST /v1/model-routing/reset - Reset Stats
 # ============================================
+
 
 @router.post("/model-routing/reset")
 async def reset_model_routing_stats() -> Dict[str, Any]:
@@ -743,20 +797,14 @@ async def reset_model_routing_stats() -> Dict[str, Any]:
     """
     try:
         if not settings.enable_model_routing:
-            return {
-                "status": "disabled",
-                "message": "Model routing is disabled"
-            }
+            return {"status": "disabled", "message": "Model routing is disabled"}
 
         model_router = get_model_router()
         model_router.reset_stats()
 
         logger.info(" Model routing stats reset")
 
-        return {
-            "status": "success",
-            "message": "Model routing stats reset"
-        }
+        return {"status": "success", "message": "Model routing stats reset"}
 
     except Exception as e:
         logger.error(f"[ERROR] Failed to reset routing stats: {e}", exc_info=True)

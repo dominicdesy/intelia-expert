@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 # Instance globale du traducteur LLM
 _translator = None
 
+
 def _get_translator():
     """Récupère l'instance singleton du traducteur"""
     global _translator
@@ -51,9 +52,7 @@ def _translate_metric(text_en: str, language: str) -> str:
 
     translator = _get_translator()
     return translator.translate(
-        text=text_en,
-        target_language=language,
-        source_language="en"
+        text=text_en, target_language=language, source_language="en"
     )
 
 
@@ -405,45 +404,53 @@ class MetricCalculator:
         if is_lower_better:
             # Pour FCR, mortalité : plus bas = meilleur
             if comparison.value1 < comparison.value2:
-                better_perf = _translate_metric("shows better performance with a value", language)
+                better_perf = _translate_metric(
+                    "shows better performance with a value", language
+                )
                 lower_label = _translate_metric("lower", language)
                 than_label = _translate_metric("than", language)
 
                 text += f"**{comparison.label1.capitalize()}** {better_perf} "
-                text += f"**{abs(comparison.relative_difference_pct):.1f}% {lower_label}** "
+                text += (
+                    f"**{abs(comparison.relative_difference_pct):.1f}% {lower_label}** "
+                )
                 text += f"{than_label} **{comparison.label2}**.\n\n"
 
                 if "fcr" in metric_name.lower() or "conversion" in metric_name.lower():
                     fcr_explanation = _translate_metric(
                         "requires less feed to produce 1 kg of live weight, indicating better feed efficiency.",
-                        language
+                        language,
                     )
                     text += f"_{comparison.label1.capitalize()} {fcr_explanation}_"
                 else:
                     lower_explanation = _translate_metric(
                         "A lower value indicates better performance for this metric.",
-                        language
+                        language,
                     )
                     text += f"_{lower_explanation}_"
             else:
-                better_perf = _translate_metric("shows better performance with a value", language)
+                better_perf = _translate_metric(
+                    "shows better performance with a value", language
+                )
                 lower_label = _translate_metric("lower", language)
                 than_label = _translate_metric("than", language)
 
                 text += f"**{comparison.label2.capitalize()}** {better_perf} "
-                text += f"**{abs(comparison.relative_difference_pct):.1f}% {lower_label}** "
+                text += (
+                    f"**{abs(comparison.relative_difference_pct):.1f}% {lower_label}** "
+                )
                 text += f"{than_label} **{comparison.label1}**.\n\n"
 
                 if "fcr" in metric_name.lower() or "conversion" in metric_name.lower():
                     fcr_explanation = _translate_metric(
                         "requires less feed to produce 1 kg of live weight, indicating better feed efficiency.",
-                        language
+                        language,
                     )
                     text += f"_{comparison.label2.capitalize()} {fcr_explanation}_"
                 else:
                     lower_explanation = _translate_metric(
                         "A lower value indicates better performance for this metric.",
-                        language
+                        language,
                     )
                     text += f"_{lower_explanation}_"
         else:

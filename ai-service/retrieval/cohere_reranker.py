@@ -50,8 +50,8 @@ class CohereReRanker:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = 'rerank-multilingual-v3.0',
-        enable_caching: bool = True
+        model: str = "rerank-multilingual-v3.0",
+        enable_caching: bool = True,
     ):
         """
         Initialize Cohere re-ranker
@@ -85,6 +85,7 @@ class CohereReRanker:
         if self._client is None:
             try:
                 import cohere
+
                 self._client = cohere.Client(api_key=self.api_key)
                 logger.info("✅ Cohere client loaded successfully")
             except ImportError:
@@ -104,7 +105,7 @@ class CohereReRanker:
         query: str,
         documents: List[str],
         top_k: Optional[int] = 5,
-        return_scores: bool = False
+        return_scores: bool = False,
     ) -> List[str] | List[Tuple[str, float]]:
         """
         Re-rank documents by relevance to query using Cohere API
@@ -162,7 +163,7 @@ class CohereReRanker:
                 query=query,
                 documents=documents,
                 top_n=top_k if top_k else len(documents),
-                return_documents=True
+                return_documents=True,
             )
 
             # Extract results
@@ -197,8 +198,8 @@ class CohereReRanker:
         self,
         query: str,
         documents: List[Dict[str, Any]],
-        content_key: str = 'content',
-        top_k: Optional[int] = 5
+        content_key: str = "content",
+        top_k: Optional[int] = 5,
     ) -> List[Dict[str, Any]]:
         """
         Re-rank documents with metadata preservation
@@ -241,7 +242,7 @@ class CohereReRanker:
             doc = content_to_doc.get(content)
             if doc:
                 doc_copy = doc.copy()
-                doc_copy['cohere_score'] = score
+                doc_copy["cohere_score"] = score
                 results.append(doc_copy)
 
         return results
@@ -251,11 +252,7 @@ class CohereReRanker:
         if not self.enable_caching:
             return {"enabled": False}
 
-        return {
-            "enabled": True,
-            "size": len(self._cache),
-            "model": self.model
-        }
+        return {"enabled": True, "size": len(self._cache), "model": self.model}
 
     def clear_cache(self):
         """Clear cache"""
@@ -269,8 +266,7 @@ _cohere_reranker_instance = None
 
 
 def get_cohere_reranker(
-    api_key: Optional[str] = None,
-    model: str = 'rerank-multilingual-v3.0'
+    api_key: Optional[str] = None, model: str = "rerank-multilingual-v3.0"
 ) -> CohereReRanker:
     """
     Get singleton Cohere reranker instance
@@ -285,9 +281,6 @@ def get_cohere_reranker(
     global _cohere_reranker_instance
 
     if _cohere_reranker_instance is None:
-        _cohere_reranker_instance = CohereReRanker(
-            api_key=api_key,
-            model=model
-        )
+        _cohere_reranker_instance = CohereReRanker(api_key=api_key, model=model)
 
     return _cohere_reranker_instance

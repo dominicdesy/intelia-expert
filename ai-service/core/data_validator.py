@@ -320,7 +320,12 @@ class DataValidator:
                 current = time_series[i]
                 next_point = time_series[i + 1]
 
-                if "weight" in current and "weight" in next_point and "age_days" in current and "age_days" in next_point:
+                if (
+                    "weight" in current
+                    and "weight" in next_point
+                    and "age_days" in current
+                    and "age_days" in next_point
+                ):
                     weight_gain = next_point["weight"] - current["weight"]
                     days_diff = next_point["age_days"] - current["age_days"]
 
@@ -368,7 +373,9 @@ class DataValidator:
             age_days = data["age_days"]
 
             # Vérifier cohérence: poids ≈ poids naissance + (gain quotidien × âge)
-            expected_weight = 50 + (daily_gain * age_days)  # 50g = poids naissance moyen
+            expected_weight = 50 + (
+                daily_gain * age_days
+            )  # 50g = poids naissance moyen
             tolerance_pct = self.WEIGHT_GAIN_TOLERANCE
 
             if abs(weight - expected_weight) / expected_weight > tolerance_pct:

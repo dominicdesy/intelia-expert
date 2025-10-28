@@ -62,7 +62,9 @@ class LLMClient(ABC):
             Tuples of (chunk_text, is_final, metadata)
         """
         # Default implementation: raise NotImplementedError
-        raise NotImplementedError(f"{self.__class__.__name__} does not support streaming")
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support streaming"
+        )
 
     @abstractmethod
     def is_available(self) -> bool:
@@ -109,7 +111,9 @@ class HuggingFaceProvider(LLMClient):
         Uses OpenAI-compatible endpoint that routes to multiple providers
         """
         try:
-            logger.info(f"Calling HuggingFace Inference Providers for model: {self.model}")
+            logger.info(
+                f"Calling HuggingFace Inference Providers for model: {self.model}"
+            )
 
             # Use OpenAI-compatible API endpoint for Inference Providers
             # This routes through router.huggingface.co to multiple providers
@@ -144,9 +148,13 @@ class HuggingFaceProvider(LLMClient):
             if prompt_tokens == 0:
                 prompt_tokens = self._estimate_tokens(messages)
             if completion_tokens == 0:
-                completion_tokens = self._estimate_tokens([{"role": "assistant", "content": generated_text}])
+                completion_tokens = self._estimate_tokens(
+                    [{"role": "assistant", "content": generated_text}]
+                )
 
-            logger.info(f"Generation successful. Tokens: ~{prompt_tokens}+{completion_tokens}")
+            logger.info(
+                f"Generation successful. Tokens: ~{prompt_tokens}+{completion_tokens}"
+            )
 
             return generated_text, prompt_tokens, completion_tokens
 
@@ -194,7 +202,9 @@ class HuggingFaceProvider(LLMClient):
             Tuples of (chunk_text, is_final, metadata)
         """
         try:
-            logger.info(f"Calling HuggingFace Inference Providers (STREAMING) for model: {self.model}")
+            logger.info(
+                f"Calling HuggingFace Inference Providers (STREAMING) for model: {self.model}"
+            )
 
             async with httpx.AsyncClient(timeout=60.0) as client:
                 async with client.stream(
@@ -236,8 +246,8 @@ class HuggingFaceProvider(LLMClient):
                                     {
                                         "prompt_tokens": prompt_tokens,
                                         "completion_tokens": completion_tokens,
-                                        "full_text": full_text
-                                    }
+                                        "full_text": full_text,
+                                    },
                                 )
                                 break
 
@@ -257,13 +267,17 @@ class HuggingFaceProvider(LLMClient):
                                 if "usage" in chunk_data:
                                     usage = chunk_data["usage"]
                                     prompt_tokens = usage.get("prompt_tokens", 0)
-                                    completion_tokens = usage.get("completion_tokens", 0)
+                                    completion_tokens = usage.get(
+                                        "completion_tokens", 0
+                                    )
 
                             except json.JSONDecodeError:
                                 # Skip malformed chunks
                                 continue
 
-                    logger.info(f"Streaming complete. Generated {len(full_text)} chars, ~{completion_tokens} tokens")
+                    logger.info(
+                        f"Streaming complete. Generated {len(full_text)} chars, ~{completion_tokens} tokens"
+                    )
 
         except Exception as e:
             logger.error(f"HuggingFace streaming error: {e}", exc_info=True)
@@ -293,7 +307,9 @@ class HuggingFaceProvider(LLMClient):
             role = msg["role"]
             content = msg["content"]
 
-            prompt_parts.append(f"<|start_header_id|>{role}<|end_header_id|>\n{content}<|eot_id|>")
+            prompt_parts.append(
+                f"<|start_header_id|>{role}<|end_header_id|>\n{content}<|eot_id|>"
+            )
 
         # Add assistant header to prompt completion
         prompt_parts.append("<|start_header_id|>assistant<|end_header_id|>\n")
@@ -315,7 +331,9 @@ class vLLMProvider(LLMClient):
     Phase 2: For cost optimization and full control
     """
 
-    def __init__(self, base_url: str, model_name: str = "intelia-llama-3.1-8b-aviculture"):
+    def __init__(
+        self, base_url: str, model_name: str = "intelia-llama-3.1-8b-aviculture"
+    ):
         """
         Initialize vLLM provider
 
@@ -364,7 +382,9 @@ class vLLMProvider(LLMClient):
             prompt_tokens = data.get("usage", {}).get("prompt_tokens", 0)
             completion_tokens = data.get("usage", {}).get("completion_tokens", 0)
 
-            logger.info(f"vLLM generation successful. Tokens: {prompt_tokens}+{completion_tokens}")
+            logger.info(
+                f"vLLM generation successful. Tokens: {prompt_tokens}+{completion_tokens}"
+            )
 
             return generated_text, prompt_tokens, completion_tokens
 
@@ -379,6 +399,7 @@ class vLLMProvider(LLMClient):
         """Check if vLLM server is available"""
         try:
             import httpx
+
             response = httpx.get(f"{self.base_url}/health", timeout=5.0)
             return response.status_code == 200
         except Exception as e:
@@ -389,6 +410,7 @@ class vLLMProvider(LLMClient):
 # ============================================
 # FACTORY
 # ============================================
+
 
 def get_llm_client(
     provider: str,

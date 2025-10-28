@@ -18,22 +18,25 @@ from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
 
+
 def log(message):
     """Print with timestamp"""
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
 
+
 def find_files(root_dir):
     """Find all Python files"""
     files = []
-    exclude = {'__pycache__', '.git', 'node_modules', 'venv', '.venv', 'env'}
+    exclude = {"__pycache__", ".git", "node_modules", "venv", ".venv", "env"}
 
     for root, dirs, filenames in os.walk(root_dir):
         dirs[:] = [d for d in dirs if d not in exclude]
         for filename in filenames:
-            if filename.endswith('.py'):
+            if filename.endswith(".py"):
                 files.append(Path(root) / filename)
 
     return files
+
 
 def analyze_imports(files, root_dir):
     """Analyze imports and find unused files"""
@@ -43,7 +46,7 @@ def analyze_imports(files, root_dir):
     for file_path in files:
         rel_path = str(file_path.relative_to(root_dir))
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 tree = ast.parse(f.read())
 
             for node in ast.walk(tree):
@@ -60,6 +63,7 @@ def analyze_imports(files, root_dir):
 
     return imports, file_imports
 
+
 def find_unused(files, file_imports, root_dir):
     """Find unused Python files"""
     unused = []
@@ -68,11 +72,14 @@ def find_unused(files, file_imports, root_dir):
         rel_path = str(file_path.relative_to(root_dir))
 
         # Skip special files
-        if any(skip in rel_path for skip in ['__init__.py', '__main__.py', 'setup.py', 'test_', 'scripts/']):
+        if any(
+            skip in rel_path
+            for skip in ["__init__.py", "__main__.py", "setup.py", "test_", "scripts/"]
+        ):
             continue
 
         # Check if module is imported
-        module_name = rel_path.replace('/', '.').replace('\\', '.').replace('.py', '')
+        module_name = rel_path.replace("/", ".").replace("\\", ".").replace(".py", "")
 
         is_imported = False
         for imported in file_imports.keys():
@@ -82,16 +89,16 @@ def find_unused(files, file_imports, root_dir):
 
         if not is_imported:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     if 'if __name__ == "__main__"' not in f.read():
-                        unused.append({
-                            'file': rel_path,
-                            'size': file_path.stat().st_size
-                        })
+                        unused.append(
+                            {"file": rel_path, "size": file_path.stat().st_size}
+                        )
             except Exception:
                 pass
 
-    return sorted(unused, key=lambda x: x['size'], reverse=True)
+    return sorted(unused, key=lambda x: x["size"], reverse=True)
+
 
 def analyze_complexity(files, root_dir):
     """Find high complexity functions"""
@@ -99,27 +106,32 @@ def analyze_complexity(files, root_dir):
 
     for file_path in files:
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 tree = ast.parse(f.read())
 
             for node in ast.walk(tree):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     complexity = 1
                     for child in ast.walk(node):
-                        if isinstance(child, (ast.If, ast.While, ast.For, ast.ExceptHandler)):
+                        if isinstance(
+                            child, (ast.If, ast.While, ast.For, ast.ExceptHandler)
+                        ):
                             complexity += 1
 
                     if complexity > 10:
-                        high_complexity.append({
-                            'file': str(file_path.relative_to(root_dir)),
-                            'function': node.name,
-                            'complexity': complexity,
-                            'line': node.lineno
-                        })
+                        high_complexity.append(
+                            {
+                                "file": str(file_path.relative_to(root_dir)),
+                                "function": node.name,
+                                "complexity": complexity,
+                                "line": node.lineno,
+                            }
+                        )
         except Exception:
             pass
 
-    return sorted(high_complexity, key=lambda x: x['complexity'], reverse=True)
+    return sorted(high_complexity, key=lambda x: x["complexity"], reverse=True)
+
 
 def find_duplicates(files, root_dir):
     """Find duplicate code blocks"""
@@ -127,29 +139,28 @@ def find_duplicates(files, root_dir):
 
     for file_path in files:
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
 
             for i in range(len(lines) - 5):
-                block = ''.join(lines[i:i+5]).strip()
+                block = "".join(lines[i : i + 5]).strip()
                 if len(block) > 50:
-                    block_hash = hashlib.md5(block.encode(), usedforsecurity=False).hexdigest()
-                    code_hashes[block_hash].append({
-                        'file': str(file_path.relative_to(root_dir)),
-                        'line': i + 1
-                    })
+                    block_hash = hashlib.md5(
+                        block.encode(), usedforsecurity=False
+                    ).hexdigest()
+                    code_hashes[block_hash].append(
+                        {"file": str(file_path.relative_to(root_dir)), "line": i + 1}
+                    )
         except Exception:
             pass
 
     duplicates = []
     for hash_val, locations in code_hashes.items():
         if len(locations) > 1:
-            duplicates.append({
-                'occurrences': len(locations),
-                'locations': locations
-            })
+            duplicates.append({"occurrences": len(locations), "locations": locations})
 
-    return sorted(duplicates, key=lambda x: x['occurrences'], reverse=True)[:20]
+    return sorted(duplicates, key=lambda x: x["occurrences"], reverse=True)[:20]
+
 
 def analyze_type_hints(files, root_dir):
     """Analyze type hint coverage"""
@@ -158,19 +169,22 @@ def analyze_type_hints(files, root_dir):
 
     for file_path in files:
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 tree = ast.parse(f.read())
 
             for node in ast.walk(tree):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     total += 1
-                    if node.returns and all(arg.annotation for arg in node.args.args if arg.arg != 'self'):
+                    if node.returns and all(
+                        arg.annotation for arg in node.args.args if arg.arg != "self"
+                    ):
                         typed += 1
         except Exception:
             pass
 
     coverage = (typed / total * 100) if total > 0 else 0
-    return {'total': total, 'typed': typed, 'coverage': round(coverage, 2)}
+    return {"total": total, "typed": typed, "coverage": round(coverage, 2)}
+
 
 def main():
     """Run complete analysis"""
@@ -178,7 +192,7 @@ def main():
     log("=" * 60)
 
     root_dir = Path(__file__).parent.parent
-    output_file = root_dir / 'logs' / 'final_analysis_report.json'
+    output_file = root_dir / "logs" / "final_analysis_report.json"
     output_file.parent.mkdir(exist_ok=True)
 
     # Find files
@@ -212,24 +226,24 @@ def main():
 
     # Build report
     report = {
-        'timestamp': datetime.now().isoformat(),
-        'summary': {
-            'total_files': len(files),
-            'unused_files': len(unused),
-            'high_complexity': len(complexity),
-            'duplicates': len(duplicates),
-            'type_coverage': type_hints['coverage']
+        "timestamp": datetime.now().isoformat(),
+        "summary": {
+            "total_files": len(files),
+            "unused_files": len(unused),
+            "high_complexity": len(complexity),
+            "duplicates": len(duplicates),
+            "type_coverage": type_hints["coverage"],
         },
-        'details': {
-            'unused_files': unused[:20],
-            'high_complexity_functions': complexity[:20],
-            'code_duplicates': duplicates,
-            'type_hints': type_hints
-        }
+        "details": {
+            "unused_files": unused[:20],
+            "high_complexity_functions": complexity[:20],
+            "code_duplicates": duplicates,
+            "type_hints": type_hints,
+        },
     }
 
     # Save report
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
 
     # Print summary
@@ -244,6 +258,7 @@ def main():
     log("")
     log(f"Report saved to: {output_file}")
     log("=" * 60)
+
 
 if __name__ == "__main__":
     main()

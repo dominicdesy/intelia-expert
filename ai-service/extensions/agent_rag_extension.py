@@ -570,15 +570,19 @@ class InteliaAgentRAG(InitializableMixin):
         if hasattr(self.rag_engine, "query_router") and self.rag_engine.query_router:
             # Create an IntentProcessor wrapper around query_router
             from processing.intent_processor import IntentProcessor
+
             intent_processor = IntentProcessor()
             logger.info("Using query_router for Agent RAG (Weaviate not available)")
-        elif hasattr(self.rag_engine, "weaviate_core") and self.rag_engine.weaviate_core:
+        elif (
+            hasattr(self.rag_engine, "weaviate_core") and self.rag_engine.weaviate_core
+        ):
             intent_processor = self.rag_engine.weaviate_core.intent_processor
             logger.info("Using weaviate_core.intent_processor for Agent RAG")
         else:
             logger.warning("No intent processor available - Agent RAG will be limited")
             # Create minimal intent processor
             from processing.intent_processor import IntentProcessor
+
             intent_processor = IntentProcessor()
 
         self.decomposer = QueryDecomposer(intent_processor)

@@ -10,13 +10,14 @@ import io
 
 # Fix Windows console encoding
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 sys.path.insert(0, ".")
 
 from app.domain_config.domains.aviculture.config import get_aviculture_config
 from app.utils.adaptive_length import get_adaptive_length
 from app.utils.post_processor import create_post_processor
+
 
 def test_config():
     """Test aviculture configuration"""
@@ -38,7 +39,7 @@ def test_config():
     test_queries = [
         "What is the weight of Ross 308 at 21 days?",
         "How do I cook chicken?",
-        "Ross 308 FCR at 33 days"
+        "Ross 308 FCR at 33 days",
     ]
 
     print("\nDomain Detection Tests:")
@@ -62,13 +63,13 @@ def test_adaptive_length():
             "query": "Ross 308 weight?",
             "entities": {"breed": "Ross 308"},
             "query_type": "standard",
-            "expected_range": (200, 600)
+            "expected_range": (200, 600),
         },
         {
             "query": "Compare Ross 308 and Cobb 500 performance at 21 and 42 days",
             "entities": {"breed": "Ross 308, Cobb 500", "age_days": "21, 42"},
             "query_type": "comparative",
-            "expected_range": (900, 1500)
+            "expected_range": (900, 1500),
         },
     ]
 
@@ -76,7 +77,7 @@ def test_adaptive_length():
         max_tokens = calc.calculate_max_tokens(
             query=case["query"],
             entities=case["entities"],
-            query_type=case["query_type"]
+            query_type=case["query_type"],
         )
 
         in_range = case["expected_range"][0] <= max_tokens <= case["expected_range"][1]
@@ -98,8 +99,7 @@ def test_post_processor():
 
     config = get_aviculture_config()
     processor = create_post_processor(
-        veterinary_terms=config.veterinary_terms,
-        language_messages=config.languages
+        veterinary_terms=config.veterinary_terms, language_messages=config.languages
     )
 
     test_response = """**Header:** Test Response
@@ -112,9 +112,7 @@ Some information here.
 """
 
     processed = processor.post_process_response(
-        response=test_response,
-        query="Test query",
-        language="en"
+        response=test_response, query="Test query", language="en"
     )
 
     print("Original response:")
@@ -126,7 +124,7 @@ Some information here.
     vet_queries = [
         ("My chickens have bloody diarrhea", True),
         ("What is the weight of Ross 308?", False),
-        ("Symptoms of coccidiosis", True)
+        ("Symptoms of coccidiosis", True),
     ]
 
     print("\nVeterinary Detection Tests:")
@@ -151,5 +149,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n✗ TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

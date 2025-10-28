@@ -216,21 +216,27 @@ class ConfigManager:
             if metrics_domain:
                 for metric_key, metric_data in metrics_domain.items():
                     if isinstance(metric_data, dict) and "variants" in metric_data:
-                        self.routing_keywords["postgresql"].extend(metric_data["variants"])
+                        self.routing_keywords["postgresql"].extend(
+                            metric_data["variants"]
+                        )
 
             # Also check performance_metrics domain
             perf_metrics = domains.get("performance_metrics", {})
             if perf_metrics:
                 for metric_key, metric_data in perf_metrics.items():
                     if isinstance(metric_data, dict) and "variants" in metric_data:
-                        self.routing_keywords["postgresql"].extend(metric_data["variants"])
+                        self.routing_keywords["postgresql"].extend(
+                            metric_data["variants"]
+                        )
 
             # Weaviate keywords (health, environment)
             health_domain = domains.get("health", {})
             if health_domain:
                 for health_key, health_data in health_domain.items():
                     if isinstance(health_data, dict) and "variants" in health_data:
-                        self.routing_keywords["weaviate"].extend(health_data["variants"])
+                        self.routing_keywords["weaviate"].extend(
+                            health_data["variants"]
+                        )
 
             environment_domain = domains.get("environment", {})
             if environment_domain:
@@ -428,6 +434,7 @@ class QueryRouter:
 
         # Initialize LLM Query Classifier (replaces fragile patterns)
         from core.llm_query_classifier import get_llm_query_classifier
+
         self.llm_classifier = get_llm_query_classifier()
 
         logger.info(
@@ -450,8 +457,7 @@ class QueryRouter:
 
         # COMPARISON - Pattern to detect multi-breed comparisons
         self.comparison_regex = re.compile(
-            r"\b(vs\.?|versus|compar[ae]|compare[zr]?|et|and|ou|or)\b",
-            re.IGNORECASE
+            r"\b(vs\.?|versus|compar[ae]|compare[zr]?|et|and|ou|or)\b", re.IGNORECASE
         )
 
         # AGE - Universal multi-language pattern
@@ -487,7 +493,10 @@ class QueryRouter:
         Returns:
             Detected domain prompt_key or 'general_poultry'
         """
-        if not self.config.domain_keywords or "domains" not in self.config.domain_keywords:
+        if (
+            not self.config.domain_keywords
+            or "domains" not in self.config.domain_keywords
+        ):
             return "general_poultry"
 
         query_lower = query.lower()
@@ -527,7 +536,9 @@ class QueryRouter:
 
         return prompt_key
 
-    def _apply_priority_rules(self, domain_scores: Dict[str, Any], current_prompt: str) -> str:
+    def _apply_priority_rules(
+        self, domain_scores: Dict[str, Any], current_prompt: str
+    ) -> str:
         """
         Applies priority rules between domains
 
@@ -538,7 +549,9 @@ class QueryRouter:
         Returns:
             Adjusted prompt according to priority rules
         """
-        priority_rules = self.config.domain_keywords.get("priority_rules", {}).get("rules", [])
+        priority_rules = self.config.domain_keywords.get("priority_rules", {}).get(
+            "rules", []
+        )
 
         for rule in priority_rules:
             condition = rule.get("condition", "")
@@ -607,7 +620,9 @@ class QueryRouter:
         if preextracted_entities:
             # Use pre-extracted entities as base, only extract new entities from current query
             entities = preextracted_entities.copy()
-            logger.debug(f"⚡ Using {len(preextracted_entities)} pre-extracted entities as base")
+            logger.debug(
+                f"⚡ Using {len(preextracted_entities)} pre-extracted entities as base"
+            )
 
             # Extract only new entities from current query (not already in context)
             query_entities = self._extract_entities(query, language)
@@ -661,9 +676,13 @@ class QueryRouter:
                 # Store in entities for transmission
                 entities["comparison_entities"] = comparison_entities
                 entities["is_comparative"] = True
-                logger.info(f"📊 {len(comparison_entities)} entités comparatives créées")
+                logger.info(
+                    f"📊 {len(comparison_entities)} entités comparatives créées"
+                )
             else:
-                logger.debug(f"⚠️ Pattern comparatif détecté mais < 2 breeds: {all_breeds}")
+                logger.debug(
+                    f"⚠️ Pattern comparatif détecté mais < 2 breeds: {all_breeds}"
+                )
                 is_comparative = False
 
         # ⚡ Pre-extracted entities already merged above (lines 607-619), skip redundant merge
@@ -686,7 +705,7 @@ class QueryRouter:
             # Extract LLM-generated clarification message if available
             llm_clarification = validation_details.get("clarification_message")
             if llm_clarification:
-                logger.info(f"✅ Using LLM-generated clarification message")
+                logger.info("✅ Using LLM-generated clarification message")
                 validation_details["generated_clarification"] = llm_clarification
 
             return QueryRoute(
@@ -708,14 +727,20 @@ class QueryRouter:
         if intent == "calculation_query":
             destination = "calculation"
             reason = "calculation_query_detected"
-            logger.info(f"🧮 Routing vers calculation handler: {entities.get('calculation_type')}")
+            logger.info(
+                f"🧮 Routing vers calculation handler: {entities.get('calculation_type')}"
+            )
         # Route to comparative handler for multi-breed comparisons
         elif is_comparative and entities.get("comparison_entities"):
             destination = "comparative"
             reason = "multi_breed_comparison_detected"
-            logger.info(f"🔀 Routing vers comparative: {len(entities['comparison_entities'])} breeds")
+            logger.info(
+                f"🔀 Routing vers comparative: {len(entities['comparison_entities'])} breeds"
+            )
         else:
-            destination, reason = self._determine_destination(query, entities, language, validation_details)
+            destination, reason = self._determine_destination(
+                query, entities, language, validation_details
+            )
 
         # Store conversation context
         self.context_store[user_id] = ConversationContext(
@@ -800,13 +825,15 @@ class QueryRouter:
             # Verify breeds exist on both sides of comparison keyword
             keyword_pos = query_lower.find(keyword)
             text_before = query_lower[:keyword_pos]
-            text_after = query_lower[keyword_pos + len(keyword):]
+            text_after = query_lower[keyword_pos + len(keyword) :]
 
             breeds_before = sum(1 for b in all_breeds if b.lower() in text_before)
             breeds_after = sum(1 for b in all_breeds if b.lower() in text_after)
 
             if breeds_before == 0 or breeds_after == 0:
-                logger.debug(f"⚠️ Breeds pas de part et d'autre de '{keyword}' → pas comparatif")
+                logger.debug(
+                    f"⚠️ Breeds pas de part et d'autre de '{keyword}' → pas comparatif"
+                )
                 return False
 
         logger.debug(f"🔀 Pattern comparatif validé: '{keyword}'")
@@ -829,7 +856,9 @@ class QueryRouter:
             canonical = self.config.get_breed_canonical(breed_text)
             if canonical and canonical not in breeds_found:
                 breeds_found.append(canonical)
-                logger.debug(f"🔍 Breed {len(breeds_found)}: '{breed_text}' → '{canonical}'")
+                logger.debug(
+                    f"🔍 Breed {len(breeds_found)}: '{breed_text}' → '{canonical}'"
+                )
 
         return breeds_found
 
@@ -970,7 +999,9 @@ class QueryRouter:
                 if llm_entities.get("age_days") is not None:
                     entities["age_days"] = llm_entities["age_days"]
                     entities["has_explicit_age"] = True
-                    logger.info(f"✅ LLM age extraction: {llm_entities['age_days']} days")
+                    logger.info(
+                        f"✅ LLM age extraction: {llm_entities['age_days']} days"
+                    )
 
                 if llm_entities.get("breed"):
                     entities["breed"] = llm_entities["breed"]
@@ -989,15 +1020,21 @@ class QueryRouter:
                 # Nouvelles entités pour calculs
                 if llm_entities.get("target_weight") is not None:
                     entities["target_weight"] = llm_entities["target_weight"]
-                    logger.debug(f"✅ LLM target_weight extraction: {llm_entities['target_weight']}g")
+                    logger.debug(
+                        f"✅ LLM target_weight extraction: {llm_entities['target_weight']}g"
+                    )
 
                 if llm_entities.get("age_end") is not None:
                     entities["age_end"] = llm_entities["age_end"]
-                    logger.info(f"✅ LLM age_end extraction: {llm_entities['age_end']} days")
+                    logger.info(
+                        f"✅ LLM age_end extraction: {llm_entities['age_end']} days"
+                    )
 
                 if llm_entities.get("calculation_type"):
                     entities["calculation_type"] = llm_entities["calculation_type"]
-                    logger.debug(f"✅ LLM calculation_type: {llm_entities['calculation_type']}")
+                    logger.debug(
+                        f"✅ LLM calculation_type: {llm_entities['calculation_type']}"
+                    )
 
             # Log classification
             logger.info(
@@ -1020,7 +1057,8 @@ class QueryRouter:
             # Build validation details
             validation_details["validation_type"] = f"llm_{intent}"
             validation_details["required_fields"] = [
-                field for field, needed in requirements.items()
+                field
+                for field, needed in requirements.items()
                 if needed and field.startswith("needs_")
             ]
             validation_details["llm_routing_target"] = routing.get("target", "weaviate")
@@ -1029,7 +1067,9 @@ class QueryRouter:
 
             # 🆕 Add LLM-generated clarification message
             if "clarification_message" in classification:
-                validation_details["clarification_message"] = classification["clarification_message"]
+                validation_details["clarification_message"] = classification[
+                    "clarification_message"
+                ]
 
         except Exception as e:
             logger.error(f"❌ LLM classification failed: {e}")
@@ -1154,7 +1194,11 @@ class QueryRouter:
         return missing
 
     def _determine_destination(
-        self, query: str, entities: Dict[str, Any], language: str, validation_details: Optional[Dict[str, Any]] = None
+        self,
+        query: str,
+        entities: Dict[str, Any],
+        language: str,
+        validation_details: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, str]:
         """
         Intelligent routing based on LLM classifier (priority) then keyword fallback
@@ -1178,14 +1222,20 @@ class QueryRouter:
             # Si LLM a une recommandation claire (confidence > 0.6), la respecter
             if llm_target and llm_confidence > 0.6:
                 if llm_target == "weaviate":
-                    logger.info(f"🤖 LLM routing (confidence={llm_confidence:.2f}): weaviate for {llm_intent}")
+                    logger.info(
+                        f"🤖 LLM routing (confidence={llm_confidence:.2f}): weaviate for {llm_intent}"
+                    )
                     return ("weaviate", f"llm_classifier_{llm_intent}")
                 elif llm_target == "postgresql":
-                    logger.info(f"🤖 LLM routing (confidence={llm_confidence:.2f}): postgresql for {llm_intent}")
+                    logger.info(
+                        f"🤖 LLM routing (confidence={llm_confidence:.2f}): postgresql for {llm_intent}"
+                    )
                     return ("postgresql", f"llm_classifier_{llm_intent}")
 
         # FALLBACK: Keyword-based routing (ancien comportement)
-        logger.debug("⚠️ Fallback to keyword-based routing (LLM routing not available or low confidence)")
+        logger.debug(
+            "⚠️ Fallback to keyword-based routing (LLM routing not available or low confidence)"
+        )
 
         # PostgreSQL: métriques chiffrées
         if self.config.should_route_to_postgresql(query, language):

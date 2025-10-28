@@ -192,7 +192,9 @@ class SystemHealthMonitor:
             # Vérification connectivité critique
             # Weaviate est OPTIONNEL - ne déclenche pas le mode dégradé
             if not connectivity_status.get("weaviate", False):
-                logger.info("ℹ️ Weaviate non configuré - recherche vectorielle désactivée (PostgreSQL utilisé)")
+                logger.info(
+                    "ℹ️ Weaviate non configuré - recherche vectorielle désactivée (PostgreSQL utilisé)"
+                )
                 validation_report["info"] = validation_report.get("info", [])
                 validation_report["info"].append(
                     "Weaviate non configuré - PostgreSQL seul (normal)"
@@ -220,7 +222,8 @@ class SystemHealthMonitor:
 
             # Filtrer les warnings non-critiques (Weaviate optionnel)
             critical_warnings = [
-                w for w in validation_report["warnings"]
+                w
+                for w in validation_report["warnings"]
                 if "redis" in w.lower() or "openai" in w.lower()
             ]
 
@@ -236,7 +239,9 @@ class SystemHealthMonitor:
                     logger.warning(f"  - {warning}")
             else:
                 validation_report["overall_status"] = "healthy"
-                logger.info("✅ Application opérationnelle (PostgreSQL + Redis + OpenAI)")
+                logger.info(
+                    "✅ Application opérationnelle (PostgreSQL + Redis + OpenAI)"
+                )
                 if validation_report.get("info"):
                     for info in validation_report["info"]:
                         logger.info(f"  ℹ️ {info}")
@@ -417,7 +422,7 @@ class SystemHealthMonitor:
                 await rag_engine_enhanced.initialize()
 
                 # ✅ FIX: Configure cache manager for Intelligent RRF
-                if cache_core and hasattr(rag_engine_enhanced, 'set_cache_manager'):
+                if cache_core and hasattr(rag_engine_enhanced, "set_cache_manager"):
                     rag_engine_enhanced.set_cache_manager(cache_core)
 
                 self._critical_services["rag_engine_enhanced"] = rag_engine_enhanced

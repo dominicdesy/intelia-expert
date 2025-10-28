@@ -40,8 +40,7 @@ from generation.response_generator import ResponseGenerator
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -49,6 +48,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TestResult:
     """Result of a single test query"""
+
     query_id: int
     query: str
     language: str
@@ -71,6 +71,7 @@ class TestResult:
 @dataclass
 class TestSummary:
     """Summary of all test results"""
+
     total_queries: int = 0
     successful: int = 0
     failed: int = 0
@@ -114,7 +115,7 @@ class CompleteSystemTester:
         self,
         queries_file: str = "test_queries.json",
         verbose: bool = False,
-        max_queries: Optional[int] = None
+        max_queries: Optional[int] = None,
     ):
         """
         Initialize test runner
@@ -161,7 +162,7 @@ class CompleteSystemTester:
             self.generator = ResponseGenerator(
                 client=openai_client,
                 cache_manager=None,  # Disable cache for testing
-                language="fr"
+                language="fr",
             )
             logger.info("OK - Response Generator initialized")
 
@@ -175,13 +176,13 @@ class CompleteSystemTester:
         """Load test queries from JSON file"""
         logger.info(f"Loading test queries from {self.queries_file}...")
 
-        with open(self.queries_file, 'r', encoding='utf-8') as f:
+        with open(self.queries_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        queries = data['queries']
+        queries = data["queries"]
 
         if self.max_queries:
-            queries = queries[:self.max_queries]
+            queries = queries[: self.max_queries]
             logger.info(f"Limited to first {self.max_queries} queries")
 
         logger.info(f"Loaded {len(queries)} test queries")
@@ -197,10 +198,10 @@ class CompleteSystemTester:
         Returns:
             TestResult with validation and metrics
         """
-        query_id = test_query['id']
-        query = test_query['query']
-        language = test_query['language']
-        domain = test_query['domain']
+        query_id = test_query["id"]
+        query = test_query["query"]
+        language = test_query["language"]
+        domain = test_query["domain"]
 
         if self.verbose:
             logger.info(f"\n{'='*70}")
@@ -213,15 +214,17 @@ class CompleteSystemTester:
             query=query,
             language=language,
             domain=domain,
-            success=False
+            success=False,
         )
 
         start_time = time.time()
 
         try:
             # Step 1: Intent Classification & Entity Extraction
-            intent_result = await self.intent_classifier.classify_intent(query, language)
-            result.entities_extracted = intent_result.get('entities', {})
+            intent_result = await self.intent_classifier.classify_intent(
+                query, language
+            )
+            result.entities_extracted = intent_result.get("entities", {})
 
             if self.verbose:
                 logger.info(f"Entities extracted: {result.entities_extracted}")
@@ -238,7 +241,7 @@ class CompleteSystemTester:
                 query=query,
                 context_docs=context_docs,
                 language=language,
-                intent_result=intent_result
+                intent_result=intent_result,
             )
             result.response = response
 
@@ -279,8 +282,8 @@ class CompleteSystemTester:
             test_query: Expected values
         """
         # Validate response length
-        min_length = test_query.get('min_response_length', 100)
-        max_length = test_query.get('max_response_length', 2000)
+        min_length = test_query.get("min_response_length", 100)
+        max_length = test_query.get("max_response_length", 2000)
         response_length = len(result.response)
 
         result.length_valid = min_length <= response_length <= max_length
@@ -291,11 +294,13 @@ class CompleteSystemTester:
             )
 
         # Validate entity extraction
-        expected_entities = test_query.get('expected_entities', [])
+        expected_entities = test_query.get("expected_entities", [])
         if expected_entities:
             extracted_keys = set(result.entities_extracted.keys())
             # At least 50% of expected entities should be extracted
-            match_rate = len(extracted_keys & set(expected_entities)) / len(expected_entities)
+            match_rate = len(extracted_keys & set(expected_entities)) / len(
+                expected_entities
+            )
             result.entities_valid = match_rate >= 0.5
 
             if not result.entities_valid and self.verbose:
@@ -305,16 +310,17 @@ class CompleteSystemTester:
 
         # Validate response quality
         result.response_quality_valid = (
-            result.response and
-            len(result.response) > 50 and
-            result.response != "Désolé, je ne peux pas générer une réponse pour cette question."
+            result.response
+            and len(result.response) > 50
+            and result.response
+            != "Désolé, je ne peux pas générer une réponse pour cette question."
         )
 
     async def run_all_tests(self):
         """Execute all test queries and generate summary"""
-        logger.info("\n" + "="*70)
+        logger.info("\n" + "=" * 70)
         logger.info("COMPLETE SYSTEM INTEGRATION TEST SUITE")
-        logger.info("="*70)
+        logger.info("=" * 70)
 
         # Load queries
         queries = self.load_queries()
@@ -326,7 +332,9 @@ class CompleteSystemTester:
 
         for i, test_query in enumerate(queries, 1):
             if not self.verbose:
-                print(f"\rProgress: {i}/{len(queries)} ({i*100//len(queries)}%)", end='')
+                print(
+                    f"\rProgress: {i}/{len(queries)} ({i*100//len(queries)}%)", end=""
+                )
 
             result = await self.run_single_query(test_query)
             self.results.append(result)
@@ -384,7 +392,9 @@ class CompleteSystemTester:
         # Quality metrics
         if successful:
             response_lengths = [len(r.response) for r in successful]
-            self.summary.avg_response_length = sum(response_lengths) / len(response_lengths)
+            self.summary.avg_response_length = sum(response_lengths) / len(
+                response_lengths
+            )
 
             length_valid_count = sum(1 for r in successful if r.length_valid)
             self.summary.length_validation_rate = (
@@ -394,11 +404,11 @@ class CompleteSystemTester:
         # Failures
         self.summary.failures = [
             {
-                'id': r.query_id,
-                'query': r.query,
-                'error': r.error_message,
-                'language': r.language,
-                'domain': r.domain
+                "id": r.query_id,
+                "query": r.query,
+                "error": r.error_message,
+                "language": r.language,
+                "domain": r.domain,
             }
             for r in failed
         ]
@@ -410,9 +420,9 @@ class CompleteSystemTester:
 
     def _print_report(self):
         """Print comprehensive test report"""
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("TEST RESULTS SUMMARY")
-        print("="*70)
+        print("=" * 70)
 
         # Overall results
         print("\nOverall Results:")
@@ -456,7 +466,7 @@ class CompleteSystemTester:
             if len(self.summary.failures) > 5:
                 print(f"  ... and {len(self.summary.failures) - 5} more")
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
 
         # Final verdict
         if self.summary.success_rate >= 95:
@@ -468,46 +478,49 @@ class CompleteSystemTester:
         else:
             print("FAIL - CRITICAL: Major system issues")
 
-        print("="*70)
+        print("=" * 70)
 
     def _save_results(self):
         """Save detailed results to JSON file"""
-        output_file = Path(__file__).parent / f"test_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        output_file = (
+            Path(__file__).parent
+            / f"test_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
 
         results_data = {
-            'summary': {
-                'total_queries': self.summary.total_queries,
-                'successful': self.summary.successful,
-                'failed': self.summary.failed,
-                'success_rate': self.summary.success_rate,
-                'avg_latency_ms': self.summary.avg_latency_ms,
-                'total_time_seconds': self.summary.total_time_seconds,
-                'entity_extraction_success_rate': self.summary.entity_extraction_success_rate,
-                'follow_up_generation_rate': self.summary.follow_up_generation_rate,
-                'avg_response_length': self.summary.avg_response_length,
-                'estimated_total_cost_usd': self.summary.estimated_total_cost_usd,
+            "summary": {
+                "total_queries": self.summary.total_queries,
+                "successful": self.summary.successful,
+                "failed": self.summary.failed,
+                "success_rate": self.summary.success_rate,
+                "avg_latency_ms": self.summary.avg_latency_ms,
+                "total_time_seconds": self.summary.total_time_seconds,
+                "entity_extraction_success_rate": self.summary.entity_extraction_success_rate,
+                "follow_up_generation_rate": self.summary.follow_up_generation_rate,
+                "avg_response_length": self.summary.avg_response_length,
+                "estimated_total_cost_usd": self.summary.estimated_total_cost_usd,
             },
-            'failures': self.summary.failures,
-            'detailed_results': [
+            "failures": self.summary.failures,
+            "detailed_results": [
                 {
-                    'query_id': r.query_id,
-                    'query': r.query,
-                    'language': r.language,
-                    'domain': r.domain,
-                    'success': r.success,
-                    'latency_ms': r.latency_ms,
-                    'response_length': len(r.response),
-                    'entities_extracted': r.entities_extracted,
-                    'follow_up_generated': r.follow_up_generated,
-                    'length_valid': r.length_valid,
-                    'entities_valid': r.entities_valid,
-                    'error': r.error_message if not r.success else None
+                    "query_id": r.query_id,
+                    "query": r.query,
+                    "language": r.language,
+                    "domain": r.domain,
+                    "success": r.success,
+                    "latency_ms": r.latency_ms,
+                    "response_length": len(r.response),
+                    "entities_extracted": r.entities_extracted,
+                    "follow_up_generated": r.follow_up_generated,
+                    "length_valid": r.length_valid,
+                    "entities_valid": r.entities_valid,
+                    "error": r.error_message if not r.success else None,
                 }
                 for r in self.results
-            ]
+            ],
         }
 
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             json.dump(results_data, f, indent=2, ensure_ascii=False)
 
         logger.info(f"\nDetailed results saved to: {output_file}")
@@ -517,15 +530,18 @@ async def main():
     """Main entry point"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Complete System Integration Test Suite')
-    parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose output')
-    parser.add_argument('--queries', '-q', type=int, help='Limit number of queries to run')
+    parser = argparse.ArgumentParser(
+        description="Complete System Integration Test Suite"
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Enable verbose output"
+    )
+    parser.add_argument(
+        "--queries", "-q", type=int, help="Limit number of queries to run"
+    )
     args = parser.parse_args()
 
-    tester = CompleteSystemTester(
-        verbose=args.verbose,
-        max_queries=args.queries
-    )
+    tester = CompleteSystemTester(verbose=args.verbose, max_queries=args.queries)
 
     await tester.setup()
     await tester.run_all_tests()

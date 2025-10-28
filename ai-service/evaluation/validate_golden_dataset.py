@@ -22,9 +22,18 @@ REQUIRED_FIELDS = {"question", "ground_truth", "contexts", "answer"}
 
 # Recommended optional fields for enhanced evaluation
 RECOMMENDED_FIELDS = {
-    "id", "lang", "category", "expected_behavior",
-    "metric", "unit", "target_value", "tolerance_abs", "tolerance_rel",
-    "source_ref", "difficulty", "exclude_from_main"
+    "id",
+    "lang",
+    "category",
+    "expected_behavior",
+    "metric",
+    "unit",
+    "target_value",
+    "tolerance_abs",
+    "tolerance_rel",
+    "source_ref",
+    "difficulty",
+    "exclude_from_main",
 }
 
 
@@ -45,41 +54,56 @@ class DatasetValidator:
             "long_ground_truths": 0,
             "comma_decimals": 0,
             "empty_contexts": 0,
-            "duplicate_questions": 0
+            "duplicate_questions": 0,
         }
 
     def validate_required_fields(self, idx: int, item: Dict[str, Any]) -> None:
         """Validate presence of required RAGAS fields"""
         missing = REQUIRED_FIELDS - set(item.keys())
         if missing:
-            self.errors.append((idx, f"CRITICAL: Missing required fields: {sorted(missing)}"))
+            self.errors.append(
+                (idx, f"CRITICAL: Missing required fields: {sorted(missing)}")
+            )
 
     def validate_field_types(self, idx: int, item: Dict[str, Any]) -> None:
         """Validate field types match RAGAS expectations"""
         q = item.get("question")
         if not isinstance(q, str):
-            self.errors.append((idx, f"CRITICAL: 'question' must be str, got {type(q).__name__}"))
+            self.errors.append(
+                (idx, f"CRITICAL: 'question' must be str, got {type(q).__name__}")
+            )
 
         gt = item.get("ground_truth")
         if not isinstance(gt, str):
-            self.errors.append((idx, f"CRITICAL: 'ground_truth' must be str, got {type(gt).__name__}"))
+            self.errors.append(
+                (idx, f"CRITICAL: 'ground_truth' must be str, got {type(gt).__name__}")
+            )
 
         ctx = item.get("contexts")
         if not isinstance(ctx, list):
-            self.errors.append((idx, f"CRITICAL: 'contexts' must be list, got {type(ctx).__name__}"))
+            self.errors.append(
+                (idx, f"CRITICAL: 'contexts' must be list, got {type(ctx).__name__}")
+            )
         elif ctx and not all(isinstance(c, str) for c in ctx):
             self.errors.append((idx, "CRITICAL: All 'contexts' items must be str"))
 
         ans = item.get("answer")
         if not isinstance(ans, str):
-            self.errors.append((idx, f"CRITICAL: 'answer' must be str, got {type(ans).__name__}"))
+            self.errors.append(
+                (idx, f"CRITICAL: 'answer' must be str, got {type(ans).__name__}")
+            )
 
     def validate_decimal_format(self, idx: int, item: Dict[str, Any]) -> None:
         """Check for comma decimals (should use dot)"""
         gt = item.get("ground_truth", "")
-        comma_nums = re.findall(r'\d+,\d+', gt)
+        comma_nums = re.findall(r"\d+,\d+", gt)
         if comma_nums:
-            self.errors.append((idx, f"FORMAT: Comma decimals found in ground_truth: {comma_nums[:3]}... (use dot instead)"))
+            self.errors.append(
+                (
+                    idx,
+                    f"FORMAT: Comma decimals found in ground_truth: {comma_nums[:3]}... (use dot instead)",
+                )
+            )
             self.stats["comma_decimals"] += 1
 
     def validate_ground_truth_length(self, idx: int, item: Dict[str, Any]) -> None:
@@ -88,26 +112,47 @@ class DatasetValidator:
         words = len(gt.split())
 
         if words > 200:
-            self.warnings.append((idx, f"VERBOSE: Ground truth has {words} words (>200). Consider shortening to atomic facts."))
+            self.warnings.append(
+                (
+                    idx,
+                    f"VERBOSE: Ground truth has {words} words (>200). Consider shortening to atomic facts.",
+                )
+            )
             self.stats["long_ground_truths"] += 1
         elif words > 100:
-            self.info.append((idx, f"Ground truth has {words} words. Consider moving explanations to 'rationale' field."))
+            self.info.append(
+                (
+                    idx,
+                    f"Ground truth has {words} words. Consider moving explanations to 'rationale' field.",
+                )
+            )
 
     def validate_metadata_presence(self, idx: int, item: Dict[str, Any]) -> None:
         """Check presence of recommended metadata fields"""
         if "id" not in item:
-            self.warnings.append((idx, "METADATA: Missing 'id' field for stable tracking"))
+            self.warnings.append(
+                (idx, "METADATA: Missing 'id' field for stable tracking")
+            )
             self.stats["missing_ids"] += 1
 
         if "source_ref" not in item:
-            self.warnings.append((idx, "METADATA: Missing 'source_ref' for traceability"))
+            self.warnings.append(
+                (idx, "METADATA: Missing 'source_ref' for traceability")
+            )
             self.stats["missing_source_refs"] += 1
 
         if "lang" not in item:
-            self.info.append((idx, "Missing 'lang' field (fr/en/th) for language-specific analysis"))
+            self.info.append(
+                (idx, "Missing 'lang' field (fr/en/th) for language-specific analysis")
+            )
 
         if "difficulty" not in item:
-            self.info.append((idx, "Missing 'difficulty' field (easy/medium/hard/subjective) for segmented analysis"))
+            self.info.append(
+                (
+                    idx,
+                    "Missing 'difficulty' field (easy/medium/hard/subjective) for segmented analysis",
+                )
+            )
 
     def validate_numeric_metadata(self, idx: int, item: Dict[str, Any]) -> None:
         """Validate numeric tolerance metadata"""
@@ -116,10 +161,20 @@ class DatasetValidator:
         has_tolerance = "tolerance_abs" in item or "tolerance_rel" in item
 
         if has_metric and not has_target:
-            self.warnings.append((idx, f"NUMERIC: Has 'metric' ({item['metric']}) but missing 'target_value'"))
+            self.warnings.append(
+                (
+                    idx,
+                    f"NUMERIC: Has 'metric' ({item['metric']}) but missing 'target_value'",
+                )
+            )
 
         if has_target and not has_tolerance:
-            self.info.append((idx, "Has 'target_value' but no tolerance. Consider adding 'tolerance_abs' or 'tolerance_rel'"))
+            self.info.append(
+                (
+                    idx,
+                    "Has 'target_value' but no tolerance. Consider adding 'tolerance_abs' or 'tolerance_rel'",
+                )
+            )
 
     def validate_empty_contexts(self, idx: int, item: Dict[str, Any]) -> None:
         """Check if contexts are empty (expected if filled dynamically)"""
@@ -133,17 +188,29 @@ class DatasetValidator:
         # Empty query test
         if q == "":
             if not item.get("exclude_from_main"):
-                self.warnings.append((idx, "SPECIAL: Empty query test should have 'exclude_from_main': True"))
+                self.warnings.append(
+                    (
+                        idx,
+                        "SPECIAL: Empty query test should have 'exclude_from_main': True",
+                    )
+                )
 
         # OOD tests
         if "out_of_domain" in item.get("category", ""):
             if not item.get("exclude_from_main"):
-                self.info.append((idx, "Consider 'exclude_from_main': True for OOD tests to evaluate separately"))
+                self.info.append(
+                    (
+                        idx,
+                        "Consider 'exclude_from_main': True for OOD tests to evaluate separately",
+                    )
+                )
 
         # Subjective questions
         if "subjective" in item.get("category", "").lower():
             if item.get("difficulty") != "subjective":
-                self.info.append((idx, "Subjective question should have difficulty='subjective'"))
+                self.info.append(
+                    (idx, "Subjective question should have difficulty='subjective'")
+                )
 
     def detect_duplicate_questions(self, dataset: List[Dict[str, Any]]) -> None:
         """Detect duplicate questions"""
@@ -153,8 +220,15 @@ class DatasetValidator:
 
         if duplicates:
             for q, count in duplicates.items():
-                indices = [i for i, item in enumerate(dataset) if item.get("question") == q]
-                self.errors.append((indices[0], f"DUPLICATE: Question appears {count} times at indices {indices}"))
+                indices = [
+                    i for i, item in enumerate(dataset) if item.get("question") == q
+                ]
+                self.errors.append(
+                    (
+                        indices[0],
+                        f"DUPLICATE: Question appears {count} times at indices {indices}",
+                    )
+                )
                 self.stats["duplicate_questions"] += 1
 
     def collect_statistics(self, dataset: List[Dict[str, Any]]) -> None:
@@ -173,9 +247,9 @@ class DatasetValidator:
 
     def validate(self, dataset: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Run all validations and return report"""
-        print("="*80)
+        print("=" * 80)
         print("RAGAS GOLDEN DATASET VALIDATOR")
-        print("="*80)
+        print("=" * 80)
         print(f"\nValidating {len(dataset)} test cases...\n")
 
         # Collect stats
@@ -200,9 +274,9 @@ class DatasetValidator:
 
     def generate_report(self) -> Dict[str, Any]:
         """Generate comprehensive validation report"""
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("VALIDATION REPORT")
-        print("="*80)
+        print("=" * 80)
 
         # Critical errors (blocking)
         if self.errors:
@@ -234,60 +308,78 @@ class DatasetValidator:
                 print(f"  ... and {len(self.info) - 10} more recommendations")
 
         # Statistics
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("DATASET STATISTICS")
-        print("="*80)
+        print("=" * 80)
         print(f"\n📊 Total Tests: {self.stats['total_tests']}")
 
         print(f"\n📁 By Category ({len(self.stats['by_category'])} categories):")
-        for cat, count in self.stats['by_category'].most_common():
+        for cat, count in self.stats["by_category"].most_common():
             print(f"  - {cat}: {count}")
 
         print("\n🌍 By Language:")
-        for lang, count in self.stats['by_lang'].most_common():
+        for lang, count in self.stats["by_lang"].most_common():
             print(f"  - {lang}: {count}")
 
         print("\n📈 By Difficulty:")
-        for diff, count in self.stats['by_difficulty'].most_common():
+        for diff, count in self.stats["by_difficulty"].most_common():
             print(f"  - {diff}: {count}")
 
         print("\n🔍 Quality Metrics:")
-        print(f"  - Missing IDs: {self.stats['missing_ids']}/{self.stats['total_tests']}")
-        print(f"  - Missing source_refs: {self.stats['missing_source_refs']}/{self.stats['total_tests']}")
-        print(f"  - Long ground truths (>200 words): {self.stats['long_ground_truths']}")
+        print(
+            f"  - Missing IDs: {self.stats['missing_ids']}/{self.stats['total_tests']}"
+        )
+        print(
+            f"  - Missing source_refs: {self.stats['missing_source_refs']}/{self.stats['total_tests']}"
+        )
+        print(
+            f"  - Long ground truths (>200 words): {self.stats['long_ground_truths']}"
+        )
         print(f"  - Comma decimals: {self.stats['comma_decimals']}")
-        print(f"  - Empty contexts: {self.stats['empty_contexts']}/{self.stats['total_tests']}")
+        print(
+            f"  - Empty contexts: {self.stats['empty_contexts']}/{self.stats['total_tests']}"
+        )
         print(f"  - Duplicate questions: {self.stats['duplicate_questions']}")
 
         # Priority recommendations
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("PRIORITY ACTIONS")
-        print("="*80)
+        print("=" * 80)
 
         priorities = []
 
         if self.errors:
-            priorities.append(f"🔴 FIX {len(self.errors)} CRITICAL ERRORS (blocking for RAGAS)")
+            priorities.append(
+                f"🔴 FIX {len(self.errors)} CRITICAL ERRORS (blocking for RAGAS)"
+            )
 
-        if self.stats['comma_decimals'] > 0:
-            priorities.append(f"🔴 Replace {self.stats['comma_decimals']} comma decimals with dots")
+        if self.stats["comma_decimals"] > 0:
+            priorities.append(
+                f"🔴 Replace {self.stats['comma_decimals']} comma decimals with dots"
+            )
 
-        if self.stats['long_ground_truths'] > 0:
-            priorities.append(f"⚠️  Shorten {self.stats['long_ground_truths']} long ground truths (move details to 'rationale')")
+        if self.stats["long_ground_truths"] > 0:
+            priorities.append(
+                f"⚠️  Shorten {self.stats['long_ground_truths']} long ground truths (move details to 'rationale')"
+            )
 
-        if self.stats['missing_ids'] > self.stats['total_tests'] * 0.5:
+        if self.stats["missing_ids"] > self.stats["total_tests"] * 0.5:
             priorities.append(f"⚠️  Add stable IDs to {self.stats['missing_ids']} tests")
 
-        if self.stats['missing_source_refs'] > self.stats['total_tests'] * 0.7:
-            priorities.append(f"ℹ️  Add source_ref to {self.stats['missing_source_refs']} tests for traceability")
+        if self.stats["missing_source_refs"] > self.stats["total_tests"] * 0.7:
+            priorities.append(
+                f"ℹ️  Add source_ref to {self.stats['missing_source_refs']} tests for traceability"
+            )
 
         if not priorities:
-            priorities.append("✅ Dataset structure looks good! Consider adding optional metadata for richer analysis.")
+            priorities.append(
+                "✅ Dataset structure looks good! Consider adding optional metadata for richer analysis."
+            )
 
         for i, action in enumerate(priorities, 1):
             print(f"\n{i}. {action}")
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
 
         return {
             "errors": len(self.errors),
@@ -296,7 +388,7 @@ class DatasetValidator:
             "stats": dict(self.stats),
             "error_details": self.errors,
             "warning_details": self.warnings,
-            "info_details": self.info
+            "info_details": self.info,
         }
 
 

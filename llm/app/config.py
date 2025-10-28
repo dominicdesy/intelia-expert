@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     model_config = {
         "protected_namespaces": (),  # Disable model_ namespace protection
         "env_file": ".env",
-        "case_sensitive": False
+        "case_sensitive": False,
     }
 
     # Service info

@@ -64,12 +64,12 @@ def create_router(services: Optional[Dict[str, Any]] = None) -> APIRouter:
         Returns version information from VERSION_INFO (reads from BUILD_VERSION env or VERSION file)
         """
         return {
-            "version": VERSION_INFO['version'],
-            "build_id": VERSION_INFO['build_id'],
-            "commit_sha": VERSION_INFO['commit_sha'],
-            "commit_time": VERSION_INFO['commit_time'],
-            "branch": VERSION_INFO['branch'],
-            "deployed_at": VERSION_INFO['deployed_at'],
+            "version": VERSION_INFO["version"],
+            "build_id": VERSION_INFO["build_id"],
+            "commit_sha": VERSION_INFO["commit_sha"],
+            "commit_time": VERSION_INFO["commit_time"],
+            "branch": VERSION_INFO["branch"],
+            "deployed_at": VERSION_INFO["deployed_at"],
             "timestamp": time.time(),
             "architecture": "modular-endpoints",
             "modules": ["health", "diagnostic", "chat", "admin", "utils"],

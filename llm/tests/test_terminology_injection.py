@@ -28,7 +28,7 @@ def test_terminology_injector():
 
     # Get stats
     stats = injector.get_terminology_stats()
-    print(f"\n Terminology Statistics:")
+    print("\n Terminology Statistics:")
     print(f"  Extended glossary terms: {stats['extended_glossary_terms']}")
     print(f"  Value chain terms: {stats['value_chain_terms']}")
     print(f"  Total terms: {stats['total_terms']}")
@@ -39,24 +39,24 @@ def test_terminology_injector():
     test_queries = [
         {
             "query": "What is the hatchability rate for Ross 308 at day 21?",
-            "description": "Hatchery query - should load hatchery terms"
+            "description": "Hatchery query - should load hatchery terms",
         },
         {
             "query": "How to improve feed conversion ratio in broilers?",
-            "description": "Nutrition query - should load nutrition terms"
+            "description": "Nutrition query - should load nutrition terms",
         },
         {
             "query": "What are the symptoms of Newcastle disease?",
-            "description": "Health query - should load health/disease terms"
+            "description": "Health query - should load health/disease terms",
         },
         {
             "query": "What is the breast yield for Cobb 500?",
-            "description": "Processing query - should load processing terms"
+            "description": "Processing query - should load processing terms",
         },
         {
             "query": "How to increase egg production in layers?",
-            "description": "Layer production query - should load layer terms"
-        }
+            "description": "Layer production query - should load layer terms",
+        },
     ]
 
     print("\n" + "=" * 80)
@@ -68,7 +68,7 @@ def test_terminology_injector():
         description = test_case["description"]
 
         print(f"\n--- Test {i}: {description} ---")
-        print(f"Query: \"{query}\"")
+        print(f'Query: "{query}"')
 
         # Detect categories
         categories = injector.detect_relevant_categories(query)
@@ -79,19 +79,21 @@ def test_terminology_injector():
         print(f" Found {len(matching_terms)} matching terms")
 
         if matching_terms:
-            print(f"\nTop 5 matching terms:")
+            print("\nTop 5 matching terms:")
             for j, term in enumerate(matching_terms[:5], 1):
-                term_name = term.get('term', 'Unknown')
-                category = term.get('category', 'N/A')
-                definition = term.get('definition', '')[:80] + '...' if len(term.get('definition', '')) > 80 else term.get('definition', '')
+                term_name = term.get("term", "Unknown")
+                category = term.get("category", "N/A")
+                definition = (
+                    term.get("definition", "")[:80] + "..."
+                    if len(term.get("definition", "")) > 80
+                    else term.get("definition", "")
+                )
                 print(f"  {j}. {term_name} ({category})")
                 print(f"     {definition}")
 
         # Format for prompt
         formatted = injector.format_terminology_for_prompt(
-            query=query,
-            max_tokens=500,
-            language='en'
+            query=query, max_tokens=500, language="en"
         )
 
         if formatted:
@@ -111,7 +113,7 @@ def test_aviculture_config_integration():
 
     test_query = "What is the optimal temperature for incubation of broiler eggs?"
 
-    print(f"\nTest query: \"{test_query}\"")
+    print(f'\nTest query: "{test_query}"')
 
     # Get system prompt WITHOUT terminology
     print("\n--- System Prompt WITHOUT Terminology ---")
@@ -119,7 +121,7 @@ def test_aviculture_config_integration():
         query_type="general_poultry",
         language="en",
         query=test_query,
-        inject_terminology=False
+        inject_terminology=False,
     )
     print(f"Length: {len(prompt_without)} chars")
     print(prompt_without[:200] + "..." if len(prompt_without) > 200 else prompt_without)
@@ -131,7 +133,7 @@ def test_aviculture_config_integration():
         language="en",
         query=test_query,
         inject_terminology=True,
-        max_terminology_tokens=500
+        max_terminology_tokens=500,
     )
     print(f"Length: {len(prompt_with)} chars")
 
@@ -143,7 +145,11 @@ def test_aviculture_config_integration():
     if "## Relevant Technical Terminology" in prompt_with:
         terminology_section = prompt_with.split("## Relevant Technical Terminology")[1]
         print("\n Terminology section extracted:")
-        print(terminology_section[:500] + "..." if len(terminology_section) > 500 else terminology_section)
+        print(
+            terminology_section[:500] + "..."
+            if len(terminology_section) > 500
+            else terminology_section
+        )
 
 
 def main():
@@ -166,9 +172,10 @@ def main():
     except Exception as e:
         print(f"\n TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

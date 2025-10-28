@@ -88,7 +88,7 @@ class ResponsePostProcessor:
             r"^([A-ZÀ-Ý][^\n]{5,60}[a-zà-ÿ])\n([a-zà-ÿ])",
             r"\1 \2",
             response,
-            flags=re.MULTILINE
+            flags=re.MULTILINE,
         )
 
         # 7. Clean multiple empty lines (3+ → 2)

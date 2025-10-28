@@ -3,6 +3,7 @@ Diagnostic script pour comprendre pourquoi Context Recall est si bas (6.67%)
 Version: 1.4.1
 Last modified: 2025-10-26
 """
+
 """
 Diagnostic script pour comprendre pourquoi Context Recall est si bas (6.67%)
 
@@ -14,38 +15,39 @@ Analyse manuelle d'une query problématique pour identifier:
 
 import json
 
+
 def main():
     # Load RAGAS results
-    with open('logs/ragas_1200words_test.json', 'r', encoding='utf-8') as f:
+    with open("logs/ragas_1200words_test.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
     # Analyze Query 1: Ross 308 male nutrition question
-    q1 = data['detailed_scores'][0]
+    q1 = data["detailed_scores"][0]
 
-    print("="*100)
+    print("=" * 100)
     print("DIAGNOSTIC: Query 1 - Ross 308 Male Feed Requirement (Context Recall = 0%)")
-    print("="*100)
+    print("=" * 100)
     print()
 
     print("QUESTION:")
-    print(q1['user_input'])
+    print(q1["user_input"])
     print()
 
     print("EXPECTED ANSWER (reference):")
-    print(q1['reference'])
+    print(q1["reference"])
     print()
 
-    print("="*100)
+    print("=" * 100)
     print("RETRIEVED CONTEXTS (3 chunks)")
-    print("="*100)
+    print("=" * 100)
 
-    for i, ctx in enumerate(q1['retrieved_contexts'], 1):
+    for i, ctx in enumerate(q1["retrieved_contexts"], 1):
         print(f"\n--- Context {i} ---")
         # Check if context contains relevant keywords
-        has_ross = 'ross' in ctx.lower() or '308' in ctx.lower()
-        has_feed = 'kg' in ctx.lower() or 'aliment' in ctx.lower() or 'feed' in ctx
-        has_day18 = 'jour 18' in ctx.lower() or 'day 18' in ctx.lower()
-        has_2400g = '2400' in ctx or '2.4' in ctx
+        has_ross = "ross" in ctx.lower() or "308" in ctx.lower()
+        has_feed = "kg" in ctx.lower() or "aliment" in ctx.lower() or "feed" in ctx
+        has_day18 = "jour 18" in ctx.lower() or "day 18" in ctx.lower()
+        has_2400g = "2400" in ctx or "2.4" in ctx
 
         print(ctx[:300])
         print("\nKeyword analysis:")
@@ -59,9 +61,9 @@ def main():
             print("  ⚠️ WARNING: Contains '0.0 kg' - this is INCORRECT DATA")
 
     print()
-    print("="*100)
+    print("=" * 100)
     print("ROOT CAUSE ANALYSIS")
-    print("="*100)
+    print("=" * 100)
     print()
     print("OBSERVATION:")
     print("  The retrieved contexts contain CALCULATION metadata with '0.0 kg'")
@@ -83,6 +85,7 @@ def main():
     print("  C. Investigate if baseline (3000 words) has similar problem")
     print("  D. Test with pure vector search (alpha=1.0) vs hybrid (alpha=0.6)")
     print()
+
 
 if __name__ == "__main__":
     main()

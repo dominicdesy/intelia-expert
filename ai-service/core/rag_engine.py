@@ -123,6 +123,7 @@ class InteliaRAGEngine(InitializableMixin):
         # Docker: /app/config, Local: llm/config
         from pathlib import Path
         import os
+
         config_dir = os.getenv("LLM_CONFIG_DIR")
         if not config_dir:
             # Auto-détection: Si /app/config existe (Docker), l'utiliser
@@ -148,7 +149,9 @@ class InteliaRAGEngine(InitializableMixin):
         self.temporal_handler = TemporalQueryHandler()
         self.comparative_handler = ComparativeQueryHandler()
         self.standard_handler = StandardQueryHandler()
-        self.calculation_handler = None  # Initialized after PostgreSQL pool is available
+        self.calculation_handler = (
+            None  # Initialized after PostgreSQL pool is available
+        )
 
         # External modules
         self.postgresql_retriever = None
@@ -206,15 +209,23 @@ class InteliaRAGEngine(InitializableMixin):
                     "calculation": self.calculation_handler,
                 },
                 conversation_memory=self.conversation_memory,
-                ood_detector=self.weaviate_core.ood_detector if self.weaviate_core else None,
-                weaviate_client=self.weaviate_core.weaviate_client if self.weaviate_core else None,
+                ood_detector=(
+                    self.weaviate_core.ood_detector if self.weaviate_core else None
+                ),
+                weaviate_client=(
+                    self.weaviate_core.weaviate_client if self.weaviate_core else None
+                ),
                 enable_external_sources=enable_external,
             )
 
             if enable_external:
-                logger.info("✅ External sources system ENABLED (Semantic Scholar, PubMed, Europe PMC)")
+                logger.info(
+                    "✅ External sources system ENABLED (Semantic Scholar, PubMed, Europe PMC)"
+                )
             else:
-                logger.info("ℹ️ External sources system DISABLED (Weaviate not available)")
+                logger.info(
+                    "ℹ️ External sources system DISABLED (Weaviate not available)"
+                )
 
             self.response_generator = RAGResponseGenerator(
                 llm_generator=self.core.generator
@@ -272,9 +283,13 @@ class InteliaRAGEngine(InitializableMixin):
                         self.calculation_handler = CalculationQueryHandler(
                             db_pool=self.postgresql_retriever.pool
                         )
-                        logger.info("✅ Calculation Handler initialized with PostgreSQL pool")
+                        logger.info(
+                            "✅ Calculation Handler initialized with PostgreSQL pool"
+                        )
                     except Exception as calc_err:
-                        logger.warning(f"Calculation Handler initialization failed: {calc_err}")
+                        logger.warning(
+                            f"Calculation Handler initialization failed: {calc_err}"
+                        )
                         self.add_initialization_error(f"CalculationHandler: {calc_err}")
 
             except Exception as e:
@@ -332,17 +347,23 @@ class InteliaRAGEngine(InitializableMixin):
         Args:
             cache_manager: RedisCacheCore instance
         """
-        if self.weaviate_core and hasattr(self.weaviate_core, 'set_cache_manager'):
+        if self.weaviate_core and hasattr(self.weaviate_core, "set_cache_manager"):
             self.weaviate_core.set_cache_manager(cache_manager)
-            logger.info("✅ Cache manager configured for WeaviateCore (Intelligent RRF enabled)")
+            logger.info(
+                "✅ Cache manager configured for WeaviateCore (Intelligent RRF enabled)"
+            )
         else:
-            logger.warning("⚠️ Cannot configure cache: WeaviateCore not available or missing set_cache_manager method")
+            logger.warning(
+                "⚠️ Cannot configure cache: WeaviateCore not available or missing set_cache_manager method"
+            )
 
     async def generate_response(
         self,
         query: str,
         tenant_id: str = "default",
-        conversation_id: Optional[str] = None,  # 🆕 ID de conversation pour isolation mémoire
+        conversation_id: Optional[
+            str
+        ] = None,  # 🆕 ID de conversation pour isolation mémoire
         conversation_context: List[Dict] = None,
         language: Optional[str] = None,
         enable_preprocessing: bool = True,
@@ -396,7 +417,9 @@ class InteliaRAGEngine(InitializableMixin):
         try:
             # Process query through processor
             # 🆕 Utiliser conversation_id comme session_id pour isolation mémoire
-            session_id = conversation_id or tenant_id  # Fallback to tenant_id if no conversation_id
+            session_id = (
+                conversation_id or tenant_id
+            )  # Fallback to tenant_id if no conversation_id
             result = await self.query_processor.process_query(
                 query=query,
                 language=effective_language,

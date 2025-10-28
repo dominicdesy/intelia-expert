@@ -10,6 +10,7 @@ from pathlib import Path
 
 # Load .env
 from dotenv import load_dotenv
+
 env_path = Path(__file__).parent / ".env"
 if env_path.exists():
     load_dotenv(env_path)
@@ -21,6 +22,7 @@ else:
 sys.path.insert(0, str(Path(__file__).parent))
 
 from core.rag_engine import InteliaRAGEngine  # noqa: E402
+
 
 async def test_processing_plant_query():
     """Test la question processing plants avec le nouveau fallback"""
@@ -41,9 +43,7 @@ async def test_processing_plant_query():
     try:
         # Process query
         result = await engine.generate_response(
-            query=query,
-            tenant_id="test_fallback",
-            language="en"
+            query=query, tenant_id="test_fallback", language="en"
         )
 
         # Display results
@@ -68,11 +68,13 @@ async def test_processing_plant_query():
     except Exception as e:
         print(f"\nError: {e}")
         import traceback
+
         traceback.print_exc()
 
     print("\n" + "=" * 80)
     print("[OK] Test completed")
     print("=" * 80)
+
 
 if __name__ == "__main__":
     asyncio.run(test_processing_plant_query())

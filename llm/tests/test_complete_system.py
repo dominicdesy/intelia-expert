@@ -1,11 +1,12 @@
 """
 Test complet du système LLM avec caching Redis et HuggingFace
 """
+
 import httpx
-import json
 import time
 
 BASE_URL = "http://localhost:8081"
+
 
 def test_complete_flow():
     """Test: Query → Cache Miss → LLM Call → Cache → Cache Hit"""
@@ -20,16 +21,13 @@ def test_complete_flow():
         "language": "en",
         "domain": "aviculture",
         "query_type": "genetics_performance",
-        "entities": {
-            "breed": "Ross 308",
-            "age": 35
-        },
+        "entities": {"breed": "Ross 308", "age": 35},
         "context_docs": [
             {
                 "text": "Ross 308 broiler performance at 35 days shows average weight of 2.2kg with feed conversion ratio of 1.65",
-                "metadata": {"source": "Ross 308 Standards"}
+                "metadata": {"source": "Ross 308 Standards"},
             }
-        ]
+        ],
     }
 
     print("\n[1] FIRST REQUEST (Cache Miss)")
@@ -46,11 +44,13 @@ def test_complete_flow():
                 print(f"[OK] Status: {response.status_code}")
                 print(f"[OK] Duration: {duration1:.0f}ms")
                 print(f"[OK] Cached: {data.get('cached', False)}")
-                print(f"[OK] Response Length: {len(data.get('generated_text', ''))} chars")
+                print(
+                    f"[OK] Response Length: {len(data.get('generated_text', ''))} chars"
+                )
                 print(f"[OK] Model: {data.get('model', 'N/A')}")
                 print(f"[OK] Tokens: {data.get('total_tokens', 0)}")
-                print(f"\nResponse Preview:")
-                print(data.get('generated_text', '')[:200] + "...")
+                print("\nResponse Preview:")
+                print(data.get("generated_text", "")[:200] + "...")
             else:
                 print(f"[ERROR] Status: {response.status_code}")
                 print(response.text)
@@ -77,12 +77,14 @@ def test_complete_flow():
                 print(f"[OK] Duration: {duration2:.0f}ms")
                 print(f"[OK] Cached: {data.get('cached', False)}")
 
-                if data.get('cached'):
-                    print(f"\n[SUCCESS] CACHE HIT! Latency reduced from {duration1:.0f}ms -> {duration2:.0f}ms")
+                if data.get("cached"):
+                    print(
+                        f"\n[SUCCESS] CACHE HIT! Latency reduced from {duration1:.0f}ms -> {duration2:.0f}ms"
+                    )
                     improvement = ((duration1 - duration2) / duration1) * 100
                     print(f"   Performance improvement: {improvement:.1f}%")
                 else:
-                    print(f"\n[WARNING] Expected cache hit but got cache miss")
+                    print("\n[WARNING] Expected cache hit but got cache miss")
             else:
                 print(f"[ERROR] Status: {response.status_code}")
 

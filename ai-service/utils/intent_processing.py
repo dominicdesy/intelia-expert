@@ -249,7 +249,9 @@ def build_where_filter(intent_result) -> Dict:
 
     # Legacy: geneticLine (remplacé par breed)
     if "line" in entities and "breed" not in entities:
-        logger.warning("⚠️  Utilisation de 'geneticLine' (deprecated). Utilisez 'breed' à la place.")
+        logger.warning(
+            "⚠️  Utilisation de 'geneticLine' (deprecated). Utilisez 'breed' à la place."
+        )
         where_conditions.append(
             {
                 "path": ["geneticLine"],
@@ -260,7 +262,9 @@ def build_where_filter(intent_result) -> Dict:
 
     # Legacy: phase (remplacé par age_min_days/age_max_days)
     if "phase" in entities and "age_days" not in entities:
-        logger.warning("⚠️  Utilisation de 'phase' (deprecated). Utilisez 'age_days' à la place.")
+        logger.warning(
+            "⚠️  Utilisation de 'phase' (deprecated). Utilisez 'age_days' à la place."
+        )
         where_conditions.append(
             {
                 "path": ["phase"],

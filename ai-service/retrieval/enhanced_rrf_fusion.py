@@ -352,7 +352,9 @@ class IntelligentRRFFusion:
 
         context = {
             "query": query,
-            "query_hash": hashlib.md5(query.encode(), usedforsecurity=False).hexdigest()[:8],
+            "query_hash": hashlib.md5(
+                query.encode(), usedforsecurity=False
+            ).hexdigest()[:8],
             "genetic_line": genetic_line.lower() if genetic_line else "",
             "age_days": age_days,
             "age_weeks": age_weeks,
@@ -801,7 +803,9 @@ class IntelligentRRFFusion:
         """Génère une clé unique pour le document"""
         content = doc.get("content", "")
         title = doc.get("metadata", {}).get("title", "")
-        return hashlib.md5(f"{title}:{content[:100]}".encode(), usedforsecurity=False).hexdigest()[:16]
+        return hashlib.md5(
+            f"{title}:{content[:100]}".encode(), usedforsecurity=False
+        ).hexdigest()[:16]
 
     def _select_fusion_method(self, context: Dict) -> str:
         """Sélectionne la méthode de fusion optimale"""

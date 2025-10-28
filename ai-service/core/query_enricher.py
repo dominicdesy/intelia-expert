@@ -70,9 +70,13 @@ class ConversationalQueryEnricher:
 
         # 🆕 STEP 0: Check if this is a confirmation to a specific follow-up question
         # If user says "Yes" to "Can I help you optimize weight?", reformulate as optimization request
-        enriched_from_followup = self._handle_followup_confirmation(query, contextual_history, language)
+        enriched_from_followup = self._handle_followup_confirmation(
+            query, contextual_history, language
+        )
         if enriched_from_followup:
-            logger.info(f"Follow-up confirmation enriched: '{query}' → '{enriched_from_followup}'")
+            logger.info(
+                f"Follow-up confirmation enriched: '{query}' → '{enriched_from_followup}'"
+            )
             return enriched_from_followup
 
         # 1. Détecter question de suivi
@@ -95,7 +99,9 @@ class ConversationalQueryEnricher:
 
         return enriched
 
-    def _handle_followup_confirmation(self, query: str, contextual_history: str, language: str) -> str:
+    def _handle_followup_confirmation(
+        self, query: str, contextual_history: str, language: str
+    ) -> str:
         """
         Handle user confirmation to a proactive follow-up question
 
@@ -104,30 +110,43 @@ class ConversationalQueryEnricher:
 
         Returns enriched query if confirmation detected, None otherwise
         """
-        logger.debug(f"🔍 DEBUG: _handle_followup_confirmation called")
+        logger.debug("🔍 DEBUG: _handle_followup_confirmation called")
         logger.debug(f"🔍 DEBUG: query='{query}', language='{language}'")
-        logger.debug(f"🔍 DEBUG: contextual_history length={len(contextual_history) if contextual_history else 0}")
+        logger.debug(
+            f"🔍 DEBUG: contextual_history length={len(contextual_history) if contextual_history else 0}"
+        )
 
         query_lower = query.lower().strip()
         logger.debug(f"🔍 DEBUG: query_lower='{query_lower}'")
 
         # Check if query is a short confirmation (yes/oui/ok)
         confirmation_words = {
-            'fr': ['oui', 'ouais', 'd\'accord', 'ok', 'okay', 'bien sûr', 'volontiers', 'oui,'],
-            'en': ['yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'please', 'yup', 'yes,'],
-            'es': ['sí', 'si', 'vale', 'ok', 'okay', 'claro', 'por supuesto'],
-            'de': ['ja', 'okay', 'ok', 'gerne', 'klar'],
+            "fr": [
+                "oui",
+                "ouais",
+                "d'accord",
+                "ok",
+                "okay",
+                "bien sûr",
+                "volontiers",
+                "oui,",
+            ],
+            "en": ["yes", "yeah", "yep", "sure", "ok", "okay", "please", "yup", "yes,"],
+            "es": ["sí", "si", "vale", "ok", "okay", "claro", "por supuesto"],
+            "de": ["ja", "okay", "ok", "gerne", "klar"],
         }
 
         is_confirmation = any(
-            query_lower == word or query_lower.startswith(word + ' ')
-            for word in confirmation_words.get(language, confirmation_words['fr'])
+            query_lower == word or query_lower.startswith(word + " ")
+            for word in confirmation_words.get(language, confirmation_words["fr"])
         )
 
         logger.debug(f"🔍 DEBUG: is_confirmation={is_confirmation}")
 
         if not is_confirmation:
-            logger.debug("❌ DEBUG: Not a confirmation word - returning None (checkpoint 1)")
+            logger.debug(
+                "❌ DEBUG: Not a confirmation word - returning None (checkpoint 1)"
+            )
             return None
 
         # Check if history contains a proactive follow-up with optimization/improvement
@@ -136,16 +155,24 @@ class ConversationalQueryEnricher:
 
         # Extract the follow-up question from history
         # Format: [Follow-up: Question here...]
-        followup_match = re.search(r'\[follow-up:\s*(.+?)\]', history_lower, re.IGNORECASE)
+        followup_match = re.search(
+            r"\[follow-up:\s*(.+?)\]", history_lower, re.IGNORECASE
+        )
         logger.debug(f"🔍 DEBUG: followup_match found={followup_match is not None}")
 
         if not followup_match:
             # Try alternative patterns
-            followup_match_alt = re.search(r'\[follow-up:\s*(.+?)\.\.\.', history_lower, re.IGNORECASE)
-            logger.debug(f"🔍 DEBUG: followup_match_alt (with ...) found={followup_match_alt is not None}")
+            followup_match_alt = re.search(
+                r"\[follow-up:\s*(.+?)\.\.\.", history_lower, re.IGNORECASE
+            )
+            logger.debug(
+                f"🔍 DEBUG: followup_match_alt (with ...) found={followup_match_alt is not None}"
+            )
 
             if not followup_match_alt:
-                logger.debug("❌ DEBUG: No follow-up pattern found in history - returning None (checkpoint 2)")
+                logger.debug(
+                    "❌ DEBUG: No follow-up pattern found in history - returning None (checkpoint 2)"
+                )
                 return None
 
             followup_match = followup_match_alt
@@ -155,24 +182,27 @@ class ConversationalQueryEnricher:
 
         # Check if follow-up is about optimization/improvement
         optimization_keywords = {
-            'fr': ['optimiser', 'améliorer', 'augmenter', 'conseils', 'stratégies'],
-            'en': ['optimize', 'improve', 'increase', 'advice', 'strategies'],
-            'es': ['optimizar', 'mejorar', 'aumentar', 'consejos', 'estrategias'],
-            'de': ['optimieren', 'verbessern', 'erhöhen', 'ratschläge', 'strategien'],
+            "fr": ["optimiser", "améliorer", "augmenter", "conseils", "stratégies"],
+            "en": ["optimize", "improve", "increase", "advice", "strategies"],
+            "es": ["optimizar", "mejorar", "aumentar", "consejos", "estrategias"],
+            "de": ["optimieren", "verbessern", "erhöhen", "ratschläge", "strategien"],
         }
 
-        keywords_to_check = optimization_keywords.get(language, optimization_keywords['fr'])
+        keywords_to_check = optimization_keywords.get(
+            language, optimization_keywords["fr"]
+        )
         logger.debug(f"🔍 DEBUG: keywords_to_check={keywords_to_check}")
 
         is_optimization_followup = any(
-            keyword in followup_text
-            for keyword in keywords_to_check
+            keyword in followup_text for keyword in keywords_to_check
         )
 
         logger.debug(f"🔍 DEBUG: is_optimization_followup={is_optimization_followup}")
 
         if not is_optimization_followup:
-            logger.debug("❌ DEBUG: Not an optimization follow-up - returning None (checkpoint 3)")
+            logger.debug(
+                "❌ DEBUG: Not an optimization follow-up - returning None (checkpoint 3)"
+            )
             return None
 
         logger.debug("✅ DEBUG: All checks passed - extracting entities")
@@ -182,40 +212,40 @@ class ConversationalQueryEnricher:
         logger.debug(f"🔍 DEBUG: entities extracted={entities}")
 
         # Build optimization question
-        metric = entities.get('metric_type', 'performance')
-        breed = entities.get('breed', '')
-        age = entities.get('age_days', '')
-        sex = entities.get('sex', '')
+        metric = entities.get("metric_type", "performance")
+        breed = entities.get("breed", "")
+        age = entities.get("age_days", "")
+        sex = entities.get("sex", "")
 
         # Translate metric to readable form
         metric_translations = {
-            'fr': {
-                'weight': 'poids',
-                'fcr': 'FCR',
-                'feed_consumption': 'consommation d\'aliment',
-                'mortality': 'mortalité',
-                'performance': 'performances',
+            "fr": {
+                "weight": "poids",
+                "fcr": "FCR",
+                "feed_consumption": "consommation d'aliment",
+                "mortality": "mortalité",
+                "performance": "performances",
             },
-            'en': {
-                'weight': 'weight',
-                'fcr': 'FCR',
-                'feed_consumption': 'feed consumption',
-                'mortality': 'mortality',
-                'performance': 'performance',
+            "en": {
+                "weight": "weight",
+                "fcr": "FCR",
+                "feed_consumption": "feed consumption",
+                "mortality": "mortality",
+                "performance": "performance",
             },
-            'es': {
-                'weight': 'peso',
-                'fcr': 'FCR',
-                'feed_consumption': 'consumo de alimento',
-                'mortality': 'mortalidad',
-                'performance': 'rendimiento',
+            "es": {
+                "weight": "peso",
+                "fcr": "FCR",
+                "feed_consumption": "consumo de alimento",
+                "mortality": "mortalidad",
+                "performance": "rendimiento",
             },
-            'de': {
-                'weight': 'Gewicht',
-                'fcr': 'Futterverwertung',
-                'feed_consumption': 'Futterverbrauch',
-                'mortality': 'Mortalität',
-                'performance': 'Leistung',
+            "de": {
+                "weight": "Gewicht",
+                "fcr": "Futterverwertung",
+                "feed_consumption": "Futterverbrauch",
+                "mortality": "Mortalität",
+                "performance": "Leistung",
             },
         }
 
@@ -224,43 +254,43 @@ class ConversationalQueryEnricher:
         logger.debug(f"🔍 DEBUG: breed='{breed}', age='{age}', sex='{sex}'")
 
         # Build enriched query based on language
-        if language == 'fr':
+        if language == "fr":
             enriched = f"Comment améliorer le {metric_display}"
             if breed:
                 enriched += f" pour {breed}"
             if age:
                 enriched += f" à {age} jours"
-            if sex and sex != 'mixed':
-                sex_fr = {'male': 'mâle', 'female': 'femelle'}.get(sex, sex)
+            if sex and sex != "mixed":
+                sex_fr = {"male": "mâle", "female": "femelle"}.get(sex, sex)
                 enriched += f" ({sex_fr})"
             enriched += " ?"
-        elif language == 'en':
+        elif language == "en":
             enriched = f"How to improve {metric_display}"
             if breed:
                 enriched += f" for {breed}"
             if age:
                 enriched += f" at {age} days"
-            if sex and sex != 'mixed':
+            if sex and sex != "mixed":
                 enriched += f" ({sex})"
             enriched += "?"
-        elif language == 'es':
+        elif language == "es":
             enriched = f"Cómo mejorar el {metric_display}"
             if breed:
                 enriched += f" para {breed}"
             if age:
                 enriched += f" a los {age} días"
-            if sex and sex != 'mixed':
-                sex_es = {'male': 'macho', 'female': 'hembra'}.get(sex, sex)
+            if sex and sex != "mixed":
+                sex_es = {"male": "macho", "female": "hembra"}.get(sex, sex)
                 enriched += f" ({sex_es})"
             enriched += "?"
-        elif language == 'de':
+        elif language == "de":
             enriched = f"Wie kann man das {metric_display} verbessern"
             if breed:
                 enriched += f" für {breed}"
             if age:
                 enriched += f" am Tag {age}"
-            if sex and sex != 'mixed':
-                sex_de = {'male': 'männlich', 'female': 'weiblich'}.get(sex, sex)
+            if sex and sex != "mixed":
+                sex_de = {"male": "männlich", "female": "weiblich"}.get(sex, sex)
                 enriched += f" ({sex_de})"
             enriched += "?"
         else:
@@ -444,7 +474,16 @@ class ConversationalQueryEnricher:
         )
         has_metric_in_query = any(
             metric in current_query_lower
-            for metric in ["poids", "weight", "fcr", "mortalité", "mortality", "ponte", "consommation", "gain"]
+            for metric in [
+                "poids",
+                "weight",
+                "fcr",
+                "mortalité",
+                "mortality",
+                "ponte",
+                "consommation",
+                "gain",
+            ]
         )
 
         is_standalone_query = has_breed_in_query and has_metric_in_query
@@ -458,21 +497,25 @@ class ConversationalQueryEnricher:
             # Check if current query is a simple number (clarification response)
             if current_query_stripped.isdigit():
                 age_from_current_query = int(current_query_stripped)
-                logger.info(f"✅ Age extracted from current query: {age_from_current_query} days (number only)")
+                logger.info(
+                    f"✅ Age extracted from current query: {age_from_current_query} days (number only)"
+                )
             else:
                 # Try patterns in current query
                 age_patterns_current = [
                     r"(\d+)\s*(?:jour|day)s?",  # "21 days", "21 jours"
-                    r"(\d+)\s*j\b",             # "21j"
-                    r"\?\s*(\d+)\s*$",          # "...male? 17" (nombre après ?)
-                    r"\s(\d+)\s*$",             # "...male 17" (nombre à la fin)
+                    r"(\d+)\s*j\b",  # "21j"
+                    r"\?\s*(\d+)\s*$",  # "...male? 17" (nombre après ?)
+                    r"\s(\d+)\s*$",  # "...male 17" (nombre à la fin)
                 ]
 
                 for pattern in age_patterns_current:
                     match = re.search(pattern, current_query.lower())
                     if match:
                         age_from_current_query = int(match.group(1))
-                        logger.info(f"✅ Age extracted from current query: {age_from_current_query} days (pattern match)")
+                        logger.info(
+                            f"✅ Age extracted from current query: {age_from_current_query} days (pattern match)"
+                        )
                         break
 
         if is_standalone_query:
@@ -515,10 +558,10 @@ class ConversationalQueryEnricher:
                 # Remove examples from history to avoid extracting from them
                 # 🔧 FIX: Also remove "e.g." patterns
                 history_cleaned = re.sub(
-                    r'(?:ex:|exemple:|example:|e\.g\.|eg\.).*?(?:\)|$)',  # Remove text after examples until ) or end
-                    '',
+                    r"(?:ex:|exemple:|example:|e\.g\.|eg\.).*?(?:\)|$)",  # Remove text after examples until ) or end
+                    "",
                     history_lower,
-                    flags=re.IGNORECASE | re.DOTALL
+                    flags=re.IGNORECASE | re.DOTALL,
                 )
 
                 age_patterns = [

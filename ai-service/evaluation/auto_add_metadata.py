@@ -18,49 +18,46 @@ from pathlib import Path
 # Metadata mapping (test index → [lang, difficulty])
 METADATA_MAP = {
     # Easy tests (simple metrics, single queries)
-    0: ["fr", "easy"],    # calculation
-    1: ["fr", "easy"],    # disease_statistics
-    3: ["fr", "easy"],    # out_of_domain
-    4: ["fr", "easy"],    # disease_symptoms
-    6: ["fr", "easy"],    # multilingual_english
-    7: ["fr", "easy"],    # too_vague
-    10: ["fr", "easy"],   # metric_simple
-    24: ["fr", "easy"],   # validation_age_limit
-    25: ["fr", "easy"],   # conversational_turn1
-    27: ["fr", "easy"],   # conversational_comparative_turn1
-    37: ["fr", "easy"],   # phase3_edge_case (empty query)
-
+    0: ["fr", "easy"],  # calculation
+    1: ["fr", "easy"],  # disease_statistics
+    3: ["fr", "easy"],  # out_of_domain
+    4: ["fr", "easy"],  # disease_symptoms
+    6: ["fr", "easy"],  # multilingual_english
+    7: ["fr", "easy"],  # too_vague
+    10: ["fr", "easy"],  # metric_simple
+    24: ["fr", "easy"],  # validation_age_limit
+    25: ["fr", "easy"],  # conversational_turn1
+    27: ["fr", "easy"],  # conversational_comparative_turn1
+    37: ["fr", "easy"],  # phase3_edge_case (empty query)
     # Medium tests (clarifications, diagnostics, comparisons)
     2: ["fr", "medium"],  # disease_prevention
     5: ["fr", "medium"],  # clarification_needed
     8: ["fr", "medium"],  # unsupported_language
     9: ["fr", "medium"],  # comparative
-    17: ["fr", "medium"], # nutrition_specification
-    18: ["fr", "medium"], # nutrition_concept
-    19: ["fr", "medium"], # environment_temperature
-    20: ["fr", "medium"], # diagnostic_heat_stress
-    26: ["fr", "medium"], # conversational_turn2
-    28: ["fr", "medium"], # conversational_comparative_turn2
-    29: ["fr", "medium"], # phase3_query_decomposer (multi-factor)
-    30: ["fr", "medium"], # phase3_query_decomposer (comma list)
-    31: ["fr", "medium"], # phase3_query_decomposer (compare)
-    32: ["fr", "medium"], # phase3_enhanced_clarification (nutrition)
-    33: ["fr", "medium"], # phase3_enhanced_clarification (health)
-    34: ["fr", "medium"], # phase3_enhanced_clarification (environment)
-    35: ["fr", "medium"], # phase3_enhanced_clarification (management)
-    36: ["fr", "medium"], # phase3_enhanced_clarification (genetics)
-    38: ["en", "medium"], # farm_to_plant_integration (English!)
-
+    17: ["fr", "medium"],  # nutrition_specification
+    18: ["fr", "medium"],  # nutrition_concept
+    19: ["fr", "medium"],  # environment_temperature
+    20: ["fr", "medium"],  # diagnostic_heat_stress
+    26: ["fr", "medium"],  # conversational_turn2
+    28: ["fr", "medium"],  # conversational_comparative_turn2
+    29: ["fr", "medium"],  # phase3_query_decomposer (multi-factor)
+    30: ["fr", "medium"],  # phase3_query_decomposer (comma list)
+    31: ["fr", "medium"],  # phase3_query_decomposer (compare)
+    32: ["fr", "medium"],  # phase3_enhanced_clarification (nutrition)
+    33: ["fr", "medium"],  # phase3_enhanced_clarification (health)
+    34: ["fr", "medium"],  # phase3_enhanced_clarification (environment)
+    35: ["fr", "medium"],  # phase3_enhanced_clarification (management)
+    36: ["fr", "medium"],  # phase3_enhanced_clarification (genetics)
+    38: ["en", "medium"],  # farm_to_plant_integration (English!)
     # Hard tests (complex calculations, multi-factor, multi-age)
-    11: ["fr", "hard"],   # flock_calculation (10k birds)
-    12: ["fr", "hard"],   # reverse_lookup
-    13: ["fr", "hard"],   # projection_diagnostic
-    14: ["fr", "hard"],   # diagnostic_underperformance
-    15: ["fr", "hard"],   # diagnostic_fcr
-    16: ["fr", "hard"],   # phase3_enhanced_clarification (treatment_protocol)
-    21: ["fr", "hard"],   # multi_metric (3 metrics at once)
-    23: ["fr", "hard"],   # comparative_multi_age (3 ages × 2 breeds)
-
+    11: ["fr", "hard"],  # flock_calculation (10k birds)
+    12: ["fr", "hard"],  # reverse_lookup
+    13: ["fr", "hard"],  # projection_diagnostic
+    14: ["fr", "hard"],  # diagnostic_underperformance
+    15: ["fr", "hard"],  # diagnostic_fcr
+    16: ["fr", "hard"],  # phase3_enhanced_clarification (treatment_protocol)
+    21: ["fr", "hard"],  # multi_metric (3 metrics at once)
+    23: ["fr", "hard"],  # comparative_multi_age (3 ages × 2 breeds)
     # Subjective test
     22: ["fr", "subjective"],  # subjective_comparison (Ross vs Cobb)
 }
@@ -92,7 +89,9 @@ def add_metadata_to_file(input_file: Path, output_file: Path):
             indent = " " * 12  # Match indentation in file
 
             # Add lang and difficulty right after category
-            metadata_lines = f'\n{indent}"lang": "{lang}",\n{indent}"difficulty": "{difficulty}",'
+            metadata_lines = (
+                f'\n{indent}"lang": "{lang}",\n{indent}"difficulty": "{difficulty}",'
+            )
             output_parts.append(metadata_lines)
 
             print(f"  [{ test_idx:2d}] Added: lang={lang}, difficulty={difficulty}")
@@ -134,13 +133,15 @@ def main():
     print("\n" + "=" * 80)
     print("NEXT STEPS")
     print("=" * 80)
-    print(f"""
+    print(
+        f"""
 1. Review the enriched file: {output_file}
 2. If correct, replace original:
    cp {output_file} {input_file}
 3. If issues, restore backup:
    cp {backup_file} {input_file}
-""")
+"""
+    )
 
 
 if __name__ == "__main__":

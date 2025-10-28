@@ -43,7 +43,9 @@ def analyze_intent_coverage():
 
         print(f"\n🎯 {intent.value.upper()}")
         print(f"   Keywords: {len(keywords)} - {', '.join(keywords[:5])}...")
-        print(f"   Entities: {len(entities)} - {', '.join([e.value for e in entities])}")
+        print(
+            f"   Entities: {len(entities)} - {', '.join([e.value for e in entities])}"
+        )
         print(f"   Threshold: {threshold}")
 
 
@@ -76,7 +78,7 @@ def analyze_routing_keywords():
     for query, expected in test_queries:
         result = router.route_query(query)
         status = "✅" if result.value.upper() == expected else "⚠️"
-        print(f"   {status} \"{query}\" → {result.value}")
+        print(f'   {status} "{query}" → {result.value}')
 
 
 def analyze_domain_coverage():
@@ -156,7 +158,7 @@ def analyze_question_patterns():
     for pattern_type, examples in complex_patterns.items():
         print(f"\n   📌 {pattern_type}")
         for example in examples:
-            print(f"      → \"{example}\"")
+            print(f'      → "{example}"')
 
 
 def identify_coverage_gaps():
@@ -253,7 +255,9 @@ def print_summary():
 
 
 if __name__ == "__main__":
-    print("\n" + "🔍 ANALYSE APPROFONDIE DE LA COUVERTURE DES QUESTIONS AVICOLES" + "\n")
+    print(
+        "\n" + "🔍 ANALYSE APPROFONDIE DE LA COUVERTURE DES QUESTIONS AVICOLES" + "\n"
+    )
 
     analyze_intent_coverage()
     analyze_routing_keywords()

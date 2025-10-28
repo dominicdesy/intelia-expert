@@ -54,7 +54,7 @@ def _load_intents_config(config_path: str = "config/intents.json") -> Dict[str, 
 
     for path in possible_paths:
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except FileNotFoundError:
             continue
@@ -70,10 +70,10 @@ def _load_intents_config(config_path: str = "config/intents.json") -> Dict[str, 
             "site_type": {},
             "bird_type": {},
             "phase": {},
-            "sex": {}
+            "sex": {},
         },
         "intents": {},
-        "defaults_by_topic": {}
+        "defaults_by_topic": {},
     }
 
 
@@ -83,17 +83,20 @@ def _get_vocabulary_extractor():
     if _vocabulary_extractor_instance is None:
         try:
             from processing.vocabulary_extractor import PoultryVocabularyExtractor
+
             intents_config = _load_intents_config()
             _vocabulary_extractor_instance = PoultryVocabularyExtractor(intents_config)
             logger.debug("VocabularyExtractor initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize VocabularyExtractor: {e}")
+
             # Create a minimal fallback
             class MinimalVocabularyExtractor:
                 def __init__(self):
                     self.alias_mappings = {}
                     self.metrics_vocabulary = {}
                     self.topic_defaults = {}
+
             _vocabulary_extractor_instance = MinimalVocabularyExtractor()
     return _vocabulary_extractor_instance
 

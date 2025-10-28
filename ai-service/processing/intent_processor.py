@@ -589,18 +589,24 @@ class IntentProcessor:
             True si la requête contient des termes généraux d'aviculture
         """
         # Use AGROVOCService if available
-        if hasattr(self, 'agrovoc_service') and self.agrovoc_service is not None:
+        if hasattr(self, "agrovoc_service") and self.agrovoc_service is not None:
             # If language not specified, detect it from query
             if language == "en":  # default, might not be accurate
                 lang_result = detect_language_enhanced(query)
                 detected_language = lang_result.language
-                logger.debug(f"Language detected for AGROVOC: {detected_language} (confidence: {lang_result.confidence:.2f})")
+                logger.debug(
+                    f"Language detected for AGROVOC: {detected_language} (confidence: {lang_result.confidence:.2f})"
+                )
             else:
                 detected_language = language
 
-            is_poultry = self.agrovoc_service.detect_poultry_terms_in_query(query, detected_language)
+            is_poultry = self.agrovoc_service.detect_poultry_terms_in_query(
+                query, detected_language
+            )
             if is_poultry:
-                logger.debug(f"🐔 Poultry terms detected via AGROVOC service ({detected_language})")
+                logger.debug(
+                    f"🐔 Poultry terms detected via AGROVOC service ({detected_language})"
+                )
             return is_poultry
 
         # Fallback to legacy hardcoded terms if AGROVOC not available
@@ -624,27 +630,61 @@ class IntentProcessor:
         # 2. Fallback: hardcoded general poultry terms (if universal_terms not loaded)
         general_poultry_terms = [
             # General terms
-            "poultry", "aviculture", "chicken", "chickens", "bird", "birds",
-            "hen", "hens", "rooster", "roosters", "broiler", "broilers",
-            "layer", "layers", "breeder", "breeders",
-
+            "poultry",
+            "aviculture",
+            "chicken",
+            "chickens",
+            "bird",
+            "birds",
+            "hen",
+            "hens",
+            "rooster",
+            "roosters",
+            "broiler",
+            "broilers",
+            "layer",
+            "layers",
+            "breeder",
+            "breeders",
             # French terms
-            "volaille", "volailles", "poulet", "poulets", "poule", "poules",
-            "avicole", "élevage", "élever",
-
+            "volaille",
+            "volailles",
+            "poulet",
+            "poulets",
+            "poule",
+            "poules",
+            "avicole",
+            "élevage",
+            "élever",
             # Spanish terms
-            "ave", "aves", "pollo", "pollos", "gallina", "gallinas",
-            "avicultura", "criar",
-
+            "ave",
+            "aves",
+            "pollo",
+            "pollos",
+            "gallina",
+            "gallinas",
+            "avicultura",
+            "criar",
             # Actions related to poultry
-            "raise", "raising", "farming", "farm", "breeding", "breed",
-            "hatching", "incubation", "egg production", "meat production",
-
+            "raise",
+            "raising",
+            "farming",
+            "farm",
+            "breeding",
+            "breed",
+            "hatching",
+            "incubation",
+            "egg production",
+            "meat production",
             # French actions
-            "élever", "élevage", "reproduction", "ponte",
-
+            "élever",
+            "élevage",
+            "reproduction",
+            "ponte",
             # Spanish actions
-            "criar", "crianza", "granja",
+            "criar",
+            "crianza",
+            "granja",
         ]
 
         for term in general_poultry_terms:
@@ -820,7 +860,9 @@ class IntentProcessor:
             if is_poultry_domain:
                 confidence = 0.6  # Medium confidence (no specific entities but clearly poultry-related)
                 intent_type = IntentType.GENERAL_POULTRY  # General poultry questions
-                logger.info(f"🐔 General poultry query detected (no specific entities): {query[:80]}...")
+                logger.info(
+                    f"🐔 General poultry query detected (no specific entities): {query[:80]}..."
+                )
             else:
                 confidence = 0.3
                 intent_type = IntentType.OUT_OF_DOMAIN

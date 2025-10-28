@@ -13,7 +13,6 @@ Coverage: FAO publications and guidelines on poultry production
 """
 
 import logging
-import re
 from typing import List, Dict, Any
 from .base_fetcher import BaseFetcher
 from ..models import ExternalDocument
@@ -40,14 +39,11 @@ class FAOFetcher(BaseFetcher):
             base_url="http://www.fao.org/faolex/api",
             rate_limit=1.0,  # Conservative rate for scraping-like behavior
             timeout=60,  # Longer timeout for FAO
-            max_retries=3
+            max_retries=3,
         )
 
     async def _make_request(
-        self,
-        query: str,
-        max_results: int,
-        min_year: int
+        self, query: str, max_results: int, min_year: int
     ) -> Dict[str, Any]:
         """
         Search FAO documents
@@ -73,11 +69,7 @@ class FAOFetcher(BaseFetcher):
 
         search_query = f"{query} ({poultry_terms}) {exclude_terms}"
 
-        params = {
-            "q": search_query,
-            "page": 1,
-            "limit": min(max_results, 50)
-        }
+        params = {"q": search_query, "page": 1, "limit": min(max_results, 50)}
 
         try:
             response = await self.client.get(search_url, params=params)
@@ -97,9 +89,7 @@ class FAOFetcher(BaseFetcher):
             return {"results": []}
 
     def _parse_response(
-        self,
-        response: Dict[str, Any],
-        query: str
+        self, response: Dict[str, Any], query: str
     ) -> List[ExternalDocument]:
         """
         Parse FAO search response
@@ -143,7 +133,7 @@ class FAOFetcher(BaseFetcher):
                     url=url,
                     citation_count=0,  # FAO docs don't have citation counts
                     journal="FAO Publications",
-                    language="en"
+                    language="en",
                 )
 
                 documents.append(doc)

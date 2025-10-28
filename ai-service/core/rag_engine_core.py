@@ -56,9 +56,7 @@ class RAGEngineCore(InitializableMixin):
                     "✅ Generator initialized in RAGEngineCore with OpenAI client"
                 )
             else:
-                logger.error(
-                    "❌ Cannot initialize generator: OpenAI client missing"
-                )
+                logger.error("❌ Cannot initialize generator: OpenAI client missing")
                 self.generator = None
 
         except Exception as e:

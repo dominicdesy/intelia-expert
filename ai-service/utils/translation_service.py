@@ -1065,9 +1065,7 @@ class UniversalTranslationService:
                 "added_at": time.time(),
             }
 
-            logger.info(
-                f"Term added: {term} in domain {domain} (language: {language})"
-            )
+            logger.info(f"Term added: {term} in domain {domain} (language: {language})")
             return True
 
         except Exception as e:

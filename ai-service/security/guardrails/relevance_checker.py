@@ -12,7 +12,7 @@ to the user's query, preventing off-topic content (e.g., dairy cattle when askin
 """
 
 import logging
-from utils.types import Dict, List, Tuple
+from utils.types import Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -36,17 +36,38 @@ class RelevanceChecker:
 
         # Topic keywords for quick filtering (poultry domain)
         self.domain_keywords = {
-            "poultry": ["chicken", "poulet", "broiler", "layer", "hen", "rooster",
-                       "cobb", "ross", "hubbard", "avian", "poultry", "volaille"],
-            "off_topic": ["cattle", "bovine", "cow", "dairy", "beef", "pig", "swine",
-                         "sheep", "goat", "horse", "fish", "aquaculture"]
+            "poultry": [
+                "chicken",
+                "poulet",
+                "broiler",
+                "layer",
+                "hen",
+                "rooster",
+                "cobb",
+                "ross",
+                "hubbard",
+                "avian",
+                "poultry",
+                "volaille",
+            ],
+            "off_topic": [
+                "cattle",
+                "bovine",
+                "cow",
+                "dairy",
+                "beef",
+                "pig",
+                "swine",
+                "sheep",
+                "goat",
+                "horse",
+                "fish",
+                "aquaculture",
+            ],
         }
 
     async def check_document_relevance(
-        self,
-        query: str,
-        document: Dict,
-        language: str = "en"
+        self, query: str, document: Dict, language: str = "en"
     ) -> Tuple[bool, float, Dict]:
         """
         Check if a document is relevant to the query
@@ -73,12 +94,16 @@ class RelevanceChecker:
             # Quick keyword-based check first (fast filter)
             quick_result = self._quick_relevance_check(query, doc_text, doc_title)
             if quick_result[0] == False:  # Definitely off-topic
-                logger.warning(f"[RelevanceChecker] Document rejected (quick check): {doc_title[:80]}")
+                logger.warning(
+                    f"[RelevanceChecker] Document rejected (quick check): {doc_title[:80]}"
+                )
                 return quick_result
 
             # If LLM client available, do deep semantic check
             if self.client:
-                return await self._llm_relevance_check(query, doc_text, doc_title, language)
+                return await self._llm_relevance_check(
+                    query, doc_text, doc_title, language
+                )
 
             # Otherwise, return quick check result
             return quick_result
@@ -89,10 +114,7 @@ class RelevanceChecker:
             return True, 0.7, {"error": str(e), "fallback": True}
 
     def _quick_relevance_check(
-        self,
-        query: str,
-        doc_text: str,
-        doc_title: str
+        self, query: str, doc_text: str, doc_title: str
     ) -> Tuple[bool, float, Dict]:
         """
         Fast keyword-based relevance check
@@ -106,13 +128,15 @@ class RelevanceChecker:
 
         # Check for off-topic keywords
         off_topic_count = sum(
-            1 for keyword in self.domain_keywords["off_topic"]
+            1
+            for keyword in self.domain_keywords["off_topic"]
             if keyword in doc_title_lower or keyword in doc_text_lower[:500]
         )
 
         # Check for on-topic keywords
         on_topic_count = sum(
-            1 for keyword in self.domain_keywords["poultry"]
+            1
+            for keyword in self.domain_keywords["poultry"]
             if keyword in doc_title_lower or keyword in doc_text_lower[:500]
         )
 
@@ -122,34 +146,39 @@ class RelevanceChecker:
                 f"[RelevanceChecker] Off-topic document detected (quick): "
                 f"off_topic={off_topic_count}, on_topic={on_topic_count}"
             )
-            return False, 0.1, {
-                "reason": "off_topic_keywords_detected",
-                "off_topic_count": off_topic_count,
-                "on_topic_count": on_topic_count,
-                "method": "quick_keyword"
-            }
+            return (
+                False,
+                0.1,
+                {
+                    "reason": "off_topic_keywords_detected",
+                    "off_topic_count": off_topic_count,
+                    "on_topic_count": on_topic_count,
+                    "method": "quick_keyword",
+                },
+            )
 
         # Likely relevant if poultry keywords present
         if on_topic_count > 0:
             score = min(0.9, 0.6 + (on_topic_count * 0.1))
-            return True, score, {
-                "reason": "on_topic_keywords_found",
-                "on_topic_count": on_topic_count,
-                "method": "quick_keyword"
-            }
+            return (
+                True,
+                score,
+                {
+                    "reason": "on_topic_keywords_found",
+                    "on_topic_count": on_topic_count,
+                    "method": "quick_keyword",
+                },
+            )
 
         # Neutral: no strong signals, pass to LLM if available
-        return True, 0.5, {
-            "reason": "neutral_needs_deep_check",
-            "method": "quick_keyword"
-        }
+        return (
+            True,
+            0.5,
+            {"reason": "neutral_needs_deep_check", "method": "quick_keyword"},
+        )
 
     async def _llm_relevance_check(
-        self,
-        query: str,
-        doc_text: str,
-        doc_title: str,
-        language: str
+        self, query: str, doc_text: str, doc_title: str, language: str
     ) -> Tuple[bool, float, Dict]:
         """
         Deep LLM-based relevance verification
@@ -166,21 +195,20 @@ class RelevanceChecker:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a relevance verification expert. Your job is to determine if a scientific document is relevant to a user's query."
+                        "content": "You are a relevance verification expert. Your job is to determine if a scientific document is relevant to a user's query.",
                     },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0,
-                max_tokens=150
+                max_tokens=150,
             )
 
             result_text = response.choices[0].message.content.strip().lower()
 
             # Parse LLM response
-            is_relevant = "relevant: yes" in result_text or "relevant:yes" in result_text
+            is_relevant = (
+                "relevant: yes" in result_text or "relevant:yes" in result_text
+            )
 
             # Extract relevance score if provided
             score = 0.5
@@ -198,11 +226,15 @@ class RelevanceChecker:
                 f"score={score:.2f}, doc_title={doc_title[:60]}"
             )
 
-            return is_relevant, score, {
-                "reason": "llm_verification",
-                "llm_response": result_text[:200],
-                "method": "llm_semantic"
-            }
+            return (
+                is_relevant,
+                score,
+                {
+                    "reason": "llm_verification",
+                    "llm_response": result_text[:200],
+                    "method": "llm_semantic",
+                },
+            )
 
         except Exception as e:
             logger.error(f"[RelevanceChecker] LLM check failed: {e}")
@@ -210,11 +242,7 @@ class RelevanceChecker:
             return True, 0.6, {"error": str(e), "fallback": "llm_failed"}
 
     def _build_relevance_prompt(
-        self,
-        query: str,
-        doc_text: str,
-        doc_title: str,
-        language: str
+        self, query: str, doc_text: str, doc_title: str, language: str
     ) -> str:
         """Build LLM prompt for relevance verification"""
 
@@ -245,10 +273,7 @@ Answer:"""
         return prompt
 
     async def check_response_relevance(
-        self,
-        query: str,
-        response: str,
-        language: str = "en"
+        self, query: str, response: str, language: str = "en"
     ) -> Tuple[bool, float, Dict]:
         """
         Check if generated response is relevant to the query
@@ -268,12 +293,14 @@ Answer:"""
 
             # Check for blatant off-topic content in response
             off_topic_in_response = sum(
-                1 for keyword in self.domain_keywords["off_topic"]
+                1
+                for keyword in self.domain_keywords["off_topic"]
                 if keyword in response_lower
             )
 
             on_topic_in_response = sum(
-                1 for keyword in self.domain_keywords["poultry"]
+                1
+                for keyword in self.domain_keywords["poultry"]
                 if keyword in response_lower
             )
 
@@ -283,16 +310,22 @@ Answer:"""
                     f"[RelevanceChecker] OFF-TOPIC RESPONSE DETECTED: "
                     f"Query about poultry but response mentions {off_topic_in_response} off-topic terms"
                 )
-                return False, 0.1, {
-                    "reason": "response_off_topic",
-                    "off_topic_terms": off_topic_in_response,
-                    "on_topic_terms": on_topic_in_response,
-                    "method": "keyword_analysis"
-                }
+                return (
+                    False,
+                    0.1,
+                    {
+                        "reason": "response_off_topic",
+                        "off_topic_terms": off_topic_in_response,
+                        "on_topic_terms": on_topic_in_response,
+                        "method": "keyword_analysis",
+                    },
+                )
 
             # If LLM available, do semantic check
             if self.client and off_topic_in_response > 0:
-                return await self._llm_response_relevance_check(query, response, language)
+                return await self._llm_response_relevance_check(
+                    query, response, language
+                )
 
             # Otherwise, assume relevant
             return True, 0.8, {"method": "keyword_analysis", "passed": True}
@@ -302,15 +335,14 @@ Answer:"""
             return True, 0.7, {"error": str(e), "fallback": True}
 
     async def _llm_response_relevance_check(
-        self,
-        query: str,
-        response: str,
-        language: str
+        self, query: str, response: str, language: str
     ) -> Tuple[bool, float, Dict]:
         """LLM-based response relevance verification"""
         try:
             # Truncate response for efficiency
-            response_snippet = response[:1000] + "..." if len(response) > 1000 else response
+            response_snippet = (
+                response[:1000] + "..." if len(response) > 1000 else response
+            )
 
             prompt = f"""Verify if this response properly answers the user's query.
 
@@ -333,11 +365,14 @@ Answer:"""
             result = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "You are a relevance verification expert."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a relevance verification expert.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0,
-                max_tokens=150
+                max_tokens=150,
             )
 
             result_text = result.choices[0].message.content.strip().lower()
@@ -345,12 +380,18 @@ Answer:"""
 
             score = 0.8 if is_relevant else 0.2
 
-            logger.info(f"[RelevanceChecker] Response relevance: {is_relevant}, score: {score}")
+            logger.info(
+                f"[RelevanceChecker] Response relevance: {is_relevant}, score: {score}"
+            )
 
-            return is_relevant, score, {
-                "reason": "llm_response_verification",
-                "llm_response": result_text[:200]
-            }
+            return (
+                is_relevant,
+                score,
+                {
+                    "reason": "llm_response_verification",
+                    "llm_response": result_text[:200],
+                },
+            )
 
         except Exception as e:
             logger.error(f"[RelevanceChecker] LLM response check failed: {e}")

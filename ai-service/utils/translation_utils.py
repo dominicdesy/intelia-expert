@@ -111,7 +111,9 @@ def get_out_of_domain_message(language: Optional[str] = None) -> str:
             return "Je me spécialise dans l'aviculture. Comment puis-je vous aider ?"
 
 
-def get_system_message(message_type: str, language: Optional[str] = None, **kwargs) -> str:
+def get_system_message(
+    message_type: str, language: Optional[str] = None, **kwargs
+) -> str:
     """
     Interface générique pour récupérer n'importe quel message système
 

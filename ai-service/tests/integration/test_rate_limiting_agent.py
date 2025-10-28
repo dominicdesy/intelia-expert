@@ -31,6 +31,7 @@ from extensions.agent_rag_extension import InteliaAgentRAG  # noqa: E402
 # RATE LIMITING TESTS
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_rate_limiting_single_user():
     """Test 1: Rate limiting pour un seul utilisateur (10 req/min)"""
@@ -41,11 +42,14 @@ async def test_rate_limiting_single_user():
         # Envoyer 10 requêtes (devrait passer)
         success_count = 0
         for i in range(10):
-            response = await client.post("/chat", json={
-                "message": f"Test query {i}",
-                "language": "fr",
-                "user_id": user_id
-            })
+            response = await client.post(
+                "/chat",
+                json={
+                    "message": f"Test query {i}",
+                    "language": "fr",
+                    "user_id": user_id,
+                },
+            )
 
             if response.status_code == 200:
                 success_count += 1
@@ -53,11 +57,9 @@ async def test_rate_limiting_single_user():
         assert success_count == 10, f"Only {success_count}/10 requests succeeded"
 
         # 11ème requête devrait être bloquée (429 Too Many Requests)
-        response = await client.post("/chat", json={
-            "message": "Query 11",
-            "language": "fr",
-            "user_id": user_id
-        })
+        response = await client.post(
+            "/chat", json={"message": "Query 11", "language": "fr", "user_id": user_id}
+        )
 
         # Devrait être rate limited
         if response.status_code == 429:
@@ -80,11 +82,10 @@ async def test_rate_limiting_multiple_users():
 
         for user_id in users:
             # Chaque utilisateur devrait avoir sa propre limite
-            response = await client.post("/chat", json={
-                "message": "Test query",
-                "language": "fr",
-                "user_id": user_id
-            })
+            response = await client.post(
+                "/chat",
+                json={"message": "Test query", "language": "fr", "user_id": user_id},
+            )
 
             assert response.status_code == 200, f"User {user_id} blocked incorrectly"
 
@@ -100,18 +101,15 @@ async def test_rate_limiting_reset():
 
         # Envoyer 10 requêtes
         for i in range(10):
-            await client.post("/chat", json={
-                "message": f"Query {i}",
-                "language": "fr",
-                "user_id": user_id
-            })
+            await client.post(
+                "/chat",
+                json={"message": f"Query {i}", "language": "fr", "user_id": user_id},
+            )
 
         # 11ème devrait être bloquée
-        response = await client.post("/chat", json={
-            "message": "Query 11",
-            "language": "fr",
-            "user_id": user_id
-        })
+        response = await client.post(
+            "/chat", json={"message": "Query 11", "language": "fr", "user_id": user_id}
+        )
 
         blocked_initially = response.status_code == 429
 
@@ -123,11 +121,14 @@ async def test_rate_limiting_reset():
             await asyncio.sleep(61)
 
             # Devrait pouvoir envoyer à nouveau
-            response_after = await client.post("/chat", json={
-                "message": "Query after reset",
-                "language": "fr",
-                "user_id": user_id
-            })
+            response_after = await client.post(
+                "/chat",
+                json={
+                    "message": "Query after reset",
+                    "language": "fr",
+                    "user_id": user_id,
+                },
+            )
 
             if response_after.status_code == 200:
                 print("   ✓ Rate limit reset after 60s")
@@ -140,6 +141,7 @@ async def test_rate_limiting_reset():
 # ============================================================================
 # AGENT RAG TESTS
 # ============================================================================
+
 
 @pytest.fixture
 async def agent_rag():
@@ -164,7 +166,7 @@ async def test_agent_rag_simple_query(agent_rag):
     result = await agent_rag.process_query(
         query="Quel poids pour Ross 308 à 35 jours ?",
         user_id="test_agent_simple",
-        language="fr"
+        language="fr",
     )
 
     assert result is not None
@@ -183,9 +185,7 @@ async def test_agent_rag_complex_query(agent_rag):
     complex_query = "Compare le poids, le FCR et la mortalité entre Ross 308 et Cobb 500 à 35 et 42 jours"
 
     result = await agent_rag.process_query(
-        query=complex_query,
-        user_id="test_agent_complex",
-        language="fr"
+        query=complex_query, user_id="test_agent_complex", language="fr"
     )
 
     assert result is not None
@@ -217,9 +217,7 @@ async def test_agent_rag_multi_criteria(agent_rag):
 
     for query in queries:
         result = await agent_rag.process_query(
-            query=query,
-            user_id="test_agent_multi",
-            language="fr"
+            query=query, user_id="test_agent_multi", language="fr"
         )
 
         assert result is not None
@@ -235,9 +233,7 @@ async def test_agent_rag_fallback(agent_rag):
 
     # Même si l'intent processor n'est pas disponible, devrait fallback
     result = await agent_rag.process_query(
-        query="Poids poulets 35 jours",
-        user_id="test_agent_fallback",
-        language="fr"
+        query="Poids poulets 35 jours", user_id="test_agent_fallback", language="fr"
     )
 
     assert result is not None
@@ -258,9 +254,7 @@ async def test_agent_rag_multilingual(agent_rag):
 
     for query, lang in queries:
         result = await agent_rag.process_query(
-            query=query,
-            user_id="test_agent_multilang",
-            language=lang
+            query=query, user_id="test_agent_multilang", language=lang
         )
 
         assert result is not None
@@ -279,9 +273,7 @@ async def test_agent_rag_query_decomposition(agent_rag):
     complex_query = "Quelles sont les différences de poids, FCR et mortalité entre Ross 308 et Cobb 500 ?"
 
     result = await agent_rag.process_query(
-        query=complex_query,
-        user_id="test_decomposition",
-        language="fr"
+        query=complex_query, user_id="test_decomposition", language="fr"
     )
 
     # Vérifier métadonnées de décomposition si disponibles
@@ -302,7 +294,6 @@ async def test_agent_rag_query_decomposition(agent_rag):
 async def test_agent_rag_performance(agent_rag):
     """Test 10: Performance Agent RAG"""
 
-
     queries = [
         "Poids Ross 308 35 jours",
         "Compare Ross 308 et Cobb 500",
@@ -313,11 +304,7 @@ async def test_agent_rag_performance(agent_rag):
     for query in queries:
         start = time.time()
 
-        await agent_rag.process_query(
-            query=query,
-            user_id="test_perf",
-            language="fr"
-        )
+        await agent_rag.process_query(query=query, user_id="test_perf", language="fr")
 
         duration = time.time() - start
         times.append(duration)

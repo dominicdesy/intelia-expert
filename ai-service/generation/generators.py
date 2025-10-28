@@ -42,9 +42,7 @@ try:
 
     PROMPTS_AVAILABLE = True
 except ImportError as e:
-    logging.warning(
-        f"SystemPromptsManager not available: {e}, using fallback prompts"
-    )
+    logging.warning(f"SystemPromptsManager not available: {e}, using fallback prompts")
     PROMPTS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
@@ -84,9 +82,13 @@ class EnhancedResponseGenerator:
         # 🧠 Claude Extended Thinking for CoT debugging
         # Only initialized when needed (on-demand CoT analysis by admins)
         self.anthropic_client = None
-        self.claude_cot_model = os.getenv("CLAUDE_COT_MODEL", "claude-3-7-sonnet-20250219")
+        self.claude_cot_model = os.getenv(
+            "CLAUDE_COT_MODEL", "claude-3-7-sonnet-20250219"
+        )
         self.claude_cot_budget = int(os.getenv("CLAUDE_COT_BUDGET", "4000"))
-        logger.info(f"🧠 Claude CoT configured: {self.claude_cot_model} (budget: {self.claude_cot_budget} tokens)")
+        logger.info(
+            f"🧠 Claude CoT configured: {self.claude_cot_model} (budget: {self.claude_cot_budget} tokens)"
+        )
 
         # Initialize Multi-LLM Router for cost optimization
         # Option to use LLM service via HTTP instead of direct routing
@@ -94,12 +96,16 @@ class EnhancedResponseGenerator:
 
         if self.use_llm_service:
             from .llm_service_client import get_llm_service_client
+
             self.llm_service_client = get_llm_service_client()
             logger.info("✅ LLM Service HTTP client initialized (USE_LLM_SERVICE=true)")
         else:
             from .llm_router import get_llm_router
+
             self.llm_router = get_llm_router()
-            logger.info("✅ LLM Router initialized in EnhancedResponseGenerator (USE_LLM_SERVICE=false)")
+            logger.info(
+                "✅ LLM Router initialized in EnhancedResponseGenerator (USE_LLM_SERVICE=false)"
+            )
 
         # Load centralized prompts manager
         if PROMPTS_AVAILABLE:
@@ -143,43 +149,85 @@ class EnhancedResponseGenerator:
         # Mots-clés pour les poules pondeuses (layer) - 33 keywords
         layer_keywords = [
             # Basic terms (FR/EN)
-            'pondeuse', 'poule', 'poules pondeuses', 'layer', 'hen', 'hens',
-
+            "pondeuse",
+            "poule",
+            "poules pondeuses",
+            "layer",
+            "hen",
+            "hens",
             # Egg-related (FR/EN/Multi-language)
-            'œuf', 'egg', 'ponte', 'laying', 'production d\'œufs', 'egg production',
-            'coquille', 'shell', 'jaune', 'yolk', 'blanc d\'œuf', 'egg white',
-            'albumine', 'albumen',
-            'poedeira', 'gallina ponedora', 'eierlegen', 'uovo',
-
+            "œuf",
+            "egg",
+            "ponte",
+            "laying",
+            "production d'œufs",
+            "egg production",
+            "coquille",
+            "shell",
+            "jaune",
+            "yolk",
+            "blanc d'œuf",
+            "egg white",
+            "albumine",
+            "albumen",
+            "poedeira",
+            "gallina ponedora",
+            "eierlegen",
+            "uovo",
             # Housing/equipment (FR/EN)
-            'poulailler', 'hen house', 'pondoir', 'nid', 'nest', 'perchoir', 'perch',
-
+            "poulailler",
+            "hen house",
+            "pondoir",
+            "nid",
+            "nest",
+            "perchoir",
+            "perch",
             # Nutrition/health (FR/EN)
-            'calcaire', 'calcium', 'picage', 'pecking', 'plumage', 'feathering',
-
+            "calcaire",
+            "calcium",
+            "picage",
+            "pecking",
+            "plumage",
+            "feathering",
             # Reproductive system (FR/EN)
-            'ovulation', 'oviducte', 'oviduct', 'clutch',
-
+            "ovulation",
+            "oviducte",
+            "oviduct",
+            "clutch",
             # Management & breeds (FR/EN)
-            'photopériode', 'photoperiod', 'lumière', 'lighting',
-            'isa brown', 'lohmann', 'hy-line', 'bovans'
+            "photopériode",
+            "photoperiod",
+            "lumière",
+            "lighting",
+            "isa brown",
+            "lohmann",
+            "hy-line",
+            "bovans",
         ]
 
         # Mots-clés pour poulets de chair (broiler)
         broiler_keywords = [
-            'broiler', 'poulet de chair', 'chair', 'meat chicken',
-            'frango de corte', 'pollo de engorde', 'masthuhn',
-            'ross', 'cobb', 'aviagen', 'hubbard'
+            "broiler",
+            "poulet de chair",
+            "chair",
+            "meat chicken",
+            "frango de corte",
+            "pollo de engorde",
+            "masthuhn",
+            "ross",
+            "cobb",
+            "aviagen",
+            "hubbard",
         ]
 
         # Détection layer (priorité si détectée)
         if any(keyword in query_lower for keyword in layer_keywords):
-            logger.info(f"🐔 Poultry type detected: LAYER (pondeuse)")
-            return 'layer'
+            logger.info("🐔 Poultry type detected: LAYER (pondeuse)")
+            return "layer"
 
         # Sinon, par défaut broiler
-        logger.info(f"🐔 Poultry type detected: BROILER (chair)")
-        return 'broiler'
+        logger.info("🐔 Poultry type detected: BROILER (chair)")
+        return "broiler"
 
     def _build_poultry_system_prompt(self, poultry_type: str, language: str) -> str:
         """
@@ -194,7 +242,7 @@ class EnhancedResponseGenerator:
         """
         language_name = self.language_display_names.get(language, language.upper())
 
-        if poultry_type == 'layer':
+        if poultry_type == "layer":
             return f"""Tu es un expert en production de poules pondeuses (layers).
 CRITIQUE: Réponds EXCLUSIVEMENT en {language_name} ({language}).
 
@@ -231,7 +279,9 @@ MÉTRIQUES CLÉS BROILERS:
 - Mortalité et homogénéité
 """
 
-    def _add_cot_instruction(self, prompt: str, structured: bool = True, language: str = "en") -> str:
+    def _add_cot_instruction(
+        self, prompt: str, structured: bool = True, language: str = "en"
+    ) -> str:
         """
         DEPRECATED: Chain-of-Thought removed from system.
 
@@ -585,7 +635,9 @@ MÉTRIQUES CLÉS BROILERS:
             )
 
             # 🧠 DEBUG: Log CoT instruction to verify it's being sent
-            logger.info(f"🔍 CoT instruction length: {len(user_prompt.split('STRUCTURE DE RÉPONSE OBLIGATOIRE:')[-1] if 'STRUCTURE DE RÉPONSE OBLIGATOIRE:' in user_prompt else '')} chars")
+            logger.info(
+                f"🔍 CoT instruction length: {len(user_prompt.split('STRUCTURE DE RÉPONSE OBLIGATOIRE:')[-1] if 'STRUCTURE DE RÉPONSE OBLIGATOIRE:' in user_prompt else '')} chars"
+            )
             logger.debug(f"🔍 Full user prompt (last 500 chars): {user_prompt[-500:]}")
 
             # 🚀 Generate response using LLM service or direct router
@@ -597,21 +649,23 @@ MÉTRIQUES CLÉS BROILERS:
                 entities = {}
                 if enrichment and enrichment.entities:
                     for entity in enrichment.entities:
-                        if hasattr(entity, 'type') and hasattr(entity, 'value'):
+                        if hasattr(entity, "type") and hasattr(entity, "value"):
                             entities[entity.type] = entity.value
 
                 # Call LLM service /v1/generate endpoint
-                generated_response, prompt_tokens, completion_tokens, metadata = await self.llm_service_client.generate(
-                    query=query,
-                    domain="aviculture",
-                    language=lang,
-                    entities=entities if entities else None,
-                    query_type=detected_domain,
-                    context_docs=context_dicts,
-                    temperature=0.1,
-                    max_tokens=None,  # Let LLM service calculate optimal
-                    post_process=False,  # We'll post-process in ai-service
-                    add_disclaimer=False,  # We'll add disclaimer in ai-service post-processing
+                generated_response, prompt_tokens, completion_tokens, metadata = (
+                    await self.llm_service_client.generate(
+                        query=query,
+                        domain="aviculture",
+                        language=lang,
+                        entities=entities if entities else None,
+                        query_type=detected_domain,
+                        context_docs=context_dicts,
+                        temperature=0.1,
+                        max_tokens=None,  # Let LLM service calculate optimal
+                        post_process=False,  # We'll post-process in ai-service
+                        add_disclaimer=False,  # We'll add disclaimer in ai-service post-processing
+                    )
                 )
 
                 logger.info(
@@ -621,7 +675,9 @@ MÉTRIQUES CLÉS BROILERS:
             else:
                 # Use direct LLM router (original behavior)
                 context_dicts = [self._doc_to_dict(doc) for doc in context_docs]
-                provider = self.llm_router.route_query(query, context_dicts, intent_result)
+                provider = self.llm_router.route_query(
+                    query, context_dicts, intent_result
+                )
 
                 # Prepare messages
                 messages = [
@@ -635,15 +691,23 @@ MÉTRIQUES CLÉS BROILERS:
                     provider=provider,
                     messages=messages,
                     temperature=0.1,
-                    max_tokens=1500
+                    max_tokens=1500,
                 )
 
             # 🧠 DEBUG: Log raw LLM response to check for CoT tags
             logger.info(f"🔍 Raw LLM response length: {len(generated_response)} chars")
-            logger.info(f"🔍 Has <thinking> tag: {'<thinking>' in generated_response.lower()}")
-            logger.info(f"🔍 Has <analysis> tag: {'<analysis>' in generated_response.lower()}")
-            logger.info(f"🔍 Has <answer> tag: {'<answer>' in generated_response.lower()}")
-            logger.debug(f"🔍 Raw response (first 300 chars): {generated_response[:300]}")
+            logger.info(
+                f"🔍 Has <thinking> tag: {'<thinking>' in generated_response.lower()}"
+            )
+            logger.info(
+                f"🔍 Has <analysis> tag: {'<analysis>' in generated_response.lower()}"
+            )
+            logger.info(
+                f"🔍 Has <answer> tag: {'<answer>' in generated_response.lower()}"
+            )
+            logger.debug(
+                f"🔍 Raw response (first 300 chars): {generated_response[:300]}"
+            )
 
             # Post-traitement avec disclaimer vétérinaire
             enhanced_response = self._post_process_response(
@@ -842,7 +906,9 @@ MÉTRIQUES CLÉS BROILERS:
             # 🎯 HIERARCHICAL RAG PROMPT - Adapts to context source
             if context_source == "postgresql":
                 # STRICTEST: PostgreSQL = authoritative data - ABSOLUTE faithfulness required
-                language_name = self.language_display_names.get(language, language.upper())
+                language_name = self.language_display_names.get(
+                    language, language.upper()
+                )
                 language_instruction = f"""You are an expert in poultry production.
 CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 
@@ -876,12 +942,28 @@ FORMATTING RULES - CLEAN & MODERN:
 """
             elif context_source == "weaviate":
                 # MODERATE: Weaviate = documentation - strict extraction with minor flexibility
-                language_name = self.language_display_names.get(language, language.upper())
+                language_name = self.language_display_names.get(
+                    language, language.upper()
+                )
 
                 # Check if query is optimization/improvement focused
                 query_lower = query.lower()
-                optimization_keywords = ['améliorer', 'optimiser', 'augmenter', 'improve', 'optimize', 'increase', 'strategies', 'conseils', 'advice', 'comment faire', 'how to']
-                is_optimization_query = any(keyword in query_lower for keyword in optimization_keywords)
+                optimization_keywords = [
+                    "améliorer",
+                    "optimiser",
+                    "augmenter",
+                    "improve",
+                    "optimize",
+                    "increase",
+                    "strategies",
+                    "conseils",
+                    "advice",
+                    "comment faire",
+                    "how to",
+                ]
+                is_optimization_query = any(
+                    keyword in query_lower for keyword in optimization_keywords
+                )
 
                 if is_optimization_query:
                     # OPTIMIZATION/ADVICE QUERIES - Detailed actionable recommendations
@@ -962,7 +1044,9 @@ FORMATTING RULES - CLEAN & MODERN:
 """
             else:
                 # FLEXIBLE: Unknown/general - allow general knowledge as last resort
-                language_name = self.language_display_names.get(language, language.upper())
+                language_name = self.language_display_names.get(
+                    language, language.upper()
+                )
                 language_instruction = f"""You are an expert in poultry production.
 CRITICAL: Respond EXCLUSIVELY in {language_name} ({language}).
 
@@ -1052,23 +1136,36 @@ MÉTRIQUES PRIORITAIRES:
         # 🆕 USER PROFILING PERSONALIZATION
         if user_id:
             try:
-                from llm.core.user_profiling import get_user_profile, build_personalized_system_prompt
+                from llm.core.user_profiling import (
+                    get_user_profile,
+                    build_personalized_system_prompt,
+                )
 
                 user_profile = get_user_profile(user_id)
                 if user_profile:
-                    system_prompt = build_personalized_system_prompt(system_prompt, user_profile)
-                    logger.info(f"✅ System prompt personalized for user {user_id[:8]}... (country={user_profile.get('country')}, production={user_profile.get('production_type')}, category={user_profile.get('category')})")
+                    system_prompt = build_personalized_system_prompt(
+                        system_prompt, user_profile
+                    )
+                    logger.info(
+                        f"✅ System prompt personalized for user {user_id[:8]}... (country={user_profile.get('country')}, production={user_profile.get('production_type')}, category={user_profile.get('category')})"
+                    )
                 else:
-                    logger.info(f"ℹ️ No profile found for user {user_id[:8]}..., using base prompt")
+                    logger.info(
+                        f"ℹ️ No profile found for user {user_id[:8]}..., using base prompt"
+                    )
             except Exception as e:
-                logger.warning(f"⚠️ Failed to personalize prompt for user {user_id[:8] if user_id else 'unknown'}: {e}")
+                logger.warning(
+                    f"⚠️ Failed to personalize prompt for user {user_id[:8] if user_id else 'unknown'}: {e}"
+                )
                 # Continue with base prompt if personalization fails
 
         # ✅ Validation simple du contexte conversationnel (déplacé ici)
         limited_context = conversation_context if conversation_context else ""
 
         # 🧠 OPTIMISATION: Obtenir l'instruction CoT dans la langue appropriée
-        cot_instruction = self._add_cot_instruction("", structured=True, language=language).strip()
+        cot_instruction = self._add_cot_instruction(
+            "", structured=True, language=language
+        ).strip()
 
         # Prompt utilisateur simplifié avec CoT APRÈS la question
         user_prompt = f"""CONTEXTE CONVERSATIONNEL:
@@ -1286,9 +1383,13 @@ Style professionnel et structuré avec recommandations actionnables.""",
         # 0. NEW: Supprimer les citations de sources (Source: ..., Link: ...)
         # Enlève "Source: Lean IJ et al. (2016)" et "Link: https://..." des réponses
         response = re.sub(r"Source:\s*[^\n]+", "", response, flags=re.IGNORECASE)
-        response = re.sub(r"Link:\s*https?://[^\s\n]+", "", response, flags=re.IGNORECASE)
+        response = re.sub(
+            r"Link:\s*https?://[^\s\n]+", "", response, flags=re.IGNORECASE
+        )
         # Aussi supprimer les variations possibles
-        response = re.sub(r"\b(?:doi|pmid|pmcid):\s*[^\s\n]+", "", response, flags=re.IGNORECASE)
+        response = re.sub(
+            r"\b(?:doi|pmid|pmcid):\s*[^\s\n]+", "", response, flags=re.IGNORECASE
+        )
 
         # 1. Supprimer les headers markdown (##, ###, ####, etc.) - convertit "## Titre" en "Titre"
         response = re.sub(r"^#{1,6}\s+", "", response, flags=re.MULTILINE)
@@ -1314,7 +1415,7 @@ Style professionnel et structuré avec recommandations actionnables.""",
             r"^([A-ZÀ-Ý][^\n]{5,60}[a-zà-ÿ])\n([a-zà-ÿ])",
             r"\1 \2",
             response,
-            flags=re.MULTILINE
+            flags=re.MULTILINE,
         )
 
         # 7. Nettoyer les lignes vides multiples (3+ → 2)
@@ -1332,7 +1433,9 @@ Style professionnel et structuré avec recommandations actionnables.""",
 
         # 11. Nettoyer les virgules orphelines en fin de liste à puces
         # Transforme "- Item\n, " en "- Item\n\n"
-        response = re.sub(r"(^-\s+[^\n]+)\n\s*,\s*$", r"\1\n\n", response, flags=re.MULTILINE)
+        response = re.sub(
+            r"(^-\s+[^\n]+)\n\s*,\s*$", r"\1\n\n", response, flags=re.MULTILINE
+        )
 
         # ⚠️ DISABLED FOR FAITHFULNESS OPTIMIZATION
         # Veterinary disclaimers reduce Faithfulness score by 20-30%
@@ -1385,7 +1488,9 @@ Style professionnel et structuré avec recommandations actionnables.""",
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
                 logger.error("❌ ANTHROPIC_API_KEY not set - CoT analysis unavailable")
-                raise ValueError("ANTHROPIC_API_KEY environment variable required for CoT analysis")
+                raise ValueError(
+                    "ANTHROPIC_API_KEY environment variable required for CoT analysis"
+                )
             self.anthropic_client = anthropic.Anthropic(api_key=api_key)
             logger.info("✅ Anthropic client initialized for CoT analysis")
 
@@ -1414,20 +1519,17 @@ Style professionnel et structuré avec recommandations actionnables.""",
 USER QUERY:
 {user_prompt}"""
 
-        logger.info(f"🧠 Starting Claude Extended Thinking analysis (budget: {self.claude_cot_budget} tokens)")
+        logger.info(
+            f"🧠 Starting Claude Extended Thinking analysis (budget: {self.claude_cot_budget} tokens)"
+        )
 
         try:
             # Call Claude with Extended Thinking
             response = self.anthropic_client.messages.create(
                 model=self.claude_cot_model,
                 max_tokens=2048,  # For the final response
-                thinking={
-                    "type": "enabled",
-                    "budget_tokens": self.claude_cot_budget
-                },
-                messages=[
-                    {"role": "user", "content": combined_prompt}
-                ]
+                thinking={"type": "enabled", "budget_tokens": self.claude_cot_budget},
+                messages=[{"role": "user", "content": combined_prompt}],
             )
 
             # Extract thinking blocks and response
@@ -1456,8 +1558,10 @@ USER QUERY:
             cost_output = (output_tokens / 1_000_000) * 15.00
             total_cost = cost_thinking + cost_input + cost_output
 
-            logger.info(f"🧠 CoT Analysis complete:")
-            logger.info(f"   - Thinking tokens: {thinking_tokens} (${cost_thinking:.4f})")
+            logger.info("🧠 CoT Analysis complete:")
+            logger.info(
+                f"   - Thinking tokens: {thinking_tokens} (${cost_thinking:.4f})"
+            )
             logger.info(f"   - Input tokens: {input_tokens} (${cost_input:.4f})")
             logger.info(f"   - Output tokens: {output_tokens} (${cost_output:.4f})")
             logger.info(f"   - Total cost: ${total_cost:.4f}")

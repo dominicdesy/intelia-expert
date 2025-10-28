@@ -35,7 +35,7 @@ def test_agrovoc_service():
 
     # Get statistics
     stats = agrovoc.get_stats()
-    print(f"\nService Statistics:")
+    print("\nService Statistics:")
     print(f"  AGROVOC cache: {stats['agrovoc_terms']:,} terms")
     print(f"  Manual terms: {stats['manual_terms']:,} terms")
     print(f"  Universal fallback: {stats['universal_terms']:,} terms")
@@ -54,13 +54,11 @@ def test_agrovoc_service():
         ("pollo", "es", True, "AGROVOC - Spanish"),
         ("hähnchen", "de", True, "AGROVOC - German"),
         ("pollame", "it", True, "AGROVOC - Italian"),
-
         # Level 2: Manual terms - Dutch (nl) and Indonesian (id)
         ("pluimvee", "nl", True, "Manual - Dutch poultry"),
         ("kip", "nl", True, "Manual - Dutch chicken"),
         ("ayam", "id", True, "Manual - Indonesian chicken"),
         ("unggas", "id", True, "Manual - Indonesian poultry"),
-
         # Level 2: Modern meat quality defects (not in AGROVOC)
         ("spaghetti breast", "en", True, "Manual - Modern defect (EN)"),
         ("white striping", "en", True, "Manual - Modern defect (EN)"),
@@ -68,12 +66,10 @@ def test_agrovoc_service():
         ("poitrine spaghetti", "fr", True, "Manual - Modern defect (FR)"),
         ("pechuga espagueti", "es", True, "Manual - Modern defect (ES)"),
         ("spaghetti borst", "nl", True, "Manual - Modern defect (NL)"),
-
         # Level 3: Universal fallback
         ("broiler", "en", True, "Universal - English"),
         ("volaille", "fr", True, "Universal - French"),
         ("ave", "es", True, "Universal - Spanish"),
-
         # Negative cases (should be False)
         ("artificial intelligence", "en", False, "Not poultry"),
         ("spaghetti", "en", False, "Partial match not enough"),
@@ -108,11 +104,21 @@ def test_agrovoc_service():
 
     query_tests = [
         ("What is Spaghetti breast?", "en", True, "Modern defect in question"),
-        ("Is it safe to use AI to raise poultry?", "en", True, "General poultry question"),
+        (
+            "Is it safe to use AI to raise poultry?",
+            "en",
+            True,
+            "General poultry question",
+        ),
         ("How to improve chicken farming?", "en", True, "General farming question"),
         ("What is artificial intelligence?", "en", False, "Non-poultry question"),
         ("Quelle est la poitrine spaghetti?", "fr", True, "French modern defect"),
-        ("Comment améliorer l'élevage de poulets?", "fr", True, "French poultry question"),
+        (
+            "Comment améliorer l'élevage de poulets?",
+            "fr",
+            True,
+            "French poultry question",
+        ),
     ]
 
     for query, language, expected, description in query_tests:
@@ -144,7 +150,7 @@ def test_agrovoc_service():
     print(f"Incorrect: {results['incorrect']}")
     print(f"Accuracy: {results['correct'] / results['total'] * 100:.1f}%")
 
-    if results['correct'] == results['total']:
+    if results["correct"] == results["total"]:
         print("\n[SUCCESS] All tests passed!")
         return True
     else:

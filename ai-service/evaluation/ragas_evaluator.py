@@ -184,11 +184,13 @@ class RAGASEvaluator:
             ]
 
         # Définir features explicitement pour RAGAS 0.1.1
-        features = Features({
-            "question": Value("string"),
-            "answer": Value("string"),
-            "contexts": Sequence(Value("string")),
-        })
+        features = Features(
+            {
+                "question": Value("string"),
+                "answer": Value("string"),
+                "contexts": Sequence(Value("string")),
+            }
+        )
 
         if "ground_truth" in ragas_data:
             features["ground_truth"] = Value("string")

@@ -45,7 +45,7 @@ async def periodic_health_check():
                     service=service_name,
                     level="ERROR",
                     message=f"Health check exception: {str(e)}",
-                    context={}
+                    context={},
                 )
 
         # Attendre 30 secondes avant le prochain check
@@ -81,7 +81,9 @@ async def stop_health_checks():
 async def get_logs(
     limit: Optional[int] = Query(100, description="Maximum number of logs to return"),
     service: Optional[str] = Query(None, description="Filter by service name"),
-    level: Optional[str] = Query(None, description="Filter by log level (INFO, WARNING, ERROR)")
+    level: Optional[str] = Query(
+        None, description="Filter by log level (INFO, WARNING, ERROR)"
+    ),
 ):
     """
     Récupère les logs de monitoring
@@ -98,22 +100,17 @@ async def get_logs(
         collector = get_log_collector()
         logs = collector.get_logs(limit=limit, service=service, level=level)
 
-        return JSONResponse(content={
-            "logs": logs,
-            "count": len(logs),
-            "filters": {
-                "service": service,
-                "level": level,
-                "limit": limit
+        return JSONResponse(
+            content={
+                "logs": logs,
+                "count": len(logs),
+                "filters": {"service": service, "level": level, "limit": limit},
             }
-        })
+        )
 
     except Exception as e:
         logger.error(f"[MONITORING] Error getting logs: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.get("/services")
@@ -128,17 +125,11 @@ async def get_services_health():
         collector = get_log_collector()
         services = collector.get_services_health()
 
-        return JSONResponse(content={
-            "services": services,
-            "count": len(services)
-        })
+        return JSONResponse(content={"services": services, "count": len(services)})
 
     except Exception as e:
         logger.error(f"[MONITORING] Error getting services health: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.get("/summary")
@@ -157,18 +148,12 @@ async def get_monitoring_summary():
 
     except Exception as e:
         logger.error(f"[MONITORING] Error getting summary: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.post("/log")
 async def add_manual_log(
-    service: str,
-    level: str,
-    message: str,
-    context: Optional[dict] = None
+    service: str, level: str, message: str, context: Optional[dict] = None
 ):
     """
     Ajoute manuellement un log (pour testing ou intégration externe)
@@ -182,20 +167,13 @@ async def add_manual_log(
     try:
         collector = get_log_collector()
         collector.add_log(
-            service=service,
-            level=level,
-            message=message,
-            context=context
+            service=service, level=level, message=message, context=context
         )
 
-        return JSONResponse(content={
-            "success": True,
-            "message": "Log added successfully"
-        })
+        return JSONResponse(
+            content={"success": True, "message": "Log added successfully"}
+        )
 
     except Exception as e:
         logger.error(f"[MONITORING] Error adding log: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"error": str(e)})

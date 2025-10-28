@@ -15,20 +15,14 @@ Usage:
 """
 
 import sys
-import os
-import json
 from pathlib import Path
 from datetime import datetime, timedelta
 from collections import defaultdict
-from typing import List, Dict, Any
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from external_sources.activity_logger import (
-    get_activity_logger,
-    ExternalSourcesActivityLogger
-)
+from external_sources.activity_logger import get_activity_logger
 
 
 def print_summary(days: int = 30):
@@ -48,15 +42,24 @@ def export_to_csv(output_file: str = "external_sources_activity.csv"):
 
     import csv
 
-    with open(output_file, 'w', newline='', encoding='utf-8') as f:
+    with open(output_file, "w", newline="", encoding="utf-8") as f:
         fieldnames = [
-            'timestamp', 'request_id', 'query', 'language',
-            'weaviate_confidence', 'triggered_reason',
-            'sources_queried', 'total_documents_found',
-            'search_duration_ms', 'best_document_found',
-            'best_document_title', 'best_document_source',
-            'best_document_score', 'document_ingested',
-            'estimated_cost_usd', 'tenant_id'
+            "timestamp",
+            "request_id",
+            "query",
+            "language",
+            "weaviate_confidence",
+            "triggered_reason",
+            "sources_queried",
+            "total_documents_found",
+            "search_duration_ms",
+            "best_document_found",
+            "best_document_title",
+            "best_document_source",
+            "best_document_score",
+            "document_ingested",
+            "estimated_cost_usd",
+            "tenant_id",
         ]
 
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -64,22 +67,22 @@ def export_to_csv(output_file: str = "external_sources_activity.csv"):
 
         for activity in activities:
             row = {
-                'timestamp': activity['timestamp'],
-                'request_id': activity['request_id'],
-                'query': activity['query'][:100],  # Truncate
-                'language': activity['language'],
-                'weaviate_confidence': activity['weaviate_confidence'],
-                'triggered_reason': activity['triggered_reason'],
-                'sources_queried': '; '.join(activity['sources_queried']),
-                'total_documents_found': activity['total_documents_found'],
-                'search_duration_ms': activity['search_duration_ms'],
-                'best_document_found': activity['best_document_found'],
-                'best_document_title': activity.get('best_document_title', '')[:100],
-                'best_document_source': activity.get('best_document_source', ''),
-                'best_document_score': activity.get('best_document_score', ''),
-                'document_ingested': activity['document_ingested'],
-                'estimated_cost_usd': activity.get('estimated_cost_usd', 0.0),
-                'tenant_id': activity.get('tenant_id', ''),
+                "timestamp": activity["timestamp"],
+                "request_id": activity["request_id"],
+                "query": activity["query"][:100],  # Truncate
+                "language": activity["language"],
+                "weaviate_confidence": activity["weaviate_confidence"],
+                "triggered_reason": activity["triggered_reason"],
+                "sources_queried": "; ".join(activity["sources_queried"]),
+                "total_documents_found": activity["total_documents_found"],
+                "search_duration_ms": activity["search_duration_ms"],
+                "best_document_found": activity["best_document_found"],
+                "best_document_title": activity.get("best_document_title", "")[:100],
+                "best_document_source": activity.get("best_document_source", ""),
+                "best_document_score": activity.get("best_document_score", ""),
+                "document_ingested": activity["document_ingested"],
+                "estimated_cost_usd": activity.get("estimated_cost_usd", 0.0),
+                "tenant_id": activity.get("tenant_id", ""),
             }
             writer.writerow(row)
 
@@ -100,21 +103,21 @@ def show_top_queries(limit: int = 10):
     query_details = {}
 
     for activity in activities:
-        query = activity['query']
+        query = activity["query"]
         query_counts[query] += 1
 
         if query not in query_details:
             query_details[query] = {
-                'language': activity['language'],
-                'avg_confidence': [],
-                'docs_found': [],
-                'ingested': 0,
+                "language": activity["language"],
+                "avg_confidence": [],
+                "docs_found": [],
+                "ingested": 0,
             }
 
-        query_details[query]['avg_confidence'].append(activity['weaviate_confidence'])
-        query_details[query]['docs_found'].append(activity['total_documents_found'])
-        if activity['document_ingested']:
-            query_details[query]['ingested'] += 1
+        query_details[query]["avg_confidence"].append(activity["weaviate_confidence"])
+        query_details[query]["docs_found"].append(activity["total_documents_found"])
+        if activity["document_ingested"]:
+            query_details[query]["ingested"] += 1
 
     # Sort by count
     top_queries = sorted(query_counts.items(), key=lambda x: x[1], reverse=True)[:limit]
@@ -125,8 +128,8 @@ def show_top_queries(limit: int = 10):
 
     for i, (query, count) in enumerate(top_queries, 1):
         details = query_details[query]
-        avg_conf = sum(details['avg_confidence']) / len(details['avg_confidence'])
-        avg_docs = sum(details['docs_found']) / len(details['docs_found'])
+        avg_conf = sum(details["avg_confidence"]) / len(details["avg_confidence"])
+        avg_docs = sum(details["docs_found"]) / len(details["docs_found"])
 
         print(f"\n{i}. Query: {query[:80]}...")
         print(f"   Count: {count}")
@@ -146,8 +149,7 @@ def show_cost_analysis(days: int = 30):
     start_date = end_date - timedelta(days=days)
 
     stats = logger.get_statistics(
-        start_date=start_date.isoformat() + "Z",
-        end_date=end_date.isoformat() + "Z"
+        start_date=start_date.isoformat() + "Z", end_date=end_date.isoformat() + "Z"
     )
 
     print("\n" + "=" * 80)
@@ -173,7 +175,7 @@ def show_cost_analysis(days: int = 30):
         monthly_cost = daily_cost * 30
         yearly_cost = daily_cost * 365
 
-        print(f"\n📊 Projections:")
+        print("\n📊 Projections:")
         print(f"   Daily: ${daily_cost:.4f}")
         print(f"   Monthly: ${monthly_cost:.4f}")
         print(f"   Yearly: ${yearly_cost:.4f}")
@@ -190,28 +192,30 @@ def show_source_performance():
         print("No activities found")
         return
 
-    source_stats = defaultdict(lambda: {
-        'searches': 0,
-        'documents_found': 0,
-        'best_selected': 0,
-        'ingested': 0,
-        'search_times': [],
-    })
+    source_stats = defaultdict(
+        lambda: {
+            "searches": 0,
+            "documents_found": 0,
+            "best_selected": 0,
+            "ingested": 0,
+            "search_times": [],
+        }
+    )
 
     for activity in activities:
-        for source in activity['sources_queried']:
-            source_stats[source]['searches'] += 1
+        for source in activity["sources_queried"]:
+            source_stats[source]["searches"] += 1
 
-        if activity['best_document_found']:
-            best_source = activity.get('best_document_source')
+        if activity["best_document_found"]:
+            best_source = activity.get("best_document_source")
             if best_source:
-                source_stats[best_source]['best_selected'] += 1
+                source_stats[best_source]["best_selected"] += 1
 
-                if activity['document_ingested']:
-                    source_stats[best_source]['ingested'] += 1
+                if activity["document_ingested"]:
+                    source_stats[best_source]["ingested"] += 1
 
-        source_stats[activity['sources_queried'][0]]['search_times'].append(
-            activity['search_duration_ms']
+        source_stats[activity["sources_queried"][0]]["search_times"].append(
+            activity["search_duration_ms"]
         )
 
     print("\n" + "=" * 80)
@@ -219,7 +223,11 @@ def show_source_performance():
     print("=" * 80)
 
     for source, stats in sorted(source_stats.items()):
-        avg_time = sum(stats['search_times']) / len(stats['search_times']) if stats['search_times'] else 0
+        avg_time = (
+            sum(stats["search_times"]) / len(stats["search_times"])
+            if stats["search_times"]
+            else 0
+        )
 
         print(f"\n📚 {source.upper()}")
         print(f"   Searches: {stats['searches']}")
@@ -227,8 +235,8 @@ def show_source_performance():
         print(f"   Documents Ingested: {stats['ingested']}")
         print(f"   Avg Search Time: {avg_time:.0f}ms")
 
-        if stats['searches'] > 0:
-            selection_rate = (stats['best_selected'] / stats['searches']) * 100
+        if stats["searches"] > 0:
+            selection_rate = (stats["best_selected"] / stats["searches"]) * 100
             print(f"   Selection Rate: {selection_rate:.1f}%")
 
     print("\n" + "=" * 80 + "\n")
@@ -245,19 +253,20 @@ def show_ingestion_timeline(days: int = 7):
 
     # Filter by date
     filtered = [
-        a for a in activities
-        if start_date.isoformat() + "Z" <= a['timestamp'] <= end_date.isoformat() + "Z"
+        a
+        for a in activities
+        if start_date.isoformat() + "Z" <= a["timestamp"] <= end_date.isoformat() + "Z"
     ]
 
     # Group by date
-    by_date = defaultdict(lambda: {'searches': 0, 'ingested': 0, 'cost': 0.0})
+    by_date = defaultdict(lambda: {"searches": 0, "ingested": 0, "cost": 0.0})
 
     for activity in filtered:
-        date = activity['timestamp'][:10]  # YYYY-MM-DD
-        by_date[date]['searches'] += 1
-        if activity['document_ingested']:
-            by_date[date]['ingested'] += 1
-            by_date[date]['cost'] += activity.get('estimated_cost_usd', 0.0)
+        date = activity["timestamp"][:10]  # YYYY-MM-DD
+        by_date[date]["searches"] += 1
+        if activity["document_ingested"]:
+            by_date[date]["ingested"] += 1
+            by_date[date]["cost"] += activity.get("estimated_cost_usd", 0.0)
 
     print("\n" + "=" * 80)
     print(f"INGESTION TIMELINE (Last {days} days)")
@@ -285,7 +294,9 @@ def main():
     if command == "--export":
         format_type = sys.argv[2] if len(sys.argv) > 2 else "csv"
         if format_type == "csv":
-            output_file = sys.argv[3] if len(sys.argv) > 3 else "external_sources_activity.csv"
+            output_file = (
+                sys.argv[3] if len(sys.argv) > 3 else "external_sources_activity.csv"
+            )
             export_to_csv(output_file)
         else:
             print(f"Unknown export format: {format_type}")
@@ -306,7 +317,8 @@ def main():
         show_ingestion_timeline(days=days)
 
     elif command == "--help":
-        print("""
+        print(
+            """
 External Sources Activity Analyzer
 
 Usage:
@@ -325,7 +337,8 @@ Examples:
     python analyze_external_sources.py --cost 90
     python analyze_external_sources.py --sources
     python analyze_external_sources.py --timeline 14
-        """)
+        """
+        )
 
     elif command.isdigit():
         # Number of days

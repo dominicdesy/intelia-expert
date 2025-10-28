@@ -17,7 +17,7 @@ import hashlib
 import json
 import logging
 import time
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 from dataclasses import dataclass, asdict
 import redis
 
@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CacheEntry:
     """Cache entry with metadata"""
+
     query: str
     response: str
     entities: Dict[str, Any]
@@ -43,7 +44,7 @@ class CacheEntry:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'CacheEntry':
+    def from_dict(cls, data: Dict) -> "CacheEntry":
         """Create from dictionary"""
         return cls(**data)
 
@@ -72,7 +73,7 @@ class SemanticCache:
         redis_db: int = 0,
         redis_password: Optional[str] = None,
         ttl: int = 3600,  # 1 hour default
-        enabled: bool = True
+        enabled: bool = True,
     ):
         """
         Initialize semantic cache
@@ -101,13 +102,17 @@ class SemanticCache:
                 password=redis_password,
                 decode_responses=True,
                 socket_connect_timeout=5,
-                socket_timeout=5
+                socket_timeout=5,
             )
             # Test connection
             self.redis_client.ping()
-            logger.info(f"[OK] SemanticCache connected to Redis at {redis_host}:{redis_port}")
+            logger.info(
+                f"[OK] SemanticCache connected to Redis at {redis_host}:{redis_port}"
+            )
         except Exception as e:
-            logger.debug(f"Redis connection failed: {e}. Cache disabled (optional feature).")
+            logger.debug(
+                f"Redis connection failed: {e}. Cache disabled (optional feature)."
+            )
             self.enabled = False
             self.redis_client = None
 
@@ -121,15 +126,11 @@ class SemanticCache:
         - Strip leading/trailing spaces
         """
         normalized = query.lower().strip()
-        normalized = ' '.join(normalized.split())  # Remove extra whitespace
+        normalized = " ".join(normalized.split())  # Remove extra whitespace
         return normalized
 
     def _generate_cache_key(
-        self,
-        query: str,
-        entities: Optional[Dict[str, Any]],
-        language: str,
-        domain: str
+        self, query: str, entities: Optional[Dict[str, Any]], language: str, domain: str
     ) -> str:
         """
         Generate cache key from query + entities + language
@@ -173,7 +174,7 @@ class SemanticCache:
         entities: Optional[Dict[str, Any]] = None,
         language: str = "en",
         domain: str = "aviculture",
-        query_type: Optional[str] = None
+        query_type: Optional[str] = None,
     ) -> Optional[CacheEntry]:
         """
         Get cached response if available
@@ -230,7 +231,7 @@ class SemanticCache:
         query_type: str = "general",
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
-        complexity: str = "unknown"
+        complexity: str = "unknown",
     ) -> bool:
         """
         Store response in cache
@@ -267,7 +268,7 @@ class SemanticCache:
                 timestamp=time.time(),
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                complexity=complexity
+                complexity=complexity,
             )
 
             # Serialize to JSON
@@ -327,11 +328,7 @@ class SemanticCache:
             Dictionary with cache stats
         """
         if not self.enabled or not self.redis_client:
-            return {
-                "enabled": False,
-                "total_keys": 0,
-                "memory_used": 0
-            }
+            return {"enabled": False, "total_keys": 0, "memory_used": 0}
 
         try:
             # Get Redis info
@@ -349,11 +346,14 @@ class SemanticCache:
                 "hits": info.get("keyspace_hits", 0),
                 "misses": info.get("keyspace_misses", 0),
                 "hit_rate": round(
-                    info.get("keyspace_hits", 0) /
-                    max(info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0), 1) * 100,
-                    2
+                    info.get("keyspace_hits", 0)
+                    / max(
+                        info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0), 1
+                    )
+                    * 100,
+                    2,
                 ),
-                "ttl": self.ttl
+                "ttl": self.ttl,
             }
 
         except Exception as e:
@@ -371,7 +371,7 @@ def get_semantic_cache(
     redis_db: int = 0,
     redis_password: Optional[str] = None,
     ttl: int = 3600,
-    enabled: bool = True
+    enabled: bool = True,
 ) -> SemanticCache:
     """
     Get singleton instance of semantic cache
@@ -396,7 +396,7 @@ def get_semantic_cache(
             redis_db=redis_db,
             redis_password=redis_password,
             ttl=ttl,
-            enabled=enabled
+            enabled=enabled,
         )
 
     return _semantic_cache

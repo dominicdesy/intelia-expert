@@ -27,6 +27,7 @@ from config.config import SUPPORTED_LANGUAGES, FALLBACK_LANGUAGE
 # Import message handler for veterinary disclaimers
 try:
     from config.messages import get_message
+
     MESSAGES_AVAILABLE = True
 except ImportError:
     MESSAGES_AVAILABLE = False
@@ -67,12 +68,22 @@ class ClaudeVisionAnalyzer:
         self.client = anthropic.Anthropic(api_key=self.api_key)
         # Use dedicated vision model env var, fallback to general model, then default
         # Default: claude-sonnet-4-5-20250929 (Claude 3.x retired Oct 22, 2025)
-        self.model = model or os.getenv("ANTHROPIC_VISION_MODEL") or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
-        self.language = language if language in SUPPORTED_LANGUAGES else FALLBACK_LANGUAGE
+        self.model = (
+            model
+            or os.getenv("ANTHROPIC_VISION_MODEL")
+            or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
+        )
+        self.language = (
+            language if language in SUPPORTED_LANGUAGES else FALLBACK_LANGUAGE
+        )
 
-        logger.info(f"✅ ClaudeVisionAnalyzer initialized - Model: {self.model}, Language: {language}")
+        logger.info(
+            f"✅ ClaudeVisionAnalyzer initialized - Model: {self.model}, Language: {language}"
+        )
 
-    def _image_to_base64(self, image_data: bytes, content_type: str = "image/jpeg") -> tuple[str, str]:
+    def _image_to_base64(
+        self, image_data: bytes, content_type: str = "image/jpeg"
+    ) -> tuple[str, str]:
         """
         Convert image bytes to base64 for API transmission
 
@@ -88,9 +99,11 @@ class ClaudeVisionAnalyzer:
             image = Image.open(BytesIO(image_data))
 
             # Convertir en base64
-            base64_data = base64.b64encode(image_data).decode('utf-8')
+            base64_data = base64.b64encode(image_data).decode("utf-8")
 
-            logger.debug(f"Image converted to base64 - Size: {len(image_data)} bytes, Format: {image.format}")
+            logger.debug(
+                f"Image converted to base64 - Size: {len(image_data)} bytes, Format: {image.format}"
+            )
 
             return base64_data, content_type
 
@@ -185,10 +198,12 @@ Utilise un ton professionnel mais accessible.
 
         # Ajouter contexte RAG si disponible
         if context_docs and len(context_docs) > 0:
-            context_text = "\n\n".join([
-                f"Document {i+1}: {doc.get('content', '')[:500]}"
-                for i, doc in enumerate(context_docs[:3])
-            ])
+            context_text = "\n\n".join(
+                [
+                    f"Document {i+1}: {doc.get('content', '')[:500]}"
+                    for i, doc in enumerate(context_docs[:3])
+                ]
+            )
 
             prompt += f"""
 
@@ -218,7 +233,10 @@ Utilise ces informations comme référence pour enrichir ton analyse si elles so
             "th": "คุณมีรูปภาพอื่นของปัญหาเดียวกันหรือสัตว์อื่นที่ได้รับผลกระทบเพื่อวิเคราะห์หรือไม่? ภาพเพิ่มเติม (มุมต่างๆ อวัยวะอื่นๆ สัตว์อื่นๆ) สามารถช่วยปรับปรุงการวินิจฉัยได้",
             "tr": "Analiz edilecek aynı sorunun veya etkilenen diğer hayvanların başka fotoğrafları var mı? Ek görüntüler (farklı açılar, diğer organlar, diğer hayvanlar) teşhisin iyileştirilmesine yardımcı olabilir.",
             "vi": "Bạn có ảnh khác về cùng một vấn đề hoặc các động vật khác bị ảnh hưởng để phân tích không? Hình ảnh bổ sung (góc độ khác nhau, các cơ quan khác, động vật khác) có thể giúp cải thiện chẩn đoán.",
-        }.get(language, "Do you have other photos of the same problem or other affected animals to analyze? Additional images (different angles, other organs, other animals) can help refine the diagnosis.")
+        }.get(
+            language,
+            "Do you have other photos of the same problem or other affected animals to analyze? Additional images (different angles, other organs, other animals) can help refine the diagnosis.",
+        )
 
         # Ajouter question de suivi et disclaimer
         prompt += f"""
@@ -264,7 +282,9 @@ DISCLAIMER OBLIGATOIRE:
         lang = language or self.language
 
         try:
-            logger.info(f"[VISION] Analyzing medical image - Query: '{user_query[:50]}...'")
+            logger.info(
+                f"[VISION] Analyzing medical image - Query: '{user_query[:50]}...'"
+            )
 
             # Convert image to base64
             image_base64, media_type = self._image_to_base64(image_data, content_type)
@@ -273,7 +293,9 @@ DISCLAIMER OBLIGATOIRE:
             prompt = self._build_veterinary_prompt(user_query, context_docs, lang)
 
             # Call Claude Vision API
-            logger.debug(f"[VISION] Calling Claude API - Model: {self.model}, Max tokens: {max_tokens}")
+            logger.debug(
+                f"[VISION] Calling Claude API - Model: {self.model}, Max tokens: {max_tokens}"
+            )
 
             message = self.client.messages.create(
                 model=self.model,
@@ -293,7 +315,7 @@ DISCLAIMER OBLIGATOIRE:
                             {
                                 "type": "text",
                                 "text": prompt,
-                            }
+                            },
                         ],
                     }
                 ],
@@ -306,10 +328,13 @@ DISCLAIMER OBLIGATOIRE:
             usage_info = {
                 "input_tokens": message.usage.input_tokens,
                 "output_tokens": message.usage.output_tokens,
-                "total_tokens": message.usage.input_tokens + message.usage.output_tokens,
+                "total_tokens": message.usage.input_tokens
+                + message.usage.output_tokens,
             }
 
-            logger.info(f"[VISION] Analysis completed - Tokens: {usage_info['total_tokens']}")
+            logger.info(
+                f"[VISION] Analysis completed - Tokens: {usage_info['total_tokens']}"
+            )
 
             # Add veterinary disclaimer if not present (safety check)
             if "⚠️" not in analysis_text and MESSAGES_AVAILABLE:
@@ -355,7 +380,9 @@ DISCLAIMER OBLIGATOIRE:
                 disclaimer = get_message("veterinary_disclaimer", language)
                 return f"⚠️ {disclaimer}"
             except Exception as e:
-                logger.warning(f"Failed to get veterinary_disclaimer for {language}: {e}")
+                logger.warning(
+                    f"Failed to get veterinary_disclaimer for {language}: {e}"
+                )
 
         # Fallback disclaimers multilingues
         fallback_disclaimers = {
@@ -403,14 +430,13 @@ DISCLAIMER OBLIGATOIRE:
 
         try:
             images_count = len(images_data)
-            logger.info(f"[VISION MULTI] Analyzing {images_count} medical images - Query: '{user_query[:50]}...'")
+            logger.info(
+                f"[VISION MULTI] Analyzing {images_count} medical images - Query: '{user_query[:50]}...'"
+            )
 
             # Build multi-image prompt
             prompt = self._build_multi_image_veterinary_prompt(
-                user_query,
-                images_count,
-                context_docs,
-                lang
+                user_query, images_count, context_docs, lang
             )
 
             # Build message content with all images
@@ -419,29 +445,36 @@ DISCLAIMER OBLIGATOIRE:
             # Add all images first
             for idx, img_info in enumerate(images_data):
                 image_base64, media_type = self._image_to_base64(
-                    img_info["data"],
-                    img_info["content_type"]
+                    img_info["data"], img_info["content_type"]
                 )
 
-                message_content.append({
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": media_type,
-                        "data": image_base64,
-                    },
-                })
+                message_content.append(
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": image_base64,
+                        },
+                    }
+                )
 
-                logger.debug(f"[VISION MULTI] Image {idx+1}/{images_count} added - {img_info['filename']}")
+                logger.debug(
+                    f"[VISION MULTI] Image {idx+1}/{images_count} added - {img_info['filename']}"
+                )
 
             # Add prompt text after all images
-            message_content.append({
-                "type": "text",
-                "text": prompt,
-            })
+            message_content.append(
+                {
+                    "type": "text",
+                    "text": prompt,
+                }
+            )
 
             # Call Claude Vision API with all images
-            logger.debug(f"[VISION MULTI] Calling Claude API - Model: {self.model}, Images: {images_count}, Max tokens: {max_tokens}")
+            logger.debug(
+                f"[VISION MULTI] Calling Claude API - Model: {self.model}, Images: {images_count}, Max tokens: {max_tokens}"
+            )
 
             message = self.client.messages.create(
                 model=self.model,
@@ -461,7 +494,8 @@ DISCLAIMER OBLIGATOIRE:
             usage_info = {
                 "input_tokens": message.usage.input_tokens,
                 "output_tokens": message.usage.output_tokens,
-                "total_tokens": message.usage.input_tokens + message.usage.output_tokens,
+                "total_tokens": message.usage.input_tokens
+                + message.usage.output_tokens,
             }
 
             logger.info(
@@ -492,7 +526,9 @@ DISCLAIMER OBLIGATOIRE:
             }
 
         except Exception as e:
-            logger.exception(f"[VISION MULTI] Unexpected error during multi-image analysis: {e}")
+            logger.exception(
+                f"[VISION MULTI] Unexpected error during multi-image analysis: {e}"
+            )
             return {
                 "success": False,
                 "error": f"Erreur inattendue: {str(e)}",
@@ -609,10 +645,12 @@ Utilise un ton professionnel mais accessible.
 
         # Ajouter contexte RAG si disponible
         if context_docs and len(context_docs) > 0:
-            context_text = "\n\n".join([
-                f"Document {i+1}: {doc.get('content', '')[:500]}"
-                for i, doc in enumerate(context_docs[:3])
-            ])
+            context_text = "\n\n".join(
+                [
+                    f"Document {i+1}: {doc.get('content', '')[:500]}"
+                    for i, doc in enumerate(context_docs[:3])
+                ]
+            )
 
             prompt += f"""
 
@@ -642,7 +680,10 @@ Utilise ces informations comme référence pour enrichir ton analyse comparative
             "th": "ภาพเหล่านี้ให้ภาพรวมที่ดี หากคุณมีรูปภาพเสริมอื่นๆ (มุมอื่นๆ อวัยวะอื่นๆ สัตว์อื่นๆ ที่ได้รับผลกระทบ) อย่าลังเลที่จะแบ่งปันเพื่อปรับปรุงการวินิจฉัยเพิ่มเติม",
             "tr": "Bu görüntüler iyi bir genel bakış sağlıyor. Diğer tamamlayıcı fotoğraflarınız varsa (diğer açılar, diğer organlar, etkilenen diğer hayvanlar), teşhisi daha da iyileştirmek için bunları paylaşmaktan çekinmeyin.",
             "vi": "Những hình ảnh này cung cấp cái nhìn tổng quan tốt. Nếu bạn có các bức ảnh bổ sung khác (góc độ khác, các cơ quan khác, động vật khác bị ảnh hưởng), hãy thoải mái chia sẻ để cải thiện chẩn đoán hơn nữa.",
-        }.get(language, "These images provide a good overview. If you have other complementary photos, feel free to share them to further refine the diagnosis.")
+        }.get(
+            language,
+            "These images provide a good overview. If you have other complementary photos, feel free to share them to further refine the diagnosis.",
+        )
 
         # Ajouter question de suivi et disclaimer
         prompt += f"""

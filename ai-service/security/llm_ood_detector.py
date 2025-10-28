@@ -100,7 +100,9 @@ Is this question about POULTRY PRODUCTION or POULTRY VALUE CHAIN?
 
 Answer ONLY with: YES or NO"""
 
-    def __init__(self, openai_api_key: Optional[str] = None, model: str = "gpt-4o-mini"):
+    def __init__(
+        self, openai_api_key: Optional[str] = None, model: str = "gpt-4o-mini"
+    ):
         """
         Initialize LLM-based OOD detector
 
@@ -115,10 +117,7 @@ Answer ONLY with: YES or NO"""
         logger.info(f"✅ LLMOODDetector initialized with model={model}")
 
     def is_in_domain(
-        self,
-        query: str,
-        intent_result: Optional[Dict] = None,
-        language: str = "fr"
+        self, query: str, intent_result: Optional[Dict] = None, language: str = "fr"
     ) -> Tuple[bool, float, Dict]:
         """
         Détermine si une query est dans le domaine avicole via LLM
@@ -148,11 +147,11 @@ Answer ONLY with: YES or NO"""
                 model=self.model,
                 messages=[
                     {"role": "system", "content": "You are a domain classifier."},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.0,  # Déterministe
-                max_tokens=10,    # Juste "YES" ou "NO"
-                timeout=5.0       # 5s timeout pour éviter blocages
+                max_tokens=10,  # Juste "YES" ou "NO"
+                timeout=5.0,  # 5s timeout pour éviter blocages
             )
 
             # Extraire réponse
@@ -174,7 +173,9 @@ Answer ONLY with: YES or NO"""
             if is_in_domain:
                 logger.info(f"✅ IN-DOMAIN (LLM): '{query[:60]}...' (lang={language})")
             else:
-                logger.warning(f"⛔ OUT-OF-DOMAIN (LLM): '{query[:60]}...' (lang={language})")
+                logger.warning(
+                    f"⛔ OUT-OF-DOMAIN (LLM): '{query[:60]}...' (lang={language})"
+                )
 
             # Cache result
             result = (is_in_domain, confidence, details)
@@ -189,19 +190,16 @@ Answer ONLY with: YES or NO"""
             logger.warning("⚠️ Fallback to IN-DOMAIN due to LLM error")
             return (
                 True,  # Fail-open: accepter en cas d'erreur
-                0.5,   # Confidence basse
+                0.5,  # Confidence basse
                 {
                     "method": "llm_classification_fallback",
                     "error": str(e),
                     "language": language,
-                }
+                },
             )
 
     def calculate_ood_score_multilingual(
-        self,
-        query: str,
-        intent_result: Optional[Dict] = None,
-        language: str = "fr"
+        self, query: str, intent_result: Optional[Dict] = None, language: str = "fr"
     ) -> Tuple[bool, float, Dict]:
         """
         Alias pour compatibilité avec ancienne API MultilingualOODDetector
@@ -214,7 +212,9 @@ Answer ONLY with: YES or NO"""
         """Vide le cache de classifications OOD"""
         cache_size = len(self.cache)
         self.cache.clear()
-        logger.info(f"🗑️ OOD classification cache cleared ({cache_size} entries removed)")
+        logger.info(
+            f"🗑️ OOD classification cache cleared ({cache_size} entries removed)"
+        )
 
     def get_cache_size(self) -> int:
         """Retourne la taille du cache"""
@@ -223,8 +223,7 @@ Answer ONLY with: YES or NO"""
 
 # Factory function pour compatibilité
 def create_llm_ood_detector(
-    openai_api_key: Optional[str] = None,
-    model: str = "gpt-4o-mini"
+    openai_api_key: Optional[str] = None, model: str = "gpt-4o-mini"
 ) -> LLMOODDetector:
     """
     Crée une instance LLMOODDetector
@@ -261,7 +260,6 @@ if __name__ == "__main__":
         ("Quel est le poids d'un Ross 308 mâle à 35 jours ?", "fr", True),
         ("How to treat Newcastle disease?", "en", True),
         ("สูตรอาหารไก่", "th", True),  # Nutrition poulet en Thai
-
         # OUT-OF-DOMAIN (devrait retourner False)
         ("What is the capital of France?", "en", False),
         ("Comment faire une pizza ?", "fr", False),
@@ -287,7 +285,9 @@ if __name__ == "__main__":
             failed += 1
 
     print("\n" + "=" * 80)
-    print(f"RESULTS: {passed}/{len(test_cases)} passed, {failed}/{len(test_cases)} failed")
+    print(
+        f"RESULTS: {passed}/{len(test_cases)} passed, {failed}/{len(test_cases)} failed"
+    )
     print("=" * 80)
 
     sys.exit(0 if failed == 0 else 1)

@@ -28,7 +28,16 @@ def detect_language(question: str) -> str:
         return "en"
 
     # French indicators (default for most)
-    french_words = ["quel", "quelle", "comment", "pourquoi", "est-ce", "combien", "pour", "donne-moi"]
+    french_words = [
+        "quel",
+        "quelle",
+        "comment",
+        "pourquoi",
+        "est-ce",
+        "combien",
+        "pour",
+        "donne-moi",
+    ]
     if any(word in q_lower for word in french_words):
         return "fr"
 
@@ -129,7 +138,9 @@ def main():
         stats["lang"][lang] = stats["lang"].get(lang, 0) + 1
         stats["difficulty"][difficulty] = stats["difficulty"].get(difficulty, 0) + 1
 
-        print(f"  [{idx:2d}] {item.get('category', 'unknown')[:35]:35s} → lang={lang}, difficulty={difficulty}")
+        print(
+            f"  [{idx:2d}] {item.get('category', 'unknown')[:35]:35s} → lang={lang}, difficulty={difficulty}"
+        )
 
     print("\n" + "=" * 80)
     print("STATISTICS")
@@ -145,7 +156,8 @@ def main():
     print("\n" + "=" * 80)
     print("MANUAL INSERTION NEEDED")
     print("=" * 80)
-    print("""
+    print(
+        """
 The script has analyzed all tests. Due to the complex structure of the Python file,
 manual insertion is recommended. Here's the mapping:
 
@@ -164,7 +176,8 @@ Add these fields to each test dict:
     "difficulty": "easy", # or "medium", "hard", "subjective"
 
 After the "category" field.
-""")
+"""
+    )
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.enhanced_clarification import (
     EnhancedClarification,
-    get_enhanced_clarification
+    get_enhanced_clarification,
 )
 
 
@@ -31,8 +31,8 @@ class TestEnhancedClarificationBasics:
         """Test initialization"""
         assert clarifier is not None
         # Should initialize even if helper not available
-        assert hasattr(clarifier, 'helper')
-        assert hasattr(clarifier, 'helper_available')
+        assert hasattr(clarifier, "helper")
+        assert hasattr(clarifier, "helper_available")
 
     def test_singleton_instance(self):
         """Test singleton factory function"""
@@ -56,92 +56,116 @@ class TestAmbiguityDetection:
     def test_detect_nutrition_ambiguity(self, clarifier):
         """Test nutrition ambiguity detection"""
         query = "Quelle formule aliment donner?"
-        missing_fields = ['age']
+        missing_fields = ["age"]
         entities = {}
 
         # May return None if helper not available (graceful degradation)
-        ambiguity_type = clarifier.detect_ambiguity_type(query, missing_fields, entities)
+        ambiguity_type = clarifier.detect_ambiguity_type(
+            query, missing_fields, entities
+        )
 
         # If helper available, should detect nutrition_ambiguity
         if clarifier.is_available():
-            assert ambiguity_type == 'nutrition_ambiguity'
+            assert ambiguity_type == "nutrition_ambiguity"
         else:
             assert ambiguity_type is None
 
     def test_detect_health_symptom_vague(self, clarifier):
         """Test health symptom ambiguity detection"""
         query = "Mes poulets sont malades"
-        missing_fields = ['age', 'breed']
+        missing_fields = ["age", "breed"]
         entities = {}
 
-        ambiguity_type = clarifier.detect_ambiguity_type(query, missing_fields, entities)
+        ambiguity_type = clarifier.detect_ambiguity_type(
+            query, missing_fields, entities
+        )
 
         if clarifier.is_available():
-            assert ambiguity_type == 'health_symptom_vague'
+            assert ambiguity_type == "health_symptom_vague"
 
     def test_detect_performance_incomplete(self, clarifier):
         """Test performance incomplete detection"""
         query = "Quel est le poids?"
-        missing_fields = ['breed', 'age']
+        missing_fields = ["breed", "age"]
         entities = {}
 
-        ambiguity_type = clarifier.detect_ambiguity_type(query, missing_fields, entities)
+        ambiguity_type = clarifier.detect_ambiguity_type(
+            query, missing_fields, entities
+        )
 
         if clarifier.is_available():
-            assert ambiguity_type == 'performance_incomplete'
+            assert ambiguity_type == "performance_incomplete"
 
     def test_detect_environment_vague(self, clarifier):
         """Test environment vague detection"""
         query = "Quelle température idéale?"
-        missing_fields = ['age']
+        missing_fields = ["age"]
         entities = {}
 
-        ambiguity_type = clarifier.detect_ambiguity_type(query, missing_fields, entities)
+        ambiguity_type = clarifier.detect_ambiguity_type(
+            query, missing_fields, entities
+        )
 
         if clarifier.is_available():
-            assert ambiguity_type == 'environment_vague'
+            assert ambiguity_type == "environment_vague"
 
     def test_detect_management_broad(self, clarifier):
         """Test management broad detection"""
         query = "Comment améliorer rentabilité?"
-        missing_fields = ['breed', 'age', 'metric']
+        missing_fields = ["breed", "age", "metric"]
         entities = {}
 
-        ambiguity_type = clarifier.detect_ambiguity_type(query, missing_fields, entities)
+        ambiguity_type = clarifier.detect_ambiguity_type(
+            query, missing_fields, entities
+        )
 
         if clarifier.is_available():
-            assert ambiguity_type == 'management_broad'
+            assert ambiguity_type == "management_broad"
 
     def test_detect_genetics_incomplete(self, clarifier):
         """Test genetics incomplete detection"""
         query = "Comparer Ross 308 et Cobb 500"
-        missing_fields = ['metric', 'age']
+        missing_fields = ["metric", "age"]
         entities = {}
 
-        ambiguity_type = clarifier.detect_ambiguity_type(query, missing_fields, entities)
+        ambiguity_type = clarifier.detect_ambiguity_type(
+            query, missing_fields, entities
+        )
 
         if clarifier.is_available():
             # May be genetics_incomplete or performance_incomplete
-            assert ambiguity_type in ['genetics_incomplete', 'performance_incomplete', None]
+            assert ambiguity_type in [
+                "genetics_incomplete",
+                "performance_incomplete",
+                None,
+            ]
 
     def test_detect_treatment_protocol_vague(self, clarifier):
         """Test treatment protocol vague detection"""
         query = "Quel protocole vaccinal?"
-        missing_fields = ['age', 'breed']
+        missing_fields = ["age", "breed"]
         entities = {}
 
-        ambiguity_type = clarifier.detect_ambiguity_type(query, missing_fields, entities)
+        ambiguity_type = clarifier.detect_ambiguity_type(
+            query, missing_fields, entities
+        )
 
         if clarifier.is_available():
-            assert ambiguity_type in ['treatment_protocol_vague', 'health_symptom_vague', None]
+            assert ambiguity_type in [
+                "treatment_protocol_vague",
+                "health_symptom_vague",
+                None,
+            ]
 
     def test_no_ambiguity_when_complete(self, clarifier):
         """Test no ambiguity detected for complete queries"""
         query = "Quel est le poids Ross 308 mâles à 35 jours?"
         missing_fields = []
-        entities = {'breed': 'Ross 308', 'age': 35, 'sex': 'male'}
+        entities = {"breed": "Ross 308", "age": 35, "sex": "male"}
 
-        ambiguity_type = clarifier.detect_ambiguity_type(query, missing_fields, entities)
+        ambiguity_type = clarifier.detect_ambiguity_type(
+            query, missing_fields, entities
+        )
 
         # Should not detect ambiguity (no missing fields)
         assert ambiguity_type is None
@@ -157,47 +181,41 @@ class TestClarificationMessages:
     def test_build_message_single_field(self, clarifier):
         """Test building message for single missing field"""
         query = "Quel poids?"
-        missing_fields = ['breed']
-        language = 'en'
+        missing_fields = ["breed"]
+        language = "en"
 
         message = clarifier.build_clarification_message(
-            query=query,
-            missing_fields=missing_fields,
-            language=language
+            query=query, missing_fields=missing_fields, language=language
         )
 
         assert isinstance(message, str)
         assert len(message) > 0
         # Should mention breed
-        assert 'breed' in message.lower() or 'race' in message.lower()
+        assert "breed" in message.lower() or "race" in message.lower()
 
     def test_build_message_multiple_fields(self, clarifier):
         """Test building message for multiple missing fields"""
         query = "Performance query"
-        missing_fields = ['breed', 'age', 'sex']
-        language = 'en'
+        missing_fields = ["breed", "age", "sex"]
+        language = "en"
 
         message = clarifier.build_clarification_message(
-            query=query,
-            missing_fields=missing_fields,
-            language=language
+            query=query, missing_fields=missing_fields, language=language
         )
 
         assert isinstance(message, str)
         assert len(message) > 0
         # Should be a longer message with multiple items
-        assert message.count('-') >= 2 or message.count('\n') >= 2
+        assert message.count("-") >= 2 or message.count("\n") >= 2
 
     def test_build_message_french(self, clarifier):
         """Test building message in French"""
         query = "Quel poids?"
-        missing_fields = ['breed', 'age']
-        language = 'fr'
+        missing_fields = ["breed", "age"]
+        language = "fr"
 
         message = clarifier.build_clarification_message(
-            query=query,
-            missing_fields=missing_fields,
-            language=language
+            query=query, missing_fields=missing_fields, language=language
         )
 
         assert isinstance(message, str)
@@ -210,15 +228,15 @@ class TestClarificationMessages:
     def test_build_message_with_entities(self, clarifier):
         """Test building message with existing entities"""
         query = "Quel poids Ross 308?"
-        missing_fields = ['age']
-        language = 'en'
-        entities = {'breed': 'Ross 308'}
+        missing_fields = ["age"]
+        language = "en"
+        entities = {"breed": "Ross 308"}
 
         message = clarifier.build_clarification_message(
             query=query,
             missing_fields=missing_fields,
             language=language,
-            entities=entities
+            entities=entities,
         )
 
         assert isinstance(message, str)
@@ -227,18 +245,18 @@ class TestClarificationMessages:
 
     def test_fallback_message_english(self, clarifier):
         """Test fallback message in English"""
-        message = clarifier._build_fallback_message(['breed', 'age'], 'en')
+        message = clarifier._build_fallback_message(["breed", "age"], "en")
 
-        assert 'Breed' in message or 'breed' in message
-        assert 'Age' in message or 'age' in message
-        assert 'Ross' in message  # Example breed
+        assert "Breed" in message or "breed" in message
+        assert "Age" in message or "age" in message
+        assert "Ross" in message  # Example breed
 
     def test_fallback_message_french(self, clarifier):
         """Test fallback message in French"""
-        message = clarifier._build_fallback_message(['breed', 'age'], 'fr')
+        message = clarifier._build_fallback_message(["breed", "age"], "fr")
 
-        assert 'Race' in message or 'race' in message
-        assert 'Âge' in message or 'âge' in message or 'Age' in message
+        assert "Race" in message or "race" in message
+        assert "Âge" in message or "âge" in message or "Age" in message
 
 
 class TestCheckAndClarify:
@@ -251,50 +269,44 @@ class TestCheckAndClarify:
     def test_check_no_clarification_needed(self, clarifier):
         """Test when no clarification needed"""
         result = clarifier.check_and_clarify(
-            query="Complete query",
-            missing_fields=[],
-            language='en'
+            query="Complete query", missing_fields=[], language="en"
         )
 
-        assert not result['needs_clarification']
-        assert result['message'] == ''
-        assert result['ambiguity_type'] is None
+        assert not result["needs_clarification"]
+        assert result["message"] == ""
+        assert result["ambiguity_type"] is None
 
     def test_check_clarification_needed(self, clarifier):
         """Test when clarification is needed"""
         result = clarifier.check_and_clarify(
-            query="Quel poids?",
-            missing_fields=['breed', 'age'],
-            language='en'
+            query="Quel poids?", missing_fields=["breed", "age"], language="en"
         )
 
-        assert result['needs_clarification']
-        assert len(result['message']) > 0
-        assert 'missing_fields' in result
-        assert len(result['missing_fields']) == 2
+        assert result["needs_clarification"]
+        assert len(result["message"]) > 0
+        assert "missing_fields" in result
+        assert len(result["missing_fields"]) == 2
 
     def test_check_with_ambiguity_detection(self, clarifier):
         """Test clarification with ambiguity type detection"""
         result = clarifier.check_and_clarify(
             query="Quelle formule aliment?",
-            missing_fields=['age'],
-            language='fr',
-            entities={}
+            missing_fields=["age"],
+            language="fr",
+            entities={},
         )
 
-        assert result['needs_clarification']
+        assert result["needs_clarification"]
         # ambiguity_type may be None or a string depending on helper availability
-        assert 'ambiguity_type' in result
+        assert "ambiguity_type" in result
 
     def test_check_preserves_language(self, clarifier):
         """Test that language is preserved in result"""
         result = clarifier.check_and_clarify(
-            query="Query",
-            missing_fields=['breed'],
-            language='es'
+            query="Query", missing_fields=["breed"], language="es"
         )
 
-        assert result['language'] == 'es'
+        assert result["language"] == "es"
 
 
 class TestShouldClarifyBeforeLLM:
@@ -307,9 +319,7 @@ class TestShouldClarifyBeforeLLM:
     def test_should_clarify_critical_field_missing(self, clarifier):
         """Test clarification when critical field missing"""
         should_clarify = clarifier.should_clarify_before_llm(
-            query="Query",
-            missing_fields=['breed'],
-            confidence=0.8
+            query="Query", missing_fields=["breed"], confidence=0.8
         )
 
         assert should_clarify  # breed is critical
@@ -317,9 +327,7 @@ class TestShouldClarifyBeforeLLM:
     def test_should_clarify_many_fields_missing(self, clarifier):
         """Test clarification when many fields missing"""
         should_clarify = clarifier.should_clarify_before_llm(
-            query="Query",
-            missing_fields=['field1', 'field2', 'field3'],
-            confidence=0.8
+            query="Query", missing_fields=["field1", "field2", "field3"], confidence=0.8
         )
 
         assert should_clarify  # 3+ fields missing
@@ -327,9 +335,7 @@ class TestShouldClarifyBeforeLLM:
     def test_should_clarify_low_confidence(self, clarifier):
         """Test clarification when low confidence"""
         should_clarify = clarifier.should_clarify_before_llm(
-            query="Query",
-            missing_fields=['some_field'],
-            confidence=0.3
+            query="Query", missing_fields=["some_field"], confidence=0.3
         )
 
         assert should_clarify  # Low confidence + missing field
@@ -337,9 +343,7 @@ class TestShouldClarifyBeforeLLM:
     def test_should_not_clarify_high_confidence_non_critical(self, clarifier):
         """Test no clarification when high confidence and non-critical"""
         should_clarify = clarifier.should_clarify_before_llm(
-            query="Query",
-            missing_fields=['non_critical_field'],
-            confidence=0.9
+            query="Query", missing_fields=["non_critical_field"], confidence=0.9
         )
 
         # May or may not clarify depending on field
@@ -348,9 +352,7 @@ class TestShouldClarifyBeforeLLM:
     def test_should_not_clarify_no_missing_fields(self, clarifier):
         """Test no clarification when no missing fields"""
         should_clarify = clarifier.should_clarify_before_llm(
-            query="Query",
-            missing_fields=[],
-            confidence=0.9
+            query="Query", missing_fields=[], confidence=0.9
         )
 
         assert not should_clarify
@@ -362,7 +364,9 @@ class TestGracefulDegradation:
     def test_degradation_when_no_helper(self):
         """Test graceful degradation when ClarificationHelper unavailable"""
         # Mock ClarificationHelper to fail
-        with patch('utils.enhanced_clarification.get_clarification_helper') as mock_helper:
+        with patch(
+            "utils.enhanced_clarification.get_clarification_helper"
+        ) as mock_helper:
             mock_helper.side_effect = Exception("API key not available")
 
             # Should still initialize
@@ -373,9 +377,7 @@ class TestGracefulDegradation:
 
             # Should still be able to build messages (using fallback)
             message = clarifier.build_clarification_message(
-                query="Test",
-                missing_fields=['breed'],
-                language='en'
+                query="Test", missing_fields=["breed"], language="en"
             )
 
             assert isinstance(message, str)
@@ -390,14 +392,12 @@ class TestGracefulDegradation:
         clarifier.helper_available = False
 
         message = clarifier.build_clarification_message(
-            query="Test",
-            missing_fields=['breed', 'age'],
-            language='en'
+            query="Test", missing_fields=["breed", "age"], language="en"
         )
 
         assert isinstance(message, str)
         assert len(message) > 0
-        assert 'breed' in message.lower()
+        assert "breed" in message.lower()
 
         # Restore
         clarifier.helper_available = original_available
@@ -413,8 +413,8 @@ class TestIntegration:
     def test_full_workflow_nutrition_question(self, clarifier):
         """Test complete workflow for nutrition question"""
         query = "Quelle formule aliment pour mes poulets?"
-        missing_fields = ['age', 'breed']
-        language = 'fr'
+        missing_fields = ["age", "breed"]
+        language = "fr"
         entities = {}
 
         # Detect ambiguity
@@ -425,7 +425,7 @@ class TestIntegration:
             query=query,
             missing_fields=missing_fields,
             language=language,
-            entities=entities
+            entities=entities,
         )
 
         assert isinstance(message, str)
@@ -433,9 +433,7 @@ class TestIntegration:
 
         # Check if should clarify before LLM
         should_clarify = clarifier.should_clarify_before_llm(
-            query=query,
-            missing_fields=missing_fields,
-            confidence=0.4
+            query=query, missing_fields=missing_fields, confidence=0.4
         )
 
         assert should_clarify
@@ -444,33 +442,31 @@ class TestIntegration:
         """Test workflow with complete question"""
         query = "Quel poids Ross 308 mâles à 35 jours?"
         missing_fields = []
-        language = 'fr'
-        entities = {'breed': 'Ross 308', 'age': 35, 'sex': 'male'}
+        language = "fr"
+        entities = {"breed": "Ross 308", "age": 35, "sex": "male"}
 
         # Check and clarify
         result = clarifier.check_and_clarify(
             query=query,
             missing_fields=missing_fields,
             language=language,
-            entities=entities
+            entities=entities,
         )
 
-        assert not result['needs_clarification']
+        assert not result["needs_clarification"]
 
     def test_full_workflow_health_question(self, clarifier):
         """Test workflow for health question"""
         query = "Mes poulets ont des symptômes"
-        missing_fields = ['age', 'breed']
-        language = 'fr'
+        missing_fields = ["age", "breed"]
+        language = "fr"
 
         result = clarifier.check_and_clarify(
-            query=query,
-            missing_fields=missing_fields,
-            language=language
+            query=query, missing_fields=missing_fields, language=language
         )
 
-        assert result['needs_clarification']
-        assert len(result['message']) > 0
+        assert result["needs_clarification"]
+        assert len(result["message"]) > 0
 
 
 def run_enhanced_clarification_tests():
@@ -481,21 +477,22 @@ def run_enhanced_clarification_tests():
         bool: True if all tests pass
     """
     import logging
+
     logging.basicConfig(level=logging.INFO)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("ENHANCED CLARIFICATION - COMPREHENSIVE TEST SUITE (Phase 3.2)")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     clarifier = EnhancedClarification()
 
     test_cases = [
         # (query, missing_fields, expected_clarification_needed)
         ("Quel poids Ross 308 à 35 jours?", [], False),
-        ("Quel poids?", ['breed', 'age'], True),
-        ("Quelle formule aliment?", ['age', 'breed'], True),
-        ("Mes poulets sont malades", ['age', 'breed'], True),
-        ("Performance query", ['breed'], True),
+        ("Quel poids?", ["breed", "age"], True),
+        ("Quelle formule aliment?", ["age", "breed"], True),
+        ("Mes poulets sont malades", ["age", "breed"], True),
+        ("Performance query", ["breed"], True),
     ]
 
     passed = 0
@@ -503,12 +500,10 @@ def run_enhanced_clarification_tests():
 
     for query, missing_fields, expected_needs_clarification in test_cases:
         result = clarifier.check_and_clarify(
-            query=query,
-            missing_fields=missing_fields,
-            language='en'
+            query=query, missing_fields=missing_fields, language="en"
         )
 
-        needs_clarification = result['needs_clarification']
+        needs_clarification = result["needs_clarification"]
         match = needs_clarification == expected_needs_clarification
 
         if match:
@@ -520,15 +515,17 @@ def run_enhanced_clarification_tests():
 
         print(f"{status} | Query: {query}")
         print(f"       | Missing fields: {missing_fields}")
-        print(f"       | Needs clarification: {needs_clarification} (expected: {expected_needs_clarification})")
+        print(
+            f"       | Needs clarification: {needs_clarification} (expected: {expected_needs_clarification})"
+        )
         print(f"       | Ambiguity type: {result.get('ambiguity_type')}")
-        if result.get('message'):
+        if result.get("message"):
             print(f"       | Message: {result['message'][:60]}...")
         print()
 
-    print("="*80)
+    print("=" * 80)
     print(f"RESULTS: {passed} passed, {failed} failed (Total: {len(test_cases)})")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     return failed == 0
 

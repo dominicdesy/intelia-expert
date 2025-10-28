@@ -78,7 +78,7 @@ async def log_requests(request: Request, call_next):
             f"[X] {request.method} {request.url.path} "
             f"- Error: {str(e)} "
             f"- Duration: {duration:.3f}s",
-            exc_info=True
+            exc_info=True,
         )
         raise
 
@@ -94,9 +94,9 @@ async def global_exception_handler(request: Request, exc: Exception):
             "error": {
                 "message": "Internal server error",
                 "type": "internal_error",
-                "code": "internal_error"
+                "code": "internal_error",
             }
-        }
+        },
     )
 
 
@@ -118,7 +118,9 @@ async def startup_event():
 
     if settings.llm_provider == "huggingface":
         logger.info(f"Model: {settings.huggingface_model}")
-        logger.info(f"HuggingFace API Key: {'[OK] Configured' if settings.huggingface_api_key else '[X] Missing'}")
+        logger.info(
+            f"HuggingFace API Key: {'[OK] Configured' if settings.huggingface_api_key else '[X] Missing'}"
+        )
     elif settings.llm_provider == "vllm":
         logger.info(f"vLLM URL: {settings.vllm_url}")
 
@@ -129,7 +131,8 @@ async def startup_event():
     # Validate configuration
     try:
         from app.dependencies import get_llm_client
-        client = get_llm_client()
+
+        _ = get_llm_client()  # Validate client initialization
         logger.info("[OK] LLM client initialized successfully")
     except Exception as e:
         logger.error(f"[X] Failed to initialize LLM client: {e}")
@@ -146,10 +149,11 @@ async def shutdown_event():
 # Run with: uvicorn app.main:app --host 0.0.0.0 --port 8081
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "app.main:app",
         host=settings.host,
         port=settings.port,
         log_level=settings.log_level.lower(),
-        reload=False  # Set to True for development
+        reload=False,  # Set to True for development
     )

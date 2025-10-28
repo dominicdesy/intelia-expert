@@ -274,15 +274,25 @@ MÉTRIQUES PRIORITAIRES:
         # 🆕 USER PROFILING PERSONALIZATION - Apply profile-based customizations
         if user_id:
             try:
-                from core.user_profiling import get_user_profile, build_personalized_system_prompt
+                from core.user_profiling import (
+                    get_user_profile,
+                    build_personalized_system_prompt,
+                )
+
                 user_profile = get_user_profile(user_id)
                 if user_profile:
-                    system_prompt = build_personalized_system_prompt(system_prompt, user_profile)
-                    logger.info(f"✅ System prompt personalized for user {user_id} (production_type={user_profile.get('production_type')}, category={user_profile.get('category')})")
+                    system_prompt = build_personalized_system_prompt(
+                        system_prompt, user_profile
+                    )
+                    logger.info(
+                        f"✅ System prompt personalized for user {user_id} (production_type={user_profile.get('production_type')}, category={user_profile.get('category')})"
+                    )
                 else:
                     logger.debug(f"ℹ️ No profile found for user {user_id}")
             except Exception as e:
-                logger.warning(f"⚠️ Failed to personalize prompt for user {user_id}: {e}")
+                logger.warning(
+                    f"⚠️ Failed to personalize prompt for user {user_id}: {e}"
+                )
 
         # Simple validation of conversation context
         limited_context = conversation_context if conversation_context else ""

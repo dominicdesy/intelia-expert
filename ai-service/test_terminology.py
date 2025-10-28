@@ -16,6 +16,7 @@ sys.path.insert(0, str(llm_dir))
 
 from config.system_prompts import get_prompts_manager
 
+
 def test_terminology_loading():
     """Test du chargement de la terminologie"""
 
@@ -51,6 +52,7 @@ def test_terminology_loading():
 
     return True
 
+
 def test_terminology_instructions():
     """Test de génération des instructions de terminologie"""
 
@@ -73,6 +75,7 @@ def test_terminology_instructions():
 
         print(instructions)
 
+
 def test_terminology_integration():
     """Test de l'intégration de la terminologie dans les prompts"""
 
@@ -84,8 +87,14 @@ def test_terminology_integration():
 
     # Test avec expert_identity (devrait inclure la terminologie)
     print("\n--- expert_identity en FRANCAIS (avec terminologie) ---")
-    expert_identity_fr = manager.get_base_prompt("expert_identity", "fr", include_terminology=True)
-    print(expert_identity_fr[:600] + "..." if len(expert_identity_fr) > 600 else expert_identity_fr)
+    expert_identity_fr = manager.get_base_prompt(
+        "expert_identity", "fr", include_terminology=True
+    )
+    print(
+        expert_identity_fr[:600] + "..."
+        if len(expert_identity_fr) > 600
+        else expert_identity_fr
+    )
 
     # Vérifier que "poulailler" est bien présent
     if "poulailler" in expert_identity_fr.lower():
@@ -95,14 +104,21 @@ def test_terminology_integration():
 
     # Test en anglais
     print("\n--- expert_identity en ANGLAIS (avec terminologie) ---")
-    expert_identity_en = manager.get_base_prompt("expert_identity", "en", include_terminology=True)
-    print(expert_identity_en[:600] + "..." if len(expert_identity_en) > 600 else expert_identity_en)
+    expert_identity_en = manager.get_base_prompt(
+        "expert_identity", "en", include_terminology=True
+    )
+    print(
+        expert_identity_en[:600] + "..."
+        if len(expert_identity_en) > 600
+        else expert_identity_en
+    )
 
     # Vérifier que "poultry house" est bien présent
     if "poultry house" in expert_identity_en.lower():
         print("\n[OK] Terminologie anglaise presente (poultry house)")
     else:
         print("\n[FAIL] Terminologie anglaise absente")
+
 
 if __name__ == "__main__":
     # Run tests

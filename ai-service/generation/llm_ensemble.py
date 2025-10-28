@@ -31,6 +31,7 @@ from generation.adaptive_length import get_adaptive_length
 # Import centralized prompts manager
 try:
     from config.system_prompts import get_prompts_manager
+
     PROMPTS_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"⚠️ SystemPromptsManager not available: {e}")
@@ -40,6 +41,7 @@ except ImportError as e:
 try:
     from generation.prompt_builder import PromptBuilder
     from generation.models import ContextEnrichment
+
     PROMPT_BUILDER_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"⚠️ PromptBuilder not available: {e}")
@@ -180,7 +182,9 @@ class LLMEnsemble:
             logger.info("✅ PromptBuilder initialized in LLM Ensemble")
         else:
             self.prompt_builder = None
-            logger.warning("⚠️ PromptBuilder not available - falling back to manual prompts")
+            logger.warning(
+                "⚠️ PromptBuilder not available - falling back to manual prompts"
+            )
 
         logger.info(
             f"✅ LLM Ensemble initialized (mode={mode.value}, enabled={self.enabled}, judge={judge_model})"
@@ -264,7 +268,14 @@ class LLMEnsemble:
         if not self.enabled:
             logger.debug("🔀 Ensemble disabled, falling back to single LLM")
             return await self._fallback_single_llm(
-                query, context_docs, language, system_prompt, entities, query_type, domain, user_id
+                query,
+                context_docs,
+                language,
+                system_prompt,
+                entities,
+                query_type,
+                domain,
+                user_id,
             )
 
         # Calculate adaptive max_tokens
@@ -371,7 +382,9 @@ Réponds en {language}."""
 
         if self.claude_client:
             tasks.append(
-                self._generate_claude_response(query, user_message, system_prompt, max_tokens)
+                self._generate_claude_response(
+                    query, user_message, system_prompt, max_tokens
+                )
             )
 
         if self.openai_client:
@@ -383,7 +396,9 @@ Réponds en {language}."""
 
         if self.deepseek_client:
             tasks.append(
-                self._generate_deepseek_response(query, user_message, system_prompt, max_tokens)
+                self._generate_deepseek_response(
+                    query, user_message, system_prompt, max_tokens
+                )
             )
 
         # Execute in parallel
@@ -401,7 +416,11 @@ Réponds en {language}."""
         return responses
 
     async def _generate_claude_response(
-        self, query: str, user_message: str, system_prompt: Optional[str], max_tokens: int
+        self,
+        query: str,
+        user_message: str,
+        system_prompt: Optional[str],
+        max_tokens: int,
     ) -> Dict[str, str]:
         """Generate response from Claude 3.5 Sonnet"""
         try:
@@ -451,7 +470,11 @@ Réponds en {language}."""
             raise
 
     async def _generate_deepseek_response(
-        self, query: str, user_message: str, system_prompt: Optional[str], max_tokens: int
+        self,
+        query: str,
+        user_message: str,
+        system_prompt: Optional[str],
+        max_tokens: int,
     ) -> Dict[str, str]:
         """Generate response from DeepSeek"""
         try:
@@ -734,7 +757,9 @@ Réponds directement en {language}, sans préambule."""
         if self.prompts_manager:
             # Try to get base identity with response guidelines
             identity = self.prompts_manager.get_base_prompt("expert_identity", language)
-            guidelines = self.prompts_manager.get_base_prompt("response_guidelines", language)
+            guidelines = self.prompts_manager.get_base_prompt(
+                "response_guidelines", language
+            )
 
             if identity and guidelines:
                 return f"{identity}\n\n{guidelines}"
@@ -778,15 +803,19 @@ Réponds directement en {language}, sans préambule."""
             )
 
             # Use PromptBuilder to build enhanced prompts (includes user profiling!)
-            enhanced_system_prompt, user_message = self.prompt_builder._build_enhanced_prompt(
-                query=query,
-                context_docs=context_docs,
-                enrichment=enrichment,
-                conversation_context="",
-                language=language,
-                user_id=user_id,  # 🆕 Pass user_id for profiling
+            enhanced_system_prompt, user_message = (
+                self.prompt_builder._build_enhanced_prompt(
+                    query=query,
+                    context_docs=context_docs,
+                    enrichment=enrichment,
+                    conversation_context="",
+                    language=language,
+                    user_id=user_id,  # 🆕 Pass user_id for profiling
+                )
             )
-            logger.info("✅ Using PromptBuilder for fallback (with user profiling support)")
+            logger.info(
+                "✅ Using PromptBuilder for fallback (with user profiling support)"
+            )
         else:
             # Fallback to manual prompt construction (legacy)
             fallback_instructions = self._get_fallback_instructions(language)
@@ -812,7 +841,12 @@ Réponds en {language}."""
             provider = "claude"
         elif self.openai_client:
             result = await self._generate_openai_response(
-                "gpt4o", "gpt-4o", query, user_message, enhanced_system_prompt, max_tokens
+                "gpt4o",
+                "gpt-4o",
+                query,
+                user_message,
+                enhanced_system_prompt,
+                max_tokens,
             )
             provider = "gpt4o"
         else:

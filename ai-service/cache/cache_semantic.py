@@ -486,7 +486,9 @@ class SemanticCacheManager:
 
                 if self._validate_semantic_cache_eligibility(keywords, data):
                     semantic_signature = "|".join(sorted(keywords))
-                    hash_obj = hashlib.md5(semantic_signature.encode("utf-8"), usedforsecurity=False)
+                    hash_obj = hashlib.md5(
+                        semantic_signature.encode("utf-8"), usedforsecurity=False
+                    )
                     logger.debug(
                         f"Clé sémantique générée: {list(keywords)} pour '{data[:30]}...'"
                     )
@@ -501,7 +503,9 @@ class SemanticCacheManager:
 
                 if len(fallback_keywords) >= 2:
                     fallback_signature = "|".join(sorted(fallback_keywords))
-                    hash_obj = hashlib.md5(fallback_signature.encode("utf-8"), usedforsecurity=False)
+                    hash_obj = hashlib.md5(
+                        fallback_signature.encode("utf-8"), usedforsecurity=False
+                    )
                     logger.debug(
                         f"Clé fallback sémantique générée: {list(fallback_keywords)} pour '{data[:30]}...'"
                     )
@@ -540,7 +544,9 @@ class SemanticCacheManager:
             minimal_normalized = re.sub(r"[?!.]+$", "", minimal_normalized)
 
             if minimal_normalized != self._normalize_text_extended(original_data):
-                simple_hash = hashlib.md5(minimal_normalized.encode(), usedforsecurity=False).hexdigest()
+                simple_hash = hashlib.md5(
+                    minimal_normalized.encode(), usedforsecurity=False
+                ).hexdigest()
                 fallback_keys.append(f"intelia_rag:response:fallback:{simple_hash}")
 
         return fallback_keys[:1]

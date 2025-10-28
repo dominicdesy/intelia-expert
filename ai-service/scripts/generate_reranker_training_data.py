@@ -35,8 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 async def extract_query_doc_pairs(
-    rag_engine: InteliaRAGEngine,
-    num_samples: int = 1000
+    rag_engine: InteliaRAGEngine, num_samples: int = 1000
 ) -> List[Tuple[str, str, float]]:
     """
     Extract (query, document, relevance) pairs from existing data
@@ -68,22 +67,28 @@ async def extract_query_doc_pairs(
         try:
             # Search Weaviate for this query
             result = await rag_engine.process_query(
-                query=query,
-                user_id="training_data_generator",
-                language="fr"
+                query=query, user_id="training_data_generator", language="fr"
             )
 
             if result.context_docs and len(result.context_docs) >= 5:
                 # Top 3 docs = positive samples (relevant)
                 for doc in result.context_docs[:3]:
-                    content = doc.get('content', '') if isinstance(doc, dict) else getattr(doc, 'content', '')
+                    content = (
+                        doc.get("content", "")
+                        if isinstance(doc, dict)
+                        else getattr(doc, "content", "")
+                    )
                     if content:
                         pairs.append((query, content, 1.0))
                         logger.info(f"✅ Positive pair: {query[:50]}...")
 
                 # Bottom 5 docs = negative samples (less relevant)
                 for doc in result.context_docs[-5:]:
-                    content = doc.get('content', '') if isinstance(doc, dict) else getattr(doc, 'content', '')
+                    content = (
+                        doc.get("content", "")
+                        if isinstance(doc, dict)
+                        else getattr(doc, "content", "")
+                    )
                     if content:
                         pairs.append((query, content, 0.0))
                         logger.info(f"❌ Negative pair: {query[:50]}...")
@@ -97,7 +102,7 @@ async def extract_query_doc_pairs(
 
 
 def convert_to_training_format(
-    pairs: List[Tuple[str, str, float]]
+    pairs: List[Tuple[str, str, float]],
 ) -> List[Dict[str, str]]:
     """
     Convert (query, doc, score) to sentence-transformers format
@@ -125,11 +130,9 @@ def convert_to_training_format(
         for pos in positives:
             if negatives:
                 neg = random.choice(negatives)
-                training_samples.append({
-                    "query": query,
-                    "positive": pos,
-                    "negative": neg
-                })
+                training_samples.append(
+                    {"query": query, "positive": pos, "negative": neg}
+                )
 
     logger.info(f"📊 Created {len(training_samples)} training triplets")
     return training_samples
@@ -146,8 +149,12 @@ async def main():
     pairs = await extract_query_doc_pairs(rag_engine, num_samples=100)
 
     if len(pairs) < 50:
-        logger.warning(f"⚠️ Only {len(pairs)} pairs generated. Need at least 500 for fine-tuning.")
-        logger.info("💡 Recommendation: Expand example_queries list or use PostgreSQL query logs")
+        logger.warning(
+            f"⚠️ Only {len(pairs)} pairs generated. Need at least 500 for fine-tuning."
+        )
+        logger.info(
+            "💡 Recommendation: Expand example_queries list or use PostgreSQL query logs"
+        )
 
     # Convert to training format
     training_data = convert_to_training_format(pairs)
@@ -156,7 +163,7 @@ async def main():
     output_path = Path("data/reranker_training_data.json")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(training_data, f, indent=2, ensure_ascii=False)
 
     logger.info(f"✅ Training data saved to {output_path}")

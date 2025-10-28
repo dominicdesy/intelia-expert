@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 # Configuration DigitalOcean Spaces
 DO_SPACES_BUCKET = os.getenv("DO_SPACES_BUCKET", "intelia-expert-images")
 DO_SPACES_REGION = os.getenv("DO_SPACES_REGION", "nyc3")
-DO_SPACES_ENDPOINT = os.getenv("DO_SPACES_ENDPOINT", f"https://{DO_SPACES_REGION}.digitaloceanspaces.com")
+DO_SPACES_ENDPOINT = os.getenv(
+    "DO_SPACES_ENDPOINT", f"https://{DO_SPACES_REGION}.digitaloceanspaces.com"
+)
 DO_SPACES_KEY = os.getenv("DO_SPACES_KEY")
 DO_SPACES_SECRET = os.getenv("DO_SPACES_SECRET")
 
@@ -44,18 +46,22 @@ class ImageStorageService:
         """Lazy-load S3 client"""
         if self._client is None:
             if not DO_SPACES_KEY or not DO_SPACES_SECRET:
-                raise ValueError("Configuration DigitalOcean Spaces manquante (DO_SPACES_KEY/SECRET)")
+                raise ValueError(
+                    "Configuration DigitalOcean Spaces manquante (DO_SPACES_KEY/SECRET)"
+                )
 
             self._client = boto3.client(
-                's3',
+                "s3",
                 endpoint_url=self.endpoint,
                 aws_access_key_id=DO_SPACES_KEY,
                 aws_secret_access_key=DO_SPACES_SECRET,
-                region_name=self.region
+                region_name=self.region,
             )
         return self._client
 
-    def generate_image_key(self, user_id: str, source: str = "frontend", extension: str = "jpg") -> str:
+    def generate_image_key(
+        self, user_id: str, source: str = "frontend", extension: str = "jpg"
+    ) -> str:
         """
         Génère une clé Spaces unique pour un fichier image
         Format: images/{source}/{user_id}/{year}/{month}/{uuid}.{extension}
@@ -70,7 +76,7 @@ class ImageStorageService:
         image_data: bytes,
         spaces_key: str,
         content_type: str = "image/jpeg",
-        metadata: Optional[Dict[str, str]] = None
+        metadata: Optional[Dict[str, str]] = None,
     ) -> str:
         """
         Upload une image vers DigitalOcean Spaces
@@ -106,8 +112,8 @@ class ImageStorageService:
                 Key=spaces_key,
                 Body=image_data,
                 ContentType=content_type,
-                ACL='public-read',  # Rendre accessible publiquement
-                Metadata=metadata or {}
+                ACL="public-read",  # Rendre accessible publiquement
+                Metadata=metadata or {},
             )
 
             # Construire URL publique
@@ -127,7 +133,7 @@ class ImageStorageService:
         source: str = "frontend",
         content_type: str = "image/jpeg",
         original_filename: str = "image.jpg",
-        metadata: Optional[Dict[str, str]] = None
+        metadata: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """
         Upload direct d'une image (déjà en mémoire) vers Spaces
@@ -156,12 +162,12 @@ class ImageStorageService:
                 "image/jpg": "jpg",
                 "image/png": "png",
                 "image/webp": "webp",
-                "image/gif": "gif"
+                "image/gif": "gif",
             }
 
             # Essayer d'obtenir extension depuis filename
-            file_ext = os.path.splitext(original_filename)[1].lower().lstrip('.')
-            if file_ext in ['jpg', 'jpeg', 'png', 'webp', 'gif']:
+            file_ext = os.path.splitext(original_filename)[1].lower().lstrip(".")
+            if file_ext in ["jpg", "jpeg", "png", "webp", "gif"]:
                 extension = file_ext
             else:
                 extension = extension_map.get(content_type, "jpg")
@@ -174,28 +180,27 @@ class ImageStorageService:
                 "source": source,
                 "user_id": user_id,
                 "original_filename": original_filename,
-                "uploaded_at": datetime.utcnow().isoformat()
+                "uploaded_at": datetime.utcnow().isoformat(),
             }
             if metadata:
                 upload_metadata.update(metadata)
 
             # Upload vers Spaces
-            spaces_url = self.upload_image(image_data, spaces_key, content_type, upload_metadata)
+            spaces_url = self.upload_image(
+                image_data, spaces_key, content_type, upload_metadata
+            )
 
             return {
                 "success": True,
                 "spaces_url": spaces_url,
                 "spaces_key": spaces_key,
                 "size_bytes": len(image_data),
-                "content_type": content_type
+                "content_type": content_type,
             }
 
         except Exception as e:
             logger.error(f"❌ Erreur upload_image_direct: {e}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
 
 # Instance singleton

@@ -280,20 +280,20 @@ def get_weaviate_test_summary() -> Dict[str, Any]:
 
     categories = {}
     for item in dataset:
-        cat = item['category']
+        cat = item["category"]
         categories[cat] = categories.get(cat, 0) + 1
 
     return {
         "total_cases": len(dataset),
         "categories": categories,
         "languages": {
-            "fr": sum(1 for item in dataset if item['lang'] == 'fr'),
-            "en": sum(1 for item in dataset if item['lang'] == 'en'),
+            "fr": sum(1 for item in dataset if item["lang"] == "fr"),
+            "en": sum(1 for item in dataset if item["lang"] == "en"),
         },
         "difficulty": {
-            "easy": sum(1 for item in dataset if item['difficulty'] == 'easy'),
-            "medium": sum(1 for item in dataset if item['difficulty'] == 'medium'),
-            "hard": sum(1 for item in dataset if item['difficulty'] == 'hard'),
+            "easy": sum(1 for item in dataset if item["difficulty"] == "easy"),
+            "medium": sum(1 for item in dataset if item["difficulty"] == "medium"),
+            "hard": sum(1 for item in dataset if item["difficulty"] == "hard"),
         },
     }
 
@@ -315,6 +315,6 @@ if __name__ == "__main__":
     print(f"  - Medium: {summary['difficulty']['medium']}")
     print(f"  - Hard: {summary['difficulty']['hard']}")
     print("\nCatégories:")
-    for cat, count in sorted(summary['categories'].items()):
+    for cat, count in sorted(summary["categories"].items()):
         print(f"  - {cat}: {count}")
     print("\n✅ Dataset validé - Prêt pour évaluation RAGAS")

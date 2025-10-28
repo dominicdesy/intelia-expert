@@ -126,7 +126,12 @@ class CalculationEngine:
             )
 
     async def calculate_total_feed(
-        self, breed: str, sex: str, age_start: int, age_end: int, target_weight: float = None
+        self,
+        breed: str,
+        sex: str,
+        age_start: int,
+        age_end: int,
+        target_weight: float = None,
     ) -> CalculationResult:
         """
         Calculates total feed consumption between two ages
@@ -177,7 +182,9 @@ class CalculationEngine:
                 rows = await conn.fetch(query, breed, sex, age_start, age_end)
 
                 if not rows or len(rows) == 0:
-                    logger.warning(f"❌ No daily_intake data found between day {age_start} and {age_end}")
+                    logger.warning(
+                        f"❌ No daily_intake data found between day {age_start} and {age_end}"
+                    )
                     return CalculationResult(
                         value=0,
                         unit="g",
@@ -227,7 +234,9 @@ class CalculationEngine:
 
                         # If target_weight is between the two weights, interpolate
                         if weight_previous < target_weight <= weight_final:
-                            interpolation_ratio = (target_weight - weight_previous) / (weight_final - weight_previous)
+                            interpolation_ratio = (target_weight - weight_previous) / (
+                                weight_final - weight_previous
+                            )
                             interpolation_applied = True
 
                             logger.info(
@@ -239,7 +248,9 @@ class CalculationEngine:
                 # Calculate total with last day interpolation if applicable
                 if interpolation_applied:
                     # Sum all days except last (convert Decimal to float)
-                    total_feed_full_days = sum(float(row["daily_intake"]) for row in rows[:-1])
+                    total_feed_full_days = sum(
+                        float(row["daily_intake"]) for row in rows[:-1]
+                    )
                     # Add fraction of last day (convert Decimal to float)
                     last_day_intake = float(rows[-1]["daily_intake"])
                     last_day_adjusted = last_day_intake * interpolation_ratio
@@ -274,7 +285,11 @@ class CalculationEngine:
                         "avg_daily_intake": round(avg_daily, 2),
                         "total_kg": round(total_feed / 1000, 2),
                         "interpolation_applied": interpolation_applied,
-                        "interpolation_ratio": round(interpolation_ratio, 3) if interpolation_applied else None,
+                        "interpolation_ratio": (
+                            round(interpolation_ratio, 3)
+                            if interpolation_applied
+                            else None
+                        ),
                     },
                     confidence=1.0,
                 )
@@ -473,7 +488,9 @@ class CalculationEngine:
                 )
 
                 total_weight_kg = (weight_per_bird * surviving_birds) / 1000
-                total_feed_kg = (intake_per_bird * flock_size) / 1000  # All birds consume
+                total_feed_kg = (
+                    intake_per_bird * flock_size
+                ) / 1000  # All birds consume
 
                 return {
                     "flock_size": flock_size,

@@ -75,9 +75,7 @@ class ClarificationHelper:
 
         # Utiliser LLMTranslator pour traduction robuste
         return self.translator.translate(
-            text=message_en,
-            target_language=language,
-            source_language="en"
+            text=message_en, target_language=language, source_language="en"
         )
 
     def detect_ambiguity_type(
@@ -237,7 +235,9 @@ class ClarificationHelper:
             message = self._translate_message(message_en, language)
             if message:
                 # Personnaliser le message en fonction des entités déjà connues
-                message = self._customize_message(message, entities, missing_fields, language)
+                message = self._customize_message(
+                    message, entities, missing_fields, language
+                )
                 logger.info(
                     f"Clarification contextuelle: type={ambiguity_type}, lang={language}"
                 )
@@ -339,12 +339,22 @@ class ClarificationHelper:
         # 🔧 FIX: Détecter le type de question pour adapter l'intro
         message_lower = message.lower()
 
-        if "treatment" in message_lower or "protocol" in message_lower or "vaccin" in message_lower:
+        if (
+            "treatment" in message_lower
+            or "protocol" in message_lower
+            or "vaccin" in message_lower
+        ):
             # Question de traitement médical
             intro_part1 = self._translate_message("To recommend a treatment", language)
-        elif "nutrition" in message_lower or "feed" in message_lower or "aliment" in message_lower:
+        elif (
+            "nutrition" in message_lower
+            or "feed" in message_lower
+            or "aliment" in message_lower
+        ):
             # Question de nutrition
-            intro_part1 = self._translate_message("To provide nutritional advice", language)
+            intro_part1 = self._translate_message(
+                "To provide nutritional advice", language
+            )
         else:
             # Question de performance générale
             intro_part1 = self._translate_message("To analyze performance", language)
@@ -355,7 +365,7 @@ class ClarificationHelper:
         if entities.get("breed"):
             of_label = self._translate_message("of", language)
             # 🔧 FIX: Capitaliser le breed (ross 308 → Ross 308)
-            breed = entities['breed']
+            breed = entities["breed"]
             breed_capitalized = breed.title() if breed else breed
             context_parts.append(f"{of_label} {breed_capitalized}")
 
@@ -375,7 +385,6 @@ class ClarificationHelper:
         custom_message = intro + "\n" + "\n".join(f"- {item}" for item in items_to_ask)
 
         return custom_message
-
 
 
 # Factory singleton

@@ -22,19 +22,16 @@ from processing.intent_processor import IntentProcessor
 from processing.intent_types import IntentType
 
 # Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 def test_spaghetti_breast():
     """Test that Spaghetti breast is now detected as poultry-related"""
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TEST SPAGHETTI BREAST DETECTION - Original Problem")
-    print("="*80)
+    print("=" * 80)
 
     # Initialize IntentProcessor
     try:
@@ -48,28 +45,26 @@ def test_spaghetti_breast():
         # Original problem case
         ("What is Spaghetti breast?", IntentType.GENERAL_POULTRY, "en"),
         ("What is spaghetti breast?", IntentType.GENERAL_POULTRY, "en"),  # lowercase
-
         # Other modern defects
         ("What is white striping?", IntentType.GENERAL_POULTRY, "en"),
         ("What is wooden breast?", IntentType.GENERAL_POULTRY, "en"),
         ("What is deep pectoral myopathy?", IntentType.GENERAL_POULTRY, "en"),
-
         # French versions
         ("Qu'est-ce que la poitrine spaghetti?", IntentType.GENERAL_POULTRY, "fr"),
         ("Qu'est-ce que les stries blanches?", IntentType.GENERAL_POULTRY, "fr"),
-
         # Spanish versions
         ("¿Qué es la pechuga espagueti?", IntentType.GENERAL_POULTRY, "es"),
-
         # Dutch version
         ("Wat is spaghetti borst?", IntentType.GENERAL_POULTRY, "nl"),
-
         # Traditional diseases (should also work via AGROVOC Level 1)
         ("What is Newcastle disease?", IntentType.GENERAL_POULTRY, "en"),
         ("What is Marek's disease?", IntentType.GENERAL_POULTRY, "en"),
-
         # Non-poultry queries (should be OUT_OF_DOMAIN)
-        ("What is spaghetti?", IntentType.OUT_OF_DOMAIN, "en"),  # Just spaghetti, not "spaghetti breast"
+        (
+            "What is spaghetti?",
+            IntentType.OUT_OF_DOMAIN,
+            "en",
+        ),  # Just spaghetti, not "spaghetti breast"
         ("What is artificial intelligence?", IntentType.OUT_OF_DOMAIN, "en"),
     ]
 
@@ -97,20 +92,22 @@ def test_spaghetti_breast():
             results["incorrect"] += 1
 
     # Summary
-    print("="*80)
+    print("=" * 80)
     print("SUMMARY")
-    print("="*80)
+    print("=" * 80)
     print(f"Total tests: {results['total']}")
     print(f"Correct: {results['correct']}")
     print(f"Incorrect: {results['incorrect']}")
     print(f"Accuracy: {results['correct'] / results['total'] * 100:.1f}%")
 
-    if results['correct'] == results['total']:
+    if results["correct"] == results["total"]:
         print("\n[SUCCESS] All tests passed!")
         print("\nSpaghetti breast is now correctly detected as a poultry term!")
         return True
     else:
-        print(f"\n[PARTIAL SUCCESS] {results['correct']}/{results['total']} tests passed")
+        print(
+            f"\n[PARTIAL SUCCESS] {results['correct']}/{results['total']} tests passed"
+        )
         return False
 
 

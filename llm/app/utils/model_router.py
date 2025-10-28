@@ -26,15 +26,17 @@ logger = logging.getLogger(__name__)
 
 class ModelSize(Enum):
     """Available model sizes"""
-    SMALL = "3b"   # Llama 3.2 3B - Fast
-    LARGE = "8b"   # Llama 3.1 8B - Accurate
+
+    SMALL = "3b"  # Llama 3.2 3B - Fast
+    LARGE = "8b"  # Llama 3.1 8B - Accurate
 
 
 class QueryComplexity(Enum):
     """Query complexity levels"""
-    SIMPLE = "simple"      # Factual, single-answer queries
-    MEDIUM = "medium"      # Standard queries with context
-    COMPLEX = "complex"    # Multi-step reasoning, comparisons
+
+    SIMPLE = "simple"  # Factual, single-answer queries
+    MEDIUM = "medium"  # Standard queries with context
+    COMPLEX = "complex"  # Multi-step reasoning, comparisons
 
 
 class ModelRouter:
@@ -55,7 +57,7 @@ class ModelRouter:
             "quality_score": 0.92,
             "cost_per_1k_tokens": 0.0001,
             "max_tokens": 128000,
-            "best_for": ["simple factual", "single metric", "straightforward context"]
+            "best_for": ["simple factual", "single metric", "straightforward context"],
         },
         ModelSize.LARGE: {
             "name": "meta-llama/Llama-3.1-8B-Instruct",
@@ -63,15 +65,15 @@ class ModelRouter:
             "quality_score": 1.0,
             "cost_per_1k_tokens": 0.0002,
             "max_tokens": 128000,
-            "best_for": ["complex reasoning", "comparisons", "nuanced questions"]
-        }
+            "best_for": ["complex reasoning", "comparisons", "nuanced questions"],
+        },
     }
 
     def __init__(
         self,
         ab_test_ratio: float = 0.5,
         enable_routing: bool = True,
-        default_model: ModelSize = ModelSize.LARGE
+        default_model: ModelSize = ModelSize.LARGE,
     ):
         """
         Initialize model router
@@ -88,7 +90,7 @@ class ModelRouter:
         # Statistics tracking
         self.stats = {
             ModelSize.SMALL: {"count": 0, "total_ms": 0},
-            ModelSize.LARGE: {"count": 0, "total_ms": 0}
+            ModelSize.LARGE: {"count": 0, "total_ms": 0},
         }
 
         logger.info(
@@ -102,7 +104,7 @@ class ModelRouter:
         query: str,
         query_type: Optional[str] = None,
         entities: Optional[Dict[str, Any]] = None,
-        context_docs: Optional[list] = None
+        context_docs: Optional[list] = None,
     ) -> QueryComplexity:
         """
         Determine query complexity based on multiple signals
@@ -139,19 +141,28 @@ class ModelRouter:
 
         # === COMPLEX QUERIES ===
         complex_indicators = [
-            "compare", "comparison", "vs", "versus", "difference between",
-            "which is better", "pros and cons", "advantages disadvantages",
-            "multiple", "several", "various", "different"
+            "compare",
+            "comparison",
+            "vs",
+            "versus",
+            "difference between",
+            "which is better",
+            "pros and cons",
+            "advantages disadvantages",
+            "multiple",
+            "several",
+            "various",
+            "different",
         ]
 
         if any(indicator in query_lower for indicator in complex_indicators):
-            logger.debug(f"🔴 COMPLEX: Comparison/multi-entity detected")
+            logger.debug("🔴 COMPLEX: Comparison/multi-entity detected")
             return QueryComplexity.COMPLEX
 
         # Check for multiple values in entities (comparison)
         if entities:
             for key, value in entities.items():
-                if isinstance(value, str) and ',' in value:
+                if isinstance(value, str) and "," in value:
                     # Multiple breeds/ages = comparison
                     logger.debug(f"🔴 COMPLEX: Multiple entities in {key}: {value}")
                     return QueryComplexity.COMPLEX
@@ -160,7 +171,7 @@ class ModelRouter:
         complex_query_types = [
             "comparative",
             "diagnostic_synthesis",
-            "multi_metric_synthesis"
+            "multi_metric_synthesis",
         ]
 
         if query_type in complex_query_types:
@@ -168,34 +179,33 @@ class ModelRouter:
             return QueryComplexity.COMPLEX
 
         # === SIMPLE QUERIES ===
-        simple_query_types = [
-            "genetics_performance",
-            "metric_query"
-        ]
+        simple_query_types = ["genetics_performance", "metric_query"]
 
         # Check for simple metric lookup pattern
         has_breed = entities and entities.get("breed")
         has_age = entities and entities.get("age_days")
-        has_metric = entities and entities.get("metric_type")
 
         if query_type in simple_query_types and has_breed and has_age:
-            logger.debug(f"🟢 SIMPLE: Single metric lookup (breed={has_breed}, age={has_age})")
+            logger.debug(
+                f"🟢 SIMPLE: Single metric lookup (breed={has_breed}, age={has_age})"
+            )
             return QueryComplexity.SIMPLE
 
         # Short factual questions
-        if len(query.split()) <= 10 and ('?' in query or 'what' in query_lower or 'how much' in query_lower):
-            logger.debug(f"🟢 SIMPLE: Short factual question ({len(query.split())} words)")
+        if len(query.split()) <= 10 and (
+            "?" in query or "what" in query_lower or "how much" in query_lower
+        ):
+            logger.debug(
+                f"🟢 SIMPLE: Short factual question ({len(query.split())} words)"
+            )
             return QueryComplexity.SIMPLE
 
         # === MEDIUM (DEFAULT) ===
-        logger.debug(f"🟡 MEDIUM: Standard query")
+        logger.debug("🟡 MEDIUM: Standard query")
         return QueryComplexity.MEDIUM
 
     def select_model(
-        self,
-        complexity: QueryComplexity,
-        query: str,
-        query_hash: Optional[str] = None
+        self, complexity: QueryComplexity, query: str, query_hash: Optional[str] = None
     ) -> ModelSize:
         """
         Select optimal model based on complexity
@@ -214,7 +224,9 @@ class ModelRouter:
             ModelSize enum (SMALL or LARGE)
         """
         if not self.enable_routing:
-            logger.debug(f"🔀 Routing disabled, using default: {self.default_model.value}")
+            logger.debug(
+                f"🔀 Routing disabled, using default: {self.default_model.value}"
+            )
             return self.default_model
 
         # Simple queries → Always fast model
@@ -236,10 +248,14 @@ class ModelRouter:
         hash_value = int(query_hash[:8], 16) / 0xFFFFFFFF
 
         if hash_value < self.ab_test_ratio:
-            logger.info(f"🟡 ROUTE → 3B (MEDIUM A/B: {hash_value:.2f} < {self.ab_test_ratio}): '{query[:60]}...'")
+            logger.info(
+                f"🟡 ROUTE → 3B (MEDIUM A/B: {hash_value:.2f} < {self.ab_test_ratio}): '{query[:60]}...'"
+            )
             return ModelSize.SMALL
         else:
-            logger.info(f"🟡 ROUTE → 8B (MEDIUM A/B: {hash_value:.2f} >= {self.ab_test_ratio}): '{query[:60]}...'")
+            logger.info(
+                f"🟡 ROUTE → 8B (MEDIUM A/B: {hash_value:.2f} >= {self.ab_test_ratio}): '{query[:60]}...'"
+            )
             return ModelSize.LARGE
 
     def get_model_name(self, model_size: ModelSize) -> str:
@@ -269,7 +285,7 @@ class ModelRouter:
                 "total_requests": 0,
                 "model_distribution": {},
                 "average_latency_ms": 0,
-                "estimated_cost_savings": 0
+                "estimated_cost_savings": 0,
             }
 
         # Calculate distributions
@@ -282,29 +298,34 @@ class ModelRouter:
         # Calculate average latencies
         small_avg = (
             self.stats[ModelSize.SMALL]["total_ms"] / small_count
-            if small_count > 0 else 0
+            if small_count > 0
+            else 0
         )
         large_avg = (
             self.stats[ModelSize.LARGE]["total_ms"] / large_count
-            if large_count > 0 else 0
+            if large_count > 0
+            else 0
         )
 
         # Weighted average latency
-        weighted_avg = (
-            small_avg * small_ratio +
-            large_avg * large_ratio
-        )
+        weighted_avg = small_avg * small_ratio + large_avg * large_ratio
 
         # Baseline (all 8B)
         baseline_latency = 4500
 
         # Cost savings calculation
-        baseline_cost = total_requests * self.MODELS[ModelSize.LARGE]["cost_per_1k_tokens"]
-        actual_cost = (
-            small_count * self.MODELS[ModelSize.SMALL]["cost_per_1k_tokens"] +
-            large_count * self.MODELS[ModelSize.LARGE]["cost_per_1k_tokens"]
+        baseline_cost = (
+            total_requests * self.MODELS[ModelSize.LARGE]["cost_per_1k_tokens"]
         )
-        cost_savings_pct = ((baseline_cost - actual_cost) / baseline_cost * 100) if baseline_cost > 0 else 0
+        actual_cost = (
+            small_count * self.MODELS[ModelSize.SMALL]["cost_per_1k_tokens"]
+            + large_count * self.MODELS[ModelSize.LARGE]["cost_per_1k_tokens"]
+        )
+        cost_savings_pct = (
+            ((baseline_cost - actual_cost) / baseline_cost * 100)
+            if baseline_cost > 0
+            else 0
+        )
 
         return {
             "total_requests": total_requests,
@@ -312,27 +333,29 @@ class ModelRouter:
                 "3b": {
                     "count": small_count,
                     "percentage": round(small_ratio * 100, 1),
-                    "avg_latency_ms": round(small_avg, 0)
+                    "avg_latency_ms": round(small_avg, 0),
                 },
                 "8b": {
                     "count": large_count,
                     "percentage": round(large_ratio * 100, 1),
-                    "avg_latency_ms": round(large_avg, 0)
-                }
+                    "avg_latency_ms": round(large_avg, 0),
+                },
             },
             "average_latency_ms": round(weighted_avg, 0),
             "baseline_latency_ms": baseline_latency,
-            "latency_improvement_pct": round((baseline_latency - weighted_avg) / baseline_latency * 100, 1),
+            "latency_improvement_pct": round(
+                (baseline_latency - weighted_avg) / baseline_latency * 100, 1
+            ),
             "estimated_cost_savings_pct": round(cost_savings_pct, 1),
             "ab_test_ratio": self.ab_test_ratio,
-            "routing_enabled": self.enable_routing
+            "routing_enabled": self.enable_routing,
         }
 
     def reset_stats(self):
         """Reset statistics"""
         self.stats = {
             ModelSize.SMALL: {"count": 0, "total_ms": 0},
-            ModelSize.LARGE: {"count": 0, "total_ms": 0}
+            ModelSize.LARGE: {"count": 0, "total_ms": 0},
         }
         logger.info("📊 ModelRouter stats reset")
 
@@ -344,7 +367,7 @@ _model_router: Optional[ModelRouter] = None
 def get_model_router(
     ab_test_ratio: float = 0.5,
     enable_routing: bool = True,
-    default_model: ModelSize = ModelSize.LARGE
+    default_model: ModelSize = ModelSize.LARGE,
 ) -> ModelRouter:
     """
     Get singleton instance of model router
@@ -363,7 +386,7 @@ def get_model_router(
         _model_router = ModelRouter(
             ab_test_ratio=ab_test_ratio,
             enable_routing=enable_routing,
-            default_model=default_model
+            default_model=default_model,
         )
 
     return _model_router

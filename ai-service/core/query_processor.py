@@ -42,7 +42,7 @@ class RAGQueryProcessor:
         conversation_memory=None,
         ood_detector=None,
         weaviate_client=None,
-        enable_external_sources=False
+        enable_external_sources=False,
     ):
         """
         Initialize query processor
@@ -82,14 +82,16 @@ class RAGQueryProcessor:
                     enable_semantic_scholar=ENABLE_SEMANTIC_SCHOLAR,
                     enable_pubmed=ENABLE_PUBMED,
                     enable_europe_pmc=ENABLE_EUROPE_PMC,
-                    enable_fao=ENABLE_FAO
+                    enable_fao=ENABLE_FAO,
                 )
 
                 self.ingestion_service = DocumentIngestionService(
                     weaviate_client=weaviate_client
                 )
 
-                logger.info("✅ External sources system initialized (query-driven ingestion)")
+                logger.info(
+                    "✅ External sources system initialized (query-driven ingestion)"
+                )
             except Exception as e:
                 logger.warning(f"⚠️ External sources initialization failed: {e}")
                 self.external_manager = None
@@ -101,27 +103,103 @@ class RAGQueryProcessor:
         # 90%+ queries are in-domain, so we can skip expensive LLM call with fast keyword check
         self.poultry_keywords = {
             # French - Common terms
-            'poulet', 'poule', 'coq', 'poussin', 'oeuf', 'volaille', 'avicole',
-            'broiler', 'pondeuse', 'élevage', 'coquelet', 'canard', 'dinde', 'oie',
+            "poulet",
+            "poule",
+            "coq",
+            "poussin",
+            "oeuf",
+            "volaille",
+            "avicole",
+            "broiler",
+            "pondeuse",
+            "élevage",
+            "coquelet",
+            "canard",
+            "dinde",
+            "oie",
             # English - Common terms
-            'chicken', 'hen', 'rooster', 'chick', 'egg', 'poultry', 'avian',
-            'broiler', 'layer', 'farm', 'coop', 'duck', 'turkey', 'goose',
+            "chicken",
+            "hen",
+            "rooster",
+            "chick",
+            "egg",
+            "poultry",
+            "avian",
+            "broiler",
+            "layer",
+            "farm",
+            "coop",
+            "duck",
+            "turkey",
+            "goose",
             # Spanish - Common terms
-            'pollo', 'gallina', 'gallo', 'pollito', 'huevo', 'ave', 'avícola',
+            "pollo",
+            "gallina",
+            "gallo",
+            "pollito",
+            "huevo",
+            "ave",
+            "avícola",
             # Breeds (very specific - strong signal)
-            'ross', 'cobb', 'hubbard', 'isa', 'lohmann', 'bovans', 'hisex',
-            'dekalb', 'shaver', 'hy-line', 'aviagen', 'arbor', 'acres',
+            "ross",
+            "cobb",
+            "hubbard",
+            "isa",
+            "lohmann",
+            "bovans",
+            "hisex",
+            "dekalb",
+            "shaver",
+            "hy-line",
+            "aviagen",
+            "arbor",
+            "acres",
             # Technical terms (strong indicators)
-            'fcr', 'mortalité', 'mortality', 'poids', 'weight', 'peso',
-            'performance', 'croissance', 'growth', 'conversion', 'rendement',
-            'nutrition', 'alimentation', 'feed', 'alimento', 'vaccin',
-            'vaccination', 'maladie', 'disease', 'santé', 'health',
+            "fcr",
+            "mortalité",
+            "mortality",
+            "poids",
+            "weight",
+            "peso",
+            "performance",
+            "croissance",
+            "growth",
+            "conversion",
+            "rendement",
+            "nutrition",
+            "alimentation",
+            "feed",
+            "alimento",
+            "vaccin",
+            "vaccination",
+            "maladie",
+            "disease",
+            "santé",
+            "health",
             # Production stages
-            'incubation', 'éclosion', 'hatch', 'démarrage', 'starter',
-            'croissance', 'grower', 'finition', 'finisher', 'ponte', 'laying',
+            "incubation",
+            "éclosion",
+            "hatch",
+            "démarrage",
+            "starter",
+            "croissance",
+            "grower",
+            "finition",
+            "finisher",
+            "ponte",
+            "laying",
             # Equipment & infrastructure
-            'bâtiment', 'building', 'ventilation', 'chauffage', 'heating',
-            'abreuvoir', 'drinker', 'mangeoire', 'feeder', 'litière', 'litter',
+            "bâtiment",
+            "building",
+            "ventilation",
+            "chauffage",
+            "heating",
+            "abreuvoir",
+            "drinker",
+            "mangeoire",
+            "feeder",
+            "litière",
+            "litter",
         }
 
     def _quick_domain_check(self, query: str) -> bool:
@@ -140,7 +218,7 @@ class RAGQueryProcessor:
         import re
 
         # Extract words (3+ chars to avoid false positives from short words)
-        query_words = set(re.findall(r'\b\w{3,}\b', query.lower()))
+        query_words = set(re.findall(r"\b\w{3,}\b", query.lower()))
 
         # Check for intersection with poultry keywords
         if self.poultry_keywords & query_words:
@@ -148,8 +226,11 @@ class RAGQueryProcessor:
 
         # Check for numeric patterns (often age/weight queries)
         # e.g., "22 jours", "35 days", "2.1 kg"
-        has_numbers = bool(re.search(r'\b\d+\b', query))
-        has_units = any(unit in query.lower() for unit in ['jour', 'day', 'semaine', 'week', 'kg', 'gram'])
+        has_numbers = bool(re.search(r"\b\d+\b", query))
+        has_units = any(
+            unit in query.lower()
+            for unit in ["jour", "day", "semaine", "week", "kg", "gram"]
+        )
 
         if has_numbers and has_units:
             # Likely a technical query even without explicit poultry keywords
@@ -199,15 +280,17 @@ class RAGQueryProcessor:
         # Si on a déjà une langue sauvegardée pour cette conversation, l'utiliser
         # Sauf si la query actuelle est longue et claire (> 10 mots)
         if self.conversation_memory:
-            saved_language = self.conversation_memory.get_conversation_language(tenant_id)
+            saved_language = self.conversation_memory.get_conversation_language(
+                tenant_id
+            )
 
             if saved_language:
                 # Détecter si la query actuelle est courte/ambiguë
                 query_stripped = query.strip()
                 is_short_query = (
-                    len(query_stripped) < 50 or  # Moins de 50 caractères
-                    query_stripped.isdigit() or  # Juste un nombre
-                    len(query_stripped.split()) <= 5  # 5 mots ou moins
+                    len(query_stripped) < 50  # Moins de 50 caractères
+                    or query_stripped.isdigit()  # Juste un nombre
+                    or len(query_stripped.split()) <= 5  # 5 mots ou moins
                 )
 
                 # Hériter la langue sauf si query longue et langue détectée différente avec haute confiance
@@ -243,7 +326,9 @@ class RAGQueryProcessor:
                     # 🆕 Récupérer le domaine sauvegardé pour réutilisation
                     saved_domain = pending_clarification.get("detected_domain")
                     if saved_domain:
-                        logger.info(f"♻️ Réutilisation domaine sauvegardé: {saved_domain}")
+                        logger.info(
+                            f"♻️ Réutilisation domaine sauvegardé: {saved_domain}"
+                        )
 
                     # Merge original query with clarification
                     original_query = pending_clarification.get("original_query", "")
@@ -272,7 +357,9 @@ class RAGQueryProcessor:
             query_stripped = query.strip()
             is_short = len(query_stripped) < 50
             is_numeric = query_stripped.isdigit()
-            is_simple_response = is_short and (is_numeric or len(query_stripped.split()) <= 3)
+            is_simple_response = is_short and (
+                is_numeric or len(query_stripped.split()) <= 3
+            )
 
             if is_simple_response:
                 skip_ood = True
@@ -285,58 +372,86 @@ class RAGQueryProcessor:
         # 1. Response to generic "Can I help you?" → ask for clarification
         # 2. Response to specific follow-up like "Want to optimize feed?" → reformulate and continue
         confirmation_words = {
-            'en': ['yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'please', 'yup'],
-            'fr': ['oui', 'ouais', 'd\'accord', 'ok', 'okay', 'bien sûr', 'volontiers'],
-            'es': ['sí', 'si', 'vale', 'ok', 'okay', 'claro', 'por supuesto'],
-            'de': ['ja', 'okay', 'ok', 'gerne', 'klar'],
+            "en": ["yes", "yeah", "yep", "sure", "ok", "okay", "please", "yup"],
+            "fr": ["oui", "ouais", "d'accord", "ok", "okay", "bien sûr", "volontiers"],
+            "es": ["sí", "si", "vale", "ok", "okay", "claro", "por supuesto"],
+            "de": ["ja", "okay", "ok", "gerne", "klar"],
         }
 
         query_words = query.lower().strip().split()
         is_short_query = len(query_words) <= 3
-        is_confirmation = any(word in confirmation_words.get(language, []) for word in query_words)
+        is_confirmation = any(
+            word in confirmation_words.get(language, []) for word in query_words
+        )
 
         # 🆕 Flag to skip OOD detector for specific follow-up confirmations
         skip_ood_for_followup = False
 
         if is_short_query and is_confirmation:
             # Check if previous response contained a follow-up question
-            contextual_history_check = await self._get_contextual_history(tenant_id, query)
+            contextual_history_check = await self._get_contextual_history(
+                tenant_id, query
+            )
             if contextual_history_check:
                 # 🆕 Check if the previous answer contains a SPECIFIC follow-up (with metric/topic)
                 # vs generic "Can I help?" question
                 # Specific follow-ups contain keywords like "optimiser", "améliorer", specific metric names
                 specific_followup_keywords = [
-                    'optimiser', 'optimize', 'optimizar',  # Optimization
-                    'améliorer', 'improve', 'mejorar',  # Improvement
-                    'consommation', 'consumption', 'intake', 'feed', 'water',  # Metrics
-                    'poids', 'weight', 'peso',  # Weight
-                    'fcr', 'gain', 'mortalité', 'mortality',  # Performance
-                    'stratégie', 'strategy', 'estrategia',  # Strategy
-                    'conseils', 'advice', 'recomendaciones',  # Advice
+                    "optimiser",
+                    "optimize",
+                    "optimizar",  # Optimization
+                    "améliorer",
+                    "improve",
+                    "mejorar",  # Improvement
+                    "consommation",
+                    "consumption",
+                    "intake",
+                    "feed",
+                    "water",  # Metrics
+                    "poids",
+                    "weight",
+                    "peso",  # Weight
+                    "fcr",
+                    "gain",
+                    "mortalité",
+                    "mortality",  # Performance
+                    "stratégie",
+                    "strategy",
+                    "estrategia",  # Strategy
+                    "conseils",
+                    "advice",
+                    "recomendaciones",  # Advice
                 ]
 
                 history_lower = contextual_history_check.lower()
-                has_specific_followup = any(keyword in history_lower for keyword in specific_followup_keywords)
+                has_specific_followup = any(
+                    keyword in history_lower for keyword in specific_followup_keywords
+                )
 
                 if has_specific_followup:
                     # User confirmed interest in specific topic - reformulate query from context
-                    logger.info(f"✅ Specific follow-up confirmation: '{query}' - reformulating from context")
+                    logger.info(
+                        f"✅ Specific follow-up confirmation: '{query}' - reformulating from context"
+                    )
                     # 🆕 Skip OOD detector since this is a valid in-domain continuation
                     skip_ood_for_followup = True
                     # Let the query continue processing with context enrichment
                     # The enricher will reformulate "Oui" into a proper question based on history
                 else:
                     # Generic follow-up - user just said "yes" to generic help offer
-                    logger.info(f"✅ Generic follow-up confirmation: '{query}' - asking for clarification")
+                    logger.info(
+                        f"✅ Generic follow-up confirmation: '{query}' - asking for clarification"
+                    )
                     from config.messages import get_message
+
                     clarification_msg = get_message("followup_clarification", language)
                     if not clarification_msg:
                         # Fallback if message not configured
                         clarification_msg = {
-                            'en': "Great! How can I help you?",
-                            'fr': "Parfait ! Comment puis-je vous aider ?",
-                            'es': "¡Perfecto! ¿Cómo puedo ayudarte?",
-                            'de': "Prima! Wie kann ich Ihnen helfen?",
+                            "en": "Great! How can I help you?",
+                            "fr": "Parfait ! Comment puis-je vous aider ?",
+                            "es": "¡Perfecto! ¿Cómo puedo ayudarte?",
+                            "de": "Prima! Wie kann ich Ihnen helfen?",
                         }.get(language, "How can I help you?")
 
                     return RAGResult(
@@ -361,10 +476,14 @@ class RAGQueryProcessor:
 
                 if is_clearly_in_domain:
                     # Skip expensive LLM check - query contains clear poultry keywords
-                    logger.info(f"✅ IN-DOMAIN (keyword check): '{query[:60]}...' - skipping LLM verification")
+                    logger.info(
+                        f"✅ IN-DOMAIN (keyword check): '{query[:60]}...' - skipping LLM verification"
+                    )
                 else:
                     # Borderline case - use LLM for accurate detection (~100ms)
-                    logger.info(f"⚠️ UNCERTAIN domain (keyword check) - using LLM verification: '{query[:60]}...'")
+                    logger.info(
+                        f"⚠️ UNCERTAIN domain (keyword check) - using LLM verification: '{query[:60]}...'"
+                    )
                     is_in_domain, domain_score, score_details = (
                         self.ood_detector.calculate_ood_score_multilingual(
                             query, None, language
@@ -372,14 +491,19 @@ class RAGQueryProcessor:
                     )
 
                     if not is_in_domain:
-                        logger.warning(f"⛔ OUT-OF-DOMAIN query detected (LLM): '{query[:60]}...'")
+                        logger.warning(
+                            f"⛔ OUT-OF-DOMAIN query detected (LLM): '{query[:60]}...'"
+                        )
                         from config.messages import get_message
+
                         ood_message = get_message("out_of_domain", language)
                         return RAGResult(
                             source=RAGSource.OOD_FILTERED,
                             answer=ood_message,
                             context_docs=[],  # Fixed: was 'sources'
-                            processing_time=(time.time() - start_time),  # Fixed: was 'processing_time_ms'
+                            processing_time=(
+                                time.time() - start_time
+                            ),  # Fixed: was 'processing_time_ms'
                             metadata={
                                 "ood_score": domain_score,
                                 "ood_details": score_details,
@@ -388,7 +512,9 @@ class RAGQueryProcessor:
                             },
                         )
                     else:
-                        logger.info(f"✅ IN-DOMAIN query confirmed (LLM): '{query[:60]}...'")
+                        logger.info(
+                            f"✅ IN-DOMAIN query confirmed (LLM): '{query[:60]}...'"
+                        )
             except Exception as e:
                 logger.error(f"❌ OOD detection error: {e}")
                 # Continue processing on error (fail-open)
@@ -494,15 +620,19 @@ class RAGQueryProcessor:
                     language=language,
                     detected_domain=route.detected_domain,  # Save domain for reuse
                 )
-                logger.info(f"🔒 Clarification marked pending for tenant {tenant_id} (domain: {route.detected_domain})")
+                logger.info(
+                    f"🔒 Clarification marked pending for tenant {tenant_id} (domain: {route.detected_domain})"
+                )
 
                 # 💾 SAVE EXCHANGE IMMEDIATELY so next query can use context
                 self.conversation_memory.add_exchange(
                     tenant_id=tenant_id,
                     question=query,
-                    answer=clarification_result.answer
+                    answer=clarification_result.answer,
                 )
-                logger.info(f"💾 Clarification exchange saved immediately for tenant {tenant_id}")
+                logger.info(
+                    f"💾 Clarification exchange saved immediately for tenant {tenant_id}"
+                )
 
             # Structured logging: Clarification needed
             structured_logger.info(
@@ -532,10 +662,12 @@ class RAGQueryProcessor:
         step6_duration = time.time() - step6_start
 
         # Step 6.5: 🆕 Try external sources if low confidence and system enabled
-        if (self.external_manager and
-            hasattr(result, 'confidence') and
-            result.confidence < EXTERNAL_SEARCH_THRESHOLD and
-            route.destination == "weaviate"):  # Only for knowledge queries
+        if (
+            self.external_manager
+            and hasattr(result, "confidence")
+            and result.confidence < EXTERNAL_SEARCH_THRESHOLD
+            and route.destination == "weaviate"
+        ):  # Only for knowledge queries
 
             logger.info(
                 f"🔍 Low confidence ({result.confidence:.2f}), searching external sources..."
@@ -554,15 +686,17 @@ class RAGQueryProcessor:
                     query=query_for_routing,
                     language=language,
                     max_results_per_source=EXTERNAL_SOURCES_MAX_RESULTS_PER_SOURCE,
-                    min_year=EXTERNAL_SOURCES_MIN_YEAR
+                    min_year=EXTERNAL_SOURCES_MIN_YEAR,
                 )
                 external_duration = time.time() - external_start
 
                 # Extract sources queried
                 sources_queried = []
-                if hasattr(external_result, 'results_by_source'):
+                if hasattr(external_result, "results_by_source"):
                     sources_queried = list(external_result.results_by_source.keys())
-                total_docs_found = len(external_result.all_documents) if external_result else 0
+                total_docs_found = (
+                    len(external_result.all_documents) if external_result else 0
+                )
 
                 if external_result.has_answer():
                     best_doc = external_result.best_document
@@ -577,12 +711,10 @@ class RAGQueryProcessor:
 
                     if not doc_exists:
                         # Ingest into Weaviate for future queries
-                        logger.info(f"📥 Ingesting document into Weaviate...")
+                        logger.info("📥 Ingesting document into Weaviate...")
                         ingestion_start = time.time()
                         success = await self.ingestion_service.ingest_document(
-                            document=best_doc,
-                            query_context=query,
-                            language=language
+                            document=best_doc, query_context=query, language=language
                         )
                         ingestion_duration_ms = (time.time() - ingestion_start) * 1000
 
@@ -606,16 +738,19 @@ class RAGQueryProcessor:
                         composite_score=best_doc.composite_score,
                         relevance_score=best_doc.relevance_score,
                         external_duration_ms=external_duration * 1000,
-                        doc_ingested=doc_ingested
+                        doc_ingested=doc_ingested,
                     )
 
                     # 🆕 Log to external sources activity logger
                     from external_sources.activity_logger import log_external_search
+
                     log_external_search(
                         request_id=request_id,
                         query=query,
                         language=language,
-                        weaviate_confidence=result.confidence if hasattr(result, 'confidence') else 0.0,
+                        weaviate_confidence=(
+                            result.confidence if hasattr(result, "confidence") else 0.0
+                        ),
                         triggered_reason="low_confidence",
                         sources_queried=sources_queried,
                         total_documents_found=total_docs_found,
@@ -632,11 +767,14 @@ class RAGQueryProcessor:
 
                     # 🆕 Log no results to activity logger
                     from external_sources.activity_logger import log_external_search
+
                     log_external_search(
                         request_id=request_id,
                         query=query,
                         language=language,
-                        weaviate_confidence=result.confidence if hasattr(result, 'confidence') else 0.0,
+                        weaviate_confidence=(
+                            result.confidence if hasattr(result, "confidence") else 0.0
+                        ),
                         triggered_reason="low_confidence",
                         sources_queried=sources_queried,
                         total_documents_found=total_docs_found,
@@ -721,15 +859,19 @@ class RAGQueryProcessor:
         llm_clarification = route.validation_details.get("generated_clarification")
         if llm_clarification:
             clarification_message = llm_clarification
-            logger.info(f"✅ Using LLM-generated clarification message: {clarification_message[:100]}...")
+            logger.info(
+                f"✅ Using LLM-generated clarification message: {clarification_message[:100]}..."
+            )
         else:
             # Fallback: Utiliser le clarification helper traditionnel
-            logger.info(f"⚠️ No LLM clarification available, using template-based helper")
-            clarification_message = self.clarification_helper.build_clarification_message(
-                missing_fields=route.missing_fields,
-                language=language,
-                query=query,
-                entities=route.entities,
+            logger.info("⚠️ No LLM clarification available, using template-based helper")
+            clarification_message = (
+                self.clarification_helper.build_clarification_message(
+                    missing_fields=route.missing_fields,
+                    language=language,
+                    query=query,
+                    entities=route.entities,
+                )
             )
 
         return RAGResult(
@@ -836,9 +978,7 @@ class RAGQueryProcessor:
                 entities = preprocessed_data.get("entities", {})
                 query = preprocessed_data.get("query", "")
                 result = await self.calculation_handler.handle(
-                    query=query,
-                    entities=entities,
-                    language=language
+                    query=query, entities=entities, language=language
                 )
 
                 # Convert to RAGResult format
@@ -846,7 +986,9 @@ class RAGQueryProcessor:
                     calc_result = result.get("calculation_result", {})
 
                     # Build context_docs from calculation details for RAGAS evaluation
-                    context_docs = self._build_calculation_contexts(calc_result, result.get("calculation_type"))
+                    context_docs = self._build_calculation_contexts(
+                        calc_result, result.get("calculation_type")
+                    )
 
                     return RAGResult(
                         source=RAGSource.RETRIEVAL_SUCCESS,
@@ -863,10 +1005,15 @@ class RAGQueryProcessor:
                     return RAGResult(
                         source=RAGSource.ERROR,
                         answer=f"Calculation error: {result.get('error', 'Unknown error')}",
-                        metadata={"query_type": "calculation", "error": result.get("error")},
+                        metadata={
+                            "query_type": "calculation",
+                            "error": result.get("error"),
+                        },
                     )
             else:
-                logger.warning("⚠️ CalculationHandler not available, falling back to StandardHandler")
+                logger.warning(
+                    "⚠️ CalculationHandler not available, falling back to StandardHandler"
+                )
                 preprocessed_data["is_calculation"] = True
                 return await self.standard_handler.handle(
                     preprocessed_data, start_time, language=language
@@ -935,7 +1082,9 @@ class RAGQueryProcessor:
         }
         return translations.get(field, field)
 
-    def _format_calculation_answer(self, calc_result: Dict[str, Any], language: str = "fr") -> str:
+    def _format_calculation_answer(
+        self, calc_result: Dict[str, Any], language: str = "fr"
+    ) -> str:
         """Format calculation result into natural language answer"""
 
         # Cumulative feed calculation
@@ -965,7 +1114,9 @@ class RAGQueryProcessor:
                 if target_weight:
                     # Weight-based calculation
                     answer = f"Pour atteindre un poids cible de {target_weight}g au jour {age_end}, "
-                    answer += f"vous aurez besoin de {total_kg} kg d'aliment par poulet "
+                    answer += (
+                        f"vous aurez besoin de {total_kg} kg d'aliment par poulet "
+                    )
                     answer += f"entre le jour {age_start} et le jour {age_end}"
                 else:
                     # Time-based calculation
@@ -1001,7 +1152,9 @@ class RAGQueryProcessor:
             if language == "en":
                 answer = f"The projected weight at day {age_end} is approximately {weight_kg} kg."
             else:
-                answer = f"Le poids projeté au jour {age_end} est d'environ {weight_kg} kg."
+                answer = (
+                    f"Le poids projeté au jour {age_end} est d'environ {weight_kg} kg."
+                )
 
             return answer
 
@@ -1025,7 +1178,9 @@ class RAGQueryProcessor:
         # Fallback
         return str(calc_result)
 
-    def _build_calculation_contexts(self, calc_result: Dict[str, Any], calc_type: str) -> List[Dict[str, Any]]:
+    def _build_calculation_contexts(
+        self, calc_result: Dict[str, Any], calc_type: str
+    ) -> List[Dict[str, Any]]:
         """
         Build context documents from calculation results for RAGAS evaluation.
 
@@ -1093,15 +1248,17 @@ class RAGQueryProcessor:
             source_context += f"Poids vif total: {total_weight} kg.\n"
             source_context += f"Aliment total consommé: {total_feed} kg."
 
-        contexts.append({
-            "content": source_context,
-            "metadata": {
-                "source": "calculation_engine",
-                "calculation_type": calc_type,
-                "breed": breed,
-                "gender": gender
+        contexts.append(
+            {
+                "content": source_context,
+                "metadata": {
+                    "source": "calculation_engine",
+                    "calculation_type": calc_type,
+                    "breed": breed,
+                    "gender": gender,
+                },
             }
-        })
+        )
 
         # Context 2: Methodology explanation
         methodology = "Méthodologie de calcul: "
@@ -1121,13 +1278,15 @@ class RAGQueryProcessor:
         elif "total_live_weight_kg" in calc_result:
             methodology += "Calcul du poids et de la consommation totale en multipliant les valeurs individuelles par la taille du troupeau."
 
-        contexts.append({
-            "content": methodology,
-            "metadata": {
-                "source": "calculation_methodology",
-                "calculation_type": calc_type
+        contexts.append(
+            {
+                "content": methodology,
+                "metadata": {
+                    "source": "calculation_methodology",
+                    "calculation_type": calc_type,
+                },
             }
-        })
+        )
 
         # Context 3: Data quality and confidence
         confidence = calc_result.get("confidence", 0.0)
@@ -1141,26 +1300,22 @@ class RAGQueryProcessor:
             if details.get("extrapolation_applied"):
                 quality_context += "Extrapolation appliquée: Projection au-delà des données de référence disponibles.\n"
             if details.get("data_source"):
-                quality_context += f"Source des données: {details.get('data_source')}.\n"
+                quality_context += (
+                    f"Source des données: {details.get('data_source')}.\n"
+                )
 
         quality_context += "Les calculs sont basés sur les standards de performance publiés par les sélectionneurs."
 
-        contexts.append({
-            "content": quality_context,
-            "metadata": {
-                "source": "data_quality",
-                "confidence": confidence
+        contexts.append(
+            {
+                "content": quality_context,
+                "metadata": {"source": "data_quality", "confidence": confidence},
             }
-        })
+        )
 
         return contexts
 
-    def _format_external_answer(
-        self,
-        document,
-        language: str,
-        query: str
-    ) -> RAGResult:
+    def _format_external_answer(self, document, language: str, query: str) -> RAGResult:
         """
         Format answer from external document
 
@@ -1177,7 +1332,9 @@ class RAGQueryProcessor:
             if len(document.authors) == 1:
                 citation = f"{document.authors[0]} ({document.year})"
             elif len(document.authors) == 2:
-                citation = f"{document.authors[0]} & {document.authors[1]} ({document.year})"
+                citation = (
+                    f"{document.authors[0]} & {document.authors[1]} ({document.year})"
+                )
             else:
                 citation = f"{document.authors[0]} et al. ({document.year})"
         else:
@@ -1198,17 +1355,19 @@ class RAGQueryProcessor:
                 answer += f"\n**Link:** {document.url}"
 
         # Build context docs for RAGAS evaluation
-        context_docs = [{
-            "content": document.abstract,
-            "metadata": {
-                "source": document.source,
-                "title": document.title,
-                "authors": ", ".join(document.authors),
-                "year": document.year,
-                "citations": document.citation_count,
-                "url": document.url
+        context_docs = [
+            {
+                "content": document.abstract,
+                "metadata": {
+                    "source": document.source,
+                    "title": document.title,
+                    "authors": ", ".join(document.authors),
+                    "year": document.year,
+                    "citations": document.citation_count,
+                    "url": document.url,
+                },
             }
-        }]
+        ]
 
         return RAGResult(
             source=RAGSource.RETRIEVAL_SUCCESS,
@@ -1226,6 +1385,6 @@ class RAGQueryProcessor:
                 "url": document.url,
                 "journal": document.journal,
                 "original_query": query,
-                "language": language
-            }
+                "language": language,
+            },
         )

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ValidationWarning:
     """Represents a validation warning for out-of-range values"""
+
     metric: str
     value: float
     expected_range: Tuple[float, float]
@@ -56,32 +57,26 @@ class PoultryMetricsValidator:
         "bw_layer": (1200, 2200, "g", "Layer Body Weight"),
         "feed_intake_broiler": (50, 200, "g/day", "Broiler Feed Intake"),
         "feed_intake_layer": (90, 140, "g/day", "Layer Feed Intake"),
-
         # === MORTALITY & HEALTH ===
         "mortality_daily": (0.0, 2.0, "%", "Daily Mortality Rate"),
         "mortality_cumulative": (0.0, 25.0, "%", "Cumulative Mortality"),
         "hatchability": (60.0, 95.0, "%", "Hatchability Rate"),
-
         # === PRODUCTION (LAYERS) ===
         "hen_day_production": (60.0, 98.0, "%", "Hen-Day Egg Production"),
         "egg_weight": (45, 75, "g", "Egg Weight"),
         "eggs_per_hen": (200, 340, "eggs/year", "Annual Eggs per Hen"),
-
         # === AGE & TIMING (DAYS) ===
         "age_vaccination": (1, 150, "days", "Vaccination Age"),
         "age_slaughter_broiler": (28, 70, "days", "Broiler Slaughter Age"),
         "age_first_egg": (100, 200, "days", "Age at First Egg"),
-
         # === ENVIRONMENTAL ===
         "temperature": (10, 38, "°C", "Environmental Temperature"),
         "humidity": (35, 85, "%", "Relative Humidity"),
         "ventilation_rate": (0.5, 15.0, "m³/h/kg", "Ventilation Rate"),
-
         # === NUTRITION ===
         "protein_percent": (12.0, 28.0, "%", "Dietary Protein"),
         "energy_me": (2400, 3400, "kcal/kg", "Metabolizable Energy"),
         "calcium_percent": (0.5, 5.0, "%", "Dietary Calcium"),
-
         # === DOSAGES (general ranges - specific drugs vary) ===
         "vaccine_dose": (0.05, 2.0, "mL", "Vaccine Dose"),
         "water_medication": (0.01, 100.0, "g/L", "Water Medication Concentration"),
@@ -133,13 +128,12 @@ class PoultryMetricsValidator:
 
     def __init__(self) -> None:
         """Initialize the validator"""
-        logger.info(f"[OK] PoultryMetricsValidator initialized with {len(self.VALID_RANGES)} metric ranges")
+        logger.info(
+            f"[OK] PoultryMetricsValidator initialized with {len(self.VALID_RANGES)} metric ranges"
+        )
 
     def validate_response(
-        self,
-        text: str,
-        language: str = "en",
-        strict_mode: bool = True
+        self, text: str, language: str = "en", strict_mode: bool = True
     ) -> Dict[str, Any]:
         """
         Validate a generated response for metric hallucinations
@@ -167,7 +161,9 @@ class PoultryMetricsValidator:
                 for match in matches:
                     try:
                         value = float(match.group(1))
-                        warning = self._validate_metric(metric_key, value, match.group(0))
+                        warning = self._validate_metric(
+                            metric_key, value, match.group(0)
+                        )
                         if warning:
                             warnings.append(warning)
                     except (ValueError, IndexError):
@@ -196,10 +192,7 @@ class PoultryMetricsValidator:
         return result
 
     def _validate_metric(
-        self,
-        metric_key: str,
-        value: float,
-        context: str
+        self, metric_key: str, value: float, context: str
     ) -> Optional[ValidationWarning]:
         """
         Validate a single metric value against acceptable ranges
@@ -220,7 +213,9 @@ class PoultryMetricsValidator:
         severity = self._calculate_severity(value, min_val, max_val)
 
         # Generate suggestion
-        suggestion = self._generate_correction_suggestion(metric_key, value, min_val, max_val, unit)
+        suggestion = self._generate_correction_suggestion(
+            metric_key, value, min_val, max_val, unit
+        )
 
         return ValidationWarning(
             metric=metric_key,
@@ -228,7 +223,7 @@ class PoultryMetricsValidator:
             expected_range=(min_val, max_val),
             context=context,
             severity=severity,
-            suggestion=suggestion
+            suggestion=suggestion,
         )
 
     def _calculate_severity(self, value: float, min_val: float, max_val: float) -> str:
@@ -241,7 +236,7 @@ class PoultryMetricsValidator:
         LOW: Value is slightly out of range (<1.5x out of range)
         """
         if value < min_val:
-            ratio = min_val / value if value > 0 else float('inf')
+            ratio = min_val / value if value > 0 else float("inf")
         else:  # value > max_val
             ratio = value / max_val
 
@@ -255,12 +250,7 @@ class PoultryMetricsValidator:
             return "LOW"
 
     def _generate_correction_suggestion(
-        self,
-        metric_key: str,
-        value: float,
-        min_val: float,
-        max_val: float,
-        unit: str
+        self, metric_key: str, value: float, min_val: float, max_val: float, unit: str
     ) -> str:
         """Generate a human-readable correction suggestion"""
         _, _, _, description = self.VALID_RANGES[metric_key]
@@ -278,13 +268,17 @@ class PoultryMetricsValidator:
                 f"Typical value: ~{(min_val + max_val) / 2:.1f} {unit}"
             )
 
-    def _generate_suggestion(self, warnings: List[ValidationWarning], blocked: bool) -> str:
+    def _generate_suggestion(
+        self, warnings: List[ValidationWarning], blocked: bool
+    ) -> str:
         """Generate overall suggestion based on warnings"""
         if not warnings:
             return "Response validated successfully"
 
         if blocked:
-            critical_warnings = [w for w in warnings if w.severity in ["HIGH", "CRITICAL"]]
+            critical_warnings = [
+                w for w in warnings if w.severity in ["HIGH", "CRITICAL"]
+            ]
             return (
                 f"Response contains {len(critical_warnings)} critical metric hallucination(s). "
                 f"This response should NOT be shown to users. "

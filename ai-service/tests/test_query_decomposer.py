@@ -15,7 +15,7 @@ from processing.query_decomposer import (
     QueryDecomposer,
     SubQuery,
     DecompositionResult,
-    get_query_decomposer
+    get_query_decomposer,
 )
 
 
@@ -32,8 +32,8 @@ class TestQueryDecomposerBasics:
         assert decomposer is not None
         assert len(decomposer.complexity_patterns) > 0
         assert len(decomposer.factor_patterns) > 0
-        assert 'nutrition' in decomposer.factor_patterns
-        assert 'temperature' in decomposer.factor_patterns
+        assert "nutrition" in decomposer.factor_patterns
+        assert "temperature" in decomposer.factor_patterns
 
     def test_singleton_instance(self):
         """Test singleton factory function"""
@@ -78,8 +78,9 @@ class TestComplexityDetection:
         """Test detection based on factor count (3+)"""
         query = "Optimiser nutrition aliment température densité pour Ross 308"
         factors_found = sum(
-            1 for pattern in decomposer.factor_patterns.values()
-            if __import__('re').search(pattern, query.lower())
+            1
+            for pattern in decomposer.factor_patterns.values()
+            if __import__("re").search(pattern, query.lower())
         )
         assert factors_found >= 3
         assert decomposer.detect_complexity(query)
@@ -110,58 +111,58 @@ class TestFactorExtraction:
         """Test nutrition factor extraction"""
         query = "Impact nutrition sur FCR Ross 308"
         factors = decomposer.extract_factors(query)
-        assert 'nutrition' in factors
+        assert "nutrition" in factors
 
     def test_extract_temperature_factor(self, decomposer):
         """Test temperature factor extraction"""
         query = "Effet température sur croissance"
         factors = decomposer.extract_factors(query)
-        assert 'temperature' in factors
+        assert "temperature" in factors
 
     def test_extract_density_factor(self, decomposer):
         """Test density factor extraction"""
         query = "Impact densité sur mortalité"
         factors = decomposer.extract_factors(query)
-        assert 'density' in factors
+        assert "density" in factors
 
     def test_extract_lighting_factor(self, decomposer):
         """Test lighting factor extraction"""
         query = "Influence éclairage sur production"
         factors = decomposer.extract_factors(query)
-        assert 'lighting' in factors
+        assert "lighting" in factors
 
     def test_extract_ventilation_factor(self, decomposer):
         """Test ventilation factor extraction"""
         query = "Effet ventilation sur performance"
         factors = decomposer.extract_factors(query)
-        assert 'ventilation' in factors
+        assert "ventilation" in factors
 
     def test_extract_multiple_factors(self, decomposer):
         """Test extraction of multiple factors"""
         query = "Impact nutrition, température et densité sur FCR"
         factors = decomposer.extract_factors(query)
-        assert 'nutrition' in factors
-        assert 'temperature' in factors
-        assert 'density' in factors
+        assert "nutrition" in factors
+        assert "temperature" in factors
+        assert "density" in factors
         assert len(factors) >= 3
 
     def test_extract_breed_factor(self, decomposer):
         """Test breed factor extraction"""
         query = "Comparaison Ross 308 vs Cobb 500"
         factors = decomposer.extract_factors(query)
-        assert 'breed' in factors
+        assert "breed" in factors
 
     def test_extract_age_factor(self, decomposer):
         """Test age factor extraction"""
         query = "Performance selon âge à 35 jours"
         factors = decomposer.extract_factors(query)
-        assert 'age' in factors
+        assert "age" in factors
 
     def test_extract_sex_factor(self, decomposer):
         """Test sex factor extraction"""
         query = "Comparaison mâles et femelles selon sexe"
         factors = decomposer.extract_factors(query)
-        assert 'sex' in factors
+        assert "sex" in factors
 
     def test_no_factors_in_simple_query(self, decomposer):
         """Test no factors in generic query"""
@@ -183,8 +184,8 @@ class TestExplicitFactorExtraction:
         query = "Impact nutrition et température sur FCR"
         factors = decomposer.extract_multi_factors_explicit(query)
         assert len(factors) >= 2
-        assert any('nutrition' in f.lower() for f in factors)
-        assert any('temp' in f.lower() for f in factors)
+        assert any("nutrition" in f.lower() for f in factors)
+        assert any("temp" in f.lower() for f in factors)
 
     def test_extract_explicit_factors_with_commas(self, decomposer):
         """Test explicit factor extraction with commas"""
@@ -215,7 +216,7 @@ class TestQueryDecomposition:
         assert not result.is_complex
         assert len(result.sub_queries) == 1
         assert result.sub_queries[0].query == query
-        assert result.aggregation_strategy == 'none'
+        assert result.aggregation_strategy == "none"
 
     def test_decompose_multi_factor_query(self, decomposer):
         """Test decomposition of multi-factor query"""
@@ -225,7 +226,7 @@ class TestQueryDecomposition:
         assert isinstance(result, DecompositionResult)
         assert result.is_complex
         assert len(result.sub_queries) >= 2
-        assert result.aggregation_strategy in ['combine', 'compare', 'synthesize']
+        assert result.aggregation_strategy in ["combine", "compare", "synthesize"]
 
     def test_decompose_creates_subqueries(self, decomposer):
         """Test that sub-queries are created correctly"""
@@ -241,7 +242,7 @@ class TestQueryDecomposition:
             assert isinstance(sub_query.query, str)
             assert len(sub_query.query) > 0
             assert isinstance(sub_query.context, dict)
-            assert 'factor' in sub_query.context
+            assert "factor" in sub_query.context
 
     def test_decompose_preserves_original_query(self, decomposer):
         """Test that original query is preserved"""
@@ -273,55 +274,61 @@ class TestSubQueryExecution:
         """Test successful execution of sub-queries"""
         # Create mock sub-queries
         sub_queries = [
-            SubQuery(query="FCR Ross 308", context={'factor': 'nutrition'}, priority=1),
-            SubQuery(query="Poids Ross 308", context={'factor': 'temperature'}, priority=1),
+            SubQuery(query="FCR Ross 308", context={"factor": "nutrition"}, priority=1),
+            SubQuery(
+                query="Poids Ross 308", context={"factor": "temperature"}, priority=1
+            ),
         ]
 
         # Mock executor function
         def mock_executor(query):
-            return {'answer': f'Result for {query}', 'success': True}
+            return {"answer": f"Result for {query}", "success": True}
 
         results = decomposer.execute_subqueries(sub_queries, mock_executor)
 
         assert len(results) == 2
-        assert all('answer' in r for r in results)
-        assert all('sub_query_context' in r for r in results)
-        assert all('sub_query_index' in r for r in results)
+        assert all("answer" in r for r in results)
+        assert all("sub_query_context" in r for r in results)
+        assert all("sub_query_index" in r for r in results)
 
     def test_execute_subqueries_with_error(self, decomposer):
         """Test execution handling errors gracefully"""
         sub_queries = [
-            SubQuery(query="Valid query", context={'factor': 'nutrition'}, priority=1),
-            SubQuery(query="Error query", context={'factor': 'temperature'}, priority=1),
+            SubQuery(query="Valid query", context={"factor": "nutrition"}, priority=1),
+            SubQuery(
+                query="Error query", context={"factor": "temperature"}, priority=1
+            ),
         ]
 
         # Mock executor that fails on second query
         def mock_executor(query):
-            if 'Error' in query:
+            if "Error" in query:
                 raise Exception("Mock error")
-            return {'answer': f'Result for {query}'}
+            return {"answer": f"Result for {query}"}
 
         results = decomposer.execute_subqueries(sub_queries, mock_executor)
 
         assert len(results) == 2
         # First should succeed
-        assert 'answer' in results[0]
+        assert "answer" in results[0]
         # Second should have error
-        assert 'error' in results[1]
+        assert "error" in results[1]
 
     def test_execute_subqueries_attaches_context(self, decomposer):
         """Test that execution attaches context to results"""
         sub_queries = [
-            SubQuery(query="Query 1", context={'factor': 'nutrition', 'index': 0}, priority=1),
+            SubQuery(
+                query="Query 1", context={"factor": "nutrition", "index": 0}, priority=1
+            ),
         ]
 
         def mock_executor(query):
-            return {'answer': 'Result'}
+            return {"answer": "Result"}
 
         results = decomposer.execute_subqueries(sub_queries, mock_executor)
 
-        assert results[0]['sub_query_context'] == {'factor': 'nutrition', 'index': 0}
-        assert results[0]['sub_query_index'] == 0
+        assert results[0]["sub_query_context"] == {"factor": "nutrition", "index": 0}
+        assert results[0]["sub_query_index"] == 0
 
 
 class TestResultAggregation:
@@ -334,70 +341,83 @@ class TestResultAggregation:
     def test_aggregate_combine_strategy(self, decomposer):
         """Test combine aggregation strategy"""
         results = [
-            {'answer': 'Nutrition impact: high', 'sub_query_context': {'factor': 'nutrition'}},
-            {'answer': 'Temperature impact: moderate', 'sub_query_context': {'factor': 'temperature'}},
+            {
+                "answer": "Nutrition impact: high",
+                "sub_query_context": {"factor": "nutrition"},
+            },
+            {
+                "answer": "Temperature impact: moderate",
+                "sub_query_context": {"factor": "temperature"},
+            },
         ]
 
-        aggregated = decomposer.aggregate_results(results, 'combine', 'Original query')
+        aggregated = decomposer.aggregate_results(results, "combine", "Original query")
 
-        assert aggregated['aggregation_type'] == 'combine'
-        assert 'summary' in aggregated
-        assert len(aggregated['summary']) == 2
-        assert aggregated['summary'][0]['factor'] == 'nutrition'
-        assert aggregated['summary'][1]['factor'] == 'temperature'
+        assert aggregated["aggregation_type"] == "combine"
+        assert "summary" in aggregated
+        assert len(aggregated["summary"]) == 2
+        assert aggregated["summary"][0]["factor"] == "nutrition"
+        assert aggregated["summary"][1]["factor"] == "temperature"
 
     def test_aggregate_compare_strategy(self, decomposer):
         """Test compare aggregation strategy"""
         results = [
-            {'answer': 'Ross 308: 2500g', 'sub_query_context': {'factor': 'ross 308'}},
-            {'answer': 'Cobb 500: 2600g', 'sub_query_context': {'factor': 'cobb 500'}},
+            {"answer": "Ross 308: 2500g", "sub_query_context": {"factor": "ross 308"}},
+            {"answer": "Cobb 500: 2600g", "sub_query_context": {"factor": "cobb 500"}},
         ]
 
-        aggregated = decomposer.aggregate_results(results, 'compare', 'Compare breeds')
+        aggregated = decomposer.aggregate_results(results, "compare", "Compare breeds")
 
-        assert aggregated['aggregation_type'] == 'compare'
-        assert 'comparisons' in aggregated
-        assert len(aggregated['comparisons']) >= 1
+        assert aggregated["aggregation_type"] == "compare"
+        assert "comparisons" in aggregated
+        assert len(aggregated["comparisons"]) >= 1
 
     def test_aggregate_synthesize_strategy(self, decomposer):
         """Test synthesize aggregation strategy"""
         results = [
-            {'answer': 'Factor A result', 'sub_query_context': {'factor': 'nutrition'}},
-            {'answer': 'Factor B result', 'sub_query_context': {'factor': 'temperature'}},
-            {'answer': 'Factor C result', 'sub_query_context': {'factor': 'density'}},
+            {"answer": "Factor A result", "sub_query_context": {"factor": "nutrition"}},
+            {
+                "answer": "Factor B result",
+                "sub_query_context": {"factor": "temperature"},
+            },
+            {"answer": "Factor C result", "sub_query_context": {"factor": "density"}},
         ]
 
-        aggregated = decomposer.aggregate_results(results, 'synthesize', 'Overall impact')
+        aggregated = decomposer.aggregate_results(
+            results, "synthesize", "Overall impact"
+        )
 
-        assert aggregated['aggregation_type'] == 'synthesize'
-        assert 'synthesis_parts' in aggregated
-        assert len(aggregated['synthesis_parts']) == 3
-        assert aggregated['needs_llm_synthesis']
+        assert aggregated["aggregation_type"] == "synthesize"
+        assert "synthesis_parts" in aggregated
+        assert len(aggregated["synthesis_parts"]) == 3
+        assert aggregated["needs_llm_synthesis"]
 
     def test_aggregate_handles_errors(self, decomposer):
         """Test aggregation handles error results"""
         results = [
-            {'answer': 'Good result', 'sub_query_context': {'factor': 'nutrition'}},
-            {'error': 'Failed', 'sub_query_context': {'factor': 'temperature'}},
+            {"answer": "Good result", "sub_query_context": {"factor": "nutrition"}},
+            {"error": "Failed", "sub_query_context": {"factor": "temperature"}},
         ]
 
-        aggregated = decomposer.aggregate_results(results, 'combine', 'Query with error')
+        aggregated = decomposer.aggregate_results(
+            results, "combine", "Query with error"
+        )
 
         # Should only aggregate valid results
-        assert 'summary' in aggregated
-        assert len(aggregated['summary']) == 1
+        assert "summary" in aggregated
+        assert len(aggregated["summary"]) == 1
 
     def test_aggregate_all_errors(self, decomposer):
         """Test aggregation when all results have errors"""
         results = [
-            {'error': 'Error 1', 'sub_query_context': {'factor': 'nutrition'}},
-            {'error': 'Error 2', 'sub_query_context': {'factor': 'temperature'}},
+            {"error": "Error 1", "sub_query_context": {"factor": "nutrition"}},
+            {"error": "Error 2", "sub_query_context": {"factor": "temperature"}},
         ]
 
-        aggregated = decomposer.aggregate_results(results, 'combine', 'All failed')
+        aggregated = decomposer.aggregate_results(results, "combine", "All failed")
 
-        assert 'error' in aggregated
-        assert aggregated['error'] == 'All sub-queries failed'
+        assert "error" in aggregated
+        assert aggregated["error"] == "All sub-queries failed"
 
 
 class TestAggregationStrategyDetermination:
@@ -410,23 +430,23 @@ class TestAggregationStrategyDetermination:
     def test_determine_compare_strategy(self, decomposer):
         """Test detection of compare strategy"""
         query = "Comparer Ross 308 versus Cobb 500"
-        factors = ['ross 308', 'cobb 500']
+        factors = ["ross 308", "cobb 500"]
         strategy = decomposer._determine_aggregation_strategy(query, factors)
-        assert strategy == 'compare'
+        assert strategy == "compare"
 
     def test_determine_synthesize_strategy(self, decomposer):
         """Test detection of synthesize strategy"""
         query = "Synthèse globale des impacts nutrition et température"
-        factors = ['nutrition', 'temperature']
+        factors = ["nutrition", "temperature"]
         strategy = decomposer._determine_aggregation_strategy(query, factors)
-        assert strategy == 'synthesize'
+        assert strategy == "synthesize"
 
     def test_determine_combine_strategy_default(self, decomposer):
         """Test default combine strategy"""
         query = "Impact nutrition et température sur FCR"
-        factors = ['nutrition', 'temperature']
+        factors = ["nutrition", "temperature"]
         strategy = decomposer._determine_aggregation_strategy(query, factors)
-        assert strategy in ['combine', 'compare', 'synthesize']
+        assert strategy in ["combine", "compare", "synthesize"]
 
 
 class TestIntegration:
@@ -438,7 +458,9 @@ class TestIntegration:
 
     def test_full_workflow_complex_query(self, decomposer):
         """Test complete workflow with complex query"""
-        query = "Impact nutrition, température et densité sur FCR Ross 308 mâles à 35 jours"
+        query = (
+            "Impact nutrition, température et densité sur FCR Ross 308 mâles à 35 jours"
+        )
 
         # Step 1: Detect complexity
         is_complex = decomposer.detect_complexity(query)
@@ -455,18 +477,18 @@ class TestIntegration:
 
         # Step 4: Mock execution
         def mock_executor(q):
-            return {'answer': f'Result for {q}'}
+            return {"answer": f"Result for {q}"}
 
-        execution_results = decomposer.execute_subqueries(result.sub_queries, mock_executor)
+        execution_results = decomposer.execute_subqueries(
+            result.sub_queries, mock_executor
+        )
         assert len(execution_results) == len(result.sub_queries)
 
         # Step 5: Aggregate
         aggregated = decomposer.aggregate_results(
-            execution_results,
-            result.aggregation_strategy,
-            query
+            execution_results, result.aggregation_strategy, query
         )
-        assert 'aggregation_type' in aggregated or 'error' in aggregated
+        assert "aggregation_type" in aggregated or "error" in aggregated
 
     def test_full_workflow_simple_query(self, decomposer):
         """Test complete workflow with simple query"""
@@ -476,7 +498,7 @@ class TestIntegration:
         result = decomposer.decompose(query)
         assert not result.is_complex
         assert len(result.sub_queries) == 1
-        assert result.aggregation_strategy == 'none'
+        assert result.aggregation_strategy == "none"
 
 
 def run_query_decomposer_tests():
@@ -487,11 +509,12 @@ def run_query_decomposer_tests():
         bool: True if all tests pass
     """
     import logging
+
     logging.basicConfig(level=logging.INFO)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("QUERY DECOMPOSER - COMPREHENSIVE TEST SUITE (Phase 3.1)")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     decomposer = QueryDecomposer()
 
@@ -525,9 +548,9 @@ def run_query_decomposer_tests():
         print(f"       | Sub-queries: {len(result.sub_queries)} (min: {min_subs})")
         print(f"       | Strategy: {result.aggregation_strategy}\n")
 
-    print("="*80)
+    print("=" * 80)
     print(f"RESULTS: {passed} passed, {failed} failed (Total: {len(test_cases)})")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     return failed == 0
 

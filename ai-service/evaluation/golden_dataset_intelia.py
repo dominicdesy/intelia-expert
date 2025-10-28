@@ -569,7 +569,7 @@ Conclusion: La nutrition a un impact 1.5-2x plus important que la température s
         # =================================================================
         {
             "question": "Comparer Ross 308 et Cobb 500",
-            "ground_truth": "Pour comparer Ross 308 et Cobb 500 de manière pertinente, j'ai besoin de précisions:\n\n1. **Critère de comparaison**:\n   - Poids vif?\n   - FCR (conversion alimentaire)?\n   - Mortalité?\n   - Rendement carcasse?\n   - Coût global de production?\n   - Tous les critères?\n\n2. **Âge de référence**: 21j, 28j, 35j, 42j, ou autre?\n\n3. **Sexe**: Mâles, femelles, ou mixte?\n\nExemple: \"Comparer Ross 308 et Cobb 500 sur poids et FCR à 35j pour mâles\"\n\nCela me permettra de vous fournir une comparaison chiffrée et précise.",
+            "ground_truth": 'Pour comparer Ross 308 et Cobb 500 de manière pertinente, j\'ai besoin de précisions:\n\n1. **Critère de comparaison**:\n   - Poids vif?\n   - FCR (conversion alimentaire)?\n   - Mortalité?\n   - Rendement carcasse?\n   - Coût global de production?\n   - Tous les critères?\n\n2. **Âge de référence**: 21j, 28j, 35j, 42j, ou autre?\n\n3. **Sexe**: Mâles, femelles, ou mixte?\n\nExemple: "Comparer Ross 308 et Cobb 500 sur poids et FCR à 35j pour mâles"\n\nCela me permettra de vous fournir une comparaison chiffrée et précise.',
             "category": "phase3_enhanced_clarification",
             "lang": "fr",
             "difficulty": "medium",

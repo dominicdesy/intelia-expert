@@ -7,6 +7,7 @@ Test script to verify msgpack compatibility with cache data types
 import msgpack
 import sys
 
+
 def test_embedding_serialization():
     """Test embedding list serialization"""
     print("Testing embedding serialization...")
@@ -28,6 +29,7 @@ def test_embedding_serialization():
     print("[OK] Embedding serialization OK")
     return True
 
+
 def test_intent_result_serialization():
     """Test intent result dictionary serialization"""
     print("Testing intent result serialization...")
@@ -36,12 +38,8 @@ def test_intent_result_serialization():
     intent_result = {
         "intent_type": "performance_query",
         "confidence": 0.95,
-        "detected_entities": {
-            "line": "ross308",
-            "metric": "fcr",
-            "age": "35j"
-        },
-        "expanded_query": "Quel est le FCR pour Ross 308 à 35 jours?"
+        "detected_entities": {"line": "ross308", "metric": "fcr", "age": "35j"},
+        "expanded_query": "Quel est le FCR pour Ross 308 à 35 jours?",
     }
 
     # Serialize with msgpack
@@ -59,6 +57,7 @@ def test_intent_result_serialization():
     print("[OK] Intent result serialization OK")
     return True
 
+
 def test_nested_structures():
     """Test nested data structures"""
     print("Testing nested structures...")
@@ -68,13 +67,10 @@ def test_nested_structures():
         "query": "Test query",
         "results": [
             {"id": 1, "score": 0.95, "metadata": {"source": "pubmed"}},
-            {"id": 2, "score": 0.87, "metadata": {"source": "local"}}
+            {"id": 2, "score": 0.87, "metadata": {"source": "local"}},
         ],
         "embeddings": [[0.1, 0.2], [0.3, 0.4]],
-        "config": {
-            "temperature": 0.7,
-            "max_tokens": 1000
-        }
+        "config": {"temperature": 0.7, "max_tokens": 1000},
     }
 
     # Serialize with msgpack
@@ -93,6 +89,7 @@ def test_nested_structures():
     print("[OK] Nested structures OK")
     return True
 
+
 def test_unicode_strings():
     """Test Unicode string handling"""
     print("Testing Unicode strings...")
@@ -100,7 +97,7 @@ def test_unicode_strings():
     # French text with accents
     data = {
         "question": "Quelle est la température idéale pour Ross 308?",
-        "answer": "La température recommandée est de 32°C au démarrage"
+        "answer": "La température recommandée est de 32°C au démarrage",
     }
 
     # Serialize with msgpack
@@ -118,6 +115,7 @@ def test_unicode_strings():
     print("[OK] Unicode strings OK")
     return True
 
+
 def test_size_comparison():
     """Compare msgpack vs pickle size"""
     print("\nSize comparison (msgpack vs pickle)...")
@@ -130,7 +128,7 @@ def test_size_comparison():
     msgpack_size = len(msgpack.packb(embedding, use_bin_type=True))
     pickle_size = len(pickle.dumps(embedding, protocol=pickle.HIGHEST_PROTOCOL))
 
-    print(f"  Embedding (1536 floats):")
+    print("  Embedding (1536 floats):")
     print(f"    msgpack: {msgpack_size} bytes")
     print(f"    pickle:  {pickle_size} bytes")
     print(f"    Difference: {((msgpack_size - pickle_size) / pickle_size * 100):+.1f}%")
@@ -140,18 +138,19 @@ def test_size_comparison():
         "intent_type": "performance_query",
         "confidence": 0.95,
         "detected_entities": {"line": "ross308", "metric": "fcr", "age": "35j"},
-        "expanded_query": "Quel est le FCR pour Ross 308 à 35 jours?"
+        "expanded_query": "Quel est le FCR pour Ross 308 à 35 jours?",
     }
 
     msgpack_size = len(msgpack.packb(intent_data, use_bin_type=True))
     pickle_size = len(pickle.dumps(intent_data, protocol=pickle.HIGHEST_PROTOCOL))
 
-    print(f"  Intent result dict:")
+    print("  Intent result dict:")
     print(f"    msgpack: {msgpack_size} bytes")
     print(f"    pickle:  {pickle_size} bytes")
     print(f"    Difference: {((msgpack_size - pickle_size) / pickle_size * 100):+.1f}%")
 
     return True
+
 
 def main():
     """Run all tests"""
@@ -165,7 +164,7 @@ def main():
         test_intent_result_serialization,
         test_nested_structures,
         test_unicode_strings,
-        test_size_comparison
+        test_size_comparison,
     ]
 
     passed = 0
@@ -179,6 +178,7 @@ def main():
             print(f"[FAILED] {test.__name__}: {e}")
             failed += 1
             import traceback
+
             traceback.print_exc()
 
     print()
@@ -194,6 +194,7 @@ def main():
         print()
         print("[ERROR] Some tests failed. Please review the errors.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

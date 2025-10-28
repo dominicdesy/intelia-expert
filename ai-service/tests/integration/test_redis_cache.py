@@ -107,7 +107,7 @@ async def test_cache_compression(cache_core):
     large_value = {
         "data": "x" * 5000,  # 5KB de données
         "array": list(range(1000)),
-        "nested": {"key": "value"} * 100
+        "nested": {"key": "value"} * 100,
     }
 
     # Set avec compression
@@ -185,10 +185,7 @@ async def test_cache_batch_operations(cache_core):
     """Test 7: Opérations batch"""
 
     # Set multiple keys
-    keys_values = {
-        f"test:batch:{i}": {"value": i}
-        for i in range(10)
-    }
+    keys_values = {f"test:batch:{i}": {"value": i} for i in range(10)}
 
     for key, value in keys_values.items():
         await cache_core.set(key, value, ttl=60)

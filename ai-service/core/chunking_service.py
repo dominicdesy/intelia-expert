@@ -24,15 +24,15 @@ import re
 import logging
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
-from datetime import datetime
 
 
 @dataclass
 class ChunkConfig:
     """Configuration for semantic chunking"""
-    min_chunk_words: int = 50          # Minimum viable chunk size
-    max_chunk_words: int = 1200        # Optimized for embeddings (was tested as sweet spot)
-    overlap_words: int = 240           # 20% overlap for context preservation
+
+    min_chunk_words: int = 50  # Minimum viable chunk size
+    max_chunk_words: int = 1200  # Optimized for embeddings (was tested as sweet spot)
+    overlap_words: int = 240  # 20% overlap for context preservation
 
     # Semantic splitting preferences
     prefer_markdown_sections: bool = True
@@ -40,7 +40,7 @@ class ChunkConfig:
     prefer_sentence_boundaries: bool = True
 
     # Quality filters
-    min_content_length: int = 10       # Minimum characters
+    min_content_length: int = 10  # Minimum characters
     max_special_char_ratio: float = 0.8  # Max ratio of special chars
     min_unique_word_ratio: float = 0.05  # Min ratio of unique words (anti-repetition)
 
@@ -48,6 +48,7 @@ class ChunkConfig:
 @dataclass
 class Chunk:
     """Represents a semantic chunk of text"""
+
     content: str
     word_count: int
     chunk_index: int
@@ -61,7 +62,7 @@ class Chunk:
             "word_count": self.word_count,
             "chunk_index": self.chunk_index,
             "source_type": self.source_type,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
 
@@ -82,11 +83,11 @@ class ChunkingService:
     """
 
     # Compiled regex patterns for performance (10x faster than re.compile on every call)
-    MARKDOWN_HEADER_PATTERN = re.compile(r'^(#+)\s+(.+)$', re.MULTILINE)
-    SENTENCE_SPLIT_PATTERN = re.compile(r'(?<=[.!?])\s+')
-    IMAGE_MARKDOWN_PATTERN = re.compile(r'!\[Image description\]\([^)]*\)')
-    WHITESPACE_NORMALIZE_PATTERN = re.compile(r'\n\s*\n\s*\n')
-    SPACE_NORMALIZE_PATTERN = re.compile(r'[ \t]+')
+    MARKDOWN_HEADER_PATTERN = re.compile(r"^(#+)\s+(.+)$", re.MULTILINE)
+    SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+")
+    IMAGE_MARKDOWN_PATTERN = re.compile(r"!\[Image description\]\([^)]*\)")
+    WHITESPACE_NORMALIZE_PATTERN = re.compile(r"\n\s*\n\s*\n")
+    SPACE_NORMALIZE_PATTERN = re.compile(r"[ \t]+")
 
     def __init__(self, config: Optional[ChunkConfig] = None):
         """
@@ -105,9 +106,7 @@ class ChunkingService:
         )
 
     def chunk_text(
-        self,
-        text: str,
-        metadata: Optional[Dict[str, Any]] = None
+        self, text: str, metadata: Optional[Dict[str, Any]] = None
     ) -> List[Chunk]:
         """
         Chunk text into semantic segments
@@ -127,7 +126,9 @@ class ChunkingService:
         cleaned_text = self._clean_text(text)
 
         # Detect structure and choose chunking strategy
-        if self.config.prefer_markdown_sections and self._has_markdown_structure(cleaned_text):
+        if self.config.prefer_markdown_sections and self._has_markdown_structure(
+            cleaned_text
+        ):
             chunks = self._chunk_by_markdown_sections(cleaned_text, metadata or {})
         elif self.config.prefer_paragraph_boundaries:
             chunks = self._chunk_by_paragraphs(cleaned_text, metadata or {})
@@ -145,9 +146,7 @@ class ChunkingService:
         return valid_chunks
 
     def chunk_document(
-        self,
-        document: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None
+        self, document: Dict[str, Any], metadata: Optional[Dict[str, Any]] = None
     ) -> List[Chunk]:
         """
         Chunk document from external sources (abstracts, full-text, etc.)
@@ -199,13 +198,13 @@ class ChunkingService:
         - Single-pass processing
         """
         # Remove markdown images
-        text = self.IMAGE_MARKDOWN_PATTERN.sub('', text)
+        text = self.IMAGE_MARKDOWN_PATTERN.sub("", text)
 
         # Normalize multiple blank lines to double newline
-        text = self.WHITESPACE_NORMALIZE_PATTERN.sub('\n\n', text)
+        text = self.WHITESPACE_NORMALIZE_PATTERN.sub("\n\n", text)
 
         # Normalize spaces and tabs
-        text = self.SPACE_NORMALIZE_PATTERN.sub(' ', text)
+        text = self.SPACE_NORMALIZE_PATTERN.sub(" ", text)
 
         return text.strip()
 
@@ -216,10 +215,10 @@ class ChunkingService:
             return True
 
         # Check for lists (bullets, numbers)
-        if re.search(r'^\s*[-*]\s', text, re.MULTILINE):
+        if re.search(r"^\s*[-*]\s", text, re.MULTILINE):
             return True
 
-        if re.search(r'^\s*\d+\.\s', text, re.MULTILINE):
+        if re.search(r"^\s*\d+\.\s", text, re.MULTILINE):
             return True
 
         return False
@@ -227,9 +226,7 @@ class ChunkingService:
     # ===== CHUNKING STRATEGIES =====
 
     def _chunk_by_markdown_sections(
-        self,
-        text: str,
-        metadata: Dict[str, Any]
+        self, text: str, metadata: Dict[str, Any]
     ) -> List[Chunk]:
         """
         Chunk by markdown sections (headers)
@@ -240,7 +237,7 @@ class ChunkingService:
         3. Respect max_chunk_words limit
         """
         chunks = []
-        sections = re.split(r'\n(?=#+\s)', text)
+        sections = re.split(r"\n(?=#+\s)", text)
 
         current_segment = ""
         current_words = 0
@@ -260,13 +257,15 @@ class ChunkingService:
             else:
                 # Save current chunk
                 if current_segment and current_words >= self.config.min_chunk_words:
-                    chunks.append(Chunk(
-                        content=current_segment.strip(),
-                        word_count=current_words,
-                        chunk_index=chunk_index,
-                        source_type="markdown_section",
-                        metadata=metadata.copy()
-                    ))
+                    chunks.append(
+                        Chunk(
+                            content=current_segment.strip(),
+                            word_count=current_words,
+                            chunk_index=chunk_index,
+                            source_type="markdown_section",
+                            metadata=metadata.copy(),
+                        )
+                    )
                     chunk_index += 1
 
                 # Start new chunk
@@ -275,21 +274,19 @@ class ChunkingService:
 
         # Final chunk
         if current_segment and current_words >= self.config.min_chunk_words:
-            chunks.append(Chunk(
-                content=current_segment.strip(),
-                word_count=current_words,
-                chunk_index=chunk_index,
-                source_type="markdown_section",
-                metadata=metadata.copy()
-            ))
+            chunks.append(
+                Chunk(
+                    content=current_segment.strip(),
+                    word_count=current_words,
+                    chunk_index=chunk_index,
+                    source_type="markdown_section",
+                    metadata=metadata.copy(),
+                )
+            )
 
         return chunks
 
-    def _chunk_by_paragraphs(
-        self,
-        text: str,
-        metadata: Dict[str, Any]
-    ) -> List[Chunk]:
+    def _chunk_by_paragraphs(self, text: str, metadata: Dict[str, Any]) -> List[Chunk]:
         """
         Chunk by paragraphs with intelligent overlap
 
@@ -299,7 +296,7 @@ class ChunkingService:
         3. Add overlap from previous chunk (20% = 240 words)
         """
         chunks = []
-        paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
 
         if not paragraphs:
             return chunks
@@ -316,23 +313,27 @@ class ChunkingService:
             if current_words + para_words > self.config.max_chunk_words:
                 # Save current chunk
                 if current_chunk and current_words >= self.config.min_chunk_words:
-                    chunks.append(Chunk(
-                        content=current_chunk.strip(),
-                        word_count=current_words,
-                        chunk_index=chunk_index,
-                        source_type="paragraph_group",
-                        metadata=metadata.copy()
-                    ))
+                    chunks.append(
+                        Chunk(
+                            content=current_chunk.strip(),
+                            word_count=current_words,
+                            chunk_index=chunk_index,
+                            source_type="paragraph_group",
+                            metadata=metadata.copy(),
+                        )
+                    )
                     chunk_index += 1
 
                     # Store paragraphs for overlap
-                    previous_paragraphs = current_chunk.split('\n\n')
+                    previous_paragraphs = current_chunk.split("\n\n")
 
                 # Create overlap from previous chunk
                 overlap_text = self._create_overlap(previous_paragraphs)
 
                 # Start new chunk with overlap + current paragraph
-                current_chunk = overlap_text + "\n\n" + paragraph if overlap_text else paragraph
+                current_chunk = (
+                    overlap_text + "\n\n" + paragraph if overlap_text else paragraph
+                )
                 current_words = len(current_chunk.split())
             else:
                 # Add paragraph to current chunk
@@ -341,21 +342,19 @@ class ChunkingService:
 
         # Final chunk
         if current_chunk and current_words >= self.config.min_chunk_words:
-            chunks.append(Chunk(
-                content=current_chunk.strip(),
-                word_count=current_words,
-                chunk_index=chunk_index,
-                source_type="paragraph_group",
-                metadata=metadata.copy()
-            ))
+            chunks.append(
+                Chunk(
+                    content=current_chunk.strip(),
+                    word_count=current_words,
+                    chunk_index=chunk_index,
+                    source_type="paragraph_group",
+                    metadata=metadata.copy(),
+                )
+            )
 
         return chunks
 
-    def _chunk_by_sentences(
-        self,
-        text: str,
-        metadata: Dict[str, Any]
-    ) -> List[Chunk]:
+    def _chunk_by_sentences(self, text: str, metadata: Dict[str, Any]) -> List[Chunk]:
         """
         Chunk by sentences (last resort for unstructured text)
 
@@ -382,13 +381,15 @@ class ChunkingService:
             if current_words + sentence_words > self.config.max_chunk_words:
                 # Save current chunk
                 if current_segment and current_words >= self.config.min_chunk_words:
-                    chunks.append(Chunk(
-                        content=current_segment.strip(),
-                        word_count=current_words,
-                        chunk_index=chunk_index,
-                        source_type="sentence_group",
-                        metadata=metadata.copy()
-                    ))
+                    chunks.append(
+                        Chunk(
+                            content=current_segment.strip(),
+                            word_count=current_words,
+                            chunk_index=chunk_index,
+                            source_type="sentence_group",
+                            metadata=metadata.copy(),
+                        )
+                    )
                     chunk_index += 1
 
                 # Start new chunk
@@ -401,13 +402,15 @@ class ChunkingService:
 
         # Final chunk
         if current_segment and current_words >= self.config.min_chunk_words:
-            chunks.append(Chunk(
-                content=current_segment.strip(),
-                word_count=current_words,
-                chunk_index=chunk_index,
-                source_type="sentence_group",
-                metadata=metadata.copy()
-            ))
+            chunks.append(
+                Chunk(
+                    content=current_segment.strip(),
+                    word_count=current_words,
+                    chunk_index=chunk_index,
+                    source_type="sentence_group",
+                    metadata=metadata.copy(),
+                )
+            )
 
         return chunks
 
@@ -457,9 +460,12 @@ class ChunkingService:
                 continue
 
             # Check special character ratio
-            special_chars = len(re.findall(r'[^a-zA-Z0-9\s]', chunk.content))
+            special_chars = len(re.findall(r"[^a-zA-Z0-9\s]", chunk.content))
             total_chars = len(chunk.content)
-            if total_chars > 0 and special_chars / total_chars > self.config.max_special_char_ratio:
+            if (
+                total_chars > 0
+                and special_chars / total_chars > self.config.max_special_char_ratio
+            ):
                 continue
 
             # Check for extreme repetition (only for long chunks)
@@ -486,7 +492,7 @@ class ChunkingService:
                 "avg_words": 0,
                 "min_words": 0,
                 "max_words": 0,
-                "total_words": 0
+                "total_words": 0,
             }
 
         word_counts = [chunk.word_count for chunk in chunks]
@@ -498,7 +504,9 @@ class ChunkingService:
             "max_words": max(word_counts),
             "total_words": sum(word_counts),
             "source_types": {
-                chunk.source_type: sum(1 for c in chunks if c.source_type == chunk.source_type)
+                chunk.source_type: sum(
+                    1 for c in chunks if c.source_type == chunk.source_type
+                )
                 for chunk in chunks
-            }
+            },
         }

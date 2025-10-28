@@ -50,6 +50,7 @@ try:
     from retrieval.embedder import OpenAIEmbedder
     from retrieval.retriever import HybridWeaviateRetriever
     from generation.generators import EnhancedResponseGenerator
+
     # 🔧 MIGRATION: LLM-based OOD detection au lieu de keyword-based
     from security.llm_ood_detector import LLMOODDetector
 
@@ -448,7 +449,9 @@ class WeaviateCore(InitializableMixin):
                 enable_cache=True,
                 cache_size=1000,
             )
-            logger.info(f"✅ Guardrails initialisés (niveau: {verification_level.value})")
+            logger.info(
+                f"✅ Guardrails initialisés (niveau: {verification_level.value})"
+            )
         except Exception as e:
             logger.warning(f"Guardrails échoué: {e}")
 
@@ -683,11 +686,7 @@ class WeaviateCore(InitializableMixin):
                 )
 
             # 🔄 COHERE RE-RANKING (independent of Intelligent RRF)
-            if (
-                self.reranker
-                and self.reranker.is_enabled()
-                and len(filtered_docs) > 1
-            ):
+            if self.reranker and self.reranker.is_enabled() and len(filtered_docs) > 1:
                 try:
                     logger.info(
                         f"🔄 Applying Cohere reranking on {len(filtered_docs)} filtered documents"
@@ -1050,7 +1049,9 @@ class WeaviateCore(InitializableMixin):
         context_hash = ""
         if conversation_context:
             context_str = str(conversation_context)
-            context_hash = hashlib.md5(context_str.encode(), usedforsecurity=False).hexdigest()[:8]
+            context_hash = hashlib.md5(
+                context_str.encode(), usedforsecurity=False
+            ).hexdigest()[:8]
 
         return f"{tenant_id}:{hashlib.md5(query.encode(), usedforsecurity=False).hexdigest()}:{language}:{context_hash}"
 

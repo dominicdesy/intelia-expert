@@ -32,11 +32,14 @@ async def test_chat_endpoint_simple_query_french():
     """Test 1: Query simple en français"""
 
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.post("/chat", json={
-            "message": "Quel poids pour Ross 308 à 35 jours ?",
-            "language": "fr",
-            "user_id": "test_user_1"
-        })
+        response = await client.post(
+            "/chat",
+            json={
+                "message": "Quel poids pour Ross 308 à 35 jours ?",
+                "language": "fr",
+                "user_id": "test_user_1",
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -68,27 +71,30 @@ async def test_chat_endpoint_multilingual():
         {
             "message": "Quel est le poids optimal pour Ross 308 à 35 jours ?",
             "language": "fr",
-            "expected_keywords": ["poids", "Ross 308", "35 jours"]
+            "expected_keywords": ["poids", "Ross 308", "35 jours"],
         },
         {
             "message": "What is the optimal weight for Ross 308 at 35 days?",
             "language": "en",
-            "expected_keywords": ["weight", "Ross 308", "35 days"]
+            "expected_keywords": ["weight", "Ross 308", "35 days"],
         },
         {
             "message": "¿Cuál es el peso óptimo para Ross 308 a los 35 días?",
             "language": "es",
-            "expected_keywords": ["peso", "Ross 308", "35 días"]
-        }
+            "expected_keywords": ["peso", "Ross 308", "35 días"],
+        },
     ]
 
     async with AsyncClient(app=app, base_url="http://test") as client:
         for i, query in enumerate(queries):
-            response = await client.post("/chat", json={
-                "message": query["message"],
-                "language": query["language"],
-                "user_id": f"test_user_{i}"
-            })
+            response = await client.post(
+                "/chat",
+                json={
+                    "message": query["message"],
+                    "language": query["language"],
+                    "user_id": f"test_user_{i}",
+                },
+            )
 
             assert response.status_code == 200
             data = response.json()
@@ -106,22 +112,29 @@ async def test_chat_endpoint_complex_query():
     """Test 3: Query complexe multi-critères"""
 
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.post("/chat", json={
-            "message": "Compare le poids et le FCR entre Ross 308 et Cobb 500 à 35 jours",
-            "language": "fr",
-            "user_id": "test_user_complex"
-        })
+        response = await client.post(
+            "/chat",
+            json={
+                "message": "Compare le poids et le FCR entre Ross 308 et Cobb 500 à 35 jours",
+                "language": "fr",
+                "user_id": "test_user_complex",
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
 
         # Query complexe doit retourner plus de sources
-        assert len(data["sources"]) >= 2, "Query complexe devrait avoir plusieurs sources"
+        assert (
+            len(data["sources"]) >= 2
+        ), "Query complexe devrait avoir plusieurs sources"
 
         # Vérifier mentions des deux races
         response_lower = data["response"].lower()
         assert "ross 308" in response_lower, "Ross 308 non mentionné"
-        assert "cobb 500" in response_lower or "cobb" in response_lower, "Cobb 500 non mentionné"
+        assert (
+            "cobb 500" in response_lower or "cobb" in response_lower
+        ), "Cobb 500 non mentionné"
 
         print("\n✅ Test 3 PASSED - Complex query")
         print(f"   Sources: {len(data['sources'])}")
@@ -136,30 +149,33 @@ async def test_chat_endpoint_with_context():
         user_id = "test_user_context"
 
         # Première query
-        response1 = await client.post("/chat", json={
-            "message": "Quel poids pour Ross 308 à 35 jours ?",
-            "language": "fr",
-            "user_id": user_id
-        })
+        response1 = await client.post(
+            "/chat",
+            json={
+                "message": "Quel poids pour Ross 308 à 35 jours ?",
+                "language": "fr",
+                "user_id": user_id,
+            },
+        )
 
         assert response1.status_code == 200
 
         # Deuxième query avec contexte
-        response2 = await client.post("/chat", json={
-            "message": "Et pour Cobb 500 ?",
-            "language": "fr",
-            "user_id": user_id,
-            "conversation_history": [
-                {
-                    "role": "user",
-                    "content": "Quel poids pour Ross 308 à 35 jours ?"
-                },
-                {
-                    "role": "assistant",
-                    "content": response1.json()["response"]
-                }
-            ]
-        })
+        response2 = await client.post(
+            "/chat",
+            json={
+                "message": "Et pour Cobb 500 ?",
+                "language": "fr",
+                "user_id": user_id,
+                "conversation_history": [
+                    {
+                        "role": "user",
+                        "content": "Quel poids pour Ross 308 à 35 jours ?",
+                    },
+                    {"role": "assistant", "content": response1.json()["response"]},
+                ],
+            },
+        )
 
         assert response2.status_code == 200
         data2 = response2.json()
@@ -177,29 +193,33 @@ async def test_chat_endpoint_invalid_inputs():
     async with AsyncClient(app=app, base_url="http://test") as client:
 
         # Test 5.1: Message vide
-        response = await client.post("/chat", json={
-            "message": "",
-            "language": "fr",
-            "user_id": "test_user"
-        })
+        response = await client.post(
+            "/chat", json={"message": "", "language": "fr", "user_id": "test_user"}
+        )
         assert response.status_code in [400, 422], "Message vide devrait être rejeté"
 
         # Test 5.2: Langue non supportée
-        response = await client.post("/chat", json={
-            "message": "Test query",
-            "language": "xx",  # Langue invalide
-            "user_id": "test_user"
-        })
+        response = await client.post(
+            "/chat",
+            json={
+                "message": "Test query",
+                "language": "xx",  # Langue invalide
+                "user_id": "test_user",
+            },
+        )
         # Devrait soit rejeter, soit fallback sur une langue par défaut
         assert response.status_code in [200, 400, 422]
 
         # Test 5.3: Message trop long (>10000 chars)
-        response = await client.post("/chat", json={
-            "message": "a" * 15000,
-            "language": "fr",
-            "user_id": "test_user"
-        })
-        assert response.status_code in [400, 413, 422], "Message trop long devrait être rejeté"
+        response = await client.post(
+            "/chat",
+            json={"message": "a" * 15000, "language": "fr", "user_id": "test_user"},
+        )
+        assert response.status_code in [
+            400,
+            413,
+            422,
+        ], "Message trop long devrait être rejeté"
 
         print("\n✅ Test 5 PASSED - Invalid inputs rejected")
 
@@ -209,11 +229,14 @@ async def test_chat_endpoint_entity_extraction():
     """Test 6: Extraction d'entités dans la query"""
 
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.post("/chat", json={
-            "message": "Quel est le poids des mâles Ross 308 à 5 semaines ?",
-            "language": "fr",
-            "user_id": "test_user_entities"
-        })
+        response = await client.post(
+            "/chat",
+            json={
+                "message": "Quel est le poids des mâles Ross 308 à 5 semaines ?",
+                "language": "fr",
+                "user_id": "test_user_entities",
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -236,11 +259,14 @@ async def test_chat_endpoint_sources_metadata():
     """Test 7: Vérifier métadonnées des sources"""
 
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.post("/chat", json={
-            "message": "Poids Ross 308 à 35 jours",
-            "language": "fr",
-            "user_id": "test_user_sources"
-        })
+        response = await client.post(
+            "/chat",
+            json={
+                "message": "Poids Ross 308 à 35 jours",
+                "language": "fr",
+                "user_id": "test_user_sources",
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -270,11 +296,14 @@ async def test_chat_endpoint_performance():
     async with AsyncClient(app=app, base_url="http://test", timeout=30.0) as client:
         start = time.time()
 
-        response = await client.post("/chat", json={
-            "message": "Quel poids pour Ross 308 à 35 jours ?",
-            "language": "fr",
-            "user_id": "test_user_perf"
-        })
+        response = await client.post(
+            "/chat",
+            json={
+                "message": "Quel poids pour Ross 308 à 35 jours ?",
+                "language": "fr",
+                "user_id": "test_user_perf",
+            },
+        )
 
         duration = time.time() - start
 
@@ -291,11 +320,14 @@ async def test_chat_endpoint_veterinary_disclaimer():
 
     async with AsyncClient(app=app, base_url="http://test") as client:
         # Query avec termes médicaux
-        response = await client.post("/chat", json={
-            "message": "Quels sont les symptômes de la coccidiose chez les poulets ?",
-            "language": "fr",
-            "user_id": "test_user_vet"
-        })
+        response = await client.post(
+            "/chat",
+            json={
+                "message": "Quels sont les symptômes de la coccidiose chez les poulets ?",
+                "language": "fr",
+                "user_id": "test_user_vet",
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -304,8 +336,15 @@ async def test_chat_endpoint_veterinary_disclaimer():
         response_text = data["response"].lower()
 
         # Vérifier présence de termes de disclaimer
-        disclaimer_keywords = ["vétérinaire", "professionnel", "consulter", "diagnostic"]
-        has_disclaimer = any(keyword in response_text for keyword in disclaimer_keywords)
+        disclaimer_keywords = [
+            "vétérinaire",
+            "professionnel",
+            "consulter",
+            "diagnostic",
+        ]
+        has_disclaimer = any(
+            keyword in response_text for keyword in disclaimer_keywords
+        )
 
         # Note: Si votre système n'ajoute pas toujours de disclaimer, ajustez ce test
         print("\n✅ Test 9 PASSED - Veterinary content")
@@ -319,10 +358,13 @@ async def test_chat_endpoint_error_handling():
     async with AsyncClient(app=app, base_url="http://test") as client:
 
         # Test avec payload malformé
-        response = await client.post("/chat", json={
-            "invalid_field": "test",
-            # Champs requis manquants
-        })
+        response = await client.post(
+            "/chat",
+            json={
+                "invalid_field": "test",
+                # Champs requis manquants
+            },
+        )
 
         # Devrait retourner 422 (validation error)
         assert response.status_code == 422

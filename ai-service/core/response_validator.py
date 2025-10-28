@@ -324,11 +324,12 @@ class ResponseQualityValidator:
             "breeds": set(),
             "metrics": set(),
             "ages": set(),
-            "values": set()
+            "values": set(),
         }
 
         # Parser les documents sources pour extraire entités
         import re
+
         for doc in context_docs:
             if isinstance(doc, dict):
                 content = doc.get("content", "").lower()
@@ -340,7 +341,7 @@ class ResponseQualityValidator:
                 r"\b(ross\s*\d+)\b",
                 r"\b(cobb\s*\d+)\b",
                 r"\b(hubbard\s*\d+)\b",
-                r"\b(isa\s*\d+)\b"
+                r"\b(isa\s*\d+)\b",
             ]
             for pattern in breed_patterns:
                 matches = re.findall(pattern, content, re.IGNORECASE)
@@ -375,7 +376,7 @@ class ResponseQualityValidator:
                         issue_type="breed_mismatch",
                         severity="warning",
                         description=f"Documents sources mentionnent {list(source_entities['breeds'])[0]} mais la réponse ne le mentionne pas explicitement",
-                        suggestion="Clarifier quelle souche est concernée dans la réponse"
+                        suggestion="Clarifier quelle souche est concernée dans la réponse",
                     )
                 )
 
@@ -391,31 +392,41 @@ class ResponseQualityValidator:
                         issue_type="value_coherence",
                         severity="info",
                         description="Aucune valeur numérique de la réponse ne correspond exactement aux documents sources",
-                        suggestion="Vérifier que les valeurs sont correctement calculées ou interpolées"
+                        suggestion="Vérifier que les valeurs sont correctement calculées ou interpolées",
                     )
                 )
 
         # Vérifier présence des métriques clés si la question les concerne
         if source_entities["metrics"]:
-            metrics_in_response = sum(1 for m in source_entities["metrics"] if m in response_lower)
+            metrics_in_response = sum(
+                1 for m in source_entities["metrics"] if m in response_lower
+            )
             if metrics_in_response == 0:
                 issues.append(
                     ValidationIssue(
                         issue_type="missing_metrics",
                         severity="warning",
                         description="Documents sources contiennent des métriques spécifiques non mentionnées dans la réponse",
-                        suggestion=f"Considérer mentionner: {', '.join(list(source_entities['metrics'])[:3])}"
+                        suggestion=f"Considérer mentionner: {', '.join(list(source_entities['metrics'])[:3])}",
                     )
                 )
 
         # Analyse sémantique: vérifier contradiction flagrante
         # Exemple: si sources disent "FCR 1.5" et réponse dit "FCR 2.5" pour même contexte
-        fcr_in_sources = re.findall(r"(?:fcr|ic)[:\s]+(\d+[.,]\d+)", " ".join([
-            doc.get("content", "") if isinstance(doc, dict) else str(doc)
-            for doc in context_docs
-        ]), re.IGNORECASE)
+        fcr_in_sources = re.findall(
+            r"(?:fcr|ic)[:\s]+(\d+[.,]\d+)",
+            " ".join(
+                [
+                    doc.get("content", "") if isinstance(doc, dict) else str(doc)
+                    for doc in context_docs
+                ]
+            ),
+            re.IGNORECASE,
+        )
 
-        fcr_in_response = re.findall(r"(?:fcr|ic)[:\s]+(\d+[.,]\d+)", response, re.IGNORECASE)
+        fcr_in_response = re.findall(
+            r"(?:fcr|ic)[:\s]+(\d+[.,]\d+)", response, re.IGNORECASE
+        )
 
         if fcr_in_sources and fcr_in_response:
             # Convertir en float et comparer
@@ -430,7 +441,7 @@ class ResponseQualityValidator:
                             issue_type="fcr_discrepancy",
                             severity="warning",
                             description=f"FCR dans réponse ({response_fcr}) diffère significativement des sources ({source_fcr})",
-                            suggestion="Vérifier calculs ou clarifier contexte différent"
+                            suggestion="Vérifier calculs ou clarifier contexte différent",
                         )
                     )
             except (ValueError, ZeroDivisionError):

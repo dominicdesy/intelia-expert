@@ -49,5 +49,5 @@ def get_llm_client() -> LLMClient:
     else:
         raise ValueError(f"Unknown provider: {settings.llm_provider}")
 
-    logger.info(f"LLM client initialized successfully")
+    logger.info("LLM client initialized successfully")
     return client

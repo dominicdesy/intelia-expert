@@ -52,7 +52,9 @@ class WeaviateSchema:
     """Weaviate collection schema definition"""
 
     @staticmethod
-    def get_collection_config(collection_name: str = "InteliaExpertKnowledge") -> Dict[str, Any]:
+    def get_collection_config(
+        collection_name: str = "InteliaExpertKnowledge",
+    ) -> Dict[str, Any]:
         """
         Returns Weaviate v4 collection configuration
 
@@ -69,7 +71,7 @@ class WeaviateSchema:
                 "text2vec-openai": {
                     "model": "text-embedding-3-small",
                     "dimensions": 1536,
-                    "type": "text"
+                    "type": "text",
                 }
             },
             "properties": [
@@ -78,70 +80,68 @@ class WeaviateSchema:
                     "dataType": ["text"],
                     "description": "Main document content (multilingual)",
                     "indexFilterable": True,
-                    "indexSearchable": True
+                    "indexSearchable": True,
                 },
                 {
                     "name": "species",
                     "dataType": ["text"],
                     "description": "Poultry species (chicken, turkey, duck, etc.)",
-                    "indexFilterable": True
+                    "indexFilterable": True,
                 },
                 {
                     "name": "breed",
                     "dataType": ["text"],
                     "description": "Breed name (Ross 308, Cobb 500, etc.)",
-                    "indexFilterable": True
+                    "indexFilterable": True,
                 },
                 {
                     "name": "age_days",
                     "dataType": ["int"],
                     "description": "Age in days",
                     "indexFilterable": True,
-                    "indexRangeFilters": True
+                    "indexRangeFilters": True,
                 },
                 {
                     "name": "metric",
                     "dataType": ["text"],
                     "description": "Performance metric (weight, FCR, mortality, etc.)",
-                    "indexFilterable": True
+                    "indexFilterable": True,
                 },
                 {
                     "name": "domain",
                     "dataType": ["text"],
                     "description": "Knowledge domain (production, health, nutrition, etc.)",
-                    "indexFilterable": True
+                    "indexFilterable": True,
                 },
                 {
                     "name": "language",
                     "dataType": ["text"],
                     "description": "Document language (ISO 639-1 code)",
-                    "indexFilterable": True
+                    "indexFilterable": True,
                 },
                 {
                     "name": "source",
                     "dataType": ["text"],
                     "description": "Source of the document",
-                    "indexFilterable": True
+                    "indexFilterable": True,
                 },
                 {
                     "name": "metadata",
                     "dataType": ["object"],
-                    "description": "Additional metadata as JSON object"
+                    "description": "Additional metadata as JSON object",
                 },
                 {
                     "name": "created_at",
                     "dataType": ["date"],
-                    "description": "Document creation timestamp"
+                    "description": "Document creation timestamp",
                 },
                 {
                     "name": "updated_at",
                     "dataType": ["date"],
-                    "description": "Last update timestamp"
-                }
+                    "description": "Last update timestamp",
+                },
             ],
-            "vectorIndexConfig": {
-                "distance": "cosine"
-            }
+            "vectorIndexConfig": {"distance": "cosine"},
         }
 
     @staticmethod
@@ -150,15 +150,24 @@ class WeaviateSchema:
         if not doc.content or len(doc.content.strip()) == 0:
             return False
 
-        if doc.language and doc.language not in ["fr", "en", "es", "de", "it", "pt", "pl", "nl", "id", "hi", "zh", "th"]:
+        if doc.language and doc.language not in [
+            "fr",
+            "en",
+            "es",
+            "de",
+            "it",
+            "pt",
+            "pl",
+            "nl",
+            "id",
+            "hi",
+            "zh",
+            "th",
+        ]:
             return False
 
         return True
 
 
 # Export public API
-__all__ = [
-    "WeaviateDocument",
-    "WeaviateQueryResult",
-    "WeaviateSchema"
-]
+__all__ = ["WeaviateDocument", "WeaviateQueryResult", "WeaviateSchema"]

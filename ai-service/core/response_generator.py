@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 # Import ProactiveAssistant for follow-up questions
 try:
     from generation.proactive_assistant import ProactiveAssistant
+
     PROACTIVE_ASSISTANT_AVAILABLE = True
 except ImportError:
     PROACTIVE_ASSISTANT_AVAILABLE = False
@@ -27,6 +28,7 @@ except ImportError:
 # Import LLM Ensemble for high-quality fallback responses
 try:
     from generation.llm_ensemble import get_llm_ensemble, EnsembleMode
+
     LLM_ENSEMBLE_AVAILABLE = True
 except ImportError:
     LLM_ENSEMBLE_AVAILABLE = False
@@ -93,15 +95,23 @@ class RAGResponseGenerator:
             # Robust check: handle both None and empty list cases
             if result.context_docs:
                 if not self.generator:
-                    logger.warning("LLM generator not available, cannot generate response")
-                    result.answer = "Data retrieved but response generation unavailable."
+                    logger.warning(
+                        "LLM generator not available, cannot generate response"
+                    )
+                    result.answer = (
+                        "Data retrieved but response generation unavailable."
+                    )
                 else:
                     logger.info(
                         f"Generating LLM response for {len(result.context_docs)} documents"
                     )
 
                     # Retrieve contextual history
-                    contextual_history = preprocessed_data.get("contextual_history") if preprocessed_data else None
+                    contextual_history = (
+                        preprocessed_data.get("contextual_history")
+                        if preprocessed_data
+                        else None
+                    )
 
                     logger.debug(
                         f"Contextual history type: {type(contextual_history)}, "
@@ -147,7 +157,9 @@ class RAGResponseGenerator:
                             result.metadata = {}
 
                         result.metadata["llm_generation_applied"] = True
-                        result.metadata["llm_input_docs_count"] = len(result.context_docs)
+                        result.metadata["llm_input_docs_count"] = len(
+                            result.context_docs
+                        )
                         result.metadata["conversation_context_used"] = bool(
                             conversation_context
                         )
@@ -161,17 +173,26 @@ class RAGResponseGenerator:
 
                     except Exception as e:
                         logger.error(f"LLM generation error: {e}", exc_info=True)
-                        result.answer = "Unable to generate response from the retrieved data."
+                        result.answer = (
+                            "Unable to generate response from the retrieved data."
+                        )
                         result.metadata["llm_generation_error"] = str(e)
 
             # FALLBACK: If NO documents found or LOW confidence, generate LLM response without context
-            elif result.source in (RAGSource.NO_RESULTS, RAGSource.LOW_CONFIDENCE) and self.generator:
-                logger.info(f"{result.source} detected - generating LLM fallback response without context")
+            elif (
+                result.source in (RAGSource.NO_RESULTS, RAGSource.LOW_CONFIDENCE)
+                and self.generator
+            ):
+                logger.info(
+                    f"{result.source} detected - generating LLM fallback response without context"
+                )
 
                 # Try to use LLM Ensemble for high-quality consensus response
                 if LLM_ENSEMBLE_AVAILABLE and get_llm_ensemble:
                     try:
-                        logger.info("Using LLM Ensemble (multi-LLM consensus) for fallback response")
+                        logger.info(
+                            "Using LLM Ensemble (multi-LLM consensus) for fallback response"
+                        )
 
                         # Get ensemble instance (uses Claude + OpenAI + DeepSeek in parallel)
                         ensemble = get_llm_ensemble(mode=EnsembleMode.BEST_OF_N)
@@ -195,8 +216,12 @@ class RAGResponseGenerator:
 
                         result.metadata["llm_fallback_used"] = True
                         result.metadata["llm_ensemble_used"] = True
-                        result.metadata["ensemble_provider"] = ensemble_result.get("provider")
-                        result.metadata["ensemble_confidence"] = ensemble_result.get("confidence")
+                        result.metadata["ensemble_provider"] = ensemble_result.get(
+                            "provider"
+                        )
+                        result.metadata["ensemble_confidence"] = ensemble_result.get(
+                            "confidence"
+                        )
                         result.metadata["no_documents_reason"] = "LOW_CONFIDENCE"
 
                         logger.info(
@@ -205,12 +230,18 @@ class RAGResponseGenerator:
                         )
 
                     except Exception as e:
-                        logger.warning(f"LLM Ensemble fallback failed: {e}, falling back to single LLM")
+                        logger.warning(
+                            f"LLM Ensemble fallback failed: {e}, falling back to single LLM"
+                        )
                         # Fallback to single LLM if ensemble fails
-                        await self._fallback_single_llm(result, original_query, language)
+                        await self._fallback_single_llm(
+                            result, original_query, language
+                        )
                 else:
                     # Use single LLM if ensemble not available
-                    logger.info("LLM Ensemble not available, using single LLM for fallback")
+                    logger.info(
+                        "LLM Ensemble not available, using single LLM for fallback"
+                    )
                     await self._fallback_single_llm(result, original_query, language)
         else:
             logger.debug("Answer already present, skipping LLM generation")
@@ -249,7 +280,9 @@ class RAGResponseGenerator:
                 # Store follow-up in metadata (will be sent as separate SSE event)
                 if follow_up and follow_up.strip():
                     result.metadata["proactive_followup"] = follow_up
-                    logger.info(f"✅ Proactive follow-up generated: {follow_up[:80]}...")
+                    logger.info(
+                        f"✅ Proactive follow-up generated: {follow_up[:80]}..."
+                    )
                 else:
                     logger.debug("No proactive follow-up generated for this query")
 

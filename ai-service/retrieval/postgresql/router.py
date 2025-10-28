@@ -62,7 +62,6 @@ class QueryRouter:
             "gain",
             "consommation",
             "consumption",
-
             # === BREEDS (PostgreSQL a les données) ===
             "ross",
             "cobb",
@@ -71,7 +70,6 @@ class QueryRouter:
             "lohmann",
             "hy-line",
             "isa",
-
             # === INDICATEURS DE QUESTION MÉTRIQUE ===
             "quel",
             "quelle",
@@ -87,7 +85,6 @@ class QueryRouter:
             "standard",
             "reference",
             "norme",
-
             # === TEMPOREL (souvent lié aux métriques) ===
             "jour",
             "jours",
@@ -99,7 +96,6 @@ class QueryRouter:
             "âge",
             "stade",
             "phase",
-
             # === SEXE (métriques différenciées) ===
             "male",
             "mâle",
@@ -111,7 +107,6 @@ class QueryRouter:
             "females",
             "mixte",
             "mixed",
-
             # === TYPES DE QUESTIONS MÉTRIQUES ===
             "courbe",
             "evolution",
@@ -144,7 +139,6 @@ class QueryRouter:
             "define",
             "c'est quoi",
             "cest quoi",
-
             # === SANTÉ & PATHOLOGIES ===
             "maladie",
             "disease",
@@ -166,7 +160,6 @@ class QueryRouter:
             "vaccine",
             "protocole",
             "protocol",
-
             # === MALADIES COMMUNES (ajoutées aussi aux KNOWLEDGE keywords) ===
             "newcastle",
             "coccidiose",
@@ -178,8 +171,7 @@ class QueryRouter:
             "aviaire",
             "avian",
             "poulet",  # Ajouté pour contexte pathologie
-            "chair",   # "poulet de chair" contexte pathologie
-
+            "chair",  # "poulet de chair" contexte pathologie
             # === PROBLÈMES & CAUSES ===
             "probleme",
             "problem",
@@ -213,18 +205,31 @@ class QueryRouter:
         # IMPORTANT: Detect question/health words in ORIGINAL query BEFORE expansion
         original_query_lower = query.lower()
         question_words = [
-            "comment", "qu'est-ce", "qu est-ce", "quest-ce", "c'est quoi", "cest quoi",
-            "pourquoi", "why", "how", "what is", "expliquer", "explain"
+            "comment",
+            "qu'est-ce",
+            "qu est-ce",
+            "quest-ce",
+            "c'est quoi",
+            "cest quoi",
+            "pourquoi",
+            "why",
+            "how",
+            "what is",
+            "expliquer",
+            "explain",
         ]
         health_keywords = ["traiter", "prévention", "prevenir", "prevent"]
         has_question_word = any(word in original_query_lower for word in question_words)
-        has_health_keyword = any(word in original_query_lower for word in health_keywords)
+        has_health_keyword = any(
+            word in original_query_lower for word in health_keywords
+        )
 
         # LAYER 0: Context resolution (multi-turn)
         if self.use_context_manager:
             if self.context_manager is None:
                 try:
                     from processing.context_manager import get_context_manager
+
                     self.context_manager = get_context_manager()
                     logger.debug("ContextManager initialized")
                 except Exception as e:
@@ -254,11 +259,15 @@ class QueryRouter:
         # Apply boosts from ORIGINAL query (detected earlier)
         if has_question_word:
             knowledge_score += 3  # Very strong boost for question words
-            logger.debug("Question word detected in original query → knowledge_score boosted +3")
+            logger.debug(
+                "Question word detected in original query → knowledge_score boosted +3"
+            )
 
         if has_health_keyword:
             knowledge_score += 2  # Boost for health/treatment keywords
-            logger.debug("Health keyword detected in original query → knowledge_score boosted +2")
+            logger.debug(
+                "Health keyword detected in original query → knowledge_score boosted +2"
+            )
 
         max_score = max(metric_score, knowledge_score)
 
@@ -270,9 +279,7 @@ class QueryRouter:
 
         # Décision avec confiance
         if metric_score > knowledge_score + 1:
-            logger.info(
-                f"✅ METRICS (confident: {metric_score} vs {knowledge_score})"
-            )
+            logger.info(f"✅ METRICS (confident: {metric_score} vs {knowledge_score})")
             return QueryType.METRICS
 
         elif knowledge_score > metric_score + 1:

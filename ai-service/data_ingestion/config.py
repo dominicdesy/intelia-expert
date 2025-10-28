@@ -8,7 +8,7 @@ Last modified: 2025-10-26
 Configuration for data ingestion pipeline
 """
 
-from typing import Dict, List
+from typing import List
 from dataclasses import dataclass
 import os
 
@@ -16,6 +16,7 @@ import os
 @dataclass
 class FetcherConfig:
     """Configuration for a data source fetcher"""
+
     name: str
     enabled: bool
     rate_limit: int  # requests per second
@@ -28,6 +29,7 @@ class FetcherConfig:
 @dataclass
 class ProcessorConfig:
     """Configuration for data processors"""
+
     min_content_length: int = 200  # Minimum abstract length
     min_citations: int = 0  # Minimum citations (0 = no filter)
     min_year: int = 2015  # Only papers from this year onwards
@@ -41,6 +43,7 @@ class ProcessorConfig:
 @dataclass
 class WeaviateConfig:
     """Configuration for Weaviate loader"""
+
     url: str
     api_key: str = None
     class_name: str = "Document"
@@ -58,7 +61,7 @@ class IngestionConfig:
         rate_limit=10,  # 10 requests/sec (conservative)
         max_results_per_topic=500,
         timeout=30,
-        retry_attempts=3
+        retry_attempts=3,
     )
 
     PUBMED = FetcherConfig(
@@ -68,7 +71,7 @@ class IngestionConfig:
         max_results_per_topic=300,
         timeout=30,
         retry_attempts=3,
-        api_key=os.getenv("PUBMED_API_KEY")  # Optional but recommended
+        api_key=os.getenv("PUBMED_API_KEY"),  # Optional but recommended
     )
 
     EUROPE_PMC = FetcherConfig(
@@ -77,7 +80,7 @@ class IngestionConfig:
         rate_limit=5,
         max_results_per_topic=300,
         timeout=30,
-        retry_attempts=3
+        retry_attempts=3,
     )
 
     FAO = FetcherConfig(
@@ -86,7 +89,7 @@ class IngestionConfig:
         rate_limit=1,  # Conservative for scraping
         max_results_per_topic=50,
         timeout=60,
-        retry_attempts=5
+        retry_attempts=5,
     )
 
     # Processing configuration
@@ -94,7 +97,7 @@ class IngestionConfig:
         min_content_length=200,
         min_citations=5,  # At least 5 citations for quality
         min_year=2015,
-        languages=["en", "fr", "es"]
+        languages=["en", "fr", "es"],
     )
 
     # Weaviate configuration
@@ -103,7 +106,7 @@ class IngestionConfig:
         api_key=os.getenv("WEAVIATE_API_KEY"),
         class_name="Document",
         batch_size=100,
-        timeout=30
+        timeout=30,
     )
 
     # Topics to collect
@@ -117,7 +120,6 @@ class IngestionConfig:
         "vitamin requirements poultry",
         "mineral requirements poultry",
         "feed additives poultry",
-
         # Health & Diseases
         "Newcastle disease",
         "infectious bronchitis",
@@ -128,7 +130,6 @@ class IngestionConfig:
         "necrotic enteritis",
         "colibacillosis poultry",
         "mycotoxins poultry",
-
         # Management
         "broiler management",
         "layer management",
@@ -138,30 +139,26 @@ class IngestionConfig:
         "lighting program broiler",
         "water quality poultry",
         "litter management poultry",
-
         # Performance
         "feed conversion ratio",
         "broiler growth performance",
         "egg production optimization",
         "uniformity flock management",
         "mortality reduction poultry",
-
         # Genetics
         "Ross 308 performance",
         "Cobb 500 management",
         "broiler breeding programs",
         "egg production genetics",
-
         # Welfare & Environment
         "animal welfare poultry",
         "environmental impact poultry",
         "carbon footprint poultry production",
         "ammonia emissions poultry",
-
         # Economics
         "poultry production economics",
         "feed cost optimization",
-        "profitability broiler production"
+        "profitability broiler production",
     ]
 
     # Storage paths

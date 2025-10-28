@@ -3,7 +3,13 @@ Prometheus Metrics for LLM Service
 Tracks requests, latency, tokens, and errors
 """
 
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import (
+    Counter,
+    Histogram,
+    Gauge,
+    generate_latest,
+    CONTENT_TYPE_LATEST,
+)
 import time
 from functools import wraps
 import logging
@@ -16,50 +22,43 @@ logger = logging.getLogger(__name__)
 
 # Request counter
 llm_requests_total = Counter(
-    'llm_requests_total',
-    'Total number of LLM inference requests',
-    ['model', 'status']
+    "llm_requests_total", "Total number of LLM inference requests", ["model", "status"]
 )
 
 # Latency histogram
 llm_inference_duration_seconds = Histogram(
-    'llm_inference_duration_seconds',
-    'LLM inference latency in seconds',
-    ['model'],
-    buckets=[0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 30.0]
+    "llm_inference_duration_seconds",
+    "LLM inference latency in seconds",
+    ["model"],
+    buckets=[0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 30.0],
 )
 
 # Token counters
 llm_tokens_generated_total = Counter(
-    'llm_tokens_generated_total',
-    'Total tokens generated',
-    ['model']
+    "llm_tokens_generated_total", "Total tokens generated", ["model"]
 )
 
 llm_tokens_prompt_total = Counter(
-    'llm_tokens_prompt_total',
-    'Total prompt tokens processed',
-    ['model']
+    "llm_tokens_prompt_total", "Total prompt tokens processed", ["model"]
 )
 
 # Model availability
 llm_model_loaded = Gauge(
-    'llm_model_loaded',
-    'Is the model loaded and available (1=yes, 0=no)',
-    ['model', 'provider']
+    "llm_model_loaded",
+    "Is the model loaded and available (1=yes, 0=no)",
+    ["model", "provider"],
 )
 
 # Error counter
 llm_errors_total = Counter(
-    'llm_errors_total',
-    'Total number of errors',
-    ['model', 'error_type']
+    "llm_errors_total", "Total number of errors", ["model", "error_type"]
 )
 
 
 # ============================================
 # TRACKING FUNCTIONS
 # ============================================
+
 
 def track_request(model: str, status: str):
     """Track a request"""
@@ -91,6 +90,7 @@ def set_model_status(model: str, provider: str, available: bool):
 # DECORATOR
 # ============================================
 
+
 def track_inference(model_name: str):
     """
     Decorator to automatically track inference metrics
@@ -100,6 +100,7 @@ def track_inference(model_name: str):
         async def my_inference_function():
             ...
     """
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -120,12 +121,14 @@ def track_inference(model_name: str):
                 track_latency(model_name, duration)
 
         return wrapper
+
     return decorator
 
 
 # ============================================
 # METRICS ENDPOINT RESPONSE
 # ============================================
+
 
 def get_metrics():
     """Get Prometheus metrics in text format"""

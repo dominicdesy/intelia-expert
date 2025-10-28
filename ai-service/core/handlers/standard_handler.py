@@ -40,24 +40,36 @@ class StandardQueryHandler(BaseQueryHandler):
         """Lazy load re-ranker (Cohere or cross-encoder based on RERANKER_TYPE env var)"""
         if self.semantic_reranker is None:
             try:
-                reranker_type = os.getenv("RERANKER_TYPE", "cross-encoder")  # "cross-encoder" or "cohere"
+                reranker_type = os.getenv(
+                    "RERANKER_TYPE", "cross-encoder"
+                )  # "cross-encoder" or "cohere"
 
                 if reranker_type == "cohere":
-                    logger.info("🔧 Initializing Cohere re-ranker (rerank-multilingual-v3.0)...")
+                    logger.info(
+                        "🔧 Initializing Cohere re-ranker (rerank-multilingual-v3.0)..."
+                    )
                     self.semantic_reranker = get_cohere_reranker(
-                        model='rerank-multilingual-v3.0'
+                        model="rerank-multilingual-v3.0"
                     )
-                    logger.info("✅ Cohere re-ranker initialized (multilingual, production-grade)")
+                    logger.info(
+                        "✅ Cohere re-ranker initialized (multilingual, production-grade)"
+                    )
                 else:
-                    logger.info("🔧 Initializing cross-encoder re-ranker (ms-marco-MiniLM)...")
-                    self.semantic_reranker = get_reranker(
-                        model_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
-                        score_threshold=0.3  # Balanced threshold
+                    logger.info(
+                        "🔧 Initializing cross-encoder re-ranker (ms-marco-MiniLM)..."
                     )
-                    logger.info("✅ Cross-encoder re-ranker initialized (threshold=0.3)")
+                    self.semantic_reranker = get_reranker(
+                        model_name="cross-encoder/ms-marco-MiniLM-L-6-v2",
+                        score_threshold=0.3,  # Balanced threshold
+                    )
+                    logger.info(
+                        "✅ Cross-encoder re-ranker initialized (threshold=0.3)"
+                    )
 
             except Exception as e:
-                logger.warning(f"⚠️ Re-ranker init failed: {e}. Continuing without re-ranking.")
+                logger.warning(
+                    f"⚠️ Re-ranker init failed: {e}. Continuing without re-ranking."
+                )
                 self.semantic_reranker = False  # Flag to avoid retry
         return self.semantic_reranker if self.semantic_reranker is not False else None
 
@@ -75,24 +87,65 @@ class StandardQueryHandler(BaseQueryHandler):
 
         # Layer keywords (same as generators.py)
         layer_keywords = [
-            'pondeuse', 'poule', 'poules pondeuses', 'layer', 'hen', 'hens',
-            'œuf', 'egg', 'ponte', 'laying', 'production d\'œufs', 'egg production',
-            'coquille', 'shell', 'jaune', 'yolk', 'blanc d\'œuf', 'egg white',
-            'albumine', 'albumen', 'poulailler', 'hen house', 'pondoir', 'nid',
-            'nest', 'perchoir', 'perch', 'calcaire', 'calcium', 'picage', 'pecking',
-            'plumage', 'feathering', 'ovulation', 'oviducte', 'oviduct', 'clutch',
-            'photopériode', 'photoperiod', 'lumière', 'lighting',
-            'isa brown', 'lohmann', 'hy-line', 'bovans'
+            "pondeuse",
+            "poule",
+            "poules pondeuses",
+            "layer",
+            "hen",
+            "hens",
+            "œuf",
+            "egg",
+            "ponte",
+            "laying",
+            "production d'œufs",
+            "egg production",
+            "coquille",
+            "shell",
+            "jaune",
+            "yolk",
+            "blanc d'œuf",
+            "egg white",
+            "albumine",
+            "albumen",
+            "poulailler",
+            "hen house",
+            "pondoir",
+            "nid",
+            "nest",
+            "perchoir",
+            "perch",
+            "calcaire",
+            "calcium",
+            "picage",
+            "pecking",
+            "plumage",
+            "feathering",
+            "ovulation",
+            "oviducte",
+            "oviduct",
+            "clutch",
+            "photopériode",
+            "photoperiod",
+            "lumière",
+            "lighting",
+            "isa brown",
+            "lohmann",
+            "hy-line",
+            "bovans",
         ]
 
         # Detect layer (priority)
         if any(keyword in query_lower for keyword in layer_keywords):
-            logger.info("🐔 Poultry type detected: LAYER (filtering Weaviate by species=layers)")
-            return 'layers'
+            logger.info(
+                "🐔 Poultry type detected: LAYER (filtering Weaviate by species=layers)"
+            )
+            return "layers"
 
         # Default: broiler
-        logger.info("🐔 Poultry type detected: BROILER (filtering Weaviate by species=broilers)")
-        return 'broilers'
+        logger.info(
+            "🐔 Poultry type detected: BROILER (filtering Weaviate by species=broilers)"
+        )
+        return "broilers"
 
     def configure(
         self,
@@ -238,12 +291,14 @@ class StandardQueryHandler(BaseQueryHandler):
 
                     if result.context_docs and not result.answer:
                         # 🧠 Generate response and retrieve CoT sections
-                        answer, cot_thinking, cot_analysis, has_cot = await generate_response_with_generator(
-                            self.response_generator,
-                            result.context_docs,
-                            query,
-                            language,
-                            preprocessed_data or {},
+                        answer, cot_thinking, cot_analysis, has_cot = (
+                            await generate_response_with_generator(
+                                self.response_generator,
+                                result.context_docs,
+                                query,
+                                language,
+                                preprocessed_data or {},
+                            )
                         )
                         result.answer = answer
                         result.cot_thinking = cot_thinking
@@ -390,12 +445,14 @@ class StandardQueryHandler(BaseQueryHandler):
                     if pg_result.context_docs and not pg_result.answer:
                         logger.info("Generating PostgreSQL response with context")
                         # 🧠 Generate response and retrieve CoT sections
-                        answer, cot_thinking, cot_analysis, has_cot = await generate_response_with_generator(
-                            self.response_generator,
-                            pg_result.context_docs,
-                            query,
-                            language,
-                            preprocessed_data or {},
+                        answer, cot_thinking, cot_analysis, has_cot = (
+                            await generate_response_with_generator(
+                                self.response_generator,
+                                pg_result.context_docs,
+                                query,
+                                language,
+                                preprocessed_data or {},
+                            )
                         )
                         pg_result.answer = answer
                         pg_result.cot_thinking = cot_thinking
@@ -488,7 +545,7 @@ class StandardQueryHandler(BaseQueryHandler):
         try:
             # 🐔 OPTION 3: Detect poultry type and filter Weaviate by species
             poultry_species = self._detect_poultry_type(query)
-            filters['species'] = poultry_species
+            filters["species"] = poultry_species
 
             # Use top_k directly (no reduction for optimization)
             # The 10x multiplier + re-ranker will handle filtering
@@ -512,21 +569,33 @@ class StandardQueryHandler(BaseQueryHandler):
             )
 
             # Handle result based on source
-            if result and result.source not in (RAGSource.NO_RESULTS, RAGSource.LOW_CONFIDENCE):
-                doc_count_before = len(result.context_docs) if result.context_docs else 0
-                logger.info(f"Weaviate ({language}): {doc_count_before} documents retrieved (before re-ranking)")
+            if result and result.source not in (
+                RAGSource.NO_RESULTS,
+                RAGSource.LOW_CONFIDENCE,
+            ):
+                doc_count_before = (
+                    len(result.context_docs) if result.context_docs else 0
+                )
+                logger.info(
+                    f"Weaviate ({language}): {doc_count_before} documents retrieved (before re-ranking)"
+                )
 
                 # Re-ranking with balanced threshold
                 if result.context_docs and self.reranker:
                     try:
                         # Extract document texts
                         doc_texts = [
-                            doc.get('content', '') if isinstance(doc, dict)
-                            else getattr(doc, 'content', '')
+                            (
+                                doc.get("content", "")
+                                if isinstance(doc, dict)
+                                else getattr(doc, "content", "")
+                            )
                             for doc in result.context_docs
                         ]
 
-                        logger.info(f"🔍 Re-ranking {len(doc_texts)} docs with threshold 0.3...")
+                        logger.info(
+                            f"🔍 Re-ranking {len(doc_texts)} docs with threshold 0.3..."
+                        )
 
                         # Re-ranker with cross-encoder OR Cohere
                         # Always filter to 5 docs max for Context Precision
@@ -536,18 +605,26 @@ class StandardQueryHandler(BaseQueryHandler):
                             query=query,
                             documents=doc_texts,
                             top_k=final_top_k,  # Always 5 docs max
-                            return_scores=False
+                            return_scores=False,
                         )
 
                         # Rebuild docs with only relevant ones
                         if reranked_texts:
                             # Map texts to original docs
                             text_to_doc = {
-                                (doc.get('content', '') if isinstance(doc, dict) else getattr(doc, 'content', '')): doc
+                                (
+                                    doc.get("content", "")
+                                    if isinstance(doc, dict)
+                                    else getattr(doc, "content", "")
+                                ): doc
                                 for doc in result.context_docs
                             }
 
-                            result.context_docs = [text_to_doc[text] for text in reranked_texts if text in text_to_doc]
+                            result.context_docs = [
+                                text_to_doc[text]
+                                for text in reranked_texts
+                                if text in text_to_doc
+                            ]
 
                             doc_count_after = len(result.context_docs)
                             logger.info(
@@ -555,12 +632,16 @@ class StandardQueryHandler(BaseQueryHandler):
                                 f"(filtered {doc_count_before - doc_count_after})"
                             )
                         else:
-                            logger.warning("⚠️ Re-ranking returned 0 docs - keeping original")
+                            logger.warning(
+                                "⚠️ Re-ranking returned 0 docs - keeping original"
+                            )
 
                     except Exception as e:
-                        logger.error(f"❌ Re-ranking error: {e}. Using original documents.", exc_info=True)
+                        logger.error(
+                            f"❌ Re-ranking error: {e}. Using original documents.",
+                            exc_info=True,
+                        )
                         # Continue with original documents on error
-
 
                 # Generate answer if documents exist but no answer yet
                 if result.context_docs and not result.answer:
@@ -575,12 +656,14 @@ class StandardQueryHandler(BaseQueryHandler):
                         preprocessed_data["language"] = language
 
                     # 🧠 Generate response and retrieve CoT sections
-                    answer, cot_thinking, cot_analysis, has_cot = await generate_response_with_generator(
-                        self.response_generator,
-                        result.context_docs,
-                        query,
-                        language,
-                        preprocessed_data,
+                    answer, cot_thinking, cot_analysis, has_cot = (
+                        await generate_response_with_generator(
+                            self.response_generator,
+                            result.context_docs,
+                            query,
+                            language,
+                            preprocessed_data,
+                        )
                     )
                     result.answer = answer
                     result.cot_thinking = cot_thinking
@@ -603,7 +686,9 @@ class StandardQueryHandler(BaseQueryHandler):
             elif result:
                 # LOW_CONFIDENCE or NO_RESULTS - return with empty message
                 # rag_engine will handle fallback to welcome message or LLM
-                logger.info(f"Weaviate ({language}): 0 documents (source={result.source})")
+                logger.info(
+                    f"Weaviate ({language}): 0 documents (source={result.source})"
+                )
 
                 # Ensure answer is initialized to empty string (not None)
                 if result.answer is None:

@@ -32,7 +32,20 @@ class SQLQueryNormalizer:
         # Fix: Use absolute path to /app/config instead of relative path
         config_dir = os.path.join(os.path.dirname(__file__), "..", "..", "config")
         terms = {}
-        supported_languages = ["en", "fr", "es", "de", "it", "pt", "pl", "nl", "id", "hi", "zh", "th"]
+        supported_languages = [
+            "en",
+            "fr",
+            "es",
+            "de",
+            "it",
+            "pt",
+            "pl",
+            "nl",
+            "id",
+            "hi",
+            "zh",
+            "th",
+        ]
 
         for lang in supported_languages:
             file_path = os.path.join(config_dir, f"universal_terms_{lang}.json")

@@ -159,6 +159,61 @@ def get_or_create_stripe_customer(user_email: str, user_name: Optional[str] = No
         raise HTTPException(status_code=500, detail="Erreur création customer")
 
 
+def get_price_by_currency(plan_name: str, currency: str, billing_cycle: str = "month") -> Optional[str]:
+    """
+    Récupère le Stripe Price ID pour une devise et un cycle de facturation spécifiques.
+
+    Cette fonction recherche dans Stripe les price IDs créés par le script multi-currency.
+
+    Args:
+        plan_name: Nom du plan ("pro" ou "elite")
+        currency: Code devise ISO ("USD", "EUR", etc.)
+        billing_cycle: "month" ou "year"
+
+    Returns:
+        Stripe Price ID ou None si pas trouvé
+    """
+    try:
+        # Liste tous les produits pour trouver celui qui correspond au plan
+        products = stripe.Product.list(limit=100)
+        target_product_id = None
+
+        plan_display_names = {
+            "pro": "Pro Plan",
+            "elite": "Elite Plan"
+        }
+
+        for product in products.auto_paging_iter():
+            if product.name == plan_display_names.get(plan_name):
+                target_product_id = product.id
+                break
+
+        if not target_product_id:
+            logger.warning(f"Product not found for plan: {plan_name}")
+            return None
+
+        # Rechercher le price correspondant
+        prices = stripe.Price.list(
+            product=target_product_id,
+            currency=currency.lower(),
+            active=True,
+            limit=100
+        )
+
+        for price in prices.data:
+            if (price.recurring and
+                price.recurring.interval == billing_cycle):
+                logger.info(f"Found price for {plan_name}/{currency}/{billing_cycle}: {price.id}")
+                return price.id
+
+        logger.warning(f"No price found for {plan_name}/{currency}/{billing_cycle}")
+        return None
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error getting price: {e}")
+        return None
+
+
 def get_regional_price(plan_name: str, country_code: str = "US") -> Tuple[float, str, Optional[str], int]:
     """
     Récupère le prix d'un plan selon le pays de l'utilisateur
@@ -308,22 +363,37 @@ async def create_checkout_session(
         fraud_risk_score = 0
         fraud_risk_level = "LOW"
 
+        # Get user's billing currency preference
+        user_billing_currency = None
+        billing_cycle = "month"  # Default to monthly
+
+        # Extract billing cycle from plan_name (e.g., "pro_yearly" -> "year")
+        if "_yearly" in plan_name:
+            billing_cycle = "year"
+            plan_name = plan_name.replace("_yearly", "")
+
         try:
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Récupérer signup_country et pricing_tier
+                    # Récupérer signup_country, pricing_tier ET billing_currency
                     cur.execute("""
-                        SELECT signup_country, pricing_tier, pricing_locked_at
+                        SELECT signup_country, pricing_tier, pricing_locked_at, billing_currency
                         FROM user_billing_info
                         WHERE user_email = %s
                     """, (user_email,))
 
                     billing_info = cur.fetchone()
 
-                    if billing_info and billing_info.get('signup_country'):
-                        country_code = billing_info['signup_country']
-                        pricing_tier = billing_info.get('pricing_tier', 'tier1')
-                        logger.info(f"Country from DB: {country_code}, Tier: {pricing_tier}")
+                    if billing_info:
+                        if billing_info.get('signup_country'):
+                            country_code = billing_info['signup_country']
+                            pricing_tier = billing_info.get('pricing_tier', 'tier1')
+                            logger.info(f"Country from DB: {country_code}, Tier: {pricing_tier}")
+
+                        # Get billing currency
+                        user_billing_currency = billing_info.get('billing_currency')
+                        if user_billing_currency:
+                            logger.info(f"User billing currency: {user_billing_currency}")
 
                     # Obtenir l'analyse de fraude
                     if COUNTRY_TRACKING_AVAILABLE:
@@ -356,10 +426,38 @@ async def create_checkout_session(
         # Récupérer ou créer le customer Stripe
         stripe_customer_id = get_or_create_stripe_customer(user_email, user_name, country_code)
 
-        # Récupérer le prix pour le pays (personnalisé ou calculé)
-        price, currency, stripe_price_id, tier_level = get_regional_price(plan_name, country_code)
+        # Use currency-based pricing if billing_currency is set, otherwise use regional pricing
+        stripe_price_id = None
+        currency = "USD"
+        price = 0.0
+        tier_level = 4
 
-        logger.info(f"Création checkout session pour {user_email}: {plan_name} @ {price} {currency} (Tier {tier_level})")
+        if user_billing_currency:
+            # Multi-currency mode: Use currency-specific Stripe Price
+            logger.info(f"Using multi-currency pricing: {user_billing_currency}/{billing_cycle}")
+            stripe_price_id = get_price_by_currency(plan_name, user_billing_currency, billing_cycle)
+
+            if stripe_price_id:
+                currency = user_billing_currency
+                # Get price amount from Stripe Price object
+                try:
+                    price_obj = stripe.Price.retrieve(stripe_price_id)
+                    price = price_obj.unit_amount / 100  # Convert cents to dollars
+                    logger.info(f"Using Stripe Price: {stripe_price_id} ({price} {currency})")
+                except stripe.error.StripeError as e:
+                    logger.error(f"Error retrieving Stripe Price: {e}")
+                    # Fallback to regional pricing
+                    stripe_price_id = None
+            else:
+                logger.warning(f"No multi-currency price found for {plan_name}/{user_billing_currency}")
+                # Fallback to regional pricing below
+
+        if not stripe_price_id:
+            # Fallback: Regional pricing (legacy system)
+            logger.info(f"Using regional pricing for country: {country_code}")
+            price, currency, stripe_price_id, tier_level = get_regional_price(plan_name, country_code)
+
+        logger.info(f"Création checkout session pour {user_email}: {plan_name} @ {price} {currency} (billing_cycle: {billing_cycle})")
 
         # Récupérer la locale demandée (avant mapping Stripe)
         user_locale = request.locale or "en"

@@ -15,9 +15,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("AUDIT D'INTEGRATION - TRACE DU FLOW QUERY")
-print("="*80 + "\n")
+print("=" * 80 + "\n")
 
 # Test imports
 modules_active = {}
@@ -27,16 +27,18 @@ print("1. RAG ENGINE (Point d'entrée)")
 print("-" * 60)
 try:
     from core.rag_engine import RAGEngine
-    modules_active['RAGEngine'] = True
+
+    modules_active["RAGEngine"] = True
     print("   [OK] RAGEngine imported")
 
     # Check methods
     import inspect
-    methods = [m for m in dir(RAGEngine) if not m.startswith('_')]
+
+    methods = [m for m in dir(RAGEngine) if not m.startswith("_")]
     print(f"   Public methods: {len(methods)}")
     print(f"   Key methods: {[m for m in methods if 'process' in m or 'query' in m]}")
 except Exception as e:
-    modules_active['RAGEngine'] = False
+    modules_active["RAGEngine"] = False
     print(f"   [ERROR] {e}")
 
 print()
@@ -46,16 +48,18 @@ print("2. QUERY PROCESSOR")
 print("-" * 60)
 try:
     from core.query_processor import QueryProcessor
-    modules_active['QueryProcessor'] = True
+
+    modules_active["QueryProcessor"] = True
     print("   [OK] QueryProcessor imported")
 
     # Check if uses ClarificationHelper
     import inspect
+
     source = inspect.getsource(QueryProcessor)
-    uses_clarification = 'clarification' in source.lower()
+    uses_clarification = "clarification" in source.lower()
     print(f"   Uses ClarificationHelper: {uses_clarification}")
 except Exception as e:
-    modules_active['QueryProcessor'] = False
+    modules_active["QueryProcessor"] = False
     print(f"   [ERROR] {e}")
 
 print()
@@ -64,10 +68,10 @@ print()
 print("3. INTENT CLASSIFIER")
 print("-" * 60)
 try:
-    modules_active['IntentClassifier'] = True
+    modules_active["IntentClassifier"] = True
     print("   [OK] IntentClassifier imported")
 except Exception as e:
-    modules_active['IntentClassifier'] = False
+    modules_active["IntentClassifier"] = False
     print(f"   [ERROR] {e}")
 
 print()
@@ -77,15 +81,18 @@ print("4. QUERY ROUTER v3.0")
 print("-" * 60)
 try:
     from retrieval.postgresql.router import QueryRouter
+
     router = QueryRouter(use_context_manager=True)
-    modules_active['QueryRouter'] = True
+    modules_active["QueryRouter"] = True
 
     stats = router.get_routing_stats()
     print(f"   [OK] QueryRouter v{stats.get('version', 'N/A')}")
     print(f"   ContextManager enabled: {router.use_context_manager}")
-    print(f"   Keywords: {stats.get('metric_keywords_count', 0)} METRICS + {stats.get('knowledge_keywords_count', 0)} KNOWLEDGE")
+    print(
+        f"   Keywords: {stats.get('metric_keywords_count', 0)} METRICS + {stats.get('knowledge_keywords_count', 0)} KNOWLEDGE"
+    )
 except Exception as e:
-    modules_active['QueryRouter'] = False
+    modules_active["QueryRouter"] = False
     print(f"   [ERROR] {e}")
 
 print()
@@ -94,16 +101,17 @@ print()
 print("5. QUERY HANDLERS")
 print("-" * 60)
 try:
-    modules_active['CalculationHandler'] = True
+    modules_active["CalculationHandler"] = True
     print("   [OK] CalculationQueryHandler imported")
 except Exception as e:
-    modules_active['CalculationHandler'] = False
+    modules_active["CalculationHandler"] = False
     print(f"   [ERROR] {e}")
 
 try:
     # Check for other handlers
     import core.handlers as handlers_module
-    all_handlers = [name for name in dir(handlers_module) if 'Handler' in name]
+
+    all_handlers = [name for name in dir(handlers_module) if "Handler" in name]
     print(f"   Available handlers: {all_handlers}")
 except Exception:
     pass
@@ -115,8 +123,9 @@ print("6. CLARIFICATION HELPER")
 print("-" * 60)
 try:
     from utils.clarification_helper import get_clarification_helper
+
     helper = get_clarification_helper()
-    modules_active['ClarificationHelper'] = True
+    modules_active["ClarificationHelper"] = True
 
     print("   [OK] ClarificationHelper loaded")
     print(f"   Ambiguity types: {len(helper.ambiguity_types)}")
@@ -127,7 +136,7 @@ try:
     ambiguity = helper.detect_ambiguity_type(test_query, ["breed"], {})
     print(f"   Test detection: '{test_query}' -> {ambiguity}")
 except Exception as e:
-    modules_active['ClarificationHelper'] = False
+    modules_active["ClarificationHelper"] = False
     print(f"   [ERROR] {e}")
 
 print()
@@ -137,8 +146,9 @@ print("7. CONTEXT MANAGER (Phase 1)")
 print("-" * 60)
 try:
     from processing.context_manager import get_context_manager
+
     manager = get_context_manager()
-    modules_active['ContextManager'] = True
+    modules_active["ContextManager"] = True
 
     print("   [OK] ContextManager loaded")
 
@@ -149,7 +159,7 @@ try:
     print("      Original: 'Et pour les femelles?'")
     print(f"      Expanded: '{expanded}'")
 except Exception as e:
-    modules_active['ContextManager'] = False
+    modules_active["ContextManager"] = False
     print(f"   [ERROR] {e}")
 
 print()
@@ -166,10 +176,10 @@ try:
 
     # Check mentions
     checks = {
-        'ClarificationHelper': 'clarification' in source.lower(),
-        'CalculationHandler': 'calculation' in source.lower(),
-        'ContextManager': 'context' in source.lower() and 'manager' in source.lower(),
-        'QueryRouter': 'router' in source.lower() or 'route' in source.lower(),
+        "ClarificationHelper": "clarification" in source.lower(),
+        "CalculationHandler": "calculation" in source.lower(),
+        "ContextManager": "context" in source.lower() and "manager" in source.lower(),
+        "QueryRouter": "router" in source.lower() or "route" in source.lower(),
     }
 
     for module, is_used in checks.items():
@@ -183,9 +193,9 @@ except Exception as e:
 print()
 
 # SUMMARY
-print("="*80)
+print("=" * 80)
 print("SUMMARY - MODULES STATUS")
-print("="*80 + "\n")
+print("=" * 80 + "\n")
 
 active_count = sum(1 for v in modules_active.values() if v)
 total_count = len(modules_active)
@@ -198,9 +208,9 @@ for module, is_active in modules_active.items():
 print(f"\nActive modules: {active_count}/{total_count}\n")
 
 # RECOMMENDATIONS
-print("="*80)
+print("=" * 80)
 print("RECOMMENDATIONS")
-print("="*80 + "\n")
+print("=" * 80 + "\n")
 
 if active_count == total_count:
     print("All modules are loaded successfully!")

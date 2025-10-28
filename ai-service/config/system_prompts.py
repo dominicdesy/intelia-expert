@@ -38,7 +38,9 @@ class SystemPromptsManager:
     Charge depuis system_prompts.json avec résolution de chemin robuste
     """
 
-    def __init__(self, prompts_path: Optional[str] = None, terminology_path: Optional[str] = None):
+    def __init__(
+        self, prompts_path: Optional[str] = None, terminology_path: Optional[str] = None
+    ):
         """
         Initialise le gestionnaire de prompts
 
@@ -61,8 +63,6 @@ class SystemPromptsManager:
             logger.error(
                 "❌ SystemPromptsManager non chargé - fichier absent ou invalide"
             )
-
-
 
     def _resolve_config_path(self, prompts_path: Optional[str]) -> Path:
         """
@@ -170,10 +170,14 @@ class SystemPromptsManager:
         try:
             with open(self.terminology_path, "r", encoding="utf-8") as f:
                 terminology = json.load(f)
-                logger.debug(f"Terminologie chargée: {len(terminology.get('terminology', {}))} termes")
+                logger.debug(
+                    f"Terminologie chargée: {len(terminology.get('terminology', {}))} termes"
+                )
                 return terminology
         except FileNotFoundError:
-            logger.warning(f"⚠️ Fichier terminologie non trouvé: {self.terminology_path}")
+            logger.warning(
+                f"⚠️ Fichier terminologie non trouvé: {self.terminology_path}"
+            )
             return {}
         except json.JSONDecodeError as e:
             logger.error(f"❌ Erreur JSON dans {self.terminology_path}: {e}")
@@ -205,9 +209,7 @@ class SystemPromptsManager:
         prompt_template = specialized.get(intent_type)
 
         if not prompt_template:
-            logger.warning(
-                f"Prompt template not found: intent_type={intent_type}"
-            )
+            logger.warning(f"Prompt template not found: intent_type={intent_type}")
             return None
 
         # Inject language_name dynamically
@@ -220,7 +222,9 @@ class SystemPromptsManager:
             logger.error(f"Missing placeholder in prompt template: {e}")
             return prompt_template
 
-    def get_base_prompt(self, key: str, language: str = "fr", include_terminology: bool = True) -> Optional[str]:
+    def get_base_prompt(
+        self, key: str, language: str = "fr", include_terminology: bool = True
+    ) -> Optional[str]:
         """
         Récupère un prompt de base (avec injection de langue et terminologie)
 
@@ -318,7 +322,9 @@ class SystemPromptsManager:
         language_name = LANGUAGE_DISPLAY_NAMES.get(language, language.upper())
 
         if not prompt_template:
-            logger.warning(f"Synthesis prompt template not found: {synthesis_type}_synthesis")
+            logger.warning(
+                f"Synthesis prompt template not found: {synthesis_type}_synthesis"
+            )
             return ""
 
         # Substituer les variables
@@ -583,7 +589,7 @@ _global_prompts_manager: Optional[SystemPromptsManager] = None
 def get_prompts_manager(
     prompts_path: Optional[str] = None,
     terminology_path: Optional[str] = None,
-    force_reload: bool = False
+    force_reload: bool = False,
 ) -> SystemPromptsManager:
     """
     Factory pour obtenir l'instance globale du gestionnaire (singleton)

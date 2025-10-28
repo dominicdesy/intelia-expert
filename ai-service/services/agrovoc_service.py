@@ -29,10 +29,10 @@ class AGROVOCService:
     """Service for detecting poultry-related terms using AGROVOC + manual fallback"""
 
     # Languages supported by AGROVOC (10/12)
-    AGROVOC_LANGUAGES = {'fr', 'en', 'es', 'de', 'it', 'pt', 'pl', 'hi', 'th', 'zh'}
+    AGROVOC_LANGUAGES = {"fr", "en", "es", "de", "it", "pt", "pl", "hi", "th", "zh"}
 
     # Languages requiring manual fallback (2/12)
-    MANUAL_LANGUAGES = {'nl', 'id'}
+    MANUAL_LANGUAGES = {"nl", "id"}
 
     def __init__(self, cache_path: Optional[str] = None):
         """
@@ -46,7 +46,9 @@ class AGROVOCService:
         self.manual_terms = self._build_manual_terms()
         self.universal_terms = self._build_universal_terms()
 
-        logger.info(f"AGROVOCService initialized with {len(self.agrovoc_cache)} cached terms")
+        logger.info(
+            f"AGROVOCService initialized with {len(self.agrovoc_cache)} cached terms"
+        )
 
     def _get_default_cache_path(self) -> str:
         """Get default path to AGROVOC cache"""
@@ -57,7 +59,7 @@ class AGROVOCService:
     def _load_cache(self) -> dict:
         """Load AGROVOC cache from JSON file"""
         try:
-            with open(self.cache_path, 'r', encoding='utf-8') as f:
+            with open(self.cache_path, "r", encoding="utf-8") as f:
                 cache = json.load(f)
                 logger.info(f"Loaded {len(cache)} terms from AGROVOC cache")
                 return cache
@@ -81,18 +83,39 @@ class AGROVOCService:
 
         # Dutch (nl) - manual poultry terms
         dutch_terms = [
-            "pluimvee", "kip", "kippen", "kippenvlees", "broiler", "leghen",
-            "braadkip", "hoenderij", "pluimveehouderij", "eierproductie",
-            "vleesproductie", "fokkerij", "uitbroeden", "kuiken", "kuikens",
+            "pluimvee",
+            "kip",
+            "kippen",
+            "kippenvlees",
+            "broiler",
+            "leghen",
+            "braadkip",
+            "hoenderij",
+            "pluimveehouderij",
+            "eierproductie",
+            "vleesproductie",
+            "fokkerij",
+            "uitbroeden",
+            "kuiken",
+            "kuikens",
         ]
         for term in dutch_terms:
             manual_terms[f"nl:{term.lower()}"] = True
 
         # Indonesian (id) - manual poultry terms
         indonesian_terms = [
-            "unggas", "ayam", "daging ayam", "broiler", "petelur",
-            "ayam pedaging", "ayam petelur", "peternakan", "penetasan",
-            "produksi telur", "produksi daging", "pembibitan",
+            "unggas",
+            "ayam",
+            "daging ayam",
+            "broiler",
+            "petelur",
+            "ayam pedaging",
+            "ayam petelur",
+            "peternakan",
+            "penetasan",
+            "produksi telur",
+            "produksi daging",
+            "pembibitan",
         ]
         for term in indonesian_terms:
             manual_terms[f"id:{term.lower()}"] = True
@@ -100,15 +123,20 @@ class AGROVOCService:
         # Modern meat quality defects (all languages - not in AGROVOC)
         # These are recent research terms (2010s-2020s)
         modern_defects = {
-            'en': ['spaghetti breast', 'white striping', 'wooden breast', 'deep pectoral myopathy'],
-            'fr': ['poitrine spaghetti', 'stries blanches', 'poitrine en bois'],
-            'es': ['pechuga espagueti', 'estriado blanco', 'pechuga de madera'],
-            'de': ['spaghetti-brust', 'weiße streifen', 'holzbrust'],
-            'it': ['petto spaghetti', 'striature bianche', 'petto di legno'],
-            'pt': ['peito espaguete', 'estrias brancas', 'peito lenhoso'],
-            'nl': ['spaghetti borst', 'witte strepen', 'houten borst'],
-            'pl': ['pierś spaghetti', 'białe prążki', 'drewniana pierś'],
-            'id': ['dada spaghetti', 'garis putih', 'dada kayu'],
+            "en": [
+                "spaghetti breast",
+                "white striping",
+                "wooden breast",
+                "deep pectoral myopathy",
+            ],
+            "fr": ["poitrine spaghetti", "stries blanches", "poitrine en bois"],
+            "es": ["pechuga espagueti", "estriado blanco", "pechuga de madera"],
+            "de": ["spaghetti-brust", "weiße streifen", "holzbrust"],
+            "it": ["petto spaghetti", "striature bianche", "petto di legno"],
+            "pt": ["peito espaguete", "estrias brancas", "peito lenhoso"],
+            "nl": ["spaghetti borst", "witte strepen", "houten borst"],
+            "pl": ["pierś spaghetti", "białe prążki", "drewniana pierś"],
+            "id": ["dada spaghetti", "garis putih", "dada kayu"],
         }
 
         for lang, terms in modern_defects.items():
@@ -127,42 +155,78 @@ class AGROVOCService:
         """
         universal = {
             # English
-            "poultry", "chicken", "chickens", "broiler", "broilers", "layer", "layers",
-            "hen", "hens", "rooster", "roosters", "bird", "birds", "chick", "chicks",
-
+            "poultry",
+            "chicken",
+            "chickens",
+            "broiler",
+            "broilers",
+            "layer",
+            "layers",
+            "hen",
+            "hens",
+            "rooster",
+            "roosters",
+            "bird",
+            "birds",
+            "chick",
+            "chicks",
             # French
-            "volaille", "volailles", "poulet", "poulets", "poule", "poules",
-            "poussin", "poussins", "coq", "coqs",
-
+            "volaille",
+            "volailles",
+            "poulet",
+            "poulets",
+            "poule",
+            "poules",
+            "poussin",
+            "poussins",
+            "coq",
+            "coqs",
             # Spanish
-            "ave", "aves", "pollo", "pollos", "gallina", "gallinas",
-
+            "ave",
+            "aves",
+            "pollo",
+            "pollos",
+            "gallina",
+            "gallinas",
             # German
-            "geflügel", "huhn", "hühner", "hähnchen",
-
+            "geflügel",
+            "huhn",
+            "hühner",
+            "hähnchen",
             # Italian
-            "pollame", "pollo", "polli", "gallina", "galline",
-
+            "pollame",
+            "pollo",
+            "polli",
+            "gallina",
+            "galline",
             # Portuguese
-            "ave", "aves", "frango", "frangos", "galinha", "galinhas",
-
+            "ave",
+            "aves",
+            "frango",
+            "frangos",
+            "galinha",
+            "galinhas",
             # Dutch
-            "kip", "kippen", "pluimvee",
-
+            "kip",
+            "kippen",
+            "pluimvee",
             # Polish
-            "drób", "kurczak", "kurczaki", "kura", "kury",
-
+            "drób",
+            "kurczak",
+            "kurczaki",
+            "kura",
+            "kury",
             # Indonesian
-            "ayam", "unggas",
-
+            "ayam",
+            "unggas",
             # Hindi (transliterated)
-            "murgi", "kukut",
-
+            "murgi",
+            "kukut",
             # Thai (transliterated)
             "gai",
-
             # Chinese (transliterated)
-            "ji", "jia qin",
+            "ji",
+            "jia qin",
         }
 
         logger.info(f"Built {len(universal)} universal fallback terms")
@@ -247,7 +311,9 @@ class AGROVOCService:
                 trigram = f"{words[i]} {words[i+1]} {words[i+2]}"
                 trigram_clean = trigram.strip(".,!?;:()[]{}\"'")
                 if self.is_poultry_term(trigram_clean, language):
-                    logger.debug(f"🐔 Poultry term detected in query: '{trigram_clean}'")
+                    logger.debug(
+                        f"🐔 Poultry term detected in query: '{trigram_clean}'"
+                    )
                     return True
 
         return False
@@ -255,27 +321,29 @@ class AGROVOCService:
     def get_stats(self) -> dict:
         """Get statistics about loaded terms"""
         stats = {
-            'agrovoc_terms': len(self.agrovoc_cache),
-            'manual_terms': len(self.manual_terms),
-            'universal_terms': len(self.universal_terms),
-            'total_terms': len(self.agrovoc_cache) + len(self.manual_terms) + len(self.universal_terms),
-            'agrovoc_languages': sorted(self.AGROVOC_LANGUAGES),
-            'manual_languages': sorted(self.MANUAL_LANGUAGES),
+            "agrovoc_terms": len(self.agrovoc_cache),
+            "manual_terms": len(self.manual_terms),
+            "universal_terms": len(self.universal_terms),
+            "total_terms": len(self.agrovoc_cache)
+            + len(self.manual_terms)
+            + len(self.universal_terms),
+            "agrovoc_languages": sorted(self.AGROVOC_LANGUAGES),
+            "manual_languages": sorted(self.MANUAL_LANGUAGES),
         }
 
         # Terms per language (AGROVOC)
         agrovoc_by_lang = {}
         for key in self.agrovoc_cache.keys():
-            lang = key.split(':')[0]
+            lang = key.split(":")[0]
             agrovoc_by_lang[lang] = agrovoc_by_lang.get(lang, 0) + 1
-        stats['agrovoc_by_language'] = agrovoc_by_lang
+        stats["agrovoc_by_language"] = agrovoc_by_lang
 
         # Manual terms per language
         manual_by_lang = {}
         for key in self.manual_terms.keys():
-            lang = key.split(':')[0]
+            lang = key.split(":")[0]
             manual_by_lang[lang] = manual_by_lang.get(lang, 0) + 1
-        stats['manual_by_language'] = manual_by_lang
+        stats["manual_by_language"] = manual_by_lang
 
         return stats
 

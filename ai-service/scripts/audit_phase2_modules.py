@@ -15,15 +15,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("AUDIT PHASE 2 - MODULES EXISTANTS")
-print("="*80 + "\n")
+print("=" * 80 + "\n")
 
 # 1. ClarificationHelper
 print("1. MODULE CLARIFICATION")
 print("-" * 60)
 try:
     from utils.clarification_helper import get_clarification_helper
+
     helper = get_clarification_helper()
     print("   Status: IMPLEMENTED")
     print("   File: utils/clarification_helper.py (407 lines)")
@@ -125,9 +126,9 @@ except Exception as e:
 print()
 
 # SUMMARY
-print("="*80)
+print("=" * 80)
 print("SUMMARY - MODULES PHASE 2")
-print("="*80 + "\n")
+print("=" * 80 + "\n")
 
 modules_status = {
     "ClarificationHelper": "IMPLEMENTED",
@@ -135,7 +136,7 @@ modules_status = {
     "QueryExpander": "IMPLEMENTED",
     "SemanticCache": "IMPLEMENTED",
     "ContextManager": "IMPLEMENTED (Phase 1)",
-    "QueryRouter v3.0": "IMPLEMENTED"
+    "QueryRouter v3.0": "IMPLEMENTED",
 }
 
 implemented = sum(1 for v in modules_status.values() if "IMPLEMENTED" in v)
@@ -147,9 +148,9 @@ for module, status in modules_status.items():
     icon = "DONE" if "IMPLEMENTED" in status else "TODO"
     print(f"   [{icon}] {module:30} - {status}")
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("CONCLUSION")
-print("="*80 + "\n")
+print("=" * 80 + "\n")
 
 if implemented == total:
     print("ALL Phase 2 modules are ALREADY IMPLEMENTED!")

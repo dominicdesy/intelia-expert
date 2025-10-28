@@ -19,5 +19,5 @@ __all__ = [
     "SemanticScholarFetcher",
     "PubMedFetcher",
     "EuropePMCFetcher",
-    "FAOFetcher"
+    "FAOFetcher",
 ]

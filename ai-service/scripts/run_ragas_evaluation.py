@@ -30,13 +30,15 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 # Fix UTF-8 encoding for Windows console FIRST (before any print)
-if sys.platform == 'win32':
+if sys.platform == "win32":
     import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 # Charger .env depuis le répertoire llm/
 from dotenv import load_dotenv
+
 env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
     load_dotenv(env_path)
@@ -51,7 +53,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from evaluation.ragas_evaluator import RAGASEvaluator  # noqa: E402
 from evaluation.golden_dataset_intelia import get_intelia_test_dataset  # noqa: E402
 from evaluation.golden_dataset_weaviate import get_weaviate_test_dataset  # noqa: E402
-from evaluation.golden_dataset_weaviate_v2 import get_weaviate_v2_test_dataset  # noqa: E402
+from evaluation.golden_dataset_weaviate_v2 import (
+    get_weaviate_v2_test_dataset,
+)  # noqa: E402
 
 # Import du système RAG réel
 try:
@@ -113,7 +117,9 @@ async def query_rag_system(
             # Extraire contextes des documents (RAGResult.context_docs: List[Union[Document, dict]])
             contexts = []
 
-            logger.info(f"   📄 RAG returned {len(result.context_docs)} context documents")
+            logger.info(
+                f"   📄 RAG returned {len(result.context_docs)} context documents"
+            )
 
             for i, doc in enumerate(result.context_docs):
                 # Extraction selon type (dict ou objet Document)
@@ -125,9 +131,13 @@ async def query_rag_system(
 
                 if content and content.strip():
                     contexts.append(content)
-                    logger.debug(f"      [{i+1}] Content extracted: {len(content)} chars")
+                    logger.debug(
+                        f"      [{i+1}] Content extracted: {len(content)} chars"
+                    )
                 else:
-                    logger.warning(f"      [{i+1}] Empty content in document: {type(doc)}")
+                    logger.warning(
+                        f"      [{i+1}] Empty content in document: {type(doc)}"
+                    )
 
             logger.info(f"   ✅ Extracted {len(contexts)} non-empty contexts")
 
@@ -171,7 +181,9 @@ async def run_evaluation(
 
     # Générer dataset golden
     if dataset_type == "weaviate_v2":
-        logger.info("📊 Chargement dataset WEAVIATE V2 (questions basées sur documents Health réels)...")
+        logger.info(
+            "📊 Chargement dataset WEAVIATE V2 (questions basées sur documents Health réels)..."
+        )
         golden_dataset = get_weaviate_v2_test_dataset()
     elif dataset_type == "weaviate":
         logger.info("📊 Chargement dataset WEAVIATE (contenu narratif/qualitatif)...")
@@ -213,7 +225,7 @@ async def run_evaluation(
         rag_result = await query_rag_system(
             question=case["question"],
             rag_engine=rag_engine,
-            expected_lang=expected_lang
+            expected_lang=expected_lang,
         )
 
         # Mettre à jour cas de test

@@ -44,6 +44,7 @@ def get_app_version() -> str:
 # Get version from environment or file
 VERSION = get_app_version()
 
+
 def get_version_info():
     """
     Get version information from environment variables (production) or git (development)
@@ -63,71 +64,90 @@ def get_version_info():
     if env_commit_sha and env_commit_sha != "unknown":
         # Production: use environment variables from GitHub Actions
         commit_sha = env_commit_sha[:8]  # Short SHA (first 8 characters)
-        commit_time = env_build_date if env_build_date != "unknown" else datetime.utcnow().isoformat()
+        commit_time = (
+            env_build_date
+            if env_build_date != "unknown"
+            else datetime.utcnow().isoformat()
+        )
         branch = "main"  # Production is always main branch
 
         return {
-            'version': VERSION,
-            'build_id': f"v{VERSION}-{commit_sha}",
-            'commit_sha': commit_sha,
-            'commit_time': commit_time,
-            'branch': branch,
-            'deployed_at': commit_time,
+            "version": VERSION,
+            "build_id": f"v{VERSION}-{commit_sha}",
+            "commit_sha": commit_sha,
+            "commit_time": commit_time,
+            "branch": branch,
+            "deployed_at": commit_time,
         }
 
     # Development: try git commands
     try:
         # Get short commit SHA (first 8 characters)
-        commit_sha = subprocess.check_output(
-            ['git', 'rev-parse', '--short=8', 'HEAD'],
-            cwd=os.path.dirname(__file__),
-            stderr=subprocess.DEVNULL
-        ).decode('utf-8').strip()
+        commit_sha = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--short=8", "HEAD"],
+                cwd=os.path.dirname(__file__),
+                stderr=subprocess.DEVNULL,
+            )
+            .decode("utf-8")
+            .strip()
+        )
 
         # Get commit timestamp
-        commit_time = subprocess.check_output(
-            ['git', 'log', '-1', '--format=%ci'],
-            cwd=os.path.dirname(__file__),
-            stderr=subprocess.DEVNULL
-        ).decode('utf-8').strip()
+        commit_time = (
+            subprocess.check_output(
+                ["git", "log", "-1", "--format=%ci"],
+                cwd=os.path.dirname(__file__),
+                stderr=subprocess.DEVNULL,
+            )
+            .decode("utf-8")
+            .strip()
+        )
 
         # Get branch name
-        branch = subprocess.check_output(
-            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
-            cwd=os.path.dirname(__file__),
-            stderr=subprocess.DEVNULL
-        ).decode('utf-8').strip()
+        branch = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=os.path.dirname(__file__),
+                stderr=subprocess.DEVNULL,
+            )
+            .decode("utf-8")
+            .strip()
+        )
 
         build_id = f"v{VERSION}-{commit_sha}"
 
         return {
-            'version': VERSION,
-            'build_id': build_id,
-            'commit_sha': commit_sha,
-            'commit_time': commit_time,
-            'branch': branch,
-            'deployed_at': datetime.utcnow().isoformat(),
+            "version": VERSION,
+            "build_id": build_id,
+            "commit_sha": commit_sha,
+            "commit_time": commit_time,
+            "branch": branch,
+            "deployed_at": datetime.utcnow().isoformat(),
         }
     except Exception as e:
         # Fallback if git is not available
         return {
-            'version': VERSION,
-            'build_id': f"v{VERSION}",
-            'commit_sha': 'local',
-            'commit_time': 'unknown',
-            'branch': 'local',
-            'deployed_at': datetime.utcnow().isoformat(),
-            'error': str(e)
+            "version": VERSION,
+            "build_id": f"v{VERSION}",
+            "commit_sha": "local",
+            "commit_time": "unknown",
+            "branch": "local",
+            "deployed_at": datetime.utcnow().isoformat(),
+            "error": str(e),
         }
+
 
 # Generate version info at module load time
 VERSION_INFO = get_version_info()
-BUILD_ID = VERSION_INFO['build_id']
-COMMIT_SHA = VERSION_INFO['commit_sha']
+BUILD_ID = VERSION_INFO["build_id"]
+COMMIT_SHA = VERSION_INFO["commit_sha"]
+
 
 def get_build_id():
     """Get the current build ID (branch-sha)"""
     return BUILD_ID
+
 
 def get_version_string():
     """Get a formatted version string for logging"""

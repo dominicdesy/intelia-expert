@@ -50,6 +50,17 @@ export function VoiceRealtimeButton() {
   } = useVoiceRealtime();
 
   // ============================================================
+  // AUTO-SCROLL LORS DU SPEAKING (must be before early return)
+  // ============================================================
+
+  useEffect(() => {
+    if (isSpeaking) {
+      // Optionnel: scroll auto vers le bas si réponse visible
+      // window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+  }, [isSpeaking]);
+
+  // ============================================================
   // PERMISSIONS
   // ============================================================
 
@@ -139,17 +150,6 @@ export function VoiceRealtimeButton() {
         return "Start voice conversation (Super Admin)";
     }
   };
-
-  // ============================================================
-  // AUTO-SCROLL LORS DU SPEAKING
-  // ============================================================
-
-  useEffect(() => {
-    if (isSpeaking) {
-      // Optionnel: scroll auto vers le bas si réponse visible
-      // window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    }
-  }, [isSpeaking]);
 
   // ============================================================
   // RENDER

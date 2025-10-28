@@ -13,12 +13,12 @@ Run with: python -m pytest tests/test_vision_integration.py -v
 import pytest
 import os
 import base64
-from pathlib import Path
 from io import BytesIO
 from PIL import Image
 
 
 # === TESTS UNITAIRES DU VISION ANALYZER ===
+
 
 @pytest.mark.asyncio
 async def test_vision_analyzer_initialization():
@@ -34,10 +34,10 @@ async def test_vision_analyzer_initialization():
     # Claude 4.5 models (current) or Claude 3.x models (legacy/deprecated)
     valid_models = [
         "claude-sonnet-4-5-20250929",  # Current default
-        "claude-haiku-4-5-20251001",   # Current budget
-        "claude-opus-4-1-20250805",    # Current premium
+        "claude-haiku-4-5-20251001",  # Current budget
+        "claude-opus-4-1-20250805",  # Current premium
         "claude-3-5-sonnet-20240620",  # Legacy (retired Oct 22, 2025)
-        "claude-3-opus-20240229",      # Legacy
+        "claude-3-opus-20240229",  # Legacy
     ]
     assert analyzer.model in valid_models
     assert analyzer.api_key is not None
@@ -51,9 +51,9 @@ async def test_vision_analyzer_image_conversion():
     from generation.claude_vision_analyzer import create_vision_analyzer
 
     # Créer une image test (100x100 rouge)
-    test_image = Image.new('RGB', (100, 100), color='red')
+    test_image = Image.new("RGB", (100, 100), color="red")
     buffer = BytesIO()
-    test_image.save(buffer, format='JPEG')
+    test_image.save(buffer, format="JPEG")
     image_data = buffer.getvalue()
 
     # Créer l'analyzer
@@ -86,7 +86,7 @@ async def test_vision_analyzer_prompt_building():
         context_docs=[
             {"content": "La coccidiose cause des diarrhées sanglantes", "metadata": {}}
         ],
-        language="fr"
+        language="fr",
     )
 
     assert prompt is not None
@@ -102,22 +102,23 @@ async def test_vision_analyzer_prompt_building():
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     not os.getenv("ANTHROPIC_API_KEY"),
-    reason="ANTHROPIC_API_KEY not set - skipping live API test"
+    reason="ANTHROPIC_API_KEY not set - skipping live API test",
 )
 async def test_vision_analyzer_live_api():
     """Test 4: Test réel avec l'API Claude (nécessite ANTHROPIC_API_KEY)"""
     from generation.claude_vision_analyzer import create_vision_analyzer
 
     # Créer une image test simple
-    test_image = Image.new('RGB', (200, 200), color='blue')
+    test_image = Image.new("RGB", (200, 200), color="blue")
 
     # Ajouter un texte simple pour que Claude ait quelque chose à voir
-    from PIL import ImageDraw, ImageFont
+    from PIL import ImageDraw
+
     draw = ImageDraw.Draw(test_image)
-    draw.text((50, 100), "TEST IMAGE", fill='white')
+    draw.text((50, 100), "TEST IMAGE", fill="white")
 
     buffer = BytesIO()
-    test_image.save(buffer, format='JPEG')
+    test_image.save(buffer, format="JPEG")
     image_data = buffer.getvalue()
 
     # Créer l'analyzer
@@ -177,17 +178,21 @@ async def test_vision_analyzer_disclaimer():
         assert len(disclaimer) > 0
         assert "⚠️" in disclaimer
         # Le disclaimer doit mentionner la consultation vétérinaire
-        assert any(word in disclaimer.lower() for word in ["vétérinaire", "veterinarian", "veterinario", "tierarzt"])
+        assert any(
+            word in disclaimer.lower()
+            for word in ["vétérinaire", "veterinarian", "veterinario", "tierarzt"]
+        )
 
         print(f"✅ Disclaimer verified for language: {lang}")
 
 
 # === TESTS D'INTÉGRATION (NÉCESSITENT LES SERVICES) ===
 
+
 @pytest.mark.integration
 @pytest.mark.skipif(
     not os.getenv("ANTHROPIC_API_KEY"),
-    reason="Integration tests require ANTHROPIC_API_KEY"
+    reason="Integration tests require ANTHROPIC_API_KEY",
 )
 async def test_full_vision_pipeline():
     """
@@ -200,6 +205,7 @@ async def test_full_vision_pipeline():
 
 
 # === NOTES POUR TESTS MANUELS ===
+
 
 def print_manual_test_instructions():
     """

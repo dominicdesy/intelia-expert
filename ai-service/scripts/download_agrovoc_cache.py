@@ -19,25 +19,27 @@ import time
 from typing import Dict, Set, List
 
 # AGROVOC supported languages (10/12 of Intelia Expert's languages)
-AGROVOC_LANGUAGES = ['fr', 'en', 'es', 'de', 'it', 'pt', 'pl', 'hi', 'th', 'zh']
+AGROVOC_LANGUAGES = ["fr", "en", "es", "de", "it", "pt", "pl", "hi", "th", "zh"]
 
 # AGROVOC SPARQL endpoint
-SPARQL_ENDPOINT = 'https://agrovoc.fao.org/sparql'
+SPARQL_ENDPOINT = "https://agrovoc.fao.org/sparql"
 
 # Key poultry-related concept URIs in AGROVOC
 POULTRY_CONCEPTS = [
-    'http://aims.fao.org/aos/agrovoc/c_6105',   # poultry
-    'http://aims.fao.org/aos/agrovoc/c_1521',   # chickens
-    'http://aims.fao.org/aos/agrovoc/c_1328',   # broilers
-    'http://aims.fao.org/aos/agrovoc/c_4397',   # layers
-    'http://aims.fao.org/aos/agrovoc/c_6106',   # poultry diseases
-    'http://aims.fao.org/aos/agrovoc/c_6107',   # poultry farming
-    'http://aims.fao.org/aos/agrovoc/c_6108',   # poultry meat
-    'http://aims.fao.org/aos/agrovoc/c_6109',   # poultry products
+    "http://aims.fao.org/aos/agrovoc/c_6105",  # poultry
+    "http://aims.fao.org/aos/agrovoc/c_1521",  # chickens
+    "http://aims.fao.org/aos/agrovoc/c_1328",  # broilers
+    "http://aims.fao.org/aos/agrovoc/c_4397",  # layers
+    "http://aims.fao.org/aos/agrovoc/c_6106",  # poultry diseases
+    "http://aims.fao.org/aos/agrovoc/c_6107",  # poultry farming
+    "http://aims.fao.org/aos/agrovoc/c_6108",  # poultry meat
+    "http://aims.fao.org/aos/agrovoc/c_6109",  # poultry products
 ]
 
 
-def download_terms_for_concept(concept_uri: str, language: str, max_depth: int = 2) -> Set[str]:
+def download_terms_for_concept(
+    concept_uri: str, language: str, max_depth: int = 2
+) -> Set[str]:
     """
     Download all terms for a concept and its narrower concepts (up to max_depth)
 
@@ -49,7 +51,7 @@ def download_terms_for_concept(concept_uri: str, language: str, max_depth: int =
     Returns:
         Set of terms (prefLabel and altLabel)
     """
-    query = f'''
+    query = f"""
     PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 
     SELECT DISTINCT ?label
@@ -58,26 +60,26 @@ def download_terms_for_concept(concept_uri: str, language: str, max_depth: int =
         ?concept skos:prefLabel|skos:altLabel ?label .
         FILTER(LANG(?label) = "{language}")
     }}
-    '''
+    """
 
     try:
         response = requests.get(
-            SPARQL_ENDPOINT,
-            params={'query': query, 'format': 'json'},
-            timeout=30
+            SPARQL_ENDPOINT, params={"query": query, "format": "json"}, timeout=30
         )
 
         if response.status_code == 200:
             results = response.json()
             terms = set()
 
-            for binding in results['results']['bindings']:
-                label = binding['label']['value'].lower()
+            for binding in results["results"]["bindings"]:
+                label = binding["label"]["value"].lower()
                 terms.add(label)
 
             return terms
         else:
-            print(f"  [ERROR] HTTP {response.status_code} for {concept_uri} ({language})")
+            print(
+                f"  [ERROR] HTTP {response.status_code} for {concept_uri} ({language})"
+            )
             return set()
 
     except Exception as e:
@@ -107,8 +109,8 @@ def download_agrovoc_cache() -> Dict[str, List[str]]:
         language_terms = set()
 
         for i, concept_uri in enumerate(POULTRY_CONCEPTS, 1):
-            concept_name = concept_uri.split('/')[-1]
-            print(f"  [{i}/{len(POULTRY_CONCEPTS)}] {concept_name}...", end=' ')
+            concept_name = concept_uri.split("/")[-1]
+            print(f"  [{i}/{len(POULTRY_CONCEPTS)}] {concept_name}...", end=" ")
 
             terms = download_terms_for_concept(concept_uri, language)
             language_terms.update(terms)
@@ -134,10 +136,11 @@ def save_cache(cache: Dict[str, bool], filename: str = None):
     if filename is None:
         # Save in llm/services/ directory
         from pathlib import Path
+
         services_dir = Path(__file__).parent.parent / "services"
         filename = str(services_dir / "agrovoc_poultry_cache.json")
 
-    with open(filename, 'w', encoding='utf-8') as f:
+    with open(filename, "w", encoding="utf-8") as f:
         json.dump(cache, f, indent=2, ensure_ascii=False)
 
     print("=" * 80)
@@ -152,7 +155,7 @@ def generate_stats(cache: Dict[str, bool]):
     stats = {}
 
     for key in cache.keys():
-        lang = key.split(':')[0]
+        lang = key.split(":")[0]
         if lang not in stats:
             stats[lang] = 0
         stats[lang] += 1

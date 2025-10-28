@@ -200,60 +200,252 @@ class ProactiveAssistant:
                 ],
             },
             AssistanceContext.OPTIMIZATION.value: {
-                "fr": ["Voulez-vous optimiser le {metric} de vos oiseaux ? Je peux vous suggérer des stratégies.", "Souhaitez-vous des recommandations pour améliorer les performances de votre élevage ?", "Puis-je vous aider à identifier les facteurs clés pour améliorer vos résultats ?"],
-                "en": ["Would you like to optimize your bird {metric}? I can suggest strategies.", "Would you like recommendations to improve your flock performance?", "Can I help you identify key factors to improve your results?"],
-                "es": ["¿Le gustaría optimizar el {metric} de sus aves? Puedo sugerir estrategias.", "¿Quisiera recomendaciones para mejorar el rendimiento de su lote?", "¿Puedo ayudarlo a identificar factores clave para mejorar sus resultados?"],
-                "de": ["Möchten Sie den {metric} Ihrer Vögel optimieren? Ich kann Strategien vorschlagen.", "Möchten Sie Empfehlungen zur Verbesserung der Leistung Ihrer Herde?", "Kann ich Ihnen helfen, Schlüsselfaktoren zur Verbesserung Ihrer Ergebnisse zu identifizieren?"],
-                "it": ["Vuole ottimizzare il {metric} dei suoi uccelli? Posso suggerire strategie.", "Desidera raccomandazioni per migliorare le prestazioni del suo allevamento?", "Posso aiutarla a identificare i fattori chiave per migliorare i suoi risultati?"],
-                "pt": ["Gostaria de otimizar o {metric} de suas aves? Posso sugerir estratégias.", "Gostaria de recomendações para melhorar o desempenho de seu lote?", "Posso ajudá-lo a identificar fatores-chave para melhorar seus resultados?"],
-                "pl": ["Czy chciałby Pan/Pani zoptymalizować {metric} swoich ptaków? Mogę zasugerować strategie.", "Czy chciałby Pan/Pani rekomendacje w celu poprawy wyników stada?", "Czy mogę pomóc zidentyfikować kluczowe czynniki poprawy wyników?"],
-                "nl": ["Wilt u de {metric} van uw vogels optimaliseren? Ik kan strategieën voorstellen.", "Wilt u aanbevelingen om de prestaties van uw koppel te verbeteren?", "Kan ik u helpen belangrijke factoren te identificeren om uw resultaten te verbeteren?"],
-                "id": ["Apakah Anda ingin mengoptimalkan {metric} burung Anda? Saya dapat menyarankan strategi.", "Apakah Anda ingin rekomendasi untuk meningkatkan kinerja kawanan Anda?", "Dapatkah saya membantu Anda mengidentifikasi faktor kunci untuk meningkatkan hasil Anda?"],
-                "hi": ["क्या आप अपने पक्षियों की {metric} को अनुकूलित करना चाहेंगे? मैं रणनीतियाँ सुझा सकता हूं।", "क्या आप अपने झुंड के प्रदर्शन को बेहतर बनाने के लिए सिफारिशें चाहेंगे?", "क्या मैं आपके परिणामों को बेहतर बनाने के लिए प्रमुख कारकों की पहचान करने में मदद कर सकता हूं?"],
-                "zh": ["您想优化禽类的{metric}吗？我可以建议策略。", "您想要改善禽群表现的建议吗？", "我能帮您识别改善结果的关键因素吗？"],
-                "th": ["คุณต้องการเพิ่มประสิทธิภาพ{metric}ของสัตว์ปีกหรือไม่? ฉันสามารถแนะนำกลยุทธ์", "คุณต้องการคำแนะนำเพื่อปรับปรุงประสิทธิภาพฝูงของคุณหรือไม่?", "ฉันสามารถช่วยคุณระบุปัจจัยสำคัญในการปรับปรุงผลลัพธ์ได้หรือไม่?"],
+                "fr": [
+                    "Voulez-vous optimiser le {metric} de vos oiseaux ? Je peux vous suggérer des stratégies.",
+                    "Souhaitez-vous des recommandations pour améliorer les performances de votre élevage ?",
+                    "Puis-je vous aider à identifier les facteurs clés pour améliorer vos résultats ?",
+                ],
+                "en": [
+                    "Would you like to optimize your bird {metric}? I can suggest strategies.",
+                    "Would you like recommendations to improve your flock performance?",
+                    "Can I help you identify key factors to improve your results?",
+                ],
+                "es": [
+                    "¿Le gustaría optimizar el {metric} de sus aves? Puedo sugerir estrategias.",
+                    "¿Quisiera recomendaciones para mejorar el rendimiento de su lote?",
+                    "¿Puedo ayudarlo a identificar factores clave para mejorar sus resultados?",
+                ],
+                "de": [
+                    "Möchten Sie den {metric} Ihrer Vögel optimieren? Ich kann Strategien vorschlagen.",
+                    "Möchten Sie Empfehlungen zur Verbesserung der Leistung Ihrer Herde?",
+                    "Kann ich Ihnen helfen, Schlüsselfaktoren zur Verbesserung Ihrer Ergebnisse zu identifizieren?",
+                ],
+                "it": [
+                    "Vuole ottimizzare il {metric} dei suoi uccelli? Posso suggerire strategie.",
+                    "Desidera raccomandazioni per migliorare le prestazioni del suo allevamento?",
+                    "Posso aiutarla a identificare i fattori chiave per migliorare i suoi risultati?",
+                ],
+                "pt": [
+                    "Gostaria de otimizar o {metric} de suas aves? Posso sugerir estratégias.",
+                    "Gostaria de recomendações para melhorar o desempenho de seu lote?",
+                    "Posso ajudá-lo a identificar fatores-chave para melhorar seus resultados?",
+                ],
+                "pl": [
+                    "Czy chciałby Pan/Pani zoptymalizować {metric} swoich ptaków? Mogę zasugerować strategie.",
+                    "Czy chciałby Pan/Pani rekomendacje w celu poprawy wyników stada?",
+                    "Czy mogę pomóc zidentyfikować kluczowe czynniki poprawy wyników?",
+                ],
+                "nl": [
+                    "Wilt u de {metric} van uw vogels optimaliseren? Ik kan strategieën voorstellen.",
+                    "Wilt u aanbevelingen om de prestaties van uw koppel te verbeteren?",
+                    "Kan ik u helpen belangrijke factoren te identificeren om uw resultaten te verbeteren?",
+                ],
+                "id": [
+                    "Apakah Anda ingin mengoptimalkan {metric} burung Anda? Saya dapat menyarankan strategi.",
+                    "Apakah Anda ingin rekomendasi untuk meningkatkan kinerja kawanan Anda?",
+                    "Dapatkah saya membantu Anda mengidentifikasi faktor kunci untuk meningkatkan hasil Anda?",
+                ],
+                "hi": [
+                    "क्या आप अपने पक्षियों की {metric} को अनुकूलित करना चाहेंगे? मैं रणनीतियाँ सुझा सकता हूं।",
+                    "क्या आप अपने झुंड के प्रदर्शन को बेहतर बनाने के लिए सिफारिशें चाहेंगे?",
+                    "क्या मैं आपके परिणामों को बेहतर बनाने के लिए प्रमुख कारकों की पहचान करने में मदद कर सकता हूं?",
+                ],
+                "zh": [
+                    "您想优化禽类的{metric}吗？我可以建议策略。",
+                    "您想要改善禽群表现的建议吗？",
+                    "我能帮您识别改善结果的关键因素吗？",
+                ],
+                "th": [
+                    "คุณต้องการเพิ่มประสิทธิภาพ{metric}ของสัตว์ปีกหรือไม่? ฉันสามารถแนะนำกลยุทธ์",
+                    "คุณต้องการคำแนะนำเพื่อปรับปรุงประสิทธิภาพฝูงของคุณหรือไม่?",
+                    "ฉันสามารถช่วยคุณระบุปัจจัยสำคัญในการปรับปรุงผลลัพธ์ได้หรือไม่?",
+                ],
             },
             AssistanceContext.COMPARISON.value: {
-                "fr": ["Voulez-vous comparer ces résultats avec une autre race ou période ?", "Souhaitez-vous analyser les différences en détail ? Je peux vous aider.", "Puis-je vous recommander la meilleure option pour votre situation ?"],
-                "en": ["Would you like to compare these results with another breed or period?", "Would you like to analyze the differences in detail? I can help.", "Can I recommend the best option for your situation?"],
-                "es": ["¿Le gustaría comparar estos resultados con otra raza o período?", "¿Quisiera analizar las diferencias en detalle? Puedo ayudar.", "¿Puedo recomendar la mejor opción para su situación?"],
-                "de": ["Möchten Sie diese Ergebnisse mit einer anderen Rasse oder Periode vergleichen?", "Möchten Sie die Unterschiede im Detail analysieren? Ich kann helfen.", "Kann ich die beste Option für Ihre Situation empfehlen?"],
-                "it": ["Vuole confrontare questi risultati con un'altra razza o periodo?", "Desidera analizzare le differenze in dettaglio? Posso aiutare.", "Posso raccomandare la migliore opzione per la sua situazione?"],
-                "pt": ["Gostaria de comparar estes resultados com outra raça ou período?", "Gostaria de analisar as diferenças em detalhe? Posso ajudar.", "Posso recomendar a melhor opção para sua situação?"],
-                "pl": ["Czy chciałby Pan/Pani porównać te wyniki z inną rasą lub okresem?", "Czy chciałby Pan/Pani szczegółowo przeanalizować różnice? Mogę pomóc.", "Czy mogę polecić najlepszą opcję dla Pana/Pani sytuacji?"],
-                "nl": ["Wilt u deze resultaten vergelijken met een ander ras of periode?", "Wilt u de verschillen in detail analyseren? Ik kan helpen.", "Kan ik de beste optie voor uw situatie aanbevelen?"],
-                "id": ["Apakah Anda ingin membandingkan hasil ini dengan breed atau periode lain?", "Apakah Anda ingin menganalisis perbedaan secara detail? Saya dapat membantu.", "Dapatkah saya merekomendasikan opsi terbaik untuk situasi Anda?"],
-                "hi": ["क्या आप इन परिणामों की तुलना किसी अन्य नस्ल या अवधि से करना चाहेंगे?", "क्या आप अंतर का विस्तार से विश्लेषण करना चाहेंगे? मैं मदद कर सकता हूं।", "क्या मैं आपकी स्थिति के लिए सर्वोत्तम विकल्प सुझा सकता हूं?"],
-                "zh": ["您想将这些结果与另一个品种或时期进行比较吗？", "您想详细分析差异吗？我可以帮忙。", "我能为您的情况推荐最佳选择吗？"],
-                "th": ["คุณต้องการเปรียบเทียบผลลัพธ์เหล่านี้กับสายพันธุ์หรือช่วงเวลาอื่นหรือไม่?", "คุณต้องการวิเคราะห์ความแตกต่างโดยละเอียดหรือไม่? ฉันสามารถช่วยได้", "ฉันสามารถแนะนำตัวเลือกที่ดีที่สุดสำหรับสถานการณ์ของคุณได้หรือไม่?"],
+                "fr": [
+                    "Voulez-vous comparer ces résultats avec une autre race ou période ?",
+                    "Souhaitez-vous analyser les différences en détail ? Je peux vous aider.",
+                    "Puis-je vous recommander la meilleure option pour votre situation ?",
+                ],
+                "en": [
+                    "Would you like to compare these results with another breed or period?",
+                    "Would you like to analyze the differences in detail? I can help.",
+                    "Can I recommend the best option for your situation?",
+                ],
+                "es": [
+                    "¿Le gustaría comparar estos resultados con otra raza o período?",
+                    "¿Quisiera analizar las diferencias en detalle? Puedo ayudar.",
+                    "¿Puedo recomendar la mejor opción para su situación?",
+                ],
+                "de": [
+                    "Möchten Sie diese Ergebnisse mit einer anderen Rasse oder Periode vergleichen?",
+                    "Möchten Sie die Unterschiede im Detail analysieren? Ich kann helfen.",
+                    "Kann ich die beste Option für Ihre Situation empfehlen?",
+                ],
+                "it": [
+                    "Vuole confrontare questi risultati con un'altra razza o periodo?",
+                    "Desidera analizzare le differenze in dettaglio? Posso aiutare.",
+                    "Posso raccomandare la migliore opzione per la sua situazione?",
+                ],
+                "pt": [
+                    "Gostaria de comparar estes resultados com outra raça ou período?",
+                    "Gostaria de analisar as diferenças em detalhe? Posso ajudar.",
+                    "Posso recomendar a melhor opção para sua situação?",
+                ],
+                "pl": [
+                    "Czy chciałby Pan/Pani porównać te wyniki z inną rasą lub okresem?",
+                    "Czy chciałby Pan/Pani szczegółowo przeanalizować różnice? Mogę pomóc.",
+                    "Czy mogę polecić najlepszą opcję dla Pana/Pani sytuacji?",
+                ],
+                "nl": [
+                    "Wilt u deze resultaten vergelijken met een ander ras of periode?",
+                    "Wilt u de verschillen in detail analyseren? Ik kan helpen.",
+                    "Kan ik de beste optie voor uw situatie aanbevelen?",
+                ],
+                "id": [
+                    "Apakah Anda ingin membandingkan hasil ini dengan breed atau periode lain?",
+                    "Apakah Anda ingin menganalisis perbedaan secara detail? Saya dapat membantu.",
+                    "Dapatkah saya merekomendasikan opsi terbaik untuk situasi Anda?",
+                ],
+                "hi": [
+                    "क्या आप इन परिणामों की तुलना किसी अन्य नस्ल या अवधि से करना चाहेंगे?",
+                    "क्या आप अंतर का विस्तार से विश्लेषण करना चाहेंगे? मैं मदद कर सकता हूं।",
+                    "क्या मैं आपकी स्थिति के लिए सर्वोत्तम विकल्प सुझा सकता हूं?",
+                ],
+                "zh": [
+                    "您想将这些结果与另一个品种或时期进行比较吗？",
+                    "您想详细分析差异吗？我可以帮忙。",
+                    "我能为您的情况推荐最佳选择吗？",
+                ],
+                "th": [
+                    "คุณต้องการเปรียบเทียบผลลัพธ์เหล่านี้กับสายพันธุ์หรือช่วงเวลาอื่นหรือไม่?",
+                    "คุณต้องการวิเคราะห์ความแตกต่างโดยละเอียดหรือไม่? ฉันสามารถช่วยได้",
+                    "ฉันสามารถแนะนำตัวเลือกที่ดีที่สุดสำหรับสถานการณ์ของคุณได้หรือไม่?",
+                ],
             },
             AssistanceContext.PLANNING.value: {
-                "fr": ["Avez-vous besoin d'aide pour planifier votre prochaine bande ?", "Voulez-vous des prévisions de performance pour votre élevage ?", "Puis-je vous aider à établir un calendrier de gestion optimal ?"],
-                "en": ["Do you need help planning your next flock?", "Would you like performance forecasts for your farm?", "Can I help you establish an optimal management schedule?"],
-                "es": ["¿Necesita ayuda para planificar su próximo lote?", "¿Quisiera pronósticos de rendimiento para su granja?", "¿Puedo ayudarlo a establecer un calendario de gestión óptimo?"],
-                "de": ["Benötigen Sie Hilfe bei der Planung Ihrer nächsten Herde?", "Möchten Sie Leistungsprognosen für Ihren Betrieb?", "Kann ich Ihnen helfen, einen optimalen Verwaltungsplan zu erstellen?"],
-                "it": ["Ha bisogno di aiuto per pianificare il suo prossimo lotto?", "Vuole previsioni di prestazioni per il suo allevamento?", "Posso aiutarla a stabilire un programma di gestione ottimale?"],
-                "pt": ["Precisa de ajuda para planejar seu próximo lote?", "Gostaria de previsões de desempenho para sua fazenda?", "Posso ajudá-lo a estabelecer um cronograma de gestão ideal?"],
-                "pl": ["Czy potrzebuje Pan/Pani pomocy w planowaniu następnego stada?", "Czy chciałby Pan/Pani prognozy wydajności dla swojego gospodarstwa?", "Czy mogę pomóc ustalić optymalny harmonogram zarządzania?"],
-                "nl": ["Heeft u hulp nodig bij het plannen van uw volgende koppel?", "Wilt u prestatievoorspellingen voor uw bedrijf?", "Kan ik u helpen een optimaal beheerplan op te stellen?"],
-                "id": ["Apakah Anda memerlukan bantuan merencanakan kawanan berikutnya?", "Apakah Anda ingin perkiraan kinerja untuk peternakan Anda?", "Dapatkah saya membantu Anda membuat jadwal manajemen yang optimal?"],
-                "hi": ["क्या आपको अपने अगले झुंड की योजना बनाने में सहायता चाहिए?", "क्या आप अपने फार्म के लिए प्रदर्शन पूर्वानुमान चाहेंगे?", "क्या मैं आपको एक इष्टतम प्रबंधन कार्यक्रम स्थापित करने में मदद कर सकता हूं?"],
-                "zh": ["您需要帮助规划下一批禽群吗？", "您想要您农场的性能预测吗？", "我能帮您建立最佳管理计划吗？"],
-                "th": ["คุณต้องการความช่วยเหลือในการวางแผนฝูงถัดไปหรือไม่?", "คุณต้องการการคาดการณ์ประสิทธิภาพสำหรับฟาร์มของคุณหรือไม่?", "ฉันสามารถช่วยคุณสร้างตารางการจัดการที่เหมาะสมได้หรือไม่?"],
+                "fr": [
+                    "Avez-vous besoin d'aide pour planifier votre prochaine bande ?",
+                    "Voulez-vous des prévisions de performance pour votre élevage ?",
+                    "Puis-je vous aider à établir un calendrier de gestion optimal ?",
+                ],
+                "en": [
+                    "Do you need help planning your next flock?",
+                    "Would you like performance forecasts for your farm?",
+                    "Can I help you establish an optimal management schedule?",
+                ],
+                "es": [
+                    "¿Necesita ayuda para planificar su próximo lote?",
+                    "¿Quisiera pronósticos de rendimiento para su granja?",
+                    "¿Puedo ayudarlo a establecer un calendario de gestión óptimo?",
+                ],
+                "de": [
+                    "Benötigen Sie Hilfe bei der Planung Ihrer nächsten Herde?",
+                    "Möchten Sie Leistungsprognosen für Ihren Betrieb?",
+                    "Kann ich Ihnen helfen, einen optimalen Verwaltungsplan zu erstellen?",
+                ],
+                "it": [
+                    "Ha bisogno di aiuto per pianificare il suo prossimo lotto?",
+                    "Vuole previsioni di prestazioni per il suo allevamento?",
+                    "Posso aiutarla a stabilire un programma di gestione ottimale?",
+                ],
+                "pt": [
+                    "Precisa de ajuda para planejar seu próximo lote?",
+                    "Gostaria de previsões de desempenho para sua fazenda?",
+                    "Posso ajudá-lo a estabelecer um cronograma de gestão ideal?",
+                ],
+                "pl": [
+                    "Czy potrzebuje Pan/Pani pomocy w planowaniu następnego stada?",
+                    "Czy chciałby Pan/Pani prognozy wydajności dla swojego gospodarstwa?",
+                    "Czy mogę pomóc ustalić optymalny harmonogram zarządzania?",
+                ],
+                "nl": [
+                    "Heeft u hulp nodig bij het plannen van uw volgende koppel?",
+                    "Wilt u prestatievoorspellingen voor uw bedrijf?",
+                    "Kan ik u helpen een optimaal beheerplan op te stellen?",
+                ],
+                "id": [
+                    "Apakah Anda memerlukan bantuan merencanakan kawanan berikutnya?",
+                    "Apakah Anda ingin perkiraan kinerja untuk peternakan Anda?",
+                    "Dapatkah saya membantu Anda membuat jadwal manajemen yang optimal?",
+                ],
+                "hi": [
+                    "क्या आपको अपने अगले झुंड की योजना बनाने में सहायता चाहिए?",
+                    "क्या आप अपने फार्म के लिए प्रदर्शन पूर्वानुमान चाहेंगे?",
+                    "क्या मैं आपको एक इष्टतम प्रबंधन कार्यक्रम स्थापित करने में मदद कर सकता हूं?",
+                ],
+                "zh": [
+                    "您需要帮助规划下一批禽群吗？",
+                    "您想要您农场的性能预测吗？",
+                    "我能帮您建立最佳管理计划吗？",
+                ],
+                "th": [
+                    "คุณต้องการความช่วยเหลือในการวางแผนฝูงถัดไปหรือไม่?",
+                    "คุณต้องการการคาดการณ์ประสิทธิภาพสำหรับฟาร์มของคุณหรือไม่?",
+                    "ฉันสามารถช่วยคุณสร้างตารางการจัดการที่เหมาะสมได้หรือไม่?",
+                ],
             },
             AssistanceContext.GENERAL_INFO.value: {
-                "fr": ["Avez-vous d'autres questions sur cette race ou ces données ?", "Puis-je vous aider avec d'autres informations ?", "Voulez-vous en savoir plus sur un aspect spécifique ?"],
-                "en": ["Do you have other questions about this breed or data?", "Can I help you with additional information?", "Would you like to know more about a specific aspect?"],
-                "es": ["¿Tiene otras preguntas sobre esta raza o estos datos?", "¿Puedo ayudarlo con información adicional?", "¿Le gustaría saber más sobre un aspecto específico?"],
-                "de": ["Haben Sie weitere Fragen zu dieser Rasse oder diesen Daten?", "Kann ich Ihnen mit weiteren Informationen helfen?", "Möchten Sie mehr über einen bestimmten Aspekt erfahren?"],
-                "it": ["Ha altre domande su questa razza o questi dati?", "Posso aiutarla con informazioni aggiuntive?", "Vuole saperne di più su un aspetto specifico?"],
-                "pt": ["Você tem outras perguntas sobre esta raça ou estes dados?", "Posso ajudá-lo com informações adicionais?", "Gostaria de saber mais sobre um aspecto específico?"],
-                "pl": ["Czy ma Pan/Pani inne pytania dotyczące tej rasy lub tych danych?", "Czy mogę pomóc z dodatkowymi informacjami?", "Czy chciałby Pan/Pani dowiedzieć się więcej o konkretnym aspekcie?"],
-                "nl": ["Heeft u andere vragen over dit ras of deze gegevens?", "Kan ik u helpen met aanvullende informatie?", "Wilt u meer weten over een specifiek aspect?"],
-                "id": ["Apakah Anda memiliki pertanyaan lain tentang breed atau data ini?", "Dapatkah saya membantu Anda dengan informasi tambahan?", "Apakah Anda ingin tahu lebih banyak tentang aspek tertentu?"],
-                "hi": ["क्या आपके पास इस नस्ल या डेटा के बारे में अन्य प्रश्न हैं?", "क्या मैं अतिरिक्त जानकारी से आपकी सहायता कर सकता हूं?", "क्या आप किसी विशिष्ट पहलू के बारे में अधिक जानना चाहेंगे?"],
-                "zh": ["您对这个品种或数据有其他问题吗？", "我能为您提供更多信息吗？", "您想了解更多关于特定方面的信息吗？"],
-                "th": ["คุณมีคำถามอื่นเกี่ยวกับสายพันธุ์หรือข้อมูลนี้หรือไม่?", "ฉันสามารถช่วยคุณด้วยข้อมูลเพิ่มเติมได้หรือไม่?", "คุณต้องการทราบข้อมูลเพิ่มเติมเกี่ยวกับด้านใดด้านหนึ่งหรือไม่?"],
+                "fr": [
+                    "Avez-vous d'autres questions sur cette race ou ces données ?",
+                    "Puis-je vous aider avec d'autres informations ?",
+                    "Voulez-vous en savoir plus sur un aspect spécifique ?",
+                ],
+                "en": [
+                    "Do you have other questions about this breed or data?",
+                    "Can I help you with additional information?",
+                    "Would you like to know more about a specific aspect?",
+                ],
+                "es": [
+                    "¿Tiene otras preguntas sobre esta raza o estos datos?",
+                    "¿Puedo ayudarlo con información adicional?",
+                    "¿Le gustaría saber más sobre un aspecto específico?",
+                ],
+                "de": [
+                    "Haben Sie weitere Fragen zu dieser Rasse oder diesen Daten?",
+                    "Kann ich Ihnen mit weiteren Informationen helfen?",
+                    "Möchten Sie mehr über einen bestimmten Aspekt erfahren?",
+                ],
+                "it": [
+                    "Ha altre domande su questa razza o questi dati?",
+                    "Posso aiutarla con informazioni aggiuntive?",
+                    "Vuole saperne di più su un aspetto specifico?",
+                ],
+                "pt": [
+                    "Você tem outras perguntas sobre esta raça ou estes dados?",
+                    "Posso ajudá-lo com informações adicionais?",
+                    "Gostaria de saber mais sobre um aspecto específico?",
+                ],
+                "pl": [
+                    "Czy ma Pan/Pani inne pytania dotyczące tej rasy lub tych danych?",
+                    "Czy mogę pomóc z dodatkowymi informacjami?",
+                    "Czy chciałby Pan/Pani dowiedzieć się więcej o konkretnym aspekcie?",
+                ],
+                "nl": [
+                    "Heeft u andere vragen over dit ras of deze gegevens?",
+                    "Kan ik u helpen met aanvullende informatie?",
+                    "Wilt u meer weten over een specifiek aspect?",
+                ],
+                "id": [
+                    "Apakah Anda memiliki pertanyaan lain tentang breed atau data ini?",
+                    "Dapatkah saya membantu Anda dengan informasi tambahan?",
+                    "Apakah Anda ingin tahu lebih banyak tentang aspek tertentu?",
+                ],
+                "hi": [
+                    "क्या आपके पास इस नस्ल या डेटा के बारे में अन्य प्रश्न हैं?",
+                    "क्या मैं अतिरिक्त जानकारी से आपकी सहायता कर सकता हूं?",
+                    "क्या आप किसी विशिष्ट पहलू के बारे में अधिक जानना चाहेंगे?",
+                ],
+                "zh": [
+                    "您对这个品种或数据有其他问题吗？",
+                    "我能为您提供更多信息吗？",
+                    "您想了解更多关于特定方面的信息吗？",
+                ],
+                "th": [
+                    "คุณมีคำถามอื่นเกี่ยวกับสายพันธุ์หรือข้อมูลนี้หรือไม่?",
+                    "ฉันสามารถช่วยคุณด้วยข้อมูลเพิ่มเติมได้หรือไม่?",
+                    "คุณต้องการทราบข้อมูลเพิ่มเติมเกี่ยวกับด้านใดด้านหนึ่งหรือไม่?",
+                ],
             },
         }
 
@@ -292,7 +484,20 @@ class ProactiveAssistant:
         lang = language or self.default_language
 
         # Validate language - support 12 languages
-        supported_languages = ["fr", "en", "es", "de", "it", "pt", "pl", "nl", "id", "hi", "zh", "th"]
+        supported_languages = [
+            "fr",
+            "en",
+            "es",
+            "de",
+            "it",
+            "pt",
+            "pl",
+            "nl",
+            "id",
+            "hi",
+            "zh",
+            "th",
+        ]
         if lang not in supported_languages:
             lang = "fr"  # Fallback to French
 
@@ -304,12 +509,25 @@ class ProactiveAssistant:
         if context == AssistanceContext.OPTIMIZATION:
             query_lower = query.lower()
             optimization_request_keywords = [
-                "optimiser", "optimize", "optimizar",
-                "améliorer", "improve", "mejorar",
-                "augmenter", "increase", "aumentar",
-                "comment", "how", "cómo", "wie",
-                "stratégies", "strategies", "estrategias",
-                "conseils", "advice", "recomendaciones"
+                "optimiser",
+                "optimize",
+                "optimizar",
+                "améliorer",
+                "improve",
+                "mejorar",
+                "augmenter",
+                "increase",
+                "aumentar",
+                "comment",
+                "how",
+                "cómo",
+                "wie",
+                "stratégies",
+                "strategies",
+                "estrategias",
+                "conseils",
+                "advice",
+                "recomendaciones",
             ]
             is_already_optimization_request = any(
                 keyword in query_lower for keyword in optimization_request_keywords
@@ -467,7 +685,8 @@ class ProactiveAssistant:
 
         # 🆕 DETECT PLACEHOLDERS in template
         import re
-        placeholders = re.findall(r'\{(\w+)\}', template)
+
+        placeholders = re.findall(r"\{(\w+)\}", template)
 
         # 🆕 VALIDATE all placeholders have values
         missing_placeholders = []
@@ -637,7 +856,11 @@ class ProactiveAssistant:
             "feed": "feed_intake",
             "water": "water_intake",
         }
-        normalized_metric = metric_mapping.get(metric_type.lower(), metric_type) if metric_type else metric_type
+        normalized_metric = (
+            metric_mapping.get(metric_type.lower(), metric_type)
+            if metric_type
+            else metric_type
+        )
 
         metric_name = metric_names.get(language, {}).get(normalized_metric, metric_type)
 

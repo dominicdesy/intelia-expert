@@ -32,7 +32,9 @@ class LLMServiceClient:
             base_url: Base URL of LLM service (defaults to env var or localhost:8081)
             timeout: Request timeout in seconds
         """
-        self.base_url = base_url or os.getenv("LLM_SERVICE_URL", "http://localhost:8081")
+        self.base_url = base_url or os.getenv(
+            "LLM_SERVICE_URL", "http://localhost:8081"
+        )
         self.timeout = timeout
         self.client = httpx.AsyncClient(timeout=timeout)
 
@@ -97,8 +99,7 @@ class LLMServiceClient:
             logger.info(f"🔗 Calling LLM service /v1/generate for domain={domain}")
 
             response = await self.client.post(
-                f"{self.base_url}/v1/generate",
-                json=request_data
+                f"{self.base_url}/v1/generate", json=request_data
             )
             response.raise_for_status()
             data = response.json()
@@ -121,11 +122,13 @@ class LLMServiceClient:
                 data["generated_text"],
                 data["prompt_tokens"],
                 data["completion_tokens"],
-                metadata
+                metadata,
             )
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"❌ LLM service HTTP error: {e.response.status_code} - {e.response.text}")
+            logger.error(
+                f"❌ LLM service HTTP error: {e.response.status_code} - {e.response.text}"
+            )
             raise Exception(f"LLM service error: {e.response.status_code}")
         except httpx.RequestError as e:
             logger.error(f"❌ LLM service connection error: {e}")
@@ -133,7 +136,6 @@ class LLMServiceClient:
         except Exception as e:
             logger.error(f"❌ LLM service client error: {e}", exc_info=True)
             raise
-
 
     async def generate_stream(
         self,
@@ -151,10 +153,10 @@ class LLMServiceClient:
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Generate intelligent LLM response with streaming (Server-Sent Events)
-        
+
         This method streams the response chunks as they are generated,
         providing a better user experience with reduced perceived latency.
-        
+
         Args:
             query: User query
             domain: Domain for configuration
@@ -167,7 +169,7 @@ class LLMServiceClient:
             top_p: Nucleus sampling (optional)
             post_process: Apply post-processing
             add_disclaimer: Add veterinary disclaimer if applicable
-            
+
         Yields:
             Dictionary with event data:
             - event="start": {"status": "generating", "complexity": "simple", ...}
@@ -183,7 +185,7 @@ class LLMServiceClient:
                 "post_process": post_process,
                 "add_disclaimer": add_disclaimer,
             }
-            
+
             # Add optional parameters
             if entities:
                 request_data["entities"] = entities
@@ -197,56 +199,59 @@ class LLMServiceClient:
                 request_data["max_tokens"] = max_tokens
             if top_p is not None:
                 request_data["top_p"] = top_p
-                
-            logger.info(f"[STREAM] Calling LLM service /v1/generate-stream for domain={domain}")
-            
+
+            logger.info(
+                f"[STREAM] Calling LLM service /v1/generate-stream for domain={domain}"
+            )
+
             async with self.client.stream(
                 "POST",
                 f"{self.base_url}/v1/generate-stream",
                 json=request_data,
-                timeout=120.0
+                timeout=120.0,
             ) as response:
                 response.raise_for_status()
-                
+
                 current_event = None
                 async for line in response.aiter_lines():
                     if not line or line.startswith(":"):
                         continue
-                        
+
                     # Parse SSE format
                     if line.startswith("event:"):
                         current_event = line.split(":", 1)[1].strip()
-                        
+
                     elif line.startswith("data:"):
                         data_str = line.split(":", 1)[1].strip()
-                        
+
                         try:
                             event_data = json.loads(data_str)
                             event_data["event"] = current_event or "chunk"
                             yield event_data
-                            
+
                         except json.JSONDecodeError:
                             logger.warning(f"[STREAM] Invalid JSON in SSE: {data_str}")
                             continue
-                            
+
         except httpx.HTTPStatusError as e:
-            logger.error(f"[ERROR] LLM service streaming HTTP error: {e.response.status_code}")
+            logger.error(
+                f"[ERROR] LLM service streaming HTTP error: {e.response.status_code}"
+            )
             yield {
                 "event": "error",
-                "error": f"LLM service error: {e.response.status_code}"
+                "error": f"LLM service error: {e.response.status_code}",
             }
         except httpx.RequestError as e:
             logger.error(f"[ERROR] LLM service streaming connection error: {e}")
             yield {
                 "event": "error",
-                "error": f"Cannot connect to LLM service at {self.base_url}"
+                "error": f"Cannot connect to LLM service at {self.base_url}",
             }
         except Exception as e:
-            logger.error(f"[ERROR] LLM service streaming client error: {e}", exc_info=True)
-            yield {
-                "event": "error",
-                "error": str(e)
-            }
+            logger.error(
+                f"[ERROR] LLM service streaming client error: {e}", exc_info=True
+            )
+            yield {"event": "error", "error": str(e)}
 
     async def route(
         self,
@@ -285,11 +290,10 @@ class LLMServiceClient:
             if intent_result:
                 request_data["intent_result"] = intent_result
 
-            logger.debug(f"🔗 Calling LLM service /v1/route")
+            logger.debug("🔗 Calling LLM service /v1/route")
 
             response = await self.client.post(
-                f"{self.base_url}/v1/route",
-                json=request_data
+                f"{self.base_url}/v1/route", json=request_data
             )
             response.raise_for_status()
             return response.json()
@@ -337,11 +341,10 @@ class LLMServiceClient:
             if domain:
                 request_data["domain"] = domain
 
-            logger.debug(f"🔗 Calling LLM service /v1/calculate-tokens")
+            logger.debug("🔗 Calling LLM service /v1/calculate-tokens")
 
             response = await self.client.post(
-                f"{self.base_url}/v1/calculate-tokens",
-                json=request_data
+                f"{self.base_url}/v1/calculate-tokens", json=request_data
             )
             response.raise_for_status()
             return response.json()
@@ -385,11 +388,10 @@ class LLMServiceClient:
             if context_docs:
                 request_data["context_docs"] = context_docs
 
-            logger.debug(f"🔗 Calling LLM service /v1/post-process")
+            logger.debug("🔗 Calling LLM service /v1/post-process")
 
             response = await self.client.post(
-                f"{self.base_url}/v1/post-process",
-                json=request_data
+                f"{self.base_url}/v1/post-process", json=request_data
             )
             response.raise_for_status()
             data = response.json()
@@ -397,7 +399,7 @@ class LLMServiceClient:
             return (
                 data["processed_text"],
                 data["disclaimer_added"],
-                data["is_veterinary"]
+                data["is_veterinary"],
             )
 
         except Exception as e:

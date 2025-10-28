@@ -34,34 +34,37 @@ class TestContextManager:
     def test_extract_breed(self, manager):
         """Test breed extraction"""
         entities = manager.extract_entities("Ross 308 performance")
-        assert entities['breed'].lower() == "ross 308"
+        assert entities["breed"].lower() == "ross 308"
 
         entities = manager.extract_entities("Cobb 500 vs Ross 308")
-        assert 'cobb 500' in entities['breed'].lower() or 'ross 308' in entities['breed'].lower()
+        assert (
+            "cobb 500" in entities["breed"].lower()
+            or "ross 308" in entities["breed"].lower()
+        )
 
     def test_extract_age(self, manager):
         """Test age extraction"""
         entities = manager.extract_entities("Poids à 35 jours")
-        assert entities['age'] == 35
+        assert entities["age"] == 35
 
         entities = manager.extract_entities("FCR at 42 days")
-        assert entities['age'] == 42
+        assert entities["age"] == 42
 
     def test_extract_sex(self, manager):
         """Test sex extraction"""
         entities = manager.extract_entities("Poids mâles")
-        assert entities['sex'] == 'male'
+        assert entities["sex"] == "male"
 
         entities = manager.extract_entities("Performance femelles")
-        assert entities['sex'] == 'female'
+        assert entities["sex"] == "female"
 
     def test_extract_metric(self, manager):
         """Test metric extraction"""
         entities = manager.extract_entities("Quel est le poids?")
-        assert entities['metric'] == 'poids'
+        assert entities["metric"] == "poids"
 
         entities = manager.extract_entities("FCR à 35 jours")
-        assert entities['metric'] == 'fcr'
+        assert entities["metric"] == "fcr"
 
     # ===== COREFERENCE DETECTION =====
 
@@ -91,7 +94,7 @@ class TestContextManager:
 
         assert manager.context.breed == "Ross 308"
         assert manager.context.age == 35
-        assert manager.context.metric == 'poids'
+        assert manager.context.metric == "poids"
 
     def test_update_context_preserves_previous(self, manager):
         """Test that context preserves previous values"""
@@ -103,7 +106,7 @@ class TestContextManager:
         manager.update_context("FCR à 42 jours")
         assert manager.context.breed == "Ross 308"  # Preserved
         assert manager.context.age == 42  # Updated
-        assert manager.context.metric == 'fcr'  # Updated
+        assert manager.context.metric == "fcr"  # Updated
 
     # ===== QUERY EXPANSION =====
 
@@ -115,9 +118,9 @@ class TestContextManager:
         # Expand incomplete query
         expanded = manager.expand_query("Et pour les femelles?")
 
-        assert 'ross' in expanded.lower() or 'ross 308' in expanded.lower()
-        assert 'femelles' in expanded.lower()
-        assert '35' in expanded or 'jours' in expanded.lower()
+        assert "ross" in expanded.lower() or "ross 308" in expanded.lower()
+        assert "femelles" in expanded.lower()
+        assert "35" in expanded or "jours" in expanded.lower()
 
     def test_expand_query_with_breed(self, manager):
         """Test query expansion with breed change"""
@@ -125,9 +128,9 @@ class TestContextManager:
 
         expanded = manager.expand_query("Même chose pour Cobb 500?")
 
-        assert 'cobb 500' in expanded.lower()
-        assert 'fcr' in expanded.lower()
-        assert '42' in expanded
+        assert "cobb 500" in expanded.lower()
+        assert "fcr" in expanded.lower()
+        assert "42" in expanded
 
     def test_expand_query_no_context(self, manager):
         """Test expansion without context (returns original)"""
@@ -149,27 +152,27 @@ class TestContextManager:
         manager.update_context("Quel est le poids Ross 308 à 35 jours?")
         assert manager.context.breed == "Ross 308"
         assert manager.context.age == 35
-        assert manager.context.metric == 'poids'
+        assert manager.context.metric == "poids"
 
         # Turn 2: Coreference (sex change)
         expanded = manager.expand_query("Et pour les femelles?")
-        assert 'ross' in expanded.lower() or 'ross 308' in expanded.lower()
-        assert 'femelles' in expanded.lower()
+        assert "ross" in expanded.lower() or "ross 308" in expanded.lower()
+        assert "femelles" in expanded.lower()
 
         # Turn 3: Coreference (age change)
         manager.update_context(expanded)  # Update from expanded
         expanded2 = manager.expand_query("À 42 jours?")
-        assert '42' in expanded2
+        assert "42" in expanded2
 
     def test_context_summary(self, manager):
         """Test context summary"""
         manager.update_context("FCR Ross 308 femelles à 35 jours")
 
         summary = manager.get_context_summary()
-        assert 'Ross 308' in summary or 'ross 308' in summary.lower()
-        assert '35' in summary
-        assert 'female' in summary.lower() or 'femelle' in summary.lower()
-        assert 'fcr' in summary.lower()
+        assert "Ross 308" in summary or "ross 308" in summary.lower()
+        assert "35" in summary
+        assert "female" in summary.lower() or "femelle" in summary.lower()
+        assert "fcr" in summary.lower()
 
     def test_clear_context(self, manager):
         """Test context clearing"""
@@ -190,6 +193,7 @@ def run_context_manager_tests():
         bool: True if all tests pass
     """
     import logging
+
     logging.basicConfig(level=logging.INFO)
 
     manager = ContextManager()
@@ -199,23 +203,19 @@ def run_context_manager_tests():
         (
             "Poids Ross 308 à 35 jours",
             "Et pour les femelles?",
-            ['ross', 'femelles', '35']
+            ["ross", "femelles", "35"],
         ),
         (
             "FCR Cobb 500 males at 42 days",
             "Même chose pour Hubbard?",
-            ['hubbard', 'fcr', '42']
+            ["hubbard", "fcr", "42"],
         ),
-        (
-            "Gain Ross 308 à 28 jours",
-            "À 35 jours?",
-            ['ross', 'gain', '35']
-        ),
+        ("Gain Ross 308 à 28 jours", "À 35 jours?", ["ross", "gain", "35"]),
     ]
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("CONTEXT MANAGER - COMPREHENSIVE TEST SUITE")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     passed = 0
     failed = 0
@@ -245,9 +245,9 @@ def run_context_manager_tests():
         else:
             failed += 1
 
-    print("="*80)
+    print("=" * 80)
     print(f"RESULTS: {passed} passed, {failed} failed (Total: {len(test_cases)})")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     return failed == 0
 

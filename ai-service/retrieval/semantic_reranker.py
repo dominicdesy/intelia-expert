@@ -46,9 +46,9 @@ class SemanticReRanker:
 
     def __init__(
         self,
-        model_name: str = 'cross-encoder/ms-marco-MiniLM-L-6-v2',
+        model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
         score_threshold: float = 0.3,
-        enable_caching: bool = True
+        enable_caching: bool = True,
     ):
         """
         Initialize semantic re-ranker
@@ -82,6 +82,7 @@ class SemanticReRanker:
         if self._model is None:
             try:
                 from sentence_transformers import CrossEncoder
+
                 logger.info(f"📥 Loading cross-encoder model: {self.model_name}...")
                 self._model = CrossEncoder(self.model_name)
                 logger.info("✅ Cross-encoder loaded successfully")
@@ -102,7 +103,7 @@ class SemanticReRanker:
         query: str,
         documents: List[str],
         top_k: Optional[int] = 5,
-        return_scores: bool = False
+        return_scores: bool = False,
     ) -> List[str] | List[Tuple[str, float]]:
         """
         Re-rank documents by relevance to query
@@ -204,8 +205,8 @@ class SemanticReRanker:
         self,
         query: str,
         documents: List[Dict[str, Any]],
-        content_key: str = 'content',
-        top_k: Optional[int] = 5
+        content_key: str = "content",
+        top_k: Optional[int] = 5,
     ) -> List[Dict[str, Any]]:
         """
         Re-rank documents with metadata preservation
@@ -248,7 +249,7 @@ class SemanticReRanker:
             doc = content_to_doc.get(content)
             if doc:
                 doc_copy = doc.copy()
-                doc_copy['rerank_score'] = score
+                doc_copy["rerank_score"] = score
                 results.append(doc_copy)
 
         return results
@@ -261,7 +262,7 @@ class SemanticReRanker:
         return {
             "enabled": True,
             "size": len(self._score_cache),
-            "model": self.model_name
+            "model": self.model_name,
         }
 
     def clear_cache(self):
@@ -276,8 +277,8 @@ _reranker_instance = None
 
 
 def get_reranker(
-    model_name: str = 'cross-encoder/ms-marco-MiniLM-L-6-v2',
-    score_threshold: float = 0.3
+    model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    score_threshold: float = 0.3,
 ) -> SemanticReRanker:
     """
     Get singleton reranker instance
@@ -293,8 +294,7 @@ def get_reranker(
 
     if _reranker_instance is None:
         _reranker_instance = SemanticReRanker(
-            model_name=model_name,
-            score_threshold=score_threshold
+            model_name=model_name, score_threshold=score_threshold
         )
 
     return _reranker_instance

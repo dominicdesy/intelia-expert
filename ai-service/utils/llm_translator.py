@@ -72,7 +72,7 @@ Translation in {target_lang}:"""
         openai_api_key: Optional[str] = None,
         model: str = "gpt-4o-mini",
         cache_enabled: bool = True,
-        redis_cache=None
+        redis_cache=None,
     ):
         """
         Initialize LLM-based translator with Redis cache support
@@ -90,7 +90,9 @@ Translation in {target_lang}:"""
         self.memory_cache = {}  # Fallback in-memory cache
 
         cache_type = "Redis" if redis_cache else "memory"
-        logger.info(f"✅ LLMTranslator initialized with model={model}, cache={cache_type}")
+        logger.info(
+            f"✅ LLMTranslator initialized with model={model}, cache={cache_type}"
+        )
 
     def _generate_cache_key(self, text: str, source_lang: str, target_lang: str) -> str:
         """Generate a unique cache key for translation"""
@@ -98,10 +100,7 @@ Translation in {target_lang}:"""
         return f"translation:{hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()}"
 
     async def translate_async(
-        self,
-        text: str,
-        target_language: str,
-        source_language: str = "en"
+        self, text: str, target_language: str, source_language: str = "en"
     ) -> str:
         """
         Async translation with Redis cache support
@@ -130,8 +129,10 @@ Translation in {target_lang}:"""
             try:
                 cached = await self.redis_cache.get(cache_key)
                 if cached:
-                    logger.debug(f"📦 Redis cache hit for translation to {target_language}")
-                    return cached.decode('utf-8')
+                    logger.debug(
+                        f"📦 Redis cache hit for translation to {target_language}"
+                    )
+                    return cached.decode("utf-8")
             except Exception as e:
                 logger.warning(f"Redis cache read error: {e}")
 
@@ -147,21 +148,22 @@ Translation in {target_lang}:"""
             target_lang_name = self.LANGUAGE_NAMES.get(target_language, target_language)
 
             prompt = self.TRANSLATION_PROMPT.format(
-                source_lang=source_lang_name,
-                target_lang=target_lang_name,
-                text=text
+                source_lang=source_lang_name, target_lang=target_lang_name, text=text
             )
 
             # OpenAI call
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a professional translator specializing in poultry production terminology."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a professional translator specializing in poultry production terminology.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.3,  # Low for consistency, but not 0 for naturalness
-                max_tokens=500,   # Sufficient for clarification messages
-                timeout=5.0       # 5s timeout
+                max_tokens=500,  # Sufficient for clarification messages
+                timeout=5.0,  # 5s timeout
             )
 
             # Extract translation
@@ -180,7 +182,7 @@ Translation in {target_lang}:"""
                 translation = translation[1:-1].strip()
 
             # Clean residual empty quotes
-            translation = translation.replace('""', '').replace("''", '')
+            translation = translation.replace('""', "").replace("''", "")
 
             # Log
             logger.debug(
@@ -198,27 +200,28 @@ Translation in {target_lang}:"""
                     try:
                         await self.redis_cache.set(
                             cache_key,
-                            translation.encode('utf-8'),
-                            ttl=86400  # 24 hours
+                            translation.encode("utf-8"),
+                            ttl=86400,  # 24 hours
                         )
-                        logger.debug(f"💾 Translation cached in Redis: {cache_key[:50]}...")
+                        logger.debug(
+                            f"💾 Translation cached in Redis: {cache_key[:50]}..."
+                        )
                     except Exception as e:
                         logger.warning(f"Redis cache write error: {e}")
 
             return translation
 
         except Exception as e:
-            logger.error(f"❌ LLM translation error ({source_language}→{target_language}): {e}")
+            logger.error(
+                f"❌ LLM translation error ({source_language}→{target_language}): {e}"
+            )
 
             # Fallback: return original text
             logger.warning("⚠️ Fallback to original text due to translation error")
             return text
 
     def translate(
-        self,
-        text: str,
-        target_language: str,
-        source_language: str = "en"
+        self, text: str, target_language: str, source_language: str = "en"
     ) -> str:
         """
         Synchronous wrapper for translate_async (for backward compatibility)
@@ -243,10 +246,11 @@ Translation in {target_lang}:"""
             if loop.is_running():
                 # We're already in async context, create task
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(
                         asyncio.run,
-                        self.translate_async(text, target_language, source_language)
+                        self.translate_async(text, target_language, source_language),
                     )
                     return future.result(timeout=10)
             else:
@@ -273,8 +277,7 @@ _llm_translator_instance = None
 
 
 def get_llm_translator(
-    openai_api_key: Optional[str] = None,
-    model: str = "gpt-4o-mini"
+    openai_api_key: Optional[str] = None, model: str = "gpt-4o-mini"
 ) -> LLMTranslator:
     """
     Get LLMTranslator singleton instance
@@ -290,8 +293,7 @@ def get_llm_translator(
 
     if _llm_translator_instance is None:
         _llm_translator_instance = LLMTranslator(
-            openai_api_key=openai_api_key,
-            model=model
+            openai_api_key=openai_api_key, model=model
         )
 
     return _llm_translator_instance
@@ -317,35 +319,31 @@ if __name__ == "__main__":
         (
             "To analyze performance of Ross 308, I need to know:",
             "fr",
-            "Pour analyser la performance du Ross 308, j'ai besoin de savoir"
+            "Pour analyser la performance du Ross 308, j'ai besoin de savoir",
         ),
-
         # Case 2: Message with Markdown
         (
             "Please specify **the breed**. For example: Ross 308, Cobb 500.",
             "fr",
-            "Veuillez préciser **la race**. Par exemple : Ross 308, Cobb 500."
+            "Veuillez préciser **la race**. Par exemple : Ross 308, Cobb 500.",
         ),
-
         # Case 3: Message with list
         (
             "To help you best, I need details on:\n- **Breed**: Ross 308, Cobb 500, other?\n- **Age**: in days or weeks?",
             "fr",
-            "Pour mieux vous aider, j'ai besoin de détails sur :\n- **Race** : Ross 308, Cobb 500, autre ?\n- **Âge** : en jours ou semaines ?"
+            "Pour mieux vous aider, j'ai besoin de détails sur :\n- **Race** : Ross 308, Cobb 500, autre ?\n- **Âge** : en jours ou semaines ?",
         ),
-
         # Case 4: Translation to Thai
         (
             "Please specify **the age** of the flock. For example: 21 days, 35 days.",
             "th",
-            "กรุณาระบุ **อายุ** ของฝูง ตัวอย่างเช่น: 21 วัน, 35 วัน"
+            "กรุณาระบุ **อายุ** ของฝูง ตัวอย่างเช่น: 21 วัน, 35 วัน",
         ),
-
         # Case 5: Translation to Spanish
         (
             "To recommend a treatment for Newcastle disease, I need to know:",
             "es",
-            "Para recomendar un tratamiento para la enfermedad de Newcastle, necesito saber"
+            "Para recomendar un tratamiento para la enfermedad de Newcastle, necesito saber",
         ),
     ]
 
@@ -370,7 +368,9 @@ if __name__ == "__main__":
             failed += 1
 
     print("\n" + "=" * 80)
-    print(f"RESULTS: {passed}/{len(test_cases)} passed, {failed}/{len(test_cases)} failed")
+    print(
+        f"RESULTS: {passed}/{len(test_cases)} passed, {failed}/{len(test_cases)} failed"
+    )
     print(f"Cache size: {translator.get_cache_size()} entries")
     print("=" * 80)
 

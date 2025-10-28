@@ -51,7 +51,7 @@ class GuardrailCache:
         try:
             content_hash = hashlib.md5(
                 f"{query}|{response}|{len(context_docs)}|{verification_level.value}".encode(),
-                usedforsecurity=False
+                usedforsecurity=False,
             ).hexdigest()
             return f"guardrail_{content_hash}"
         except Exception as e:

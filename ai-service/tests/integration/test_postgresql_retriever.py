@@ -44,10 +44,7 @@ def normalizer():
 async def test_pg_retriever_basic(pg_retriever):
     """Test 1: Retrieval basique"""
 
-    results = await pg_retriever.retrieve(
-        query="Poids Ross 308 35 jours",
-        top_k=5
-    )
+    results = await pg_retriever.retrieve(query="Poids Ross 308 35 jours", top_k=5)
 
     assert len(results) > 0, "Aucun résultat retourné"
     assert len(results) <= 5, "Trop de résultats"
@@ -109,12 +106,16 @@ async def test_normalizer_concepts(normalizer):
 
     for concept_fr, variants in concepts_tests:
         # Test en français
-        normalized_fr = normalizer.normalize_query(f"Quel est le {concept_fr} ?", language="fr")
+        normalized_fr = normalizer.normalize_query(
+            f"Quel est le {concept_fr} ?", language="fr"
+        )
         assert normalized_fr is not None
 
         # Test variants dans d'autres langues
         for variant in variants:
-            normalized = normalizer.normalize_query(f"What is the {variant}?", language="en")
+            normalized = normalizer.normalize_query(
+                f"What is the {variant}?", language="en"
+            )
             assert normalized is not None
 
     print("\n✅ Test 3 PASSED - Concept normalization")
@@ -128,9 +129,7 @@ async def test_pg_retriever_with_breed_filter(pg_retriever):
 
     for breed in breeds:
         results = await pg_retriever.retrieve(
-            query=f"Poids {breed} 35 jours",
-            filters={"breed": breed},
-            top_k=5
+            query=f"Poids {breed} 35 jours", filters={"breed": breed}, top_k=5
         )
 
         # Devrait retourner des résultats pour les races principales
@@ -148,11 +147,8 @@ async def test_pg_retriever_with_age_range(pg_retriever):
 
     results = await pg_retriever.retrieve(
         query="Poids poulets",
-        filters={
-            "age_days_min": 30,
-            "age_days_max": 40
-        },
-        top_k=10
+        filters={"age_days_min": 30, "age_days_max": 40},
+        top_k=10,
     )
 
     # Devrait retourner des résultats dans le range 30-40 jours
@@ -168,9 +164,7 @@ async def test_pg_retriever_with_metric_filter(pg_retriever):
 
     for metric in metrics:
         results = await pg_retriever.retrieve(
-            query=f"Ross 308 35 days {metric}",
-            filters={"metric": metric},
-            top_k=5
+            query=f"Ross 308 35 days {metric}", filters={"metric": metric}, top_k=5
         )
 
         # Certaines métriques peuvent avoir peu de données
@@ -191,11 +185,7 @@ async def test_pg_retriever_multilingual_queries(pg_retriever):
     ]
 
     for query, lang in queries:
-        results = await pg_retriever.retrieve(
-            query=query,
-            language=lang,
-            top_k=5
-        )
+        results = await pg_retriever.retrieve(query=query, language=lang, top_k=5)
 
         assert len(results) > 0, f"No results for {lang}"
         print(f"   {lang.upper()}: {len(results)} results")
@@ -211,14 +201,14 @@ async def test_pg_retriever_reranking(pg_retriever):
     results_no_rerank = await pg_retriever.retrieve(
         query="Quel est le poids optimal pour Ross 308 à 35 jours pour maximiser le rendement ?",
         top_k=10,
-        use_reranker=False
+        use_reranker=False,
     )
 
     # Retrieval avec reranking
     results_reranked = await pg_retriever.retrieve(
         query="Quel est le poids optimal pour Ross 308 à 35 jours pour maximiser le rendement ?",
         top_k=3,
-        use_reranker=True
+        use_reranker=True,
     )
 
     # Les deux devraient retourner des résultats
@@ -236,10 +226,7 @@ async def test_pg_retriever_empty_query(pg_retriever):
     """Test 9: Handling de query vide"""
 
     try:
-        results = await pg_retriever.retrieve(
-            query="",
-            top_k=5
-        )
+        results = await pg_retriever.retrieve(query="", top_k=5)
         # Si ça ne lève pas d'erreur, devrait retourner liste vide
         assert results == [] or results is None
         print("\n✅ Test 9 PASSED - Empty query handled")
@@ -266,10 +253,7 @@ async def test_pg_retriever_performance(pg_retriever):
     for query in queries:
         start = time.time()
 
-        await pg_retriever.retrieve(
-            query=query,
-            top_k=5
-        )
+        await pg_retriever.retrieve(query=query, top_k=5)
 
         duration = time.time() - start
         times.append(duration)
@@ -298,8 +282,7 @@ async def test_normalizer_technical_terms_preservation(normalizer):
 
     for term in technical_terms:
         normalized = normalizer.normalize_query(
-            f"What is {term} performance?",
-            language="en"
+            f"What is {term} performance?", language="en"
         )
 
         # Le terme technique devrait être préservé

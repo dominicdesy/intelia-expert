@@ -39,7 +39,7 @@ class TestRunner:
                 ["pytest", test_file, "-v", "--tb=short", "-x"],
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minutes max
+                timeout=300,  # 5 minutes max
             )
 
             duration = time.time() - start
@@ -57,14 +57,16 @@ class TestRunner:
                 "failed": failed,
                 "errors": errors,
                 "duration": duration,
-                "returncode": result.returncode
+                "returncode": result.returncode,
             }
 
             # Print summary
             if success:
                 print(f"\n[OK] SUCCESS: {passed} tests passed in {duration:.2f}s")
             else:
-                print(f"\n[FAILED] FAILED: {passed} passed, {failed} failed, {errors} errors")
+                print(
+                    f"\n[FAILED] FAILED: {passed} passed, {failed} failed, {errors} errors"
+                )
                 print("\nError output:")
                 print(result.stdout[-500:])  # Last 500 chars
 
@@ -80,7 +82,7 @@ class TestRunner:
                 "failed": 0,
                 "errors": 1,
                 "duration": duration,
-                "returncode": -1
+                "returncode": -1,
             }
 
             return False
@@ -94,7 +96,7 @@ class TestRunner:
                 "failed": 0,
                 "errors": 1,
                 "duration": 0,
-                "returncode": -1
+                "returncode": -1,
             }
 
             return False
@@ -110,16 +112,28 @@ class TestRunner:
 
         # Tests importants
         important_tests = [
-            ("tests/integration/test_postgresql_retriever.py", "PostgreSQL Retriever + Normalizer"),
-            ("tests/integration/test_security_guardrails.py", "Security Guardrails + OOD"),
+            (
+                "tests/integration/test_postgresql_retriever.py",
+                "PostgreSQL Retriever + Normalizer",
+            ),
+            (
+                "tests/integration/test_security_guardrails.py",
+                "Security Guardrails + OOD",
+            ),
             ("tests/integration/test_redis_cache.py", "Redis Cache Performance"),
         ]
 
         # Tests supplémentaires
         additional_tests = [
             ("tests/integration/test_weaviate_retriever.py", "Weaviate Retriever"),
-            ("tests/integration/test_translation_service.py", "Translation Service (12 langues)"),
-            ("tests/integration/test_rate_limiting_agent.py", "Rate Limiting + Agent RAG"),
+            (
+                "tests/integration/test_translation_service.py",
+                "Translation Service (12 langues)",
+            ),
+            (
+                "tests/integration/test_rate_limiting_agent.py",
+                "Rate Limiting + Agent RAG",
+            ),
         ]
 
         # Déterminer quels tests exécuter
@@ -134,7 +148,9 @@ class TestRunner:
         # Exécuter les tests
         print(f"\n{'*' * 80}")
         print("INTELIA EXPERT LLM - TEST SUITE")
-        print(f"Mode: {'FAST' if self.fast_mode else 'CRITICAL ONLY' if self.critical_only else 'FULL'}")
+        print(
+            f"Mode: {'FAST' if self.fast_mode else 'CRITICAL ONLY' if self.critical_only else 'FULL'}"
+        )
         print(f"Total tests: {len(tests_to_run)}")
         print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'*' * 80}")
@@ -168,7 +184,9 @@ class TestRunner:
             status = "[PASS]" if result["success"] else "[FAIL]"
 
             print(f"{status} | {description}")
-            print(f"       Tests: {result['passed']} passed, {result['failed']} failed, {result['errors']} errors")
+            print(
+                f"       Tests: {result['passed']} passed, {result['failed']} failed, {result['errors']} errors"
+            )
             print(f"       Duration: {result['duration']:.2f}s")
             print()
 
@@ -185,8 +203,12 @@ class TestRunner:
         print("SUMMARY")
         print(f"{'=' * 80}")
         print(f"Test files: {success_count}/{len(self.results)} passed")
-        print(f"Total tests: {total_passed} passed, {total_failed} failed, {total_errors} errors")
-        print(f"Total duration: {total_duration:.2f}s ({total_duration/60:.1f} minutes)")
+        print(
+            f"Total tests: {total_passed} passed, {total_failed} failed, {total_errors} errors"
+        )
+        print(
+            f"Total duration: {total_duration:.2f}s ({total_duration/60:.1f} minutes)"
+        )
         print()
 
         # Verdict
@@ -201,7 +223,9 @@ class TestRunner:
 def main():
     parser = argparse.ArgumentParser(description="Run Intelia Expert LLM tests")
     parser.add_argument("--fast", action="store_true", help="Run fast tests only")
-    parser.add_argument("--critical", action="store_true", help="Run critical tests only")
+    parser.add_argument(
+        "--critical", action="store_true", help="Run critical tests only"
+    )
 
     args = parser.parse_args()
 

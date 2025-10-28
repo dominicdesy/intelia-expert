@@ -41,7 +41,7 @@ def create_prometheus_routes(get_service: Callable) -> APIRouter:
             logger.error(f"Error generating Prometheus metrics: {e}")
             return Response(
                 content=f"# Error generating metrics: {str(e)}\n",
-                media_type="text/plain; charset=utf-8"
+                media_type="text/plain; charset=utf-8",
             )
 
     return router

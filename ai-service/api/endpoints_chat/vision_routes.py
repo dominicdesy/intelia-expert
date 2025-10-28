@@ -13,7 +13,6 @@ Multi-image support added
 import time
 import uuid
 import logging
-import httpx
 from typing import Optional, List
 from utils.types import Any, Callable
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
@@ -35,10 +34,13 @@ logger = logging.getLogger(__name__)
 STORAGE_SERVICE_AVAILABLE = False
 try:
     from services.image_storage_service import image_storage_service
+
     STORAGE_SERVICE_AVAILABLE = True
     logger.info("✅ Storage service loaded - images will be saved to Spaces")
 except ImportError as e:
-    logger.warning(f"⚠️ Storage service not available - images will not be saved to Spaces: {e}")
+    logger.warning(
+        f"⚠️ Storage service not available - images will not be saved to Spaces: {e}"
+    )
     STORAGE_SERVICE_AVAILABLE = False
 
 
@@ -85,8 +87,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
             # Validation des paramètres
             if not files or len(files) == 0:
                 raise HTTPException(
-                    status_code=400,
-                    detail="Veuillez fournir au moins une image"
+                    status_code=400, detail="Veuillez fournir au moins une image"
                 )
 
             images_count = len(files)
@@ -102,7 +103,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
             if len(message) > MAX_REQUEST_SIZE:
                 raise HTTPException(
                     status_code=413,
-                    detail=f"Message trop long (max {MAX_REQUEST_SIZE})"
+                    detail=f"Message trop long (max {MAX_REQUEST_SIZE})",
                 )
 
             # Normaliser tenant_id
@@ -138,7 +139,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 if content_type not in allowed_types:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Type de fichier non supporté pour {file.filename}: {content_type}. Types acceptés: {', '.join(allowed_types)}"
+                        detail=f"Type de fichier non supporté pour {file.filename}: {content_type}. Types acceptés: {', '.join(allowed_types)}",
                     )
 
                 image_data = await file.read()
@@ -147,16 +148,20 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 if len(image_data) > max_size:
                     raise HTTPException(
                         status_code=413,
-                        detail=f"Image {file.filename} trop volumineuse: {len(image_data) / 1024 / 1024:.1f}MB. Maximum: 10MB"
+                        detail=f"Image {file.filename} trop volumineuse: {len(image_data) / 1024 / 1024:.1f}MB. Maximum: 10MB",
                     )
 
-                logger.info(f"[VISION] File {idx+1}/{images_count} read - {file.filename} - Size: {len(image_data)} bytes")
+                logger.info(
+                    f"[VISION] File {idx+1}/{images_count} read - {file.filename} - Size: {len(image_data)} bytes"
+                )
 
-                images_data.append({
-                    "data": image_data,
-                    "content_type": content_type,
-                    "filename": file.filename
-                })
+                images_data.append(
+                    {
+                        "data": image_data,
+                        "content_type": content_type,
+                        "filename": file.filename,
+                    }
+                )
 
             logger.info(f"[VISION] All {images_count} file(s) processed successfully")
 
@@ -169,7 +174,9 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         rag_engine = health_monitor.get_service("rag_engine_enhanced")
 
                         if rag_engine:
-                            logger.info("[VISION] Fetching RAG context for image analysis...")
+                            logger.info(
+                                "[VISION] Fetching RAG context for image analysis..."
+                            )
 
                             # Appeler le retriever pour obtenir du contexte
                             retriever = getattr(rag_engine, "retriever", None)
@@ -184,23 +191,39 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                                 # Convertir en format dict pour le vision analyzer
                                 context_docs = [
                                     {
-                                        "content": doc.content if hasattr(doc, "content") else str(doc),
-                                        "metadata": doc.metadata if hasattr(doc, "metadata") else {},
+                                        "content": (
+                                            doc.content
+                                            if hasattr(doc, "content")
+                                            else str(doc)
+                                        ),
+                                        "metadata": (
+                                            doc.metadata
+                                            if hasattr(doc, "metadata")
+                                            else {}
+                                        ),
                                     }
                                     for doc in rag_results[:3]
                                 ]
 
-                                logger.info(f"[VISION] RAG context retrieved - {len(context_docs)} documents")
+                                logger.info(
+                                    f"[VISION] RAG context retrieved - {len(context_docs)} documents"
+                                )
                         else:
-                            logger.warning("[VISION] RAG engine not available - continuing without context")
+                            logger.warning(
+                                "[VISION] RAG engine not available - continuing without context"
+                            )
                 except Exception as e:
-                    logger.warning(f"[VISION] Error fetching RAG context: {e} - continuing without context")
+                    logger.warning(
+                        f"[VISION] Error fetching RAG context: {e} - continuing without context"
+                    )
 
             # Créer le vision analyzer
             vision_analyzer = create_vision_analyzer(language=detected_language)
 
             # Analyser les images (méthode différente selon le nombre)
-            logger.info(f"[VISION] Starting Claude Vision analysis for {len(images_data)} image(s)...")
+            logger.info(
+                f"[VISION] Starting Claude Vision analysis for {len(images_data)} image(s)..."
+            )
 
             if len(images_data) == 1:
                 # Mode single image
@@ -225,8 +248,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 error_msg = analysis_result.get("error", "Unknown error")
                 logger.error(f"[VISION] Analysis failed: {error_msg}")
                 raise HTTPException(
-                    status_code=500,
-                    detail=f"Erreur d'analyse: {error_msg}"
+                    status_code=500, detail=f"Erreur d'analyse: {error_msg}"
                 )
 
             # Upload images to DigitalOcean Spaces (permanent storage)
@@ -239,11 +261,18 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     if auth_header.startswith("Bearer "):
                         try:
                             import jwt
+
                             token = auth_header.replace("Bearer ", "")
                             # Decode without verification (just to get user info)
-                            decoded = jwt.decode(token, options={"verify_signature": False})
-                            user_id = decoded.get("sub") or decoded.get("email") or tenant_id
-                            logger.info(f"[VISION] Extracted user_id from JWT: {user_id}")
+                            decoded = jwt.decode(
+                                token, options={"verify_signature": False}
+                            )
+                            user_id = (
+                                decoded.get("sub") or decoded.get("email") or tenant_id
+                            )
+                            logger.info(
+                                f"[VISION] Extracted user_id from JWT: {user_id}"
+                            )
                         except Exception as e:
                             logger.warning(f"[VISION] Failed to decode JWT: {e}")
                             user_id = tenant_id
@@ -258,30 +287,43 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                                 user_id=user_id,
                                 source="frontend",
                                 content_type=img_data["content_type"],
-                                original_filename=img_data["filename"] or f"image_{idx+1}.jpg",
+                                original_filename=img_data["filename"]
+                                or f"image_{idx+1}.jpg",
                                 metadata={
                                     "tenant_id": tenant_id,
                                     "analysis_completed": "true",
-                                    "model": analysis_result.get("model", "claude-3-5-sonnet")
-                                }
+                                    "model": analysis_result.get(
+                                        "model", "claude-3-5-sonnet"
+                                    ),
+                                },
                             )
 
                             if upload_result.get("success"):
-                                uploaded_images.append({
-                                    "filename": img_data["filename"],
-                                    "spaces_url": upload_result["spaces_url"],
-                                    "spaces_key": upload_result["spaces_key"],
-                                    "size_bytes": upload_result["size_bytes"]
-                                })
-                                logger.info(f"[VISION] Image {idx+1}/{len(images_data)} uploaded to Spaces: {upload_result['spaces_url']}")
+                                uploaded_images.append(
+                                    {
+                                        "filename": img_data["filename"],
+                                        "spaces_url": upload_result["spaces_url"],
+                                        "spaces_key": upload_result["spaces_key"],
+                                        "size_bytes": upload_result["size_bytes"],
+                                    }
+                                )
+                                logger.info(
+                                    f"[VISION] Image {idx+1}/{len(images_data)} uploaded to Spaces: {upload_result['spaces_url']}"
+                                )
                             else:
-                                logger.warning(f"[VISION] Failed to upload image {idx+1}: {upload_result.get('error')}")
+                                logger.warning(
+                                    f"[VISION] Failed to upload image {idx+1}: {upload_result.get('error')}"
+                                )
 
                         except Exception as e:
                             # Non-blocking: continue even if one image fails
-                            logger.error(f"[VISION] Error uploading image {idx+1} to Spaces: {e}")
+                            logger.error(
+                                f"[VISION] Error uploading image {idx+1} to Spaces: {e}"
+                            )
 
-                    logger.info(f"[VISION] Uploaded {len(uploaded_images)}/{len(images_data)} images to Spaces")
+                    logger.info(
+                        f"[VISION] Uploaded {len(uploaded_images)}/{len(images_data)} images to Spaces"
+                    )
 
                 except Exception as e:
                     # Non-blocking: analysis already succeeded
@@ -318,7 +360,9 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     "success": True,
                     "analysis": analysis_result["analysis"],
                     "metadata": {
-                        "model": analysis_result.get("model", "claude-sonnet-4-5-20250929"),
+                        "model": analysis_result.get(
+                            "model", "claude-sonnet-4-5-20250929"
+                        ),
                         "language": detected_language,
                         "tenant_id": tenant_id,
                         "images_count": len(images_data),
@@ -327,16 +371,18 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "rag_context_used": len(context_docs) > 0,
                         "rag_documents_count": len(context_docs),
                         "uploaded_images": uploaded_images,  # URLs des images dans Spaces
-                        "images_saved_to_spaces": len(uploaded_images)
-                    }
-                }
+                        "images_saved_to_spaces": len(uploaded_images),
+                    },
+                },
             )
 
         except HTTPException:
             raise
 
         except Exception as e:
-            logger.exception(f"[VISION] Unexpected error in chat-with-image endpoint: {e}")
+            logger.exception(
+                f"[VISION] Unexpected error in chat-with-image endpoint: {e}"
+            )
 
             # Enregistrer l'erreur
             error_duration = time.time() - start_time
@@ -357,10 +403,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             return JSONResponse(
                 status_code=500,
-                content={
-                    "success": False,
-                    "error": f"Erreur traitement: {str(e)}"
-                }
+                content={"success": False, "error": f"Erreur traitement: {str(e)}"},
             )
 
     @router.post(f"{BASE_PATH}/analyze-session-images")
@@ -402,7 +445,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
             if not temp_dir.exists():
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Aucune image trouvée pour la session {session_id}"
+                    detail=f"Aucune image trouvée pour la session {session_id}",
                 )
 
             # Lire les métadonnées et charger les images
@@ -411,11 +454,12 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             if len(metadata_files) == 0:
                 raise HTTPException(
-                    status_code=404,
-                    detail=f"Aucune image dans la session {session_id}"
+                    status_code=404, detail=f"Aucune image dans la session {session_id}"
                 )
 
-            logger.info(f"[VISION_SESSION] Loading {len(metadata_files)} images from session {session_id}")
+            logger.info(
+                f"[VISION_SESSION] Loading {len(metadata_files)} images from session {session_id}"
+            )
 
             for metadata_file in metadata_files:
                 try:
@@ -423,22 +467,28 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         metadata = json.load(f)
 
                     image_id = metadata["image_id"]
-                    file_extension = Path(metadata["original_filename"]).suffix or ".jpg"
+                    file_extension = (
+                        Path(metadata["original_filename"]).suffix or ".jpg"
+                    )
                     image_path = temp_dir / f"{image_id}{file_extension}"
 
                     if not image_path.exists():
-                        logger.warning(f"[VISION_SESSION] Image file not found: {image_path}")
+                        logger.warning(
+                            f"[VISION_SESSION] Image file not found: {image_path}"
+                        )
                         continue
 
                     # Lire l'image
                     with open(image_path, "rb") as f:
                         image_data = f.read()
 
-                    images_data.append({
-                        "data": image_data,
-                        "content_type": metadata["content_type"],
-                        "filename": metadata["original_filename"]
-                    })
+                    images_data.append(
+                        {
+                            "data": image_data,
+                            "content_type": metadata["content_type"],
+                            "filename": metadata["original_filename"],
+                        }
+                    )
 
                     logger.info(
                         f"[VISION_SESSION] Loaded image {image_id} - {metadata['original_filename']} - "
@@ -446,13 +496,15 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     )
 
                 except Exception as e:
-                    logger.warning(f"[VISION_SESSION] Error loading image from {metadata_file}: {e}")
+                    logger.warning(
+                        f"[VISION_SESSION] Error loading image from {metadata_file}: {e}"
+                    )
                     continue
 
             if len(images_data) == 0:
                 raise HTTPException(
                     status_code=404,
-                    detail="Aucune image valide trouvée dans la session"
+                    detail="Aucune image valide trouvée dans la session",
                 )
 
             images_count = len(images_data)
@@ -505,13 +557,23 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
                                 context_docs = [
                                     {
-                                        "content": doc.content if hasattr(doc, "content") else str(doc),
-                                        "metadata": doc.metadata if hasattr(doc, "metadata") else {},
+                                        "content": (
+                                            doc.content
+                                            if hasattr(doc, "content")
+                                            else str(doc)
+                                        ),
+                                        "metadata": (
+                                            doc.metadata
+                                            if hasattr(doc, "metadata")
+                                            else {}
+                                        ),
                                     }
                                     for doc in rag_results[:3]
                                 ]
 
-                                logger.info(f"[VISION_SESSION] RAG context retrieved - {len(context_docs)} documents")
+                                logger.info(
+                                    f"[VISION_SESSION] RAG context retrieved - {len(context_docs)} documents"
+                                )
                 except Exception as e:
                     logger.warning(f"[VISION_SESSION] Error fetching RAG context: {e}")
 
@@ -519,7 +581,9 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
             vision_analyzer = create_vision_analyzer(language=detected_language)
 
             # Analyser les images
-            logger.info(f"[VISION_SESSION] Starting Claude Vision analysis for {images_count} image(s)...")
+            logger.info(
+                f"[VISION_SESSION] Starting Claude Vision analysis for {images_count} image(s)..."
+            )
 
             if images_count == 1:
                 # Mode single image
@@ -544,8 +608,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 error_msg = analysis_result.get("error", "Unknown error")
                 logger.error(f"[VISION_SESSION] Analysis failed: {error_msg}")
                 raise HTTPException(
-                    status_code=500,
-                    detail=f"Erreur d'analyse: {error_msg}"
+                    status_code=500, detail=f"Erreur d'analyse: {error_msg}"
                 )
 
             # Upload images to DigitalOcean Spaces (permanent storage)
@@ -558,12 +621,21 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     if auth_header.startswith("Bearer "):
                         try:
                             import jwt
+
                             token = auth_header.replace("Bearer ", "")
-                            decoded = jwt.decode(token, options={"verify_signature": False})
-                            user_id = decoded.get("sub") or decoded.get("email") or tenant_id
-                            logger.info(f"[VISION_SESSION] Extracted user_id from JWT: {user_id}")
+                            decoded = jwt.decode(
+                                token, options={"verify_signature": False}
+                            )
+                            user_id = (
+                                decoded.get("sub") or decoded.get("email") or tenant_id
+                            )
+                            logger.info(
+                                f"[VISION_SESSION] Extracted user_id from JWT: {user_id}"
+                            )
                         except Exception as e:
-                            logger.warning(f"[VISION_SESSION] Failed to decode JWT: {e}")
+                            logger.warning(
+                                f"[VISION_SESSION] Failed to decode JWT: {e}"
+                            )
                             user_id = tenant_id
                     else:
                         user_id = tenant_id
@@ -576,38 +648,54 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                                 user_id=user_id,
                                 source="frontend_session",
                                 content_type=img_data["content_type"],
-                                original_filename=img_data["filename"] or f"image_{idx+1}.jpg",
+                                original_filename=img_data["filename"]
+                                or f"image_{idx+1}.jpg",
                                 metadata={
                                     "tenant_id": tenant_id,
                                     "session_id": session_id,
                                     "analysis_completed": "true",
-                                    "model": analysis_result.get("model", "claude-3-5-sonnet")
-                                }
+                                    "model": analysis_result.get(
+                                        "model", "claude-3-5-sonnet"
+                                    ),
+                                },
                             )
 
                             if upload_result.get("success"):
-                                uploaded_images.append({
-                                    "filename": img_data["filename"],
-                                    "spaces_url": upload_result["spaces_url"],
-                                    "spaces_key": upload_result["spaces_key"],
-                                    "size_bytes": upload_result["size_bytes"]
-                                })
-                                logger.info(f"[VISION_SESSION] Image {idx+1}/{len(images_data)} uploaded to Spaces: {upload_result['spaces_url']}")
+                                uploaded_images.append(
+                                    {
+                                        "filename": img_data["filename"],
+                                        "spaces_url": upload_result["spaces_url"],
+                                        "spaces_key": upload_result["spaces_key"],
+                                        "size_bytes": upload_result["size_bytes"],
+                                    }
+                                )
+                                logger.info(
+                                    f"[VISION_SESSION] Image {idx+1}/{len(images_data)} uploaded to Spaces: {upload_result['spaces_url']}"
+                                )
                             else:
-                                logger.warning(f"[VISION_SESSION] Failed to upload image {idx+1}: {upload_result.get('error')}")
+                                logger.warning(
+                                    f"[VISION_SESSION] Failed to upload image {idx+1}: {upload_result.get('error')}"
+                                )
 
                         except Exception as e:
-                            logger.error(f"[VISION_SESSION] Error uploading image {idx+1} to Spaces: {e}")
+                            logger.error(
+                                f"[VISION_SESSION] Error uploading image {idx+1} to Spaces: {e}"
+                            )
 
-                    logger.info(f"[VISION_SESSION] Uploaded {len(uploaded_images)}/{len(images_data)} images to Spaces")
+                    logger.info(
+                        f"[VISION_SESSION] Uploaded {len(uploaded_images)}/{len(images_data)} images to Spaces"
+                    )
 
                 except Exception as e:
-                    logger.error(f"[VISION_SESSION] Error during image upload to Spaces: {e}")
+                    logger.error(
+                        f"[VISION_SESSION] Error during image upload to Spaces: {e}"
+                    )
 
             # Nettoyer les images temporaires si demandé
             if cleanup_after:
                 try:
                     import shutil
+
                     shutil.rmtree(temp_dir)
                     logger.info(f"[VISION_SESSION] Cleaned up session {session_id}")
                 except Exception as e:
@@ -644,7 +732,9 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     "success": True,
                     "analysis": analysis_result["analysis"],
                     "metadata": {
-                        "model": analysis_result.get("model", "claude-sonnet-4-5-20250929"),
+                        "model": analysis_result.get(
+                            "model", "claude-sonnet-4-5-20250929"
+                        ),
                         "language": detected_language,
                         "tenant_id": tenant_id,
                         "session_id": session_id,
@@ -655,9 +745,9 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "rag_documents_count": len(context_docs),
                         "cleaned_up": cleanup_after,
                         "uploaded_images": uploaded_images,  # URLs des images dans Spaces
-                        "images_saved_to_spaces": len(uploaded_images)
-                    }
-                }
+                        "images_saved_to_spaces": len(uploaded_images),
+                    },
+                },
             )
 
         except HTTPException:
@@ -683,10 +773,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             return JSONResponse(
                 status_code=500,
-                content={
-                    "success": False,
-                    "error": f"Erreur traitement: {str(e)}"
-                }
+                content={"success": False, "error": f"Erreur traitement: {str(e)}"},
             )
 
     @router.get(f"{BASE_PATH}/vision/health")
@@ -699,6 +786,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
         try:
             # Vérifier que la clé API est configurée
             import os
+
             api_key = os.getenv("ANTHROPIC_API_KEY")
 
             if not api_key:
@@ -708,12 +796,13 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "status": "unavailable",
                         "message": "ANTHROPIC_API_KEY non configurée",
                         "configured": False,
-                    }
+                    },
                 )
 
             # Vérifier que le module est importable
             try:
                 from generation.claude_vision_analyzer import ClaudeVisionAnalyzer
+
                 return JSONResponse(
                     status_code=200,
                     content={
@@ -721,7 +810,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "message": "Claude Vision service disponible",
                         "configured": True,
                         "model": "claude-sonnet-4-5-20250929",
-                    }
+                    },
                 )
             except ImportError as e:
                 return JSONResponse(
@@ -730,7 +819,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "status": "unavailable",
                         "message": f"Module claude_vision_analyzer non disponible: {e}",
                         "configured": False,
-                    }
+                    },
                 )
 
         except Exception as e:
@@ -740,7 +829,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 content={
                     "status": "error",
                     "message": str(e),
-                }
+                },
             )
 
     return router

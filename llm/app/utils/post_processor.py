@@ -34,7 +34,11 @@ class ResponsePostProcessor:
     - Remove unwanted formatting artifacts
     """
 
-    def __init__(self, veterinary_terms: Optional[Dict] = None, language_messages: Optional[Dict] = None) -> None:
+    def __init__(
+        self,
+        veterinary_terms: Optional[Dict] = None,
+        language_messages: Optional[Dict] = None,
+    ) -> None:
         """
         Initialize post-processor
 
@@ -57,7 +61,9 @@ class ResponsePostProcessor:
         # Initialize compliance wrapper for role-based disclaimers
         self.compliance_wrapper = get_compliance_wrapper()
 
-        logger.info(f"[OK] ResponsePostProcessor initialized with {len(self.veterinary_keywords)} veterinary terms + metrics validator + compliance wrapper")
+        logger.info(
+            f"[OK] ResponsePostProcessor initialized with {len(self.veterinary_keywords)} veterinary terms + metrics validator + compliance wrapper"
+        )
 
     def _load_veterinary_keywords(self) -> List[str]:
         """
@@ -105,7 +111,10 @@ class ResponsePostProcessor:
             # 5. Clean orphan colons
             (re.compile(r"^\s*:\s*$", re.MULTILINE), ""),
             # 6. Fix broken titles
-            (re.compile(r"^([A-ZÀ-Ý][^\n]{5,60}[a-zà-ÿ])\n([a-zà-ÿ])", re.MULTILINE), r"\1 \2"),
+            (
+                re.compile(r"^([A-ZÀ-Ý][^\n]{5,60}[a-zà-ÿ])\n([a-zà-ÿ])", re.MULTILINE),
+                r"\1 \2",
+            ),
             # 7. Clean multiple empty lines (3+ -> 2)
             (re.compile(r"\n{3,}"), "\n\n"),
             # 8. Remove trailing spaces
@@ -154,7 +163,9 @@ class ResponsePostProcessor:
             response = pattern.sub(replacement, response)
 
         # GARDE-FOUS: Validate poultry metrics to prevent dangerous hallucinations
-        validation_result = self.metrics_validator.validate_response(response, language=language)
+        validation_result = self.metrics_validator.validate_response(
+            response, language=language
+        )
 
         if validation_result["blocked"]:
             # CRITICAL: Response contains dangerous metric hallucinations
@@ -166,9 +177,12 @@ class ResponsePostProcessor:
             safe_messages = {
                 "en": "I apologize, but I detected potentially incorrect numerical values in my response. For accurate information about this topic, please consult a veterinarian or poultry specialist.",
                 "fr": "Je m'excuse, mais j'ai détecté des valeurs numériques potentiellement incorrectes dans ma réponse. Pour des informations précises sur ce sujet, veuillez consulter un vétérinaire ou un spécialiste avicole.",
-                "es": "Me disculpo, pero he detectado valores numéricos potencialmente incorrectos en mi respuesta. Para obtener información precisa sobre este tema, consulte a un veterinario o especialista avícola."
+                "es": "Me disculpo, pero he detectado valores numéricos potencialmente incorrectos en mi respuesta. Para obtener información precisa sobre este tema, consulte a un veterinario o especialista avícola.",
             }
-            return safe_messages.get(language, safe_messages["en"]), {"blocked": True, "validation": validation_result}
+            return safe_messages.get(language, safe_messages["en"]), {
+                "blocked": True,
+                "validation": validation_result,
+            }
 
         # Log warnings even if not blocked
         if validation_result["warnings"]:
@@ -186,13 +200,17 @@ class ResponsePostProcessor:
             query=query,
             user_category=user_category,
             is_veterinary_query=is_veterinary,
-            language=language
+            language=language,
         )
 
         # Prepare metadata
         metadata = {
             "blocked": False,
-            "validation_warnings": len(validation_result["warnings"]) if validation_result["warnings"] else 0
+            "validation_warnings": (
+                len(validation_result["warnings"])
+                if validation_result["warnings"]
+                else 0
+            ),
         }
         metadata.update(compliance_metadata)
 
@@ -204,7 +222,9 @@ class ResponsePostProcessor:
 
         return response, metadata
 
-    def is_veterinary_query(self, query: str, context_docs: Optional[List[Dict]] = None) -> bool:
+    def is_veterinary_query(
+        self, query: str, context_docs: Optional[List[Dict]] = None
+    ) -> bool:
         """
         Detects if the question concerns a veterinary topic.
 
@@ -222,12 +242,14 @@ class ResponsePostProcessor:
 
         # [FAST] Use set intersection for O(1) lookup instead of linear search (optimized from 2ms to ~0.5ms)
         # Extract words from query
-        query_words = set(re.findall(r'\b\w+\b', query_lower))
+        query_words = set(re.findall(r"\b\w+\b", query_lower))
 
         # Check if any query word matches veterinary keywords
         matching_keywords = self.veterinary_keywords_set & query_words
         if matching_keywords:
-            logger.debug(f"Veterinary keyword detected in query: '{next(iter(matching_keywords))}'")
+            logger.debug(
+                f"Veterinary keyword detected in query: '{next(iter(matching_keywords))}'"
+            )
             return True
 
         # Check context documents if provided
@@ -245,14 +267,20 @@ class ResponsePostProcessor:
                 # Check document category
                 category = metadata.get("category", "").lower()
                 if category in ["health", "santé", "disease", "maladie", "veterinary"]:
-                    logger.debug(f"Veterinary category detected in context: '{category}'")
+                    logger.debug(
+                        f"Veterinary category detected in context: '{category}'"
+                    )
                     return True
 
                 # Check document content
                 content_lower = content.lower()
-                for keyword in self.veterinary_keywords[:20]:  # Check first 20 keywords in content
+                for keyword in self.veterinary_keywords[
+                    :20
+                ]:  # Check first 20 keywords in content
                     if keyword in content_lower:
-                        logger.debug(f"Veterinary keyword detected in context: '{keyword}'")
+                        logger.debug(
+                            f"Veterinary keyword detected in context: '{keyword}'"
+                        )
                         return True
 
         return False
@@ -281,8 +309,9 @@ class ResponsePostProcessor:
 
 
 # Factory function for easy instantiation
-def create_post_processor(veterinary_terms: Optional[Dict] = None,
-                         language_messages: Optional[Dict] = None) -> ResponsePostProcessor:
+def create_post_processor(
+    veterinary_terms: Optional[Dict] = None, language_messages: Optional[Dict] = None
+) -> ResponsePostProcessor:
     """
     Create a ResponsePostProcessor instance
 

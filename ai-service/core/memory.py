@@ -102,7 +102,9 @@ class ConversationMemory:
                 # 🆕 Ajouter le follow-up à l'échange s'il existe
                 if followup:
                     exchange_text += f" [Follow-up: {followup[:150]}...]"
-                    logger.debug(f"🔍 MEMORY - Follow-up inclus dans contexte: {followup[:50]}...")
+                    logger.debug(
+                        f"🔍 MEMORY - Follow-up inclus dans contexte: {followup[:50]}..."
+                    )
 
                 exchange_length = len(exchange_text)
 
@@ -160,7 +162,9 @@ class ConversationMemory:
             )
             return ""
 
-    def add_exchange(self, tenant_id: str, question: str, answer: str, followup: Optional[str] = None):
+    def add_exchange(
+        self, tenant_id: str, question: str, answer: str, followup: Optional[str] = None
+    ):
         """
         Ajoute un échange avec métadonnées dans le store partagé
 
@@ -176,7 +180,7 @@ class ConversationMemory:
         exchange_data = {
             "question": question,
             "answer": answer,
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
         # 🆕 Ajouter le follow-up s'il existe
@@ -486,7 +490,9 @@ class ConversationMemory:
         # Sauvegarder uniquement si c'est la première fois (première question)
         if tenant_id not in self._shared_conversation_languages:
             self._shared_conversation_languages[tenant_id] = language
-            logger.info(f"🌍 Langue de conversation sauvegardée pour {tenant_id}: {language}")
+            logger.info(
+                f"🌍 Langue de conversation sauvegardée pour {tenant_id}: {language}"
+            )
 
     def get_conversation_language(self, tenant_id: str) -> Optional[str]:
         """
@@ -500,7 +506,9 @@ class ConversationMemory:
         """
         language = self._shared_conversation_languages.get(tenant_id)
         if language:
-            logger.debug(f"🌍 Langue de conversation récupérée pour {tenant_id}: {language}")
+            logger.debug(
+                f"🌍 Langue de conversation récupérée pour {tenant_id}: {language}"
+            )
         return language
 
     def clear_conversation_language(self, tenant_id: str):

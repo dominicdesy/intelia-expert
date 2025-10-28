@@ -16,13 +16,13 @@ import os
 from dotenv import load_dotenv
 
 # Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from llm.external_sources import ExternalSourceManager
 from llm.external_sources.fetchers import (
     SemanticScholarFetcher,
     PubMedFetcher,
-    EuropePMCFetcher
+    EuropePMCFetcher,
 )
 
 # Load environment variables
@@ -30,8 +30,7 @@ load_dotenv()
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -68,19 +67,16 @@ async def test_individual_fetcher(fetcher, name: str, query: str):
 async def test_parallel_search(manager: ExternalSourceManager, query: str):
     """Test parallel search across all sources"""
     print(f"\n{'='*80}")
-    print(f"Testing Parallel Search (All Sources)")
+    print("Testing Parallel Search (All Sources)")
     print(f"{'='*80}")
     print(f"Query: '{query}'")
 
     try:
         result = await manager.search(
-            query=query,
-            language="en",
-            max_results_per_source=5,
-            min_year=2015
+            query=query, language="en", max_results_per_source=5, min_year=2015
         )
 
-        print(f"\n[RESULTS]")
+        print("\n[RESULTS]")
         print(f"  Found: {result.found}")
         print(f"  Sources searched: {result.sources_searched}")
         print(f"  Sources succeeded: {result.sources_succeeded}")
@@ -89,22 +85,24 @@ async def test_parallel_search(manager: ExternalSourceManager, query: str):
         print(f"  Search duration: {result.search_duration_ms:.0f}ms")
 
         if result.has_answer():
-            print(f"\n[BEST DOCUMENT]")
+            print("\n[BEST DOCUMENT]")
             best = result.best_document
             print(f"  Title: {best.title}")
             print(f"  Authors: {', '.join(best.authors[:3])}")
             print(f"  Year: {best.year} | Citations: {best.citation_count}")
             print(f"  Source: {best.source}")
-            print(f"  Scores:")
+            print("  Scores:")
             print(f"    - Composite: {best.composite_score:.3f}")
             print(f"    - Relevance: {best.relevance_score:.3f}")
             print(f"  URL: {best.url}")
             print(f"  Abstract: {best.abstract[:200]}...")
 
-            print(f"\n[TOP 5 DOCUMENTS]")
+            print("\n[TOP 5 DOCUMENTS]")
             for i, doc in enumerate(result.all_documents, 1):
                 print(f"{i}. [{doc.source}] {doc.title[:80]}")
-                print(f"   Score: {doc.composite_score:.3f} | Relevance: {doc.relevance_score:.3f} | Citations: {doc.citation_count}")
+                print(
+                    f"   Score: {doc.composite_score:.3f} | Relevance: {doc.relevance_score:.3f} | Citations: {doc.citation_count}"
+                )
 
         return True
 
@@ -116,15 +114,15 @@ async def test_parallel_search(manager: ExternalSourceManager, query: str):
 
 async def main():
     """Run all tests"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("EXTERNAL SOURCES SYSTEM - TEST SUITE")
-    print("="*80)
+    print("=" * 80)
 
     # Test queries
     queries = [
         "coccidiosis prevention broiler chickens",
         "Newcastle disease vaccination poultry",
-        "heat stress management laying hens"
+        "heat stress management laying hens",
     ]
 
     test_query = queries[0]  # Use first query for tests
@@ -158,7 +156,7 @@ async def main():
         enable_semantic_scholar=True,
         enable_pubmed=True,
         enable_europe_pmc=True,
-        enable_fao=False  # FAO is placeholder
+        enable_fao=False,  # FAO is placeholder
     )
     result = await test_parallel_search(manager, test_query)
     results.append(("Parallel Search", result))

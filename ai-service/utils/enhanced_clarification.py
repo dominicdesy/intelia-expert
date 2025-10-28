@@ -51,7 +51,7 @@ class EnhancedClarification:
     def __init__(
         self,
         config_path: str = "config/clarification_strategies.json",
-        enable_llm_translation: bool = True
+        enable_llm_translation: bool = True,
     ):
         """
         Initialize Enhanced Clarification system
@@ -84,10 +84,7 @@ class EnhancedClarification:
         return self.helper_available
 
     def detect_ambiguity_type(
-        self,
-        query: str,
-        missing_fields: List[str],
-        entities: Optional[Dict] = None
+        self, query: str, missing_fields: List[str], entities: Optional[Dict] = None
     ) -> Optional[str]:
         """
         Detect type of ambiguity in query
@@ -133,8 +130,8 @@ class EnhancedClarification:
         self,
         query: str,
         missing_fields: List[str],
-        language: str = 'en',
-        entities: Optional[Dict] = None
+        language: str = "en",
+        entities: Optional[Dict] = None,
     ) -> str:
         """
         Build contextual clarification message
@@ -158,7 +155,7 @@ class EnhancedClarification:
                     missing_fields=missing_fields,
                     language=language,
                     query=query,
-                    entities=entities
+                    entities=entities,
                 )
                 logger.debug(f"✅ Clarification message built (lang={language})")
                 return message
@@ -170,11 +167,7 @@ class EnhancedClarification:
         # Fallback: simple clarification without translation
         return self._build_fallback_message(missing_fields, language)
 
-    def _build_fallback_message(
-        self,
-        missing_fields: List[str],
-        language: str
-    ) -> str:
+    def _build_fallback_message(self, missing_fields: List[str], language: str) -> str:
         """
         Build simple fallback clarification message (no LLM translation)
 
@@ -187,42 +180,42 @@ class EnhancedClarification:
         """
         # Simple templates in English and French
         templates = {
-            'en': {
-                'intro': "To help you best, I need more information:",
-                'breed': "- **Breed**: Ross 308, Cobb 500, other?",
-                'age': "- **Age**: in days (e.g., 21 days, 35 days)",
-                'sex': "- **Sex**: male, female, or as-hatched?",
-                'metric': "- **Metric**: body weight, FCR, mortality?",
-                'production_phase': "- **Production phase**: starter, grower, or finisher?",
+            "en": {
+                "intro": "To help you best, I need more information:",
+                "breed": "- **Breed**: Ross 308, Cobb 500, other?",
+                "age": "- **Age**: in days (e.g., 21 days, 35 days)",
+                "sex": "- **Sex**: male, female, or as-hatched?",
+                "metric": "- **Metric**: body weight, FCR, mortality?",
+                "production_phase": "- **Production phase**: starter, grower, or finisher?",
             },
-            'fr': {
-                'intro': "Pour mieux vous aider, j'ai besoin de précisions:",
-                'breed': "- **Race**: Ross 308, Cobb 500, autre?",
-                'age': "- **Âge**: en jours (ex: 21 jours, 35 jours)",
-                'sex': "- **Sexe**: mâle, femelle, ou mixte?",
-                'metric': "- **Métrique**: poids vif, IC, mortalité?",
-                'production_phase': "- **Phase de production**: démarrage, croissance, ou finition?",
-            }
+            "fr": {
+                "intro": "Pour mieux vous aider, j'ai besoin de précisions:",
+                "breed": "- **Race**: Ross 308, Cobb 500, autre?",
+                "age": "- **Âge**: en jours (ex: 21 jours, 35 jours)",
+                "sex": "- **Sexe**: mâle, femelle, ou mixte?",
+                "metric": "- **Métrique**: poids vif, IC, mortalité?",
+                "production_phase": "- **Phase de production**: démarrage, croissance, ou finition?",
+            },
         }
 
         # Use English if language not supported
-        lang_templates = templates.get(language, templates['en'])
+        lang_templates = templates.get(language, templates["en"])
 
-        parts = [lang_templates['intro']]
+        parts = [lang_templates["intro"]]
 
         for field in missing_fields:
             if field in lang_templates:
                 parts.append(lang_templates[field])
 
-        return '\n'.join(parts)
+        return "\n".join(parts)
 
     def check_and_clarify(
         self,
         query: str,
         missing_fields: List[str],
-        language: str = 'en',
+        language: str = "en",
         entities: Optional[Dict] = None,
-        intent_result: Optional[Dict] = None
+        intent_result: Optional[Dict] = None,
     ) -> Dict[str, Any]:
         """
         Check if clarification is needed and build message
@@ -249,10 +242,10 @@ class EnhancedClarification:
 
         if not needs_clarification:
             return {
-                'needs_clarification': False,
-                'message': '',
-                'ambiguity_type': None,
-                'missing_fields': []
+                "needs_clarification": False,
+                "message": "",
+                "ambiguity_type": None,
+                "missing_fields": [],
             }
 
         # Detect ambiguity type
@@ -263,24 +256,23 @@ class EnhancedClarification:
             query=query,
             missing_fields=missing_fields,
             language=language,
-            entities=entities
+            entities=entities,
         )
 
-        logger.info(f"📝 Clarification needed: {len(missing_fields)} fields, type={ambiguity_type}")
+        logger.info(
+            f"📝 Clarification needed: {len(missing_fields)} fields, type={ambiguity_type}"
+        )
 
         return {
-            'needs_clarification': True,
-            'message': message,
-            'ambiguity_type': ambiguity_type,
-            'missing_fields': missing_fields,
-            'language': language
+            "needs_clarification": True,
+            "message": message,
+            "ambiguity_type": ambiguity_type,
+            "missing_fields": missing_fields,
+            "language": language,
         }
 
     def should_clarify_before_llm(
-        self,
-        query: str,
-        missing_fields: List[str],
-        confidence: float = 0.0
+        self, query: str, missing_fields: List[str], confidence: float = 0.0
     ) -> bool:
         """
         Determine if should ask for clarification before LLM fallback
@@ -299,7 +291,7 @@ class EnhancedClarification:
             True if should clarify before using LLM
         """
         # Critical fields that should trigger clarification
-        critical_fields = {'breed', 'age', 'metric'}
+        critical_fields = {"breed", "age", "metric"}
 
         # If any critical field missing
         has_critical_missing = any(f in critical_fields for f in missing_fields)
@@ -327,7 +319,7 @@ _enhanced_clarification_instance: Optional[EnhancedClarification] = None
 
 def get_enhanced_clarification(
     config_path: str = "config/clarification_strategies.json",
-    enable_llm_translation: bool = True
+    enable_llm_translation: bool = True,
 ) -> EnhancedClarification:
     """
     Get singleton instance of EnhancedClarification
@@ -343,12 +335,11 @@ def get_enhanced_clarification(
 
     if _enhanced_clarification_instance is None:
         _enhanced_clarification_instance = EnhancedClarification(
-            config_path=config_path,
-            enable_llm_translation=enable_llm_translation
+            config_path=config_path, enable_llm_translation=enable_llm_translation
         )
         logger.debug("EnhancedClarification singleton initialized")
 
     return _enhanced_clarification_instance
 
 
-__all__ = ['EnhancedClarification', 'get_enhanced_clarification']
+__all__ = ["EnhancedClarification", "get_enhanced_clarification"]

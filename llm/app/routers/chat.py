@@ -11,7 +11,6 @@ from app.models.schemas import (
     ChatCompletionMessage,
     UsageInfo,
     ErrorResponse,
-    ErrorDetail
 )
 from app.models.llm_client import LLMClient
 from app.utils.metrics import track_tokens, track_inference
@@ -31,12 +30,11 @@ router = APIRouter(prefix="/v1", tags=["chat"])
     responses={
         400: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
-    }
+    },
 )
 @track_inference("intelia-llama")
 async def create_chat_completion(
-    request: ChatCompletionRequest,
-    llm_client: LLMClient = Depends(get_llm_client)
+    request: ChatCompletionRequest, llm_client: LLMClient = Depends(get_llm_client)
 ):
     """
     Create a chat completion (OpenAI-compatible)
@@ -84,15 +82,11 @@ async def create_chat_completion(
 
         # Validate messages
         if not request.messages:
-            raise HTTPException(
-                status_code=400,
-                detail="Messages list cannot be empty"
-            )
+            raise HTTPException(status_code=400, detail="Messages list cannot be empty")
 
         # Convert messages to dict format
         messages_dict = [
-            {"role": msg.role, "content": msg.content}
-            for msg in request.messages
+            {"role": msg.role, "content": msg.content} for msg in request.messages
         ]
 
         # Call LLM provider
@@ -108,7 +102,7 @@ async def create_chat_completion(
         track_tokens(
             model=request.model,
             prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens
+            completion_tokens=completion_tokens,
         )
 
         # Build response
@@ -123,20 +117,21 @@ async def create_chat_completion(
                 ChatCompletionChoice(
                     index=0,
                     message=ChatCompletionMessage(
-                        role="assistant",
-                        content=generated_text
+                        role="assistant", content=generated_text
                     ),
-                    finish_reason="stop"
+                    finish_reason="stop",
                 )
             ],
             usage=UsageInfo(
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                total_tokens=prompt_tokens + completion_tokens
-            )
+                total_tokens=prompt_tokens + completion_tokens,
+            ),
         )
 
-        logger.info(f"Completion successful. ID: {completion_id}, Tokens: {prompt_tokens}+{completion_tokens}")
+        logger.info(
+            f"Completion successful. ID: {completion_id}, Tokens: {prompt_tokens}+{completion_tokens}"
+        )
 
         return response
 
@@ -144,7 +139,4 @@ async def create_chat_completion(
         raise
     except Exception as e:
         logger.error(f"Error in chat completion: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

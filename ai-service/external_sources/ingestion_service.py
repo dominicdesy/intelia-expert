@@ -10,7 +10,6 @@ Version 2.0 - Uses unified ChunkingService for optimal performance
 """
 
 import logging
-import uuid
 from typing import List, Dict, Any
 from datetime import datetime
 
@@ -47,22 +46,21 @@ class DocumentIngestionService:
         # Optimized semantic chunking for external documents
         self.chunking_service = ChunkingService(
             config=ChunkConfig(
-                min_chunk_words=50,      # Minimum viable chunk
-                max_chunk_words=1200,    # Sweet spot for embeddings
-                overlap_words=240,       # 20% overlap for context
-                prefer_markdown_sections=False,   # External docs rarely have markdown
-                prefer_paragraph_boundaries=True, # Prefer paragraph boundaries
-                prefer_sentence_boundaries=True   # Fall back to sentences
+                min_chunk_words=50,  # Minimum viable chunk
+                max_chunk_words=1200,  # Sweet spot for embeddings
+                overlap_words=240,  # 20% overlap for context
+                prefer_markdown_sections=False,  # External docs rarely have markdown
+                prefer_paragraph_boundaries=True,  # Prefer paragraph boundaries
+                prefer_sentence_boundaries=True,  # Fall back to sentences
             )
         )
 
-        logger.info(f"✅ DocumentIngestionService initialized with unified ChunkingService")
+        logger.info(
+            "✅ DocumentIngestionService initialized with unified ChunkingService"
+        )
 
     async def ingest_document(
-        self,
-        document: ExternalDocument,
-        query_context: str,
-        language: str = "en"
+        self, document: ExternalDocument, query_context: str, language: str = "en"
     ) -> bool:
         """
         Ingest external document into Weaviate
@@ -94,7 +92,7 @@ class DocumentIngestionService:
                     total_chunks=len(chunks),
                     document=document,
                     query_context=query_context,
-                    language=language
+                    language=language,
                 )
 
                 if success:
@@ -107,7 +105,7 @@ class DocumentIngestionService:
                 )
                 return True
             else:
-                logger.error(f"❌ Failed to upload any chunks")
+                logger.error("❌ Failed to upload any chunks")
                 return False
 
         except Exception as e:
@@ -115,10 +113,7 @@ class DocumentIngestionService:
             return False
 
     def _chunk_document(
-        self,
-        document: ExternalDocument,
-        chunk_size: int = 500,
-        overlap: int = 50
+        self, document: ExternalDocument, chunk_size: int = 500, overlap: int = 50
     ) -> List[Dict[str, Any]]:
         """
         Chunk document into semantic segments using unified ChunkingService
@@ -138,13 +133,13 @@ class DocumentIngestionService:
         doc_dict = {
             "title": document.title,
             "abstract": document.abstract,
-            "text": document.full_text if hasattr(document, 'full_text') else None
+            "text": document.full_text if hasattr(document, "full_text") else None,
         }
 
         metadata = {
             "source": document.source,
             "doi": document.doi,
-            "pmid": document.pmid
+            "pmid": document.pmid,
         }
 
         # Get semantic chunks from ChunkingService
@@ -157,7 +152,7 @@ class DocumentIngestionService:
                 "start_word": 0,  # Not used anymore
                 "end_word": chunk.word_count,
                 "word_count": chunk.word_count,
-                "chunk_type": chunk.source_type
+                "chunk_type": chunk.source_type,
             }
             for chunk in semantic_chunks
         ]
@@ -176,7 +171,7 @@ class DocumentIngestionService:
         total_chunks: int,
         document: ExternalDocument,
         query_context: str,
-        language: str
+        language: str,
     ) -> bool:
         """
         Upload a single chunk to Weaviate
@@ -203,31 +198,27 @@ class DocumentIngestionService:
                 "authors": ", ".join(document.authors),
                 "year": document.year,
                 "language": language,
-
                 # External source metadata
                 "doi": document.doi or "",
                 "pmid": document.pmid or "",
                 "pmcid": document.pmcid or "",
                 "citation_count": document.citation_count,
                 "journal": document.journal or "",
-
                 # Ingestion metadata
                 "ingested_from_query": query_context,
                 "ingested_at": datetime.now().isoformat(),
                 "relevance_score": document.relevance_score,
                 "composite_score": document.composite_score,
-
                 # Chunk metadata
                 "chunk_index": chunk_index,
                 "total_chunks": total_chunks,
                 "is_first_chunk": chunk_index == 0,
-                "is_last_chunk": chunk_index == total_chunks - 1
+                "is_last_chunk": chunk_index == total_chunks - 1,
             }
 
             # Upload to Weaviate (embeddings generated automatically)
             self.weaviate_client.data_object.create(
-                data_object=properties,
-                class_name=self.collection_name
+                data_object=properties, class_name=self.collection_name
             )
 
             return True
@@ -256,31 +247,33 @@ class DocumentIngestionService:
                 where_filter = {
                     "path": ["doi"],
                     "operator": "Equal",
-                    "valueString": document.doi
+                    "valueString": document.doi,
                 }
             elif document.pmid:
                 where_filter = {
                     "path": ["pmid"],
                     "operator": "Equal",
-                    "valueString": document.pmid
+                    "valueString": document.pmid,
                 }
             else:
                 # Fallback to title match
                 where_filter = {
                     "path": ["title"],
                     "operator": "Equal",
-                    "valueString": document.title
+                    "valueString": document.title,
                 }
 
             result = (
-                self.weaviate_client.query
-                .get(self.collection_name, ["uuid"])
+                self.weaviate_client.query.get(self.collection_name, ["uuid"])
                 .with_where(where_filter)
                 .with_limit(1)
                 .do()
             )
 
-            exists = len(result.get("data", {}).get("Get", {}).get(self.collection_name, [])) > 0
+            exists = (
+                len(result.get("data", {}).get("Get", {}).get(self.collection_name, []))
+                > 0
+            )
 
             if exists:
                 logger.info(f"✅ Document already exists: {document.title[:60]}...")

@@ -59,9 +59,7 @@ async def test_weaviate_hybrid_search(weaviate_core):
     query = "Quel est le poids optimal pour Ross 308 à 35 jours ?"
 
     results = await weaviate_core.hybrid_search(
-        query=query,
-        alpha=0.5,  # 50% vector, 50% keyword
-        limit=5
+        query=query, alpha=0.5, limit=5  # 50% vector, 50% keyword
     )
 
     # Peut retourner 0 résultats si la collection est vide
@@ -78,10 +76,7 @@ async def test_weaviate_vector_search(weaviate_core):
 
     query = "Poids Ross 308 35 jours"
 
-    results = await weaviate_core.vector_search(
-        query=query,
-        limit=5
-    )
+    results = await weaviate_core.vector_search(query=query, limit=5)
 
     print("\n✅ Test 3 PASSED - Vector search")
     print(f"   Results: {len(results)}")
@@ -93,10 +88,7 @@ async def test_weaviate_keyword_search(weaviate_core):
 
     query = "Ross 308"
 
-    results = await weaviate_core.keyword_search(
-        query=query,
-        limit=5
-    )
+    results = await weaviate_core.keyword_search(query=query, limit=5)
 
     print("\n✅ Test 4 PASSED - Keyword search")
     print(f"   Results: {len(results)}")
@@ -113,11 +105,7 @@ async def test_weaviate_multilingual_search(weaviate_core):
     ]
 
     for query, lang in queries:
-        results = await weaviate_core.hybrid_search(
-            query=query,
-            language=lang,
-            limit=5
-        )
+        results = await weaviate_core.hybrid_search(query=query, language=lang, limit=5)
 
         print(f"   {lang.upper()}: {len(results)} results")
 
@@ -129,12 +117,7 @@ async def test_weaviate_with_filters(weaviate_core):
     """Test 6: Search avec filtres"""
 
     results = await weaviate_core.hybrid_search(
-        query="Poids poulets",
-        filters={
-            "breed": "Ross 308",
-            "age_days": 35
-        },
-        limit=5
+        query="Poids poulets", filters={"breed": "Ross 308", "age_days": 35}, limit=5
     )
 
     print("\n✅ Test 6 PASSED - Filtered search")
@@ -149,16 +132,12 @@ async def test_weaviate_reranking(weaviate_core):
 
     # Search sans reranking
     results_no_rerank = await weaviate_core.hybrid_search(
-        query=query,
-        limit=10,
-        use_reranker=False
+        query=query, limit=10, use_reranker=False
     )
 
     # Search avec reranking
     results_reranked = await weaviate_core.hybrid_search(
-        query=query,
-        limit=3,
-        use_reranker=True
+        query=query, limit=3, use_reranker=True
     )
 
     print("\n✅ Test 7 PASSED - Reranking")
@@ -191,7 +170,7 @@ async def test_weaviate_embeddings(weaviate_core):
     texts = [
         "Poids Ross 308 35 jours",
         "FCR Cobb 500 42 jours",
-        "Mortalité poulets semaine 3"
+        "Mortalité poulets semaine 3",
     ]
 
     for text in texts:
@@ -220,10 +199,7 @@ async def test_weaviate_performance(weaviate_core):
     for query in queries:
         start = time.time()
 
-        await weaviate_core.hybrid_search(
-            query=query,
-            limit=5
-        )
+        await weaviate_core.hybrid_search(query=query, limit=5)
 
         duration = time.time() - start
         times.append(duration)

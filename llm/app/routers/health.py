@@ -45,9 +45,13 @@ async def health_check(llm_client: LLMClient = Depends(get_llm_client)):
 
         # Update Prometheus metric
         set_model_status(
-            model=settings.huggingface_model if settings.llm_provider == "huggingface" else "intelia-llama",
+            model=(
+                settings.huggingface_model
+                if settings.llm_provider == "huggingface"
+                else "intelia-llama"
+            ),
             provider=settings.llm_provider,
-            available=model_loaded
+            available=model_loaded,
         )
 
     except Exception as e:
@@ -61,7 +65,7 @@ async def health_check(llm_client: LLMClient = Depends(get_llm_client)):
         version=settings.version,
         provider=settings.llm_provider,
         model_loaded=model_loaded,
-        timestamp=datetime.utcnow().isoformat() + "Z"
+        timestamp=datetime.utcnow().isoformat() + "Z",
     )
 
 
@@ -96,10 +100,7 @@ async def metrics():
     """
     logger.debug("Metrics requested")
 
-    return Response(
-        content=get_metrics(),
-        media_type=get_metrics_content_type()
-    )
+    return Response(content=get_metrics(), media_type=get_metrics_content_type())
 
 
 @router.get("/")
@@ -116,5 +117,5 @@ async def root():
         "status": "running",
         "docs": "/docs",
         "health": "/health",
-        "metrics": "/metrics"
+        "metrics": "/metrics",
     }

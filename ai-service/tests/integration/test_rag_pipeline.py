@@ -44,7 +44,7 @@ async def test_rag_pipeline_simple_query(rag_engine):
     result = await rag_engine.process_query(
         query="Quel poids pour Ross 308 à 35 jours ?",
         user_id="test_user_1",
-        language="fr"
+        language="fr",
     )
 
     # Vérifier structure de réponse
@@ -79,8 +79,8 @@ async def test_rag_pipeline_entity_extraction(rag_engine):
                 "breed": "Ross 308",
                 "age_weeks": 5,
                 "sex": "male",
-                "metric": "weight"
-            }
+                "metric": "weight",
+            },
         },
         {
             "query": "FCR Cobb 500 femelles 42 jours",
@@ -88,23 +88,18 @@ async def test_rag_pipeline_entity_extraction(rag_engine):
                 "breed": "Cobb 500",
                 "age_days": 42,
                 "sex": "female",
-                "metric": "fcr"
-            }
+                "metric": "fcr",
+            },
         },
         {
             "query": "Mortalité poulets de chair semaine 3",
-            "expected_entities": {
-                "age_weeks": 3,
-                "metric": "mortality"
-            }
-        }
+            "expected_entities": {"age_weeks": 3, "metric": "mortality"},
+        },
     ]
 
     for i, test_case in enumerate(queries):
         result = await rag_engine.process_query(
-            query=test_case["query"],
-            user_id=f"test_user_{i}",
-            language="fr"
+            query=test_case["query"], user_id=f"test_user_{i}", language="fr"
         )
 
         # Vérifier que des entités ont été extraites
@@ -130,9 +125,7 @@ async def test_rag_pipeline_multilingual(rag_engine):
 
     for query, lang in queries:
         result = await rag_engine.process_query(
-            query=query,
-            user_id="test_user_multilang",
-            language=lang
+            query=query, user_id="test_user_multilang", language=lang
         )
 
         assert result["answer"] is not None
@@ -149,16 +142,14 @@ async def test_rag_pipeline_query_routing(rag_engine):
 
     # Query structurée -> devrait router vers PostgreSQL
     result_pg = await rag_engine.process_query(
-        query="Poids Ross 308 35 jours",
-        user_id="test_user_routing_pg",
-        language="fr"
+        query="Poids Ross 308 35 jours", user_id="test_user_routing_pg", language="fr"
     )
 
     # Query ouverte -> pourrait router vers Weaviate
     result_open = await rag_engine.process_query(
         query="Quelles sont les meilleures pratiques pour l'alimentation des poulets ?",
         user_id="test_user_routing_open",
-        language="fr"
+        language="fr",
     )
 
     # Les deux devraient retourner des résultats
@@ -166,7 +157,9 @@ async def test_rag_pipeline_query_routing(rag_engine):
     assert result_open["answer"] is not None
 
     print("\n✅ Test 4 PASSED - Query routing")
-    print(f"   Structured query method: {result_pg['metadata'].get('retrieval_method')}")
+    print(
+        f"   Structured query method: {result_pg['metadata'].get('retrieval_method')}"
+    )
     print(f"   Open query method: {result_open['metadata'].get('retrieval_method')}")
 
 
@@ -178,9 +171,7 @@ async def test_rag_pipeline_conversation_memory(rag_engine):
 
     # Query 1
     result1 = await rag_engine.process_query(
-        query="Quel poids pour Ross 308 à 35 jours ?",
-        user_id=user_id,
-        language="fr"
+        query="Quel poids pour Ross 308 à 35 jours ?", user_id=user_id, language="fr"
     )
 
     # Query 2 avec référence contextuelle
@@ -190,8 +181,8 @@ async def test_rag_pipeline_conversation_memory(rag_engine):
         language="fr",
         conversation_history=[
             {"role": "user", "content": "Quel poids pour Ross 308 à 35 jours ?"},
-            {"role": "assistant", "content": result1["answer"]}
-        ]
+            {"role": "assistant", "content": result1["answer"]},
+        ],
     )
 
     # Les deux queries devraient fonctionner
@@ -209,7 +200,7 @@ async def test_rag_pipeline_multiple_breeds_comparison(rag_engine):
     result = await rag_engine.process_query(
         query="Compare le poids entre Ross 308 et Cobb 500 à 35 jours",
         user_id="test_user_compare",
-        language="fr"
+        language="fr",
     )
 
     # Devrait retourner des infos sur les deux races
@@ -237,9 +228,7 @@ async def test_rag_pipeline_age_variants(rag_engine):
     results = []
     for query in queries:
         result = await rag_engine.process_query(
-            query=query,
-            user_id="test_user_age",
-            language="fr"
+            query=query, user_id="test_user_age", language="fr"
         )
         results.append(result)
 
@@ -266,9 +255,7 @@ async def test_rag_pipeline_metric_variants(rag_engine):
 
     for query, metric in queries:
         result = await rag_engine.process_query(
-            query=query,
-            user_id="test_user_metrics",
-            language="fr"
+            query=query, user_id="test_user_metrics", language="fr"
         )
 
         assert result["answer"] is not None
@@ -289,9 +276,7 @@ async def test_rag_pipeline_species_support(rag_engine):
 
     for query in queries:
         result = await rag_engine.process_query(
-            query=query,
-            user_id="test_user_species",
-            language="fr"
+            query=query, user_id="test_user_species", language="fr"
         )
 
         # Peut retourner "pas d'info" pour certaines espèces
@@ -309,7 +294,7 @@ async def test_rag_pipeline_no_results_handling(rag_engine):
     result = await rag_engine.process_query(
         query="Poids des zèbres à 35 jours",  # Hors domaine
         user_id="test_user_no_results",
-        language="fr"
+        language="fr",
     )
 
     # Devrait quand même retourner une réponse (même si c'est "je ne sais pas")
@@ -337,9 +322,7 @@ async def test_rag_pipeline_performance(rag_engine):
         start = time.time()
 
         result = await rag_engine.process_query(
-            query=query,
-            user_id="test_user_perf",
-            language="fr"
+            query=query, user_id="test_user_perf", language="fr"
         )
 
         duration = time.time() - start

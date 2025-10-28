@@ -9,13 +9,12 @@ api/endpoints_chat/temp_image_routes.py - Upload temporaire d'images pour accumu
 Version 1.0.0 - Stockage temporaire pour analyse différée multi-images
 """
 
-import os
 import time
 import uuid
 import logging
 import shutil
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any
 from utils.types import Callable
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse
@@ -80,7 +79,7 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
             if content_type not in allowed_types:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Type de fichier non supporté: {content_type}. Types acceptés: {', '.join(allowed_types)}"
+                    detail=f"Type de fichier non supporté: {content_type}. Types acceptés: {', '.join(allowed_types)}",
                 )
 
             # Lire l'image
@@ -89,7 +88,7 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
             if len(image_data) > max_size:
                 raise HTTPException(
                     status_code=413,
-                    detail=f"Image trop volumineuse: {len(image_data) / 1024 / 1024:.1f}MB. Maximum: 10MB"
+                    detail=f"Image trop volumineuse: {len(image_data) / 1024 / 1024:.1f}MB. Maximum: 10MB",
                 )
 
             # Créer le répertoire de session si nécessaire
@@ -118,6 +117,7 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             metadata_filepath = session_dir / f"{image_id}.json"
             import json
+
             with open(metadata_filepath, "w") as f:
                 json.dump(metadata, f)
 
@@ -138,7 +138,7 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     "session_id": session_id,
                     "temp_filepath": str(temp_filepath),
                     "upload_time": metadata["upload_time"],
-                }
+                },
             )
 
         except HTTPException:
@@ -148,10 +148,7 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
             logger.exception(f"[TEMP_IMAGE] Erreur upload image temporaire: {e}")
             return JSONResponse(
                 status_code=500,
-                content={
-                    "success": False,
-                    "error": f"Erreur upload: {str(e)}"
-                }
+                content={"success": False, "error": f"Erreur upload: {str(e)}"},
             )
 
     @router.get(f"{BASE_PATH}/temp-images/{{session_id}}")
@@ -176,11 +173,12 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "session_id": session_id,
                         "images": [],
                         "count": 0,
-                    }
+                    },
                 )
 
             # Lister les fichiers de métadonnées
             import json
+
             images = []
 
             for metadata_file in session_dir.glob("*.json"):
@@ -190,16 +188,22 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
                     # Vérifier que l'image existe toujours
                     image_id = metadata["image_id"]
-                    file_extension = Path(metadata["original_filename"]).suffix or ".jpg"
+                    file_extension = (
+                        Path(metadata["original_filename"]).suffix or ".jpg"
+                    )
                     image_path = session_dir / f"{image_id}{file_extension}"
 
                     if image_path.exists():
                         images.append(metadata)
                 except Exception as e:
-                    logger.warning(f"[TEMP_IMAGE] Erreur lecture métadonnées {metadata_file}: {e}")
+                    logger.warning(
+                        f"[TEMP_IMAGE] Erreur lecture métadonnées {metadata_file}: {e}"
+                    )
                     continue
 
-            logger.info(f"[TEMP_IMAGE] Récupération images - Session: {session_id}, Count: {len(images)}")
+            logger.info(
+                f"[TEMP_IMAGE] Récupération images - Session: {session_id}, Count: {len(images)}"
+            )
 
             return JSONResponse(
                 status_code=200,
@@ -208,17 +212,13 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     "session_id": session_id,
                     "images": images,
                     "count": len(images),
-                }
+                },
             )
 
         except Exception as e:
             logger.exception(f"[TEMP_IMAGE] Erreur récupération images: {e}")
             return JSONResponse(
-                status_code=500,
-                content={
-                    "success": False,
-                    "error": str(e)
-                }
+                status_code=500, content={"success": False, "error": str(e)}
             )
 
     @router.delete(f"{BASE_PATH}/temp-images/{{session_id}}")
@@ -242,7 +242,7 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         "success": True,
                         "message": "Aucune image à supprimer",
                         "deleted_count": 0,
-                    }
+                    },
                 )
 
             # Compter les images avant suppression
@@ -251,7 +251,9 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
             # Supprimer le répertoire de session
             shutil.rmtree(session_dir)
 
-            logger.info(f"[TEMP_IMAGE] Nettoyage session - Session: {session_id}, Deleted: {image_count}")
+            logger.info(
+                f"[TEMP_IMAGE] Nettoyage session - Session: {session_id}, Deleted: {image_count}"
+            )
 
             return JSONResponse(
                 status_code=200,
@@ -259,17 +261,13 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     "success": True,
                     "message": f"{image_count} image(s) supprimée(s)",
                     "deleted_count": image_count,
-                }
+                },
             )
 
         except Exception as e:
             logger.exception(f"[TEMP_IMAGE] Erreur suppression images: {e}")
             return JSONResponse(
-                status_code=500,
-                content={
-                    "success": False,
-                    "error": str(e)
-                }
+                status_code=500, content={"success": False, "error": str(e)}
             )
 
     @router.post(f"{BASE_PATH}/cleanup-old-temp-images")
@@ -293,6 +291,7 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
                 # Vérifier l'âge de la session (basé sur le fichier le plus récent)
                 import json
+
                 session_age = 0
 
                 for metadata_file in session_dir.glob("*.json"):
@@ -326,17 +325,13 @@ def create_temp_image_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     "deleted_sessions": deleted_sessions,
                     "deleted_images": deleted_images,
                     "message": f"{deleted_sessions} session(s) expirée(s) nettoyée(s)",
-                }
+                },
             )
 
         except Exception as e:
             logger.exception(f"[TEMP_IMAGE] Erreur nettoyage: {e}")
             return JSONResponse(
-                status_code=500,
-                content={
-                    "success": False,
-                    "error": str(e)
-                }
+                status_code=500, content={"success": False, "error": str(e)}
             )
 
     return router

@@ -131,7 +131,7 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
     @router.post("/public/evaluate-rag")
     async def public_trigger_ragas_evaluation(
         request: EvaluationRequest,
-        x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+        x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     ):
         """
         Public endpoint to run RAGAS evaluation with API key authentication.
@@ -148,8 +148,7 @@ def create_admin_endpoints(services: Optional[Dict[str, Any]] = None) -> APIRout
 
         if not x_api_key or x_api_key != expected_key:
             raise HTTPException(
-                status_code=403,
-                detail="Invalid or missing X-API-Key header"
+                status_code=403, detail="Invalid or missing X-API-Key header"
             )
 
         # Call the same handler as admin endpoint

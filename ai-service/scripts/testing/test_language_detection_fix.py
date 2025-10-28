@@ -12,19 +12,16 @@ import logging
 from utils.language_detection import detect_language_enhanced
 
 # Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 def test_language_detection():
     """Test de détection de langue avec termes techniques"""
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TEST DE DÉTECTION DE LANGUE - FIX TERMES TECHNIQUES")
-    print("="*80)
+    print("=" * 80)
 
     # Test cases with technical Latin/international terms
     test_cases = [
@@ -35,18 +32,15 @@ def test_language_detection():
         ("Is Newcastle disease dangerous?", "en"),
         ("What are the symptoms of coccidiosis?", "en"),
         ("Can I use ivermectin for mites?", "en"),
-
         # French queries
         ("Quelle est la vaccination in ovo?", "fr"),
         ("Comment faire la vaccination in ovo?", "fr"),
         ("Quel est le poids d'un Ross 308?", "fr"),
         ("La maladie de Newcastle est-elle dangereuse?", "fr"),
-
         # Spanish queries
         ("¿Qué es la vacunación in ovo?", "es"),
         ("¿Cómo realizar la vacunación in ovo?", "es"),
         ("¿Cuál es el peso de un Ross 308?", "es"),
-
         # Italian queries (should still be detected as Italian)
         ("Cos'è la vaccinazione in ovo?", "it"),
         ("Come si fa la vaccinazione in ovo?", "it"),
@@ -75,15 +69,15 @@ def test_language_detection():
             results["incorrect"] += 1
 
     # Summary
-    print("="*80)
+    print("=" * 80)
     print("SUMMARY")
-    print("="*80)
+    print("=" * 80)
     print(f"Total tests: {results['total']}")
     print(f"Correct: {results['correct']}")
     print(f"Incorrect: {results['incorrect']}")
     print(f"Accuracy: {results['correct'] / results['total'] * 100:.1f}%")
 
-    if results['correct'] == results['total']:
+    if results["correct"] == results["total"]:
         print("\n[SUCCESS] All tests passed!")
         return True
     else:

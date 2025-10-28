@@ -255,7 +255,13 @@ class PostgreSQLRetriever(InitializableMixin):
             logger.debug(f"Unit preference: {unit_preference}")
 
             sql_query, params = self._build_query(
-                query, normalized_entities, entities, top_k, strict_sex_match, filters, unit_preference
+                query,
+                normalized_entities,
+                entities,
+                top_k,
+                strict_sex_match,
+                filters,
+                unit_preference,
             )
 
             logger.debug(f"SQL Query: {sql_query}")
@@ -322,15 +328,23 @@ class PostgreSQLRetriever(InitializableMixin):
                 ):
                     # Vérifier si conversion nécessaire
                     needs_conversion = False
-                    if unit_preference == "metric" and metric.unit_system in ["imperial", "mixed"]:
+                    if unit_preference == "metric" and metric.unit_system in [
+                        "imperial",
+                        "mixed",
+                    ]:
                         needs_conversion = True
-                    elif unit_preference == "imperial" and metric.unit_system in ["metric", "mixed"]:
+                    elif unit_preference == "imperial" and metric.unit_system in [
+                        "metric",
+                        "mixed",
+                    ]:
                         needs_conversion = True
 
                     if needs_conversion:
                         # Tenter la conversion
-                        converted_value, converted_unit = UnitConverter.convert_to_preference(
-                            metric.value_numeric, metric.unit, unit_preference
+                        converted_value, converted_unit = (
+                            UnitConverter.convert_to_preference(
+                                metric.value_numeric, metric.unit, unit_preference
+                            )
                         )
 
                         if converted_value is not None and converted_unit:
@@ -346,7 +360,9 @@ class PostgreSQLRetriever(InitializableMixin):
 
                 # Créer un contenu textuel naturel et lisible pour le LLM
                 # ✅ CORRECTION: Utiliser breed + strain pour nom complet (ex: "Cobb 500", "Ross 308")
-                full_breed_name = f"{metric.breed} {metric.strain}" if metric.breed else metric.strain
+                full_breed_name = (
+                    f"{metric.breed} {metric.strain}" if metric.breed else metric.strain
+                )
 
                 if display_value is not None:
                     # Phrase complète avec contexte
@@ -704,17 +720,40 @@ class PostgreSQLRetriever(InitializableMixin):
 
         # Mots-clés impériaux
         imperial_keywords = [
-            'pound', 'pounds', 'lb', 'lbs', 'ounce', 'ounces', 'oz',
-            'feet', 'foot', 'ft', 'inch', 'inches', 'in', 'fahrenheit'
+            "pound",
+            "pounds",
+            "lb",
+            "lbs",
+            "ounce",
+            "ounces",
+            "oz",
+            "feet",
+            "foot",
+            "ft",
+            "inch",
+            "inches",
+            "in",
+            "fahrenheit",
         ]
         if any(kw in query_lower for kw in imperial_keywords):
-            logger.info("🇺🇸 Unit preference detected: IMPERIAL (keyword found in query)")
+            logger.info(
+                "🇺🇸 Unit preference detected: IMPERIAL (keyword found in query)"
+            )
             return "imperial"
 
         # Mots-clés métriques
         metric_keywords = [
-            'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'kilo',
-            'meter', 'meters', 'cm', 'centimeter', 'celsius'
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "kilo",
+            "meter",
+            "meters",
+            "cm",
+            "centimeter",
+            "celsius",
         ]
         if any(kw in query_lower for kw in metric_keywords):
             logger.info("🌍 Unit preference detected: METRIC (keyword found in query)")
@@ -725,11 +764,15 @@ class PostgreSQLRetriever(InitializableMixin):
             for key, value in entities.items():
                 if isinstance(value, str):
                     # Chercher patterns comme "2.2kg", "5lb", etc.
-                    if re.search(r'\d+\.?\d*\s*(kg|g|gram)', value):
-                        logger.info(f"🌍 Unit preference detected: METRIC (from entity: {key}={value})")
+                    if re.search(r"\d+\.?\d*\s*(kg|g|gram)", value):
+                        logger.info(
+                            f"🌍 Unit preference detected: METRIC (from entity: {key}={value})"
+                        )
                         return "metric"
-                    if re.search(r'\d+\.?\d*\s*(lb|pound)', value):
-                        logger.info(f"🇺🇸 Unit preference detected: IMPERIAL (from entity: {key}={value})")
+                    if re.search(r"\d+\.?\d*\s*(lb|pound)", value):
+                        logger.info(
+                            f"🇺🇸 Unit preference detected: IMPERIAL (from entity: {key}={value})"
+                        )
                         return "imperial"
 
         # Par défaut: métrique (standard international aviculture)
@@ -793,16 +836,26 @@ class PostgreSQLRetriever(InitializableMixin):
 
         # Filtre métrique basé sur interprétation OpenAI OU metric_type
         metric_name = None
-        if original_entities and "metric" in original_entities and original_entities["metric"]:
+        if (
+            original_entities
+            and "metric" in original_entities
+            and original_entities["metric"]
+        ):
             metric_name = original_entities["metric"]
-        elif original_entities and "metric_type" in original_entities and original_entities["metric_type"]:
+        elif (
+            original_entities
+            and "metric_type" in original_entities
+            and original_entities["metric_type"]
+        ):
             # 🆕 Support metric_type depuis query_enricher
             metric_name = original_entities["metric_type"]
 
         # 🔧 Si metric='performance', détecter type spécifique depuis query
         if metric_name == "performance":
             query_lower = query.lower()
-            if any(kw in query_lower for kw in ["poids", "weight", "body weight", "masse"]):
+            if any(
+                kw in query_lower for kw in ["poids", "weight", "body weight", "masse"]
+            ):
                 metric_name = "weight"
             elif any(kw in query_lower for kw in ["fcr", "conversion", "indice"]):
                 metric_name = "fcr"
@@ -835,9 +888,15 @@ class PostgreSQLRetriever(InitializableMixin):
 
                 # 🔧 FILTRE: Exclure valeurs impériales mal étiquetées
                 # Pour métriques en grammes, valeurs < 10g sont probablement des pounds
-                if "body_weight" in db_pattern or "feed_intake" in db_pattern or "daily_gain" in db_pattern:
+                if (
+                    "body_weight" in db_pattern
+                    or "feed_intake" in db_pattern
+                    or "daily_gain" in db_pattern
+                ):
                     conditions.append("m.value_numeric >= 10")
-                    logger.info(f"🔧 Excluding imperial units mislabeled as grams (< 10g) for {db_pattern}")
+                    logger.info(
+                        f"🔧 Excluding imperial units mislabeled as grams (< 10g) for {db_pattern}"
+                    )
             else:
                 logger.warning(f"⚠️ Unknown metric type: {metric_name}")
 

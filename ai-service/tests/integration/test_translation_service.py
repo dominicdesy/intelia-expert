@@ -50,13 +50,23 @@ def test_translation_12_languages(translation_service):
     source_text = "chicken weight at 35 days"
     from_lang = "en"
 
-    target_languages = ["fr", "es", "de", "it", "pt", "pl", "nl", "id", "hi", "zh", "th"]
+    target_languages = [
+        "fr",
+        "es",
+        "de",
+        "it",
+        "pt",
+        "pl",
+        "nl",
+        "id",
+        "hi",
+        "zh",
+        "th",
+    ]
 
     for to_lang in target_languages:
         translated = translation_service.translate(
-            text=source_text,
-            from_lang=from_lang,
-            to_lang=to_lang
+            text=source_text, from_lang=from_lang, to_lang=to_lang
         )
 
         assert translated is not None, f"Translation to {to_lang} failed"
@@ -83,9 +93,7 @@ def test_translation_technical_terms_preservation(translation_service):
         text = f"The {term} performance is excellent"
 
         translated = translation_service.translate(
-            text=text,
-            from_lang="en",
-            to_lang="fr"
+            text=text, from_lang="en", to_lang="fr"
         )
 
         # Le terme technique doit être préservé
@@ -115,7 +123,7 @@ def test_translation_domains(translation_service):
             text="chicken weight performance",
             from_lang="en",
             to_lang="fr",
-            domain=domain
+            domain=domain,
         )
 
         assert translated is not None
@@ -145,7 +153,7 @@ def test_translation_fallback_missing_dict(translation_service):
         text="chicken weight",
         from_lang="en",
         to_lang="xx",  # Langue invalide
-        fallback=True
+        fallback=True,
     )
 
     # Devrait fallback sur le texte original ou une langue par défaut
@@ -157,11 +165,7 @@ def test_translation_fallback_missing_dict(translation_service):
 def test_translation_empty_text(translation_service):
     """Test 7: Texte vide"""
 
-    translated = translation_service.translate(
-        text="",
-        from_lang="en",
-        to_lang="fr"
-    )
+    translated = translation_service.translate(text="", from_lang="en", to_lang="fr")
 
     # Devrait retourner chaîne vide ou None
     assert translated == "" or translated is None
@@ -175,9 +179,7 @@ def test_translation_very_long_text(translation_service):
     long_text = "chicken weight performance " * 100  # Texte répété
 
     translated = translation_service.translate(
-        text=long_text,
-        from_lang="en",
-        to_lang="fr"
+        text=long_text, from_lang="en", to_lang="fr"
     )
 
     assert translated is not None
@@ -193,9 +195,7 @@ def test_translation_mixed_content(translation_service):
     mixed_text = "Ross 308 weight at 35 days is 2100g with FCR of 1.5"
 
     translated = translation_service.translate(
-        text=mixed_text,
-        from_lang="en",
-        to_lang="fr"
+        text=mixed_text, from_lang="en", to_lang="fr"
     )
 
     # Vérifier que les termes techniques et nombres sont préservés
@@ -216,15 +216,13 @@ def test_translation_batch(translation_service):
         "feed conversion ratio",
         "mortality rate",
         "water consumption",
-        "temperature control"
+        "temperature control",
     ]
 
     results = []
     for text in texts:
         translated = translation_service.translate(
-            text=text,
-            from_lang="en",
-            to_lang="fr"
+            text=text, from_lang="en", to_lang="fr"
         )
         results.append(translated)
 
@@ -239,7 +237,20 @@ def test_translation_batch(translation_service):
 def test_translation_all_supported_languages_loaded(translation_service):
     """Test 11: Vérifier que toutes les langues sont chargées"""
 
-    expected_languages = ["fr", "en", "es", "de", "it", "pt", "pl", "nl", "id", "hi", "zh", "th"]
+    expected_languages = [
+        "fr",
+        "en",
+        "es",
+        "de",
+        "it",
+        "pt",
+        "pl",
+        "nl",
+        "id",
+        "hi",
+        "zh",
+        "th",
+    ]
 
     loaded_languages = translation_service.get_loaded_languages()
 
@@ -258,16 +269,12 @@ def test_translation_roundtrip(translation_service):
 
     # EN -> FR
     translated_fr = translation_service.translate(
-        text=original,
-        from_lang="en",
-        to_lang="fr"
+        text=original, from_lang="en", to_lang="fr"
     )
 
     # FR -> EN
     back_to_en = translation_service.translate(
-        text=translated_fr,
-        from_lang="fr",
-        to_lang="en"
+        text=translated_fr, from_lang="fr", to_lang="en"
     )
 
     # Devrait être similaire (pas forcément identique)

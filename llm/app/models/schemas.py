@@ -4,22 +4,24 @@ Based on OpenAI API specification for chat completions
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal, Dict, Any
-from datetime import datetime
+from typing import List, Optional, Literal
 
 
 # ============================================
 # REQUEST MODELS
 # ============================================
 
+
 class ChatMessage(BaseModel):
     """Single message in a conversation"""
+
     role: Literal["system", "user", "assistant"]
     content: str
 
 
 class ChatCompletionRequest(BaseModel):
     """OpenAI-compatible chat completion request"""
+
     model: str = Field(default="intelia-llama-3.1-8b-aviculture")
     messages: List[ChatMessage]
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
@@ -36,14 +38,17 @@ class ChatCompletionRequest(BaseModel):
 # RESPONSE MODELS
 # ============================================
 
+
 class ChatCompletionMessage(BaseModel):
     """Message in completion response"""
+
     role: Literal["assistant"]
     content: str
 
 
 class ChatCompletionChoice(BaseModel):
     """Single choice in completion response"""
+
     index: int
     message: ChatCompletionMessage
     finish_reason: Literal["stop", "length", "content_filter"] = "stop"
@@ -51,6 +56,7 @@ class ChatCompletionChoice(BaseModel):
 
 class UsageInfo(BaseModel):
     """Token usage information"""
+
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
@@ -58,6 +64,7 @@ class UsageInfo(BaseModel):
 
 class ChatCompletionResponse(BaseModel):
     """OpenAI-compatible chat completion response"""
+
     id: str
     object: Literal["chat.completion"] = "chat.completion"
     created: int
@@ -70,8 +77,10 @@ class ChatCompletionResponse(BaseModel):
 # MODELS LIST
 # ============================================
 
+
 class ModelInfo(BaseModel):
     """Information about a model"""
+
     id: str
     object: Literal["model"] = "model"
     created: int
@@ -80,6 +89,7 @@ class ModelInfo(BaseModel):
 
 class ModelsResponse(BaseModel):
     """List of available models"""
+
     object: Literal["list"] = "list"
     data: List[ModelInfo]
 
@@ -88,8 +98,10 @@ class ModelsResponse(BaseModel):
 # HEALTH & STATUS
 # ============================================
 
+
 class HealthResponse(BaseModel):
     """Health check response"""
+
     status: Literal["healthy", "unhealthy"]
     service: str
     version: str
@@ -104,8 +116,10 @@ class HealthResponse(BaseModel):
 # ERROR RESPONSE
 # ============================================
 
+
 class ErrorDetail(BaseModel):
     """Error details"""
+
     message: str
     type: str
     code: Optional[str] = None
@@ -113,4 +127,5 @@ class ErrorDetail(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Error response"""
+
     error: ErrorDetail

@@ -13,4 +13,4 @@ Provides:
 
 from .agrovoc_service import AGROVOCService, get_agrovoc_service
 
-__all__ = ['AGROVOCService', 'get_agrovoc_service']
+__all__ = ["AGROVOCService", "get_agrovoc_service"]

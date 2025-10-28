@@ -167,7 +167,9 @@ class AdaptiveResponseLength:
         )
 
         # 🎯 ROLE-BASED ADJUSTMENT: Veterinarians need longer, technical responses
-        final_tokens = self._adjust_for_user_role(final_tokens, user_category, complexity)
+        final_tokens = self._adjust_for_user_role(
+            final_tokens, user_category, complexity
+        )
 
         logger.info(
             f"📏 Adaptive length: {final_tokens} tokens "
@@ -389,7 +391,7 @@ class AdaptiveResponseLength:
         self,
         base_tokens: int,
         user_category: Optional[str],
-        complexity: QueryComplexity
+        complexity: QueryComplexity,
     ) -> int:
         """
         Adjust token count based on user expertise level
@@ -409,7 +411,11 @@ class AdaptiveResponseLength:
             return base_tokens
 
         # 🎯 VETERINARY/TECHNICAL PROFESSIONALS: +30-50% tokens
-        if user_category in ['health_veterinary', 'feed_nutrition', 'breeding_hatchery']:
+        if user_category in [
+            "health_veterinary",
+            "feed_nutrition",
+            "breeding_hatchery",
+        ]:
             multiplier = 1.5  # 50% more tokens for detailed technical responses
             adjusted = int(base_tokens * multiplier)
 
@@ -421,7 +427,11 @@ class AdaptiveResponseLength:
             return min(adjusted, 2000)
 
         # 📊 MANAGEMENT/STRATEGIC: +20-30% tokens (need analysis + recommendations)
-        elif user_category in ['management_oversight', 'equipment_technology', 'processing']:
+        elif user_category in [
+            "management_oversight",
+            "equipment_technology",
+            "processing",
+        ]:
             multiplier = 1.3
             adjusted = int(base_tokens * multiplier)
 
@@ -432,10 +442,8 @@ class AdaptiveResponseLength:
             return min(adjusted, 1800)
 
         # 👨‍🌾 FARM OPERATORS: Keep concise and actionable (no adjustment)
-        elif user_category == 'farm_operations':
-            logger.debug(
-                f"👨‍🌾 Producer role: keeping concise at {base_tokens} tokens"
-            )
+        elif user_category == "farm_operations":
+            logger.debug(f"👨‍🌾 Producer role: keeping concise at {base_tokens} tokens")
             return base_tokens
 
         # Generic/unknown: no adjustment

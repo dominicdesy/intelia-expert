@@ -176,7 +176,7 @@ Return a JSON object with this EXACT structure:
         self,
         openai_api_key: Optional[str] = None,
         model: str = "gpt-4o-mini",
-        cache_enabled: bool = True
+        cache_enabled: bool = True,
     ):
         """
         Initialize LLM-based query classifier
@@ -191,13 +191,11 @@ Return a JSON object with this EXACT structure:
         self.cache_enabled = cache_enabled
         self.cache = {}  # Simple cache: (query, language) → classification
 
-        logger.info(f"✅ LLMQueryClassifier initialized with model={model}, cache={cache_enabled}")
+        logger.info(
+            f"✅ LLMQueryClassifier initialized with model={model}, cache={cache_enabled}"
+        )
 
-    def classify(
-        self,
-        query: str,
-        language: str = "fr"
-    ) -> Dict[str, Any]:
+    def classify(self, query: str, language: str = "fr") -> Dict[str, Any]:
         """
         Classifie une query et retourne structured classification
 
@@ -224,22 +222,22 @@ Return a JSON object with this EXACT structure:
 
         try:
             # Build prompt
-            prompt = self.CLASSIFICATION_PROMPT.format(
-                query=query,
-                language=language
-            )
+            prompt = self.CLASSIFICATION_PROMPT.format(query=query, language=language)
 
             # Call OpenAI with JSON mode
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a query classifier. Always respond with valid JSON."},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "You are a query classifier. Always respond with valid JSON.",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 response_format={"type": "json_object"},  # Force JSON output
                 temperature=0.1,  # Bas pour cohérence
-                max_tokens=500,   # Suffisant pour structured output
-                timeout=10.0      # 10s timeout
+                max_tokens=500,  # Suffisant pour structured output
+                timeout=10.0,  # 10s timeout
             )
 
             # Parse JSON response
@@ -271,7 +269,9 @@ Return a JSON object with this EXACT structure:
             logger.error(f"❌ LLM classification error: {e}")
             return self._fallback_classification(query, language)
 
-    def _validate_classification(self, classification: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_classification(
+        self, classification: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Valide et normalise la structure de classification
 
@@ -288,16 +288,16 @@ Return a JSON object with this EXACT structure:
             "requirements": {
                 "needs_breed": False,
                 "needs_age": False,
-                "needs_sex": False
+                "needs_sex": False,
             },
             "routing": {
                 "target": "weaviate",
                 "confidence": 0.5,
-                "reason": "default routing"
+                "reason": "default routing",
             },
             "missing_entities": [],
             "is_complete": True,
-            "clarification_message": None
+            "clarification_message": None,
         }
 
         # Merge with defaults
@@ -361,16 +361,16 @@ Return a JSON object with this EXACT structure:
             "requirements": {
                 "needs_breed": False,
                 "needs_age": False,
-                "needs_sex": False
+                "needs_sex": False,
             },
             "routing": {
                 "target": "weaviate",
                 "confidence": 0.3,
-                "reason": "fallback - LLM classification failed"
+                "reason": "fallback - LLM classification failed",
             },
             "missing_entities": [],
             "is_complete": True,
-            "clarification_message": None
+            "clarification_message": None,
         }
 
     def clear_cache(self):
@@ -388,8 +388,7 @@ _llm_classifier_instance = None
 
 
 def get_llm_query_classifier(
-    openai_api_key: Optional[str] = None,
-    model: str = "gpt-4o-mini"
+    openai_api_key: Optional[str] = None, model: str = "gpt-4o-mini"
 ) -> LLMQueryClassifier:
     """
     Récupère l'instance singleton du LLMQueryClassifier
@@ -405,8 +404,7 @@ def get_llm_query_classifier(
 
     if _llm_classifier_instance is None:
         _llm_classifier_instance = LLMQueryClassifier(
-            openai_api_key=openai_api_key,
-            model=model
+            openai_api_key=openai_api_key, model=model
         )
 
     return _llm_classifier_instance

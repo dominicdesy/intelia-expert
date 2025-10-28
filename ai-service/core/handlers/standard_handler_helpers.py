@@ -143,9 +143,9 @@ async def generate_response_with_generator(
             logger.error(f"Erreur validation qualité: {val_err}")
 
         # 🧠 Retrieve CoT sections from generator (if available)
-        cot_thinking = getattr(response_generator, 'last_cot_thinking', None)
-        cot_analysis = getattr(response_generator, 'last_cot_analysis', None)
-        has_cot_structure = getattr(response_generator, 'last_has_cot_structure', False)
+        cot_thinking = getattr(response_generator, "last_cot_thinking", None)
+        cot_analysis = getattr(response_generator, "last_cot_analysis", None)
+        has_cot_structure = getattr(response_generator, "last_has_cot_structure", False)
 
         return response, cot_thinking, cot_analysis, has_cot_structure
 

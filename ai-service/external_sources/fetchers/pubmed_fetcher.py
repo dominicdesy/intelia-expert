@@ -38,15 +38,12 @@ class PubMedFetcher(BaseFetcher):
             base_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils",
             rate_limit=10.0 if api_key else 3.0,  # 10/s with key, 3/s without
             timeout=30,
-            max_retries=3
+            max_retries=3,
         )
         self.api_key = api_key
 
     async def _make_request(
-        self,
-        query: str,
-        max_results: int,
-        min_year: int
+        self, query: str, max_results: int, min_year: int
     ) -> Dict[str, Any]:
         """
         Make request to PubMed E-utilities API
@@ -68,7 +65,9 @@ class PubMedFetcher(BaseFetcher):
         poultry_terms = "(poultry[Title/Abstract] OR chicken[Title/Abstract] OR broiler[Title/Abstract] OR layer[Title/Abstract] OR avian[Title/Abstract])"
         exclude_terms = "NOT (cattle[Title/Abstract] OR bovine[Title/Abstract] OR cow[Title/Abstract] OR dairy[Title/Abstract] OR pig[Title/Abstract] OR swine[Title/Abstract])"
 
-        search_query = f"{query} AND {poultry_terms} {exclude_terms} AND {min_year}:3000[DP]"
+        search_query = (
+            f"{query} AND {poultry_terms} {exclude_terms} AND {min_year}:3000[DP]"
+        )
 
         search_url = f"{self.base_url}/esearch.fcgi"
         search_params = {
@@ -76,7 +75,7 @@ class PubMedFetcher(BaseFetcher):
             "term": search_query,
             "retmax": min(max_results, 100),  # API limit
             "retmode": "json",
-            "sort": "relevance"
+            "sort": "relevance",
         }
 
         if self.api_key:
@@ -96,11 +95,7 @@ class PubMedFetcher(BaseFetcher):
 
         # Step 2: EFetch - Get full metadata for PMIDs
         fetch_url = f"{self.base_url}/efetch.fcgi"
-        fetch_params = {
-            "db": "pubmed",
-            "id": ",".join(pmids),
-            "retmode": "xml"
-        }
+        fetch_params = {"db": "pubmed", "id": ",".join(pmids), "retmode": "xml"}
 
         if self.api_key:
             fetch_params["api_key"] = self.api_key
@@ -114,15 +109,10 @@ class PubMedFetcher(BaseFetcher):
         # Parse XML response
         xml_content = fetch_response.text
 
-        return {
-            "pmids": pmids,
-            "xml_content": xml_content
-        }
+        return {"pmids": pmids, "xml_content": xml_content}
 
     def _parse_response(
-        self,
-        response: Dict[str, Any],
-        query: str
+        self, response: Dict[str, Any], query: str
     ) -> List[ExternalDocument]:
         """
         Parse PubMed XML response
@@ -218,7 +208,7 @@ class PubMedFetcher(BaseFetcher):
                     pmid=pmid,
                     citation_count=0,  # PubMed doesn't provide citation counts
                     journal=journal,
-                    language="en"
+                    language="en",
                 )
 
                 documents.append(doc)

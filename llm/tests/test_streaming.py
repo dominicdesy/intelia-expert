@@ -12,7 +12,6 @@ import asyncio
 import httpx
 import json
 import time
-from typing import AsyncIterator
 
 
 async def test_streaming_generation():
@@ -27,7 +26,7 @@ async def test_streaming_generation():
         "domain": "aviculture",
         "language": "en",
         "query_type": "genetics_performance",
-        "post_process": True
+        "post_process": True,
     }
 
     print("=" * 80)
@@ -70,13 +69,13 @@ async def test_streaming_generation():
 
                         # Handle different event types
                         if event_type == "start":
-                            print(f"\n🚀 START EVENT:")
+                            print("\n🚀 START EVENT:")
                             print(f"   Status: {data.get('status')}")
                             print(f"   Complexity: {data.get('complexity')}")
                             print(f"   Max Tokens: {data.get('max_tokens')}")
                             print(f"   Provider: {data.get('provider')}")
                             print(f"   Model: {data.get('model')}")
-                            print(f"\n📦 STREAMING CHUNKS:")
+                            print("\n📦 STREAMING CHUNKS:")
 
                         elif event_type == "chunk":
                             chunk_count += 1
@@ -90,7 +89,7 @@ async def test_streaming_generation():
                                 print(f"\n   ⚡ FIRST CHUNK at {elapsed_ms}ms")
 
                             # Print chunk (truncate if too long)
-                            chunk_display = content[:80].replace('\n', '\\n')
+                            chunk_display = content[:80].replace("\n", "\\n")
                             if len(content) > 80:
                                 chunk_display += "..."
                             print(f"   {chunk_count:3d}. {chunk_display}")
@@ -98,36 +97,52 @@ async def test_streaming_generation():
                         elif event_type == "end":
                             end_time = time.time()
                             total_ms = int((end_time - start_time) * 1000)
-                            first_chunk_ms = int((first_chunk_time - start_time) * 1000) if first_chunk_time else 0
+                            first_chunk_ms = (
+                                int((first_chunk_time - start_time) * 1000)
+                                if first_chunk_time
+                                else 0
+                            )
 
-                            print(f"\n✅ END EVENT:")
+                            print("\n✅ END EVENT:")
                             print(f"   Status: {data.get('status')}")
                             print(f"   Prompt Tokens: {data.get('prompt_tokens')}")
-                            print(f"   Completion Tokens: {data.get('completion_tokens')}")
+                            print(
+                                f"   Completion Tokens: {data.get('completion_tokens')}"
+                            )
                             print(f"   Total Tokens: {data.get('total_tokens')}")
                             print(f"   Complexity: {data.get('complexity')}")
-                            print(f"   Calculated Max Tokens: {data.get('calculated_max_tokens')}")
+                            print(
+                                f"   Calculated Max Tokens: {data.get('calculated_max_tokens')}"
+                            )
                             print(f"   Post-Processed: {data.get('post_processed')}")
-                            print(f"   Disclaimer Added: {data.get('disclaimer_added')}")
+                            print(
+                                f"   Disclaimer Added: {data.get('disclaimer_added')}"
+                            )
 
-                            print(f"\n⏱️ TIMING RESULTS:")
+                            print("\n⏱️ TIMING RESULTS:")
                             print(f"   First Chunk: {first_chunk_ms}ms ⚡")
                             print(f"   Total Time: {total_ms}ms")
                             print(f"   Chunks Received: {chunk_count}")
-                            print(f"   Avg Time/Chunk: {total_ms // chunk_count if chunk_count > 0 else 0}ms")
+                            print(
+                                f"   Avg Time/Chunk: {total_ms // chunk_count if chunk_count > 0 else 0}ms"
+                            )
 
                             # Calculate improvement
                             baseline = 5000  # Non-streaming baseline
                             improvement = ((baseline - first_chunk_ms) / baseline) * 100
-                            print(f"\n🎯 PERCEIVED LATENCY IMPROVEMENT: {improvement:.1f}%")
-                            print(f"   (Baseline: {baseline}ms → Streaming: {first_chunk_ms}ms)")
+                            print(
+                                f"\n🎯 PERCEIVED LATENCY IMPROVEMENT: {improvement:.1f}%"
+                            )
+                            print(
+                                f"   (Baseline: {baseline}ms → Streaming: {first_chunk_ms}ms)"
+                            )
 
                         elif event_type == "error":
-                            print(f"\n❌ ERROR EVENT:")
+                            print("\n❌ ERROR EVENT:")
                             print(f"   Error: {data.get('error')}")
                             return False
 
-        print(f"\n" + "=" * 80)
+        print("\n" + "=" * 80)
         print("📄 FULL RESPONSE:")
         print("=" * 80)
         print(full_response)
@@ -140,10 +155,12 @@ async def test_streaming_generation():
 
         first_chunk_ms = int((first_chunk_time - start_time) * 1000)
         if first_chunk_ms > 2000:
-            print(f"\n⚠️ WARNING: First chunk took {first_chunk_ms}ms (expected < 2000ms)")
+            print(
+                f"\n⚠️ WARNING: First chunk took {first_chunk_ms}ms (expected < 2000ms)"
+            )
             print("   This might indicate cold start or network issues")
 
-        print(f"\n✅ TEST PASSED: Streaming working correctly!")
+        print("\n✅ TEST PASSED: Streaming working correctly!")
         return True
 
     except httpx.HTTPStatusError as e:
@@ -154,6 +171,7 @@ async def test_streaming_generation():
     except Exception as e:
         print(f"\n❌ TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -169,7 +187,7 @@ async def test_non_streaming_comparison():
         "domain": "aviculture",
         "language": "en",
         "query_type": "genetics_performance",
-        "post_process": True
+        "post_process": True,
     }
 
     print("\n" + "=" * 80)
@@ -188,11 +206,11 @@ async def test_non_streaming_comparison():
 
             data = response.json()
 
-            print(f"\n⏱️ TIMING RESULTS:")
+            print("\n⏱️ TIMING RESULTS:")
             print(f"   Total Time: {total_ms}ms")
             print(f"   (User waits {total_ms}ms before seeing anything)")
 
-            print(f"\n📊 RESPONSE METADATA:")
+            print("\n📊 RESPONSE METADATA:")
             print(f"   Provider: {data.get('provider')}")
             print(f"   Model: {data.get('model')}")
             print(f"   Total Tokens: {data.get('total_tokens')}")
@@ -234,10 +252,12 @@ async def main():
         print("❌ Streaming endpoint: FAILED")
 
     if non_streaming_ms:
-        print(f"\n⏱️ Latency Comparison:")
-        print(f"   Non-streaming: User waits {non_streaming_ms}ms for complete response")
-        print(f"   Streaming: User sees first token in ~300-500ms")
-        print(f"   UX Improvement: ~90% reduction in perceived latency")
+        print("\n⏱️ Latency Comparison:")
+        print(
+            f"   Non-streaming: User waits {non_streaming_ms}ms for complete response"
+        )
+        print("   Streaming: User sees first token in ~300-500ms")
+        print("   UX Improvement: ~90% reduction in perceived latency")
 
     print("\n" + "=" * 80)
 

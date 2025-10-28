@@ -25,42 +25,37 @@ class UnitConverter:
     # Tables de conversion (multiplicateur vers unité cible)
     CONVERSIONS = {
         # Poids
-        ('pounds', 'kilograms'): 0.453592,
-        ('pounds', 'grams'): 453.592,
-        ('lb', 'kg'): 0.453592,
-        ('lb', 'g'): 453.592,
-        ('lbs', 'kg'): 0.453592,
-        ('lbs', 'grams'): 453.592,
-        ('ounces', 'grams'): 28.3495,
-        ('oz', 'g'): 28.3495,
-
+        ("pounds", "kilograms"): 0.453592,
+        ("pounds", "grams"): 453.592,
+        ("lb", "kg"): 0.453592,
+        ("lb", "g"): 453.592,
+        ("lbs", "kg"): 0.453592,
+        ("lbs", "grams"): 453.592,
+        ("ounces", "grams"): 28.3495,
+        ("oz", "g"): 28.3495,
         # Inverse poids
-        ('kilograms', 'pounds'): 2.20462,
-        ('grams', 'pounds'): 0.00220462,
-        ('kg', 'lb'): 2.20462,
-        ('g', 'lb'): 0.00220462,
-        ('grams', 'ounces'): 0.035274,
-        ('g', 'oz'): 0.035274,
-
+        ("kilograms", "pounds"): 2.20462,
+        ("grams", "pounds"): 0.00220462,
+        ("kg", "lb"): 2.20462,
+        ("g", "lb"): 0.00220462,
+        ("grams", "ounces"): 0.035274,
+        ("g", "oz"): 0.035274,
         # Longueur
-        ('inches', 'centimeters'): 2.54,
-        ('inch', 'cm'): 2.54,
-        ('in', 'cm'): 2.54,
-        ('feet', 'meters'): 0.3048,
-        ('foot', 'meters'): 0.3048,
-        ('ft', 'm'): 0.3048,
-
+        ("inches", "centimeters"): 2.54,
+        ("inch", "cm"): 2.54,
+        ("in", "cm"): 2.54,
+        ("feet", "meters"): 0.3048,
+        ("foot", "meters"): 0.3048,
+        ("ft", "m"): 0.3048,
         # Inverse longueur
-        ('centimeters', 'inches'): 0.393701,
-        ('cm', 'in'): 0.393701,
-        ('meters', 'feet'): 3.28084,
-        ('m', 'ft'): 3.28084,
+        ("centimeters", "inches"): 0.393701,
+        ("cm", "in"): 0.393701,
+        ("meters", "feet"): 3.28084,
+        ("m", "ft"): 3.28084,
     }
 
     @classmethod
-    def convert(
-        cls, value: float, from_unit: str, to_unit: str
-    ) -> Optional[float]:
+    def convert(cls, value: float, from_unit: str, to_unit: str) -> Optional[float]:
         """
         Convertit une valeur d'une unité vers une autre.
 
@@ -90,9 +85,17 @@ class UnitConverter:
             return value
 
         # Cas spécial: température (formule différente)
-        if from_unit_norm in ['fahrenheit', 'f', '°f'] and to_unit_norm in ['celsius', 'c', '°c']:
+        if from_unit_norm in ["fahrenheit", "f", "°f"] and to_unit_norm in [
+            "celsius",
+            "c",
+            "°c",
+        ]:
             return cls._fahrenheit_to_celsius(value)
-        if from_unit_norm in ['celsius', 'c', '°c'] and to_unit_norm in ['fahrenheit', 'f', '°f']:
+        if from_unit_norm in ["celsius", "c", "°c"] and to_unit_norm in [
+            "fahrenheit",
+            "f",
+            "°f",
+        ]:
             return cls._celsius_to_fahrenheit(value)
 
         # Chercher dans la table de conversion
@@ -106,9 +109,7 @@ class UnitConverter:
             return converted
 
         # Conversion non supportée
-        logger.warning(
-            f"Conversion not supported: {from_unit} → {to_unit}"
-        )
+        logger.warning(f"Conversion not supported: {from_unit} → {to_unit}")
         return None
 
     @staticmethod
@@ -144,16 +145,26 @@ class UnitConverter:
             return True
 
         # Température
-        if from_unit_norm in ['fahrenheit', 'f', '°f'] and to_unit_norm in ['celsius', 'c', '°c']:
+        if from_unit_norm in ["fahrenheit", "f", "°f"] and to_unit_norm in [
+            "celsius",
+            "c",
+            "°c",
+        ]:
             return True
-        if from_unit_norm in ['celsius', 'c', '°c'] and to_unit_norm in ['fahrenheit', 'f', '°f']:
+        if from_unit_norm in ["celsius", "c", "°c"] and to_unit_norm in [
+            "fahrenheit",
+            "f",
+            "°f",
+        ]:
             return True
 
         # Table de conversion
         return (from_unit_norm, to_unit_norm) in cls.CONVERSIONS
 
     @classmethod
-    def get_canonical_unit(cls, unit: str, unit_system: str = "metric") -> Optional[str]:
+    def get_canonical_unit(
+        cls, unit: str, unit_system: str = "metric"
+    ) -> Optional[str]:
         """
         Retourne l'unité canonique pour un système donné.
 
@@ -174,38 +185,63 @@ class UnitConverter:
 
         if unit_system == "metric":
             # Mapper vers unités métriques
-            if unit_norm in ['pounds', 'lb', 'lbs']:
-                return 'kilograms'
-            if unit_norm in ['ounces', 'oz']:
-                return 'grams'
-            if unit_norm in ['inches', 'inch', 'in']:
-                return 'centimeters'
-            if unit_norm in ['feet', 'foot', 'ft']:
-                return 'meters'
-            if unit_norm in ['fahrenheit', 'f', '°f']:
-                return 'celsius'
+            if unit_norm in ["pounds", "lb", "lbs"]:
+                return "kilograms"
+            if unit_norm in ["ounces", "oz"]:
+                return "grams"
+            if unit_norm in ["inches", "inch", "in"]:
+                return "centimeters"
+            if unit_norm in ["feet", "foot", "ft"]:
+                return "meters"
+            if unit_norm in ["fahrenheit", "f", "°f"]:
+                return "celsius"
             # Déjà métrique
-            if unit_norm in ['grams', 'g', 'kilograms', 'kg', 'cm', 'mm', 'meters', 'm', 'celsius', 'c', '°c']:
+            if unit_norm in [
+                "grams",
+                "g",
+                "kilograms",
+                "kg",
+                "cm",
+                "mm",
+                "meters",
+                "m",
+                "celsius",
+                "c",
+                "°c",
+            ]:
                 return unit_norm
 
         elif unit_system == "imperial":
             # Mapper vers unités impériales
-            if unit_norm in ['kilograms', 'kg']:
-                return 'pounds'
-            if unit_norm in ['grams', 'g']:
-                return 'ounces'
-            if unit_norm in ['centimeters', 'cm', 'millimeters', 'mm']:
-                return 'inches'
-            if unit_norm in ['meters', 'm']:
-                return 'feet'
-            if unit_norm in ['celsius', 'c', '°c']:
-                return 'fahrenheit'
+            if unit_norm in ["kilograms", "kg"]:
+                return "pounds"
+            if unit_norm in ["grams", "g"]:
+                return "ounces"
+            if unit_norm in ["centimeters", "cm", "millimeters", "mm"]:
+                return "inches"
+            if unit_norm in ["meters", "m"]:
+                return "feet"
+            if unit_norm in ["celsius", "c", "°c"]:
+                return "fahrenheit"
             # Déjà impérial
-            if unit_norm in ['pounds', 'lb', 'lbs', 'ounces', 'oz', 'inches', 'in', 'feet', 'ft', 'fahrenheit', 'f', '°f']:
+            if unit_norm in [
+                "pounds",
+                "lb",
+                "lbs",
+                "ounces",
+                "oz",
+                "inches",
+                "in",
+                "feet",
+                "ft",
+                "fahrenheit",
+                "f",
+                "°f",
+            ]:
                 return unit_norm
 
         # Unités neutres (pourcentage, jours) - pas de conversion
-        if unit_norm in ['percentage', '%', 'days', 'day', 'j', 'jours']:
+        if unit_norm in ["percentage", "%", "days", "day", "j", "jours"]:
             return unit_norm
 
         return None
@@ -237,7 +273,9 @@ class UnitConverter:
         # Déterminer l'unité cible canonique
         target_unit = cls.get_canonical_unit(current_unit, unit_preference)
         if not target_unit:
-            logger.warning(f"No canonical unit for '{current_unit}' in {unit_preference} system")
+            logger.warning(
+                f"No canonical unit for '{current_unit}' in {unit_preference} system"
+            )
             return value, current_unit  # Retourner tel quel
 
         # Si déjà dans la bonne unité

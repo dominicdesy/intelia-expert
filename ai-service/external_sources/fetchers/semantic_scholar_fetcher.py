@@ -37,14 +37,11 @@ class SemanticScholarFetcher(BaseFetcher):
             base_url="https://api.semanticscholar.org/graph/v1",
             rate_limit=10.0,  # 10 requests/second
             timeout=30,
-            max_retries=3
+            max_retries=3,
         )
 
     async def _make_request(
-        self,
-        query: str,
-        max_results: int,
-        min_year: int
+        self, query: str, max_results: int, min_year: int
     ) -> Dict[str, Any]:
         """
         Make request to Semantic Scholar API
@@ -70,7 +67,7 @@ class SemanticScholarFetcher(BaseFetcher):
             "query": search_query,
             "limit": min(max_results, 100),  # API max is 100
             "fields": "title,abstract,authors,year,citationCount,url,externalIds,venue,publicationTypes",
-            "year": f"{min_year}-"  # Filter by year
+            "year": f"{min_year}-",  # Filter by year
         }
 
         response = await self.client.get(url, params=params)
@@ -79,9 +76,7 @@ class SemanticScholarFetcher(BaseFetcher):
         return response.json()
 
     def _parse_response(
-        self,
-        response: Dict[str, Any],
-        query: str
+        self, response: Dict[str, Any], query: str
     ) -> List[ExternalDocument]:
         """
         Parse Semantic Scholar API response
@@ -140,7 +135,7 @@ class SemanticScholarFetcher(BaseFetcher):
                     pmcid=pmcid,
                     citation_count=citation_count,
                     journal=venue,
-                    language="en"  # Semantic Scholar is primarily English
+                    language="en",  # Semantic Scholar is primarily English
                 )
 
                 documents.append(doc)

@@ -29,41 +29,37 @@ def analyze_routing_gaps():
         ("Même chose pour le Hubbard?", "CONTEXT_REQUIRED", "metrics"),
         ("À cet âge-là?", "CONTEXT_REQUIRED", "metrics"),
         ("Pour cette race?", "CONTEXT_REQUIRED", "metrics"),
-
         # Questions ambiguës (unités/métriques implicites)
         ("Performance à 35 jours", "AMBIGUOUS", "metrics"),
         ("Résultats Cobb 500", "AMBIGUOUS", "metrics"),
         ("Données de croissance", "AMBIGUOUS", "metrics"),
         ("Les chiffres", "AMBIGUOUS", "metrics"),
-
         # Questions nécessitant calculs
         ("Écart entre Ross et Cobb", "CALCULATION", "metrics"),
         ("Différence de FCR", "CALCULATION", "metrics"),
         ("Gain comparé au standard", "CALCULATION", "metrics"),
         ("Combien de plus que la cible?", "CALCULATION", "metrics"),
-
         # Questions très courtes
         ("Poids?", "TOO_SHORT", "metrics"),
         ("FCR", "TOO_SHORT", "metrics"),
         ("Newcastle", "TOO_SHORT", "knowledge"),
         ("Traitement?", "TOO_SHORT", "knowledge"),
-
         # Questions complexes multi-critères
-        ("Impact nutrition et température sur FCR males Ross 308", "MULTI_CRITERIA", "hybrid"),
+        (
+            "Impact nutrition et température sur FCR males Ross 308",
+            "MULTI_CRITERIA",
+            "hybrid",
+        ),
         ("Relation densité mortalité selon breed", "MULTI_CRITERIA", "hybrid"),
         ("Performance selon climat et alimentation", "MULTI_CRITERIA", "hybrid"),
     ]
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("ANALYSE DES GAPS POUR ATTEINDRE 100% DE COUVERTURE")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     # Statistiques
-    stats = {
-        "metrics": 0,
-        "knowledge": 0,
-        "hybrid": 0
-    }
+    stats = {"metrics": 0, "knowledge": 0, "hybrid": 0}
 
     gaps_by_type = {}
     correct_routing = 0
@@ -76,20 +72,24 @@ def analyze_routing_gaps():
         if gap_type not in gaps_by_type:
             gaps_by_type[gap_type] = []
 
-        is_correct = (result.value == expected)
+        is_correct = result.value == expected
         if is_correct:
             correct_routing += 1
 
-        gaps_by_type[gap_type].append({
-            "query": query,
-            "routed_to": result.value,
-            "expected": expected,
-            "correct": is_correct
-        })
+        gaps_by_type[gap_type].append(
+            {
+                "query": query,
+                "routed_to": result.value,
+                "expected": expected,
+                "correct": is_correct,
+            }
+        )
 
     # Résultats globaux
     accuracy = (correct_routing / total) * 100
-    print(f"📊 PRÉCISION ACTUELLE SUR CAS DIFFICILES: {correct_routing}/{total} ({accuracy:.1f}%)\n")
+    print(
+        f"📊 PRÉCISION ACTUELLE SUR CAS DIFFICILES: {correct_routing}/{total} ({accuracy:.1f}%)\n"
+    )
 
     print("DISTRIBUTION DES ROUTING:")
     for route_type, count in stats.items():
@@ -97,9 +97,9 @@ def analyze_routing_gaps():
         print(f"   {route_type:12} : {count:2}/{total} ({pct:5.1f}%)")
 
     # Gaps par catégorie
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("GAPS PAR CATÉGORIE")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     for gap_type, queries in gaps_by_type.items():
         correct = sum(1 for q in queries if q["correct"])
@@ -108,12 +108,14 @@ def analyze_routing_gaps():
         print(f"\n🔴 {gap_type} ({correct}/{len(queries)} correct, {accuracy:.0f}%):")
         for item in queries:
             status = "✅" if item["correct"] else "❌"
-            print(f"   {status} \"{item['query']}\" → {item['routed_to']} (expected: {item['expected']})")
+            print(
+                f"   {status} \"{item['query']}\" → {item['routed_to']} (expected: {item['expected']})"
+            )
 
     # Recommandations
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("ROADMAP VERS 100% DE COUVERTURE")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     recommendations = {
         "CONTEXT_REQUIRED": {
@@ -123,8 +125,8 @@ def analyze_routing_gaps():
                 "Créer ContextManager pour stocker dernier contexte (breed, age, sex)",
                 "Détecter pronouns/démonstratifs (femelles, lui, ça, cette race)",
                 "Résoudre coréférences via contexte conversation",
-                "Expandre query: 'Et pour femelles?' → 'Poids femelles Ross 308 35j'"
-            ]
+                "Expandre query: 'Et pour femelles?' → 'Poids femelles Ross 308 35j'",
+            ],
         },
         "AMBIGUOUS": {
             "priority": "🟡 MOYEN",
@@ -133,8 +135,8 @@ def analyze_routing_gaps():
                 "Module Clarification: demander précision utilisateur",
                 "Enrichissement sémantique via embeddings",
                 "Mapper 'performance' → [poids, FCR, gain, mortalité]",
-                "LLM expansion pour termes vagues"
-            ]
+                "LLM expansion pour termes vagues",
+            ],
         },
         "CALCULATION": {
             "priority": "🟢 FAIBLE",
@@ -143,8 +145,8 @@ def analyze_routing_gaps():
                 "Ajouter QueryType.CALCULATION",
                 "Router vers PostgreSQL + post-processing calculs",
                 "Détecter patterns: 'écart', 'différence', 'comparé à', 'de plus'",
-                "Extraire entités à comparer (Ross vs Cobb)"
-            ]
+                "Extraire entités à comparer (Ross vs Cobb)",
+            ],
         },
         "TOO_SHORT": {
             "priority": "🟡 MOYEN",
@@ -153,8 +155,8 @@ def analyze_routing_gaps():
                 "LLM expansion: 'FCR' → 'Quel est le FCR?'",
                 "Utiliser contexte conversation pour enrichir",
                 "Heuristiques: 'poids?' → METRICS, 'Newcastle' → KNOWLEDGE",
-                "Fallback intelligent selon historique"
-            ]
+                "Fallback intelligent selon historique",
+            ],
         },
         "MULTI_CRITERIA": {
             "priority": "🟢 FAIBLE",
@@ -163,9 +165,9 @@ def analyze_routing_gaps():
                 "Décomposer en sous-requêtes via LLM",
                 "Router chaque critère séparément",
                 "Agréger résultats avec orchestration LLM",
-                "Toujours utiliser HYBRID pour multi-critères"
-            ]
-        }
+                "Toujours utiliser HYBRID pour multi-critères",
+            ],
+        },
     }
 
     for gap_type, info in recommendations.items():
@@ -174,9 +176,9 @@ def analyze_routing_gaps():
             print(f"   {i}. {solution}")
 
     # Plan d'action
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("PLAN D'ACTION PRIORISÉ")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     action_plan = [
         {
@@ -185,10 +187,10 @@ def analyze_routing_gaps():
                 "✅ Enrichir keywords METRICS/KNOWLEDGE (FAIT)",
                 "✅ Ajouter LLM fallback Layer 2 (FAIT)",
                 "🔲 Implémenter ContextManager pour multi-turn",
-                "🔲 Ajouter heuristiques pour questions courtes"
+                "🔲 Ajouter heuristiques pour questions courtes",
             ],
             "impact": "92% → 96%",
-            "effort": "2-3 jours"
+            "effort": "2-3 jours",
         },
         {
             "phase": "Phase 2 - Intelligence Sémantique (Moyen terme)",
@@ -196,10 +198,10 @@ def analyze_routing_gaps():
                 "🔲 Module Clarification pour questions ambiguës",
                 "🔲 Enrichissement sémantique via embeddings",
                 "🔲 LLM expansion pour questions courtes/vagues",
-                "🔲 QueryType.CALCULATION avec post-processing"
+                "🔲 QueryType.CALCULATION avec post-processing",
             ],
             "impact": "96% → 98%",
-            "effort": "1-2 semaines"
+            "effort": "1-2 semaines",
         },
         {
             "phase": "Phase 3 - Orchestration Avancée (Long terme)",
@@ -207,11 +209,11 @@ def analyze_routing_gaps():
                 "🔲 Décomposition multi-critères via LLM",
                 "🔲 Graph de connaissances breed-metrics",
                 "🔲 Fine-tuning modèle avicole spécifique",
-                "🔲 Monitoring & amélioration continue"
+                "🔲 Monitoring & amélioration continue",
             ],
             "impact": "98% → 99.5%+",
-            "effort": "1 mois+"
-        }
+            "effort": "1 mois+",
+        },
     ]
 
     for phase_info in action_plan:
@@ -221,9 +223,9 @@ def analyze_routing_gaps():
             print(f"      {task}")
 
     # Estimation finale
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("ESTIMATION COUVERTURE FINALE")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     coverage_estimate = """
 État actuel (v2.0):

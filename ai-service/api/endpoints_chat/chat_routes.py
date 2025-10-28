@@ -20,10 +20,9 @@ from fastapi.responses import StreamingResponse, JSONResponse
 
 from config.config import BASE_PATH, MAX_REQUEST_SIZE
 from utils.utilities import (
-    safe_get_attribute,
     detect_language_enhanced,
 )
-from ..endpoints import safe_serialize_for_json, metrics_collector
+from ..endpoints import metrics_collector
 from ..chat_handlers import ChatHandlers
 
 # NOUVEAU: Import du monitoring
@@ -56,7 +55,7 @@ async def check_user_quota(user_email: str, auth_token: str) -> dict:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(
                 f"{BACKEND_API_URL}/v1/usage/check",
-                headers={"Authorization": f"Bearer {auth_token}"}
+                headers={"Authorization": f"Bearer {auth_token}"},
             )
 
             if response.status_code == 200:
@@ -71,21 +70,33 @@ async def check_user_quota(user_email: str, auth_token: str) -> dict:
                         detail={
                             "error": "quota_exceeded",
                             "message": "Vous avez atteint votre limite mensuelle de questions.",
-                            "quota": quota_info
-                        }
+                            "quota": quota_info,
+                        },
                     )
 
                 return quota_info
 
             elif response.status_code == 401:
-                logger.warning(f"Authentification invalide pour quota check: {user_email}")
+                logger.warning(
+                    f"Authentification invalide pour quota check: {user_email}"
+                )
                 # En cas d'erreur d'auth, laisser passer (fail-open)
-                return {"can_ask": True, "quota_enforcement": False, "error": "auth_failed"}
+                return {
+                    "can_ask": True,
+                    "quota_enforcement": False,
+                    "error": "auth_failed",
+                }
 
             else:
-                logger.error(f"Erreur quota check API: {response.status_code} - {response.text}")
+                logger.error(
+                    f"Erreur quota check API: {response.status_code} - {response.text}"
+                )
                 # En cas d'erreur API, laisser passer (fail-open)
-                return {"can_ask": True, "quota_enforcement": False, "error": "api_error"}
+                return {
+                    "can_ask": True,
+                    "quota_enforcement": False,
+                    "error": "api_error",
+                }
 
     except httpx.TimeoutException:
         logger.warning("Timeout lors du quota check - laisser passer")
@@ -98,7 +109,9 @@ async def check_user_quota(user_email: str, auth_token: str) -> dict:
         return {"can_ask": True, "quota_enforcement": False, "error": str(e)}
 
 
-async def increment_user_quota(user_email: str, auth_token: str, success: bool = True) -> None:
+async def increment_user_quota(
+    user_email: str, auth_token: str, success: bool = True
+) -> None:
     """
     Incrémente le compteur de questions de l'utilisateur.
 
@@ -114,7 +127,7 @@ async def increment_user_quota(user_email: str, auth_token: str, success: bool =
             response = await client.post(
                 f"{BACKEND_API_URL}/v1/usage/increment",
                 headers={"Authorization": f"Bearer {auth_token}"},
-                json={"success": success}
+                json={"success": success},
             )
 
             if response.status_code == 200:
@@ -185,11 +198,15 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             message = body.get("message", "").strip()
             tenant_id = body.get("tenant_id", str(uuid.uuid4())[:8])
-            conversation_id = body.get("conversation_id")  # 🆕 ID de session/conversation
+            conversation_id = body.get(
+                "conversation_id"
+            )  # 🆕 ID de session/conversation
             genetic_line_filter = body.get("genetic_line_filter")
             use_json_search = body.get("use_json_search", True)
             performance_context = body.get("performance_context")
-            user_email = body.get("user_email")  # 🆕 Email utilisateur pour quota checking
+            user_email = body.get(
+                "user_email"
+            )  # 🆕 Email utilisateur pour quota checking
 
             # Validation basique
             if not message:
@@ -209,10 +226,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 except HTTPException as quota_error:
                     # Quota dépassé - retourner erreur 429
                     logger.warning(f"Quota dépassé pour {user_email}")
-                    return JSONResponse(
-                        status_code=429,
-                        content=quota_error.detail
-                    )
+                    return JSONResponse(status_code=429, content=quota_error.detail)
             else:
                 logger.warning("user_email ou auth_token manquant - quota check ignoré")
             # ============================================================
@@ -299,7 +313,9 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 try:
                     await increment_user_quota(user_email, auth_token, success=True)
                 except Exception as inc_error:
-                    logger.error(f"Erreur incrémentation quota (non-bloquante): {inc_error}")
+                    logger.error(
+                        f"Erreur incrémentation quota (non-bloquante): {inc_error}"
+                    )
             # ============================================================
 
             # Streaming de la réponse
@@ -399,12 +415,9 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 {
                     "role": "system",
                     "content": "You are an expert in aviculture and poultry farming. "
-                               "Provide clear, technical, and accurate answers."
+                    "Provide clear, technical, and accurate answers.",
                 },
-                {
-                    "role": "user",
-                    "content": message
-                }
+                {"role": "user", "content": message},
             ]
 
             async def stream_generator():
@@ -418,33 +431,33 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
                         temperature=0.1,
                         query=message,
                         domain="aviculture",
-                        language=detected_language
+                        language=detected_language,
                     ):
                         event_type = event.get("event", "chunk")
 
                         # Forward LLM events to client
                         if event_type == "start":
                             # Send START event with metadata
-                            yield f"event: start\n"
+                            yield "event: start\n"
                             yield f"data: {json.dumps(event)}\n\n"
 
                         elif event_type == "chunk":
                             # Accumulate full response and forward chunk
                             content = event.get("content", "")
                             full_response += content
-                            yield f"event: chunk\n"
+                            yield "event: chunk\n"
                             yield f"data: {json.dumps({'content': content})}\n\n"
 
                         elif event_type == "end":
                             # Send END event with final metadata
                             total_time = time.time() - total_start_time
                             event["total_time"] = total_time
-                            yield f"event: end\n"
+                            yield "event: end\n"
                             yield f"data: {json.dumps(event)}\n\n"
 
                         elif event_type == "error":
                             # Send ERROR event
-                            yield f"event: error\n"
+                            yield "event: error\n"
                             yield f"data: {json.dumps(event)}\n\n"
                             break
 
@@ -462,8 +475,10 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     )
 
                 except Exception as e:
-                    logger.error(f"[ERROR] Stream generation failed: {e}", exc_info=True)
-                    yield f"event: error\n"
+                    logger.error(
+                        f"[ERROR] Stream generation failed: {e}", exc_info=True
+                    )
+                    yield "event: error\n"
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
             return StreamingResponse(
@@ -473,7 +488,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     "Cache-Control": "no-cache",
                     "Connection": "keep-alive",
                     "X-Accel-Buffering": "no",  # Disable nginx buffering
-                }
+                },
             )
 
         except HTTPException:
@@ -481,8 +496,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
         except Exception as e:
             logger.error(f"[ERROR] Chat stream endpoint: {e}", exc_info=True)
             return JSONResponse(
-                status_code=500,
-                content={"error": f"Processing error: {str(e)}"}
+                status_code=500, content={"error": f"Processing error: {str(e)}"}
             )
 
     return router

@@ -12,8 +12,7 @@ import logging
 import asyncio
 import httpx
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from typing import List, Dict, Any
 
 from ..models import ExternalDocument
 
@@ -35,7 +34,7 @@ class BaseFetcher(ABC):
         base_url: str,
         rate_limit: float = 1.0,
         timeout: int = 30,
-        max_retries: int = 3
+        max_retries: int = 3,
     ):
         """
         Initialize fetcher
@@ -55,8 +54,7 @@ class BaseFetcher(ABC):
 
         # HTTP client with timeout
         self.client = httpx.AsyncClient(
-            timeout=httpx.Timeout(timeout),
-            follow_redirects=True
+            timeout=httpx.Timeout(timeout), follow_redirects=True
         )
 
         # Rate limiting
@@ -66,10 +64,7 @@ class BaseFetcher(ABC):
         logger.info(f"✅ {name} fetcher initialized (rate_limit={rate_limit}/s)")
 
     async def search(
-        self,
-        query: str,
-        max_results: int = 5,
-        min_year: int = 2015
+        self, query: str, max_results: int = 5, min_year: int = 2015
     ) -> List[ExternalDocument]:
         """
         Search for documents matching query
@@ -121,10 +116,7 @@ class BaseFetcher(ABC):
             self._last_request_time = asyncio.get_event_loop().time()
 
     async def _request_with_retry(
-        self,
-        query: str,
-        max_results: int,
-        min_year: int
+        self, query: str, max_results: int, min_year: int
     ) -> Dict[str, Any]:
         """
         Make API request with exponential backoff retry
@@ -144,7 +136,7 @@ class BaseFetcher(ABC):
 
             except httpx.TimeoutException:
                 if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt  # Exponential backoff
+                    wait_time = 2**attempt  # Exponential backoff
                     logger.warning(
                         f"⚠️ [{self.name}] Timeout, retrying in {wait_time}s "
                         f"(attempt {attempt + 1}/{self.max_retries})"
@@ -156,7 +148,7 @@ class BaseFetcher(ABC):
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:  # Rate limit
                     if attempt < self.max_retries - 1:
-                        wait_time = 5 * (2 ** attempt)  # Longer wait for rate limits
+                        wait_time = 5 * (2**attempt)  # Longer wait for rate limits
                         logger.warning(
                             f"⚠️ [{self.name}] Rate limited, waiting {wait_time}s"
                         )
@@ -170,10 +162,7 @@ class BaseFetcher(ABC):
 
     @abstractmethod
     async def _make_request(
-        self,
-        query: str,
-        max_results: int,
-        min_year: int
+        self, query: str, max_results: int, min_year: int
     ) -> Dict[str, Any]:
         """
         Make actual API request (must be implemented by subclass)
@@ -190,9 +179,7 @@ class BaseFetcher(ABC):
 
     @abstractmethod
     def _parse_response(
-        self,
-        response: Dict[str, Any],
-        query: str
+        self, response: Dict[str, Any], query: str
     ) -> List[ExternalDocument]:
         """
         Parse API response into ExternalDocument objects

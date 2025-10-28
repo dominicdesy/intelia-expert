@@ -277,7 +277,9 @@ class ChatHandlers:
                 source = str(source)
 
             # Event START
-            logger.info(f"📤 Sending START event with source='{source}', confidence={confidence}")
+            logger.info(
+                f"📤 Sending START event with source='{source}', confidence={confidence}"
+            )
             start_data = {
                 "type": "start",
                 "source": source,
@@ -325,7 +327,9 @@ class ChatHandlers:
             proactive_followup = metadata.get("proactive_followup")
             followup_to_save = None  # 🆕 Variable pour sauvegarder le follow-up
             if proactive_followup and isinstance(proactive_followup, str):
-                logger.info(f"📤 Envoi follow-up proactif: {proactive_followup[:80]}...")
+                logger.info(
+                    f"📤 Envoi follow-up proactif: {proactive_followup[:80]}..."
+                )
                 followup_to_save = proactive_followup  # 🆕 Capturer pour sauvegarde
                 yield sse_event(
                     {
@@ -351,9 +355,13 @@ class ChatHandlers:
             # 🔍 DEBUG: Extract CoT fields before building end_data
             cot_thinking = safe_get_attribute(rag_result, "cot_thinking", None)
             cot_analysis = safe_get_attribute(rag_result, "cot_analysis", None)
-            has_cot_structure = safe_get_attribute(rag_result, "has_cot_structure", False)
+            has_cot_structure = safe_get_attribute(
+                rag_result, "has_cot_structure", False
+            )
 
-            logger.info(f"🧠 END event CoT fields - has_cot: {has_cot_structure}, thinking: {len(cot_thinking or '') } chars, analysis: {len(cot_analysis or '')} chars")
+            logger.info(
+                f"🧠 END event CoT fields - has_cot: {has_cot_structure}, thinking: {len(cot_thinking or '') } chars, analysis: {len(cot_analysis or '')} chars"
+            )
 
             end_data = {
                 "type": "end",
@@ -399,13 +407,17 @@ class ChatHandlers:
                             tenant_id=memory_key,
                             question=message,
                             answer=str(answer),
-                            followup=followup_to_save  # 🆕 Inclure le follow-up
+                            followup=followup_to_save,  # 🆕 Inclure le follow-up
                         )
-                        logger.debug(f"✅ Sauvegarde ConversationMemory OK pour {memory_key} (with followup: {followup_to_save is not None})")
+                        logger.debug(
+                            f"✅ Sauvegarde ConversationMemory OK pour {memory_key} (with followup: {followup_to_save is not None})"
+                        )
                     except Exception as e:
                         logger.error(f"❌ Erreur sauvegarde ConversationMemory: {e}")
                 else:
-                    logger.warning(f"⚠️ ConversationMemory non disponible pour {memory_key}")
+                    logger.warning(
+                        f"⚠️ ConversationMemory non disponible pour {memory_key}"
+                    )
 
         except Exception as e:
             logger.error(f"Erreur streaming: {e}", exc_info=True)

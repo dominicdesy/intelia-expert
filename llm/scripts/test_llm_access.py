@@ -37,6 +37,7 @@ def test_huggingface_access():
     # Test huggingface_hub import
     try:
         from huggingface_hub import InferenceClient
+
         print("✓ huggingface_hub library installed")
     except ImportError:
         print("❌ ERROR: huggingface_hub not installed")
@@ -71,7 +72,7 @@ def test_huggingface_access():
         response = client.chat_completion(
             model=model,
             messages=[{"role": "user", "content": "Hello, respond with just 'Hi'"}],
-            max_tokens=10
+            max_tokens=10,
         )
 
         generated_text = response.choices[0].message.content

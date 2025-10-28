@@ -24,6 +24,7 @@ structured_logger = structlog.get_logger()
 @dataclass
 class ExternalSearchActivity:
     """Record of an external source search activity"""
+
     timestamp: str
     request_id: str
     query: str
@@ -61,6 +62,7 @@ class ExternalSearchActivity:
 @dataclass
 class ExternalSourcesStats:
     """Aggregated statistics for external sources usage"""
+
     total_searches: int = 0
     total_documents_ingested: int = 0
     total_documents_found: int = 0
@@ -100,7 +102,9 @@ class ExternalSourcesActivityLogger:
 
         # Use environment variable if set, otherwise use default
         if log_dir is None:
-            log_dir = os.getenv("EXTERNAL_SOURCES_LOG_DIR", "/app/logs/external_sources")
+            log_dir = os.getenv(
+                "EXTERNAL_SOURCES_LOG_DIR", "/app/logs/external_sources"
+            )
 
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -165,7 +169,9 @@ class ExternalSourcesActivityLogger:
             # Estimate tokens from title + abstract length
             text_length = len(best_document.title) + len(best_document.abstract)
             estimated_tokens = int(text_length / 4)  # Rough estimate: 4 chars per token
-            estimated_cost = (estimated_tokens / 1_000_000) * self.EMBEDDING_COST_PER_1M_TOKENS
+            estimated_cost = (
+                estimated_tokens / 1_000_000
+            ) * self.EMBEDDING_COST_PER_1M_TOKENS
 
         # Create activity record
         activity = ExternalSearchActivity(
@@ -244,9 +250,7 @@ class ExternalSourcesActivityLogger:
             )
 
     def get_statistics(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
     ) -> ExternalSourcesStats:
         """
         Calculate statistics from activity logs
@@ -258,10 +262,7 @@ class ExternalSourcesActivityLogger:
         Returns:
             ExternalSourcesStats object with aggregated statistics
         """
-        stats = ExternalSourcesStats(
-            searches_by_source={},
-            documents_by_source={}
-        )
+        stats = ExternalSourcesStats(searches_by_source={}, documents_by_source={})
 
         if not self.activity_log_file.exists():
             return stats
@@ -286,7 +287,9 @@ class ExternalSourcesActivityLogger:
 
             # Calculate aggregates
             stats.total_searches = len(activities)
-            stats.total_documents_found = sum(a["total_documents_found"] for a in activities)
+            stats.total_documents_found = sum(
+                a["total_documents_found"] for a in activities
+            )
             stats.total_documents_ingested = sum(
                 1 for a in activities if a["document_ingested"]
             )
@@ -297,22 +300,35 @@ class ExternalSourcesActivityLogger:
             # Per-source statistics
             for activity in activities:
                 for source in activity.get("sources_queried", []):
-                    stats.searches_by_source[source] = stats.searches_by_source.get(source, 0) + 1
+                    stats.searches_by_source[source] = (
+                        stats.searches_by_source.get(source, 0) + 1
+                    )
 
-                if activity.get("document_ingested") and activity.get("best_document_source"):
+                if activity.get("document_ingested") and activity.get(
+                    "best_document_source"
+                ):
                     source = activity["best_document_source"]
-                    stats.documents_by_source[source] = stats.documents_by_source.get(source, 0) + 1
+                    stats.documents_by_source[source] = (
+                        stats.documents_by_source.get(source, 0) + 1
+                    )
 
             # Performance averages
             search_durations = [a["search_duration_ms"] for a in activities]
-            stats.avg_search_duration_ms = sum(search_durations) / len(search_durations) if search_durations else 0.0
+            stats.avg_search_duration_ms = (
+                sum(search_durations) / len(search_durations)
+                if search_durations
+                else 0.0
+            )
 
             ingestion_durations = [
-                a["ingestion_duration_ms"] for a in activities
+                a["ingestion_duration_ms"]
+                for a in activities
                 if a.get("ingestion_duration_ms") is not None
             ]
             stats.avg_ingestion_duration_ms = (
-                sum(ingestion_durations) / len(ingestion_durations) if ingestion_durations else 0.0
+                sum(ingestion_durations) / len(ingestion_durations)
+                if ingestion_durations
+                else 0.0
             )
 
             # Time range
@@ -365,33 +381,36 @@ class ExternalSourcesActivityLogger:
         start_date = end_date - timedelta(days=days)
 
         stats = self.get_statistics(
-            start_date=start_date.isoformat() + "Z",
-            end_date=end_date.isoformat() + "Z"
+            start_date=start_date.isoformat() + "Z", end_date=end_date.isoformat() + "Z"
         )
 
         print("\n" + "=" * 80)
         print(f"EXTERNAL SOURCES ACTIVITY SUMMARY (Last {days} days)")
         print("=" * 80)
 
-        print(f"\n📊 Overall Statistics:")
+        print("\n📊 Overall Statistics:")
         print(f"  Total Searches: {stats.total_searches}")
         print(f"  Documents Found: {stats.total_documents_found}")
         print(f"  Documents Ingested: {stats.total_documents_ingested}")
         print(f"  Total Cost: ${stats.total_cost_usd:.4f}")
 
         if stats.total_searches > 0:
-            print(f"\n⚡ Performance:")
+            print("\n⚡ Performance:")
             print(f"  Avg Search Duration: {stats.avg_search_duration_ms:.0f}ms")
             print(f"  Avg Ingestion Duration: {stats.avg_ingestion_duration_ms:.0f}ms")
 
         if stats.searches_by_source:
-            print(f"\n🔍 Searches by Source:")
-            for source, count in sorted(stats.searches_by_source.items(), key=lambda x: x[1], reverse=True):
+            print("\n🔍 Searches by Source:")
+            for source, count in sorted(
+                stats.searches_by_source.items(), key=lambda x: x[1], reverse=True
+            ):
                 print(f"  {source}: {count}")
 
         if stats.documents_by_source:
-            print(f"\n📥 Documents Ingested by Source:")
-            for source, count in sorted(stats.documents_by_source.items(), key=lambda x: x[1], reverse=True):
+            print("\n📥 Documents Ingested by Source:")
+            for source, count in sorted(
+                stats.documents_by_source.items(), key=lambda x: x[1], reverse=True
+            ):
                 print(f"  {source}: {count}")
 
         print("\n" + "=" * 80 + "\n")
@@ -447,8 +466,7 @@ def log_external_search(
 
 
 def get_external_sources_stats(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None
+    start_date: Optional[str] = None, end_date: Optional[str] = None
 ) -> ExternalSourcesStats:
     """Get external sources statistics (convenience function)"""
     logger_instance = get_activity_logger()

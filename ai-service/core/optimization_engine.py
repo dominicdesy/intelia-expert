@@ -397,7 +397,7 @@ class OptimizationEngine:
         if not scenarios or len(scenarios) < 2:
             return {
                 "error": "Au moins 2 scénarios sont requis pour la comparaison",
-                "scenarios_count": len(scenarios)
+                "scenarios_count": len(scenarios),
             }
 
         try:
@@ -449,48 +449,54 @@ class OptimizationEngine:
                         mortality_score = max(0, 100 - mortality * 10)
 
                         composite_score = (
-                            fcr_score * 0.4 +
-                            weight_score * 0.3 +
-                            gain_score * 0.2 +
-                            mortality_score * 0.1
+                            fcr_score * 0.4
+                            + weight_score * 0.3
+                            + gain_score * 0.2
+                            + mortality_score * 0.1
                         )
 
-                        results.append({
-                            "scenario_id": scenario_id,
-                            "breed": breed,
-                            "sex": sex,
-                            "age_days": age_days,
-                            "metrics": {
-                                "body_weight": round(weight, 1),
-                                "fcr": round(fcr, 2),
-                                "daily_gain": round(daily_gain, 1),
-                                "mortality_rate": round(mortality, 2),
-                            },
-                            "economics": {
-                                "feed_cost_per_bird": round(feed_cost, 2),
-                                "efficiency_score": round(efficiency, 1),
-                            },
-                            "scores": {
-                                "fcr_score": round(fcr_score, 1),
-                                "weight_score": round(weight_score, 1),
-                                "gain_score": round(gain_score, 1),
-                                "mortality_score": round(mortality_score, 1),
-                                "composite_score": round(composite_score, 1),
+                        results.append(
+                            {
+                                "scenario_id": scenario_id,
+                                "breed": breed,
+                                "sex": sex,
+                                "age_days": age_days,
+                                "metrics": {
+                                    "body_weight": round(weight, 1),
+                                    "fcr": round(fcr, 2),
+                                    "daily_gain": round(daily_gain, 1),
+                                    "mortality_rate": round(mortality, 2),
+                                },
+                                "economics": {
+                                    "feed_cost_per_bird": round(feed_cost, 2),
+                                    "efficiency_score": round(efficiency, 1),
+                                },
+                                "scores": {
+                                    "fcr_score": round(fcr_score, 1),
+                                    "weight_score": round(weight_score, 1),
+                                    "gain_score": round(gain_score, 1),
+                                    "mortality_score": round(mortality_score, 1),
+                                    "composite_score": round(composite_score, 1),
+                                },
                             }
-                        })
+                        )
                     else:
-                        results.append({
-                            "scenario_id": scenario_id,
-                            "breed": breed,
-                            "sex": sex,
-                            "age_days": age_days,
-                            "error": "Données non disponibles pour ce scénario"
-                        })
+                        results.append(
+                            {
+                                "scenario_id": scenario_id,
+                                "breed": breed,
+                                "sex": sex,
+                                "age_days": age_days,
+                                "error": "Données non disponibles pour ce scénario",
+                            }
+                        )
 
             # Trier par score composite (meilleur en premier)
             valid_results = [r for r in results if "error" not in r]
             if valid_results:
-                valid_results.sort(key=lambda x: x["scores"]["composite_score"], reverse=True)
+                valid_results.sort(
+                    key=lambda x: x["scores"]["composite_score"], reverse=True
+                )
 
                 # Identifier le meilleur scénario
                 best_scenario = valid_results[0]
@@ -499,18 +505,30 @@ class OptimizationEngine:
                 for result in valid_results[1:]:
                     result["vs_best"] = {
                         "weight_diff_pct": round(
-                            (result["metrics"]["body_weight"] - best_scenario["metrics"]["body_weight"]) /
-                            best_scenario["metrics"]["body_weight"] * 100, 1
+                            (
+                                result["metrics"]["body_weight"]
+                                - best_scenario["metrics"]["body_weight"]
+                            )
+                            / best_scenario["metrics"]["body_weight"]
+                            * 100,
+                            1,
                         ),
-                        "fcr_diff": round(result["metrics"]["fcr"] - best_scenario["metrics"]["fcr"], 2),
+                        "fcr_diff": round(
+                            result["metrics"]["fcr"] - best_scenario["metrics"]["fcr"],
+                            2,
+                        ),
                         "score_diff": round(
-                            result["scores"]["composite_score"] - best_scenario["scores"]["composite_score"], 1
+                            result["scores"]["composite_score"]
+                            - best_scenario["scores"]["composite_score"],
+                            1,
                         ),
                     }
 
             return {
                 "comparison": results,
-                "best_scenario_id": valid_results[0]["scenario_id"] if valid_results else None,
+                "best_scenario_id": (
+                    valid_results[0]["scenario_id"] if valid_results else None
+                ),
                 "scenarios_analyzed": len(scenarios),
                 "valid_scenarios": len(valid_results),
                 "ranking": [r["scenario_id"] for r in valid_results],
@@ -520,5 +538,5 @@ class OptimizationEngine:
             logger.error(f"Erreur comparaison scénarios: {e}")
             return {
                 "error": f"Erreur lors de la comparaison: {str(e)}",
-                "scenarios_count": len(scenarios)
+                "scenarios_count": len(scenarios),
             }

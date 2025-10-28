@@ -85,7 +85,9 @@ class LLMRouter:
 
         # Initialize Intelia Llama service (internal)
         self.llm_service_url = os.getenv("LLM_SERVICE_URL", "http://llm:8081")
-        self.llm_service_enabled = os.getenv("ENABLE_INTELIA_LLAMA", "true").lower() == "true"
+        self.llm_service_enabled = (
+            os.getenv("ENABLE_INTELIA_LLAMA", "true").lower() == "true"
+        )
         if self.llm_service_enabled:
             logger.info(f"✅ Intelia Llama service configured: {self.llm_service_url}")
         else:
@@ -177,7 +179,9 @@ class LLMRouter:
         logger.info("🔀 Route → GPT-4o (default/fallback)")
         return LLMProvider.GPT_4O
 
-    def _is_aviculture_query(self, query: str, intent_result: Optional[Dict] = None) -> bool:
+    def _is_aviculture_query(
+        self, query: str, intent_result: Optional[Dict] = None
+    ) -> bool:
         """
         Detect if query is domain-specific aviculture
 
@@ -193,30 +197,87 @@ class LLMRouter:
         # Domain keywords (aviculture, poultry, livestock)
         aviculture_keywords = [
             # French
-            "poulet", "poule", "pondeuse", "broiler", "poussin", "volaille",
-            "aviculture", "élevage", "mortalité", "ponte", "aliment", "eau",
-            "biosécurité", "vaccination", "maladie", "coccidiose", "newcastle",
-            "gumboro", "bronchite", "marek", "ventilation", "température",
-            "litière", "densité", "indice de conversion", "icv", "poids vif",
+            "poulet",
+            "poule",
+            "pondeuse",
+            "broiler",
+            "poussin",
+            "volaille",
+            "aviculture",
+            "élevage",
+            "mortalité",
+            "ponte",
+            "aliment",
+            "eau",
+            "biosécurité",
+            "vaccination",
+            "maladie",
+            "coccidiose",
+            "newcastle",
+            "gumboro",
+            "bronchite",
+            "marek",
+            "ventilation",
+            "température",
+            "litière",
+            "densité",
+            "indice de conversion",
+            "icv",
+            "poids vif",
             # English
-            "chicken", "hen", "layer", "broiler", "chick", "poultry",
-            "bird", "flock", "mortality", "egg production", "feed", "water",
-            "biosecurity", "vaccine", "disease", "coccidiosis",
+            "chicken",
+            "hen",
+            "layer",
+            "broiler",
+            "chick",
+            "poultry",
+            "bird",
+            "flock",
+            "mortality",
+            "egg production",
+            "feed",
+            "water",
+            "biosecurity",
+            "vaccine",
+            "disease",
+            "coccidiosis",
             # Spanish/Portuguese
-            "pollo", "gallina", "ave", "avicultura", "mortalidad",
+            "pollo",
+            "gallina",
+            "ave",
+            "avicultura",
+            "mortalidad",
         ]
 
         # Breed names (strong indicators of aviculture queries)
         breed_keywords = [
-            "ross", "cobb", "hubbard", "isa", "lohmann", "hy-line",
-            "aviagen", "novogen", "dekalb", "shaver", "bovans",
+            "ross",
+            "cobb",
+            "hubbard",
+            "isa",
+            "lohmann",
+            "hy-line",
+            "aviagen",
+            "novogen",
+            "dekalb",
+            "shaver",
+            "bovans",
         ]
 
         # Performance metrics (when combined with age/sex, indicate aviculture)
         metric_keywords = [
-            "weight", "poids", "fcr", "feed conversion", "indice de conversion",
-            "egg production", "ponte", "mortality", "mortalité",
-            "body weight", "poids vif", "gain de poids",
+            "weight",
+            "poids",
+            "fcr",
+            "feed conversion",
+            "indice de conversion",
+            "egg production",
+            "ponte",
+            "mortality",
+            "mortalité",
+            "body weight",
+            "poids vif",
+            "gain de poids",
         ]
 
         # Check if query contains aviculture keywords
@@ -225,14 +286,17 @@ class LLMRouter:
 
         # Check for breed names (strong indicator)
         if any(breed in query_lower for breed in breed_keywords):
-            logger.debug(f"🐔 Breed name detected in query → aviculture")
+            logger.debug("🐔 Breed name detected in query → aviculture")
             return True
 
         # Check for performance metrics with age indicators
         has_metric = any(metric in query_lower for metric in metric_keywords)
-        has_age = any(age_term in query_lower for age_term in ["day", "days", "week", "weeks", "jours", "jour", "semaine"])
+        has_age = any(
+            age_term in query_lower
+            for age_term in ["day", "days", "week", "weeks", "jours", "jour", "semaine"]
+        )
         if has_metric and has_age:
-            logger.debug(f"🐔 Metric + age detected in query → aviculture")
+            logger.debug("🐔 Metric + age detected in query → aviculture")
             return True
 
         # Check domain from intent result
@@ -241,12 +305,25 @@ class LLMRouter:
             intent_type = intent_result.get("intent", "")
 
             # Check for aviculture-related domains
-            if domain in ["aviculture", "poultry", "livestock", "genetics_performance", "nutrition", "health", "housing"]:
+            if domain in [
+                "aviculture",
+                "poultry",
+                "livestock",
+                "genetics_performance",
+                "nutrition",
+                "health",
+                "housing",
+            ]:
                 logger.debug(f"🐔 Domain '{domain}' detected → aviculture")
                 return True
 
             # Check for performance-related intents
-            if intent_type in ["performance_query", "genetics_query", "nutrition_query", "health_query"]:
+            if intent_type in [
+                "performance_query",
+                "genetics_query",
+                "nutrition_query",
+                "health_query",
+            ]:
                 logger.debug(f"🐔 Intent '{intent_type}' detected → aviculture")
                 return True
 
@@ -298,7 +375,9 @@ class LLMRouter:
                 logger.info(f"📏 Adaptive max_tokens: {max_tokens}")
             else:
                 max_tokens = 900  # Default fallback
-                logger.warning("⚠️ No query provided for adaptive length, using default 900")
+                logger.warning(
+                    "⚠️ No query provided for adaptive length, using default 900"
+                )
 
         try:
             if provider == LLMProvider.INTELIA_LLAMA and self.llm_service_enabled:
@@ -310,7 +389,7 @@ class LLMRouter:
                     entities=entities,
                     query_type=query_type,
                     context_docs=context_docs,
-                    domain=domain or "aviculture"
+                    domain=domain or "aviculture",
                 )
             elif provider == LLMProvider.DEEPSEEK and self.deepseek_client:
                 return await self._generate_deepseek(messages, temperature, max_tokens)
@@ -377,7 +456,9 @@ class LLMRouter:
                 logger.info(f"[RULE] Adaptive max_tokens: {max_tokens}")
             else:
                 max_tokens = 900  # Default fallback
-                logger.warning("[WARNING] No query provided for adaptive length, using default 900")
+                logger.warning(
+                    "[WARNING] No query provided for adaptive length, using default 900"
+                )
 
         try:
             # Route to appropriate streaming provider
@@ -391,34 +472,42 @@ class LLMRouter:
                     query_type=query_type,
                     context_docs=context_docs,
                     domain=domain or "aviculture",
-                    language=language
+                    language=language,
                 ):
                     yield event
 
             elif provider == LLMProvider.DEEPSEEK:
                 logger.info("[STREAM] Using DeepSeek streaming")
                 yield {"event": "start", "provider": "deepseek"}
-                async for chunk in self._generate_deepseek_stream(messages, temperature, max_tokens):
+                async for chunk in self._generate_deepseek_stream(
+                    messages, temperature, max_tokens
+                ):
                     yield {"event": "chunk", "content": chunk}
                 yield {"event": "end", "total_tokens": 0}
 
             elif provider == LLMProvider.CLAUDE_35_SONNET:
                 logger.info("[STREAM] Using Claude 3.5 Sonnet streaming")
                 yield {"event": "start", "provider": "claude"}
-                async for chunk in self._generate_claude_stream(messages, temperature, max_tokens):
+                async for chunk in self._generate_claude_stream(
+                    messages, temperature, max_tokens
+                ):
                     yield {"event": "chunk", "content": chunk}
                 yield {"event": "end", "total_tokens": 0}
 
             elif provider == LLMProvider.GPT_4O:
                 logger.info("[STREAM] Using GPT-4o streaming")
                 yield {"event": "start", "provider": "gpt4o"}
-                async for chunk in self._generate_gpt4o_stream(messages, temperature, max_tokens):
+                async for chunk in self._generate_gpt4o_stream(
+                    messages, temperature, max_tokens
+                ):
                     yield {"event": "chunk", "content": chunk}
                 yield {"event": "end", "total_tokens": 0}
 
             else:
                 # Fallback: use non-streaming generation and yield as single chunk
-                logger.warning(f"[WARNING] {provider.value} does not support streaming, falling back to non-streaming")
+                logger.warning(
+                    f"[WARNING] {provider.value} does not support streaming, falling back to non-streaming"
+                )
                 text = await self.generate(
                     provider=provider,
                     messages=messages,
@@ -428,7 +517,7 @@ class LLMRouter:
                     entities=entities,
                     query_type=query_type,
                     context_docs=context_docs,
-                    domain=domain
+                    domain=domain,
                 )
                 # Yield single event with full text
                 yield {"event": "chunk", "content": text}
@@ -439,10 +528,16 @@ class LLMRouter:
             yield {"event": "error", "error": str(e)}
 
     async def _generate_intelia_llama_stream(
-        self, messages: List[Dict], temperature: float, max_tokens: int,
-        query: Optional[str] = None, entities: Optional[Dict] = None,
-        query_type: Optional[str] = None, context_docs: Optional[List[Dict]] = None,
-        domain: str = "aviculture", language: str = "en"
+        self,
+        messages: List[Dict],
+        temperature: float,
+        max_tokens: int,
+        query: Optional[str] = None,
+        entities: Optional[Dict] = None,
+        query_type: Optional[str] = None,
+        context_docs: Optional[List[Dict]] = None,
+        domain: str = "aviculture",
+        language: str = "en",
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Generate using Intelia Llama with streaming (Server-Sent Events)
@@ -484,7 +579,7 @@ class LLMRouter:
                 temperature=temperature,
                 max_tokens=max_tokens,
                 post_process=True,
-                add_disclaimer=True
+                add_disclaimer=True,
             ):
                 total_chunks += 1
 
@@ -509,6 +604,7 @@ class LLMRouter:
             # Track Prometheus metrics
             try:
                 from monitoring.prometheus_metrics import track_llm_call
+
                 track_llm_call(
                     model="llama-3.1-8b-instruct",
                     provider="intelia-llama",
@@ -517,7 +613,7 @@ class LLMRouter:
                     completion_tokens=completion_tokens,
                     cost_usd=cost,
                     duration=duration,
-                    status="success"
+                    status="success",
                 )
             except Exception as e:
                 logger.debug(f"Failed to track Prometheus metrics: {e}")
@@ -531,10 +627,16 @@ class LLMRouter:
             yield {"event": "error", "error": str(e)}
 
     async def _generate_intelia_llama(
-        self, messages: List[Dict], temperature: float, max_tokens: int,
-        query: Optional[str] = None, entities: Optional[Dict] = None,
-        query_type: Optional[str] = None, context_docs: Optional[List[Dict]] = None,
-        domain: str = "aviculture", language: str = "en"
+        self,
+        messages: List[Dict],
+        temperature: float,
+        max_tokens: int,
+        query: Optional[str] = None,
+        entities: Optional[Dict] = None,
+        query_type: Optional[str] = None,
+        context_docs: Optional[List[Dict]] = None,
+        domain: str = "aviculture",
+        language: str = "en",
     ) -> str:
         """
         Generate using Intelia Llama (internal service with terminology injection, $0.20/1M)
@@ -560,17 +662,19 @@ class LLMRouter:
                     query = user_messages[-1]["content"]
 
             # Call /v1/generate with terminology injection
-            generated_text, prompt_tokens, completion_tokens, metadata = await llm_client.generate(
-                query=query or "",
-                domain=domain,
-                language=language,
-                entities=entities,
-                query_type=query_type,
-                context_docs=context_docs,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                post_process=True,
-                add_disclaimer=True
+            generated_text, prompt_tokens, completion_tokens, metadata = (
+                await llm_client.generate(
+                    query=query or "",
+                    domain=domain,
+                    language=language,
+                    entities=entities,
+                    query_type=query_type,
+                    context_docs=context_docs,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    post_process=True,
+                    add_disclaimer=True,
+                )
             )
 
             duration = time.time() - start_time
@@ -586,6 +690,7 @@ class LLMRouter:
             # Track Prometheus metrics
             try:
                 from monitoring.prometheus_metrics import track_llm_call
+
                 track_llm_call(
                     model=metadata.get("model", "llama-3.1-8b-instruct"),
                     provider="intelia-llama",
@@ -594,7 +699,7 @@ class LLMRouter:
                     completion_tokens=completion_tokens,
                     cost_usd=cost,
                     duration=duration,
-                    status="success"
+                    status="success",
                 )
             except Exception as e:
                 logger.debug(f"Failed to track Prometheus metrics: {e}")
@@ -616,6 +721,7 @@ class LLMRouter:
         """Generate using DeepSeek ($0.55/1M)"""
 
         import time
+
         start_time = time.time()
 
         response = await self.deepseek_client.chat.completions.create(
@@ -640,6 +746,7 @@ class LLMRouter:
         # Track Prometheus metrics
         try:
             from monitoring.prometheus_metrics import track_llm_call
+
             track_llm_call(
                 model="deepseek-chat",
                 provider="deepseek",
@@ -648,7 +755,7 @@ class LLMRouter:
                 completion_tokens=completion_tokens,
                 cost_usd=cost,
                 duration=duration,
-                status="success"
+                status="success",
             )
         except Exception as e:
             logger.debug(f"Failed to track Prometheus metrics: {e}")
@@ -663,6 +770,7 @@ class LLMRouter:
         """Generate using Claude 3.5 Sonnet ($3/1M)"""
 
         import time
+
         start_time = time.time()
 
         # Convert OpenAI format to Anthropic format
@@ -697,6 +805,7 @@ class LLMRouter:
         # Track Prometheus metrics
         try:
             from monitoring.prometheus_metrics import track_llm_call
+
             track_llm_call(
                 model=model,
                 provider="anthropic",
@@ -705,7 +814,7 @@ class LLMRouter:
                 completion_tokens=completion_tokens,
                 cost_usd=cost,
                 duration=duration,
-                status="success"
+                status="success",
             )
         except Exception as e:
             logger.debug(f"Failed to track Prometheus metrics: {e}")
@@ -720,6 +829,7 @@ class LLMRouter:
         """Generate using GPT-4o ($15/1M)"""
 
         import time
+
         start_time = time.time()
 
         response = await self.openai_client.chat.completions.create(
@@ -744,6 +854,7 @@ class LLMRouter:
         # Track Prometheus metrics
         try:
             from monitoring.prometheus_metrics import track_llm_call
+
             track_llm_call(
                 model="gpt-4o",
                 provider="openai",
@@ -752,7 +863,7 @@ class LLMRouter:
                 completion_tokens=completion_tokens,
                 cost_usd=cost,
                 duration=duration,
-                status="success"
+                status="success",
             )
         except Exception as e:
             logger.debug(f"Failed to track Prometheus metrics: {e}")
@@ -766,6 +877,7 @@ class LLMRouter:
     ) -> AsyncGenerator[str, None]:
         """Generate using DeepSeek with streaming"""
         import time
+
         start_time = time.time()
 
         try:
@@ -784,7 +896,7 @@ class LLMRouter:
             async for chunk in stream:
                 if chunk.choices and len(chunk.choices) > 0:
                     delta = chunk.choices[0].delta
-                    if hasattr(delta, 'content') and delta.content:
+                    if hasattr(delta, "content") and delta.content:
                         content = delta.content
                         full_text += content
                         completion_tokens += 1
@@ -811,11 +923,14 @@ class LLMRouter:
     ) -> AsyncGenerator[str, None]:
         """Generate using Claude 3.5 Sonnet with streaming"""
         import time
+
         start_time = time.time()
 
         try:
             # Convert OpenAI format to Anthropic format
-            system_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
+            system_msg = next(
+                (m["content"] for m in messages if m["role"] == "system"), ""
+            )
             user_messages = [
                 {"role": m["role"], "content": m["content"]}
                 for m in messages
@@ -849,7 +964,9 @@ class LLMRouter:
                 self.usage_stats[LLMProvider.CLAUDE_35_SONNET.value]["tokens"] += tokens
                 self.usage_stats[LLMProvider.CLAUDE_35_SONNET.value]["cost"] += cost
 
-                logger.info(f"✅ Claude 3.5 Sonnet (streaming): {tokens} tokens, ${cost:.4f}")
+                logger.info(
+                    f"✅ Claude 3.5 Sonnet (streaming): {tokens} tokens, ${cost:.4f}"
+                )
 
         except Exception as e:
             logger.error(f"Claude streaming error: {e}")
@@ -860,6 +977,7 @@ class LLMRouter:
     ) -> AsyncGenerator[str, None]:
         """Generate using GPT-4o with streaming"""
         import time
+
         start_time = time.time()
 
         try:
@@ -878,7 +996,7 @@ class LLMRouter:
             async for chunk in stream:
                 if chunk.choices and len(chunk.choices) > 0:
                     delta = chunk.choices[0].delta
-                    if hasattr(delta, 'content') and delta.content:
+                    if hasattr(delta, "content") and delta.content:
                         content = delta.content
                         full_text += content
                         completion_tokens += 1

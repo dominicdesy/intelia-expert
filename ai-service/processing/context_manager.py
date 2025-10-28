@@ -34,6 +34,7 @@ class ConversationContext:
         intent: Last intent type
         full_query: Last complete query
     """
+
     breed: Optional[str] = None
     age: Optional[int] = None
     sex: Optional[str] = None
@@ -66,37 +67,35 @@ class ContextManager:
 
         # Patterns pour extraction d'entités
         self.breed_pattern = re.compile(
-            r'\b(ross\s*\d+|cobb\s*\d+|hubbard|aviagen|lohmann|hy-line|isa)\b',
-            re.IGNORECASE
+            r"\b(ross\s*\d+|cobb\s*\d+|hubbard|aviagen|lohmann|hy-line|isa)\b",
+            re.IGNORECASE,
         )
 
         self.age_pattern = re.compile(
-            r'\b(\d+)\s*(jour|jours|day|days|j)\b',
-            re.IGNORECASE
+            r"\b(\d+)\s*(jour|jours|day|days|j)\b", re.IGNORECASE
         )
 
         self.sex_pattern = re.compile(
-            r'\b(m[aâ]les?|femelles?|females?|males?|mixte|mixed)\b',
-            re.IGNORECASE
+            r"\b(m[aâ]les?|femelles?|females?|males?|mixte|mixed)\b", re.IGNORECASE
         )
 
         self.metric_keywords = {
-            'poids': ['poids', 'weight'],
-            'fcr': ['fcr', 'icg', 'conversion'],
-            'gain': ['gain', 'croissance', 'growth'],
-            'mortality': ['mortalité', 'mortality'],
-            'production': ['production', 'ponte', 'egg'],
-            'consumption': ['consommation', 'consumption', 'feed']
+            "poids": ["poids", "weight"],
+            "fcr": ["fcr", "icg", "conversion"],
+            "gain": ["gain", "croissance", "growth"],
+            "mortality": ["mortalité", "mortality"],
+            "production": ["production", "ponte", "egg"],
+            "consumption": ["consommation", "consumption", "feed"],
         }
 
         # Patterns de coréférence (questions incomplètes)
         self.coreference_patterns = [
-            r'^et\s+(pour|chez)\s+',  # "Et pour les femelles?"
-            r'^même\s+chose',         # "Même chose pour..."
-            r'^à\s+cet\s+[aâ]ge',     # "À cet âge-là?"
-            r'^pour\s+cette\s+race',  # "Pour cette race?"
-            r'^quelle?\s*est',        # "Quel est..." (sans contexte)
-            r'^\?$',                  # Juste "?"
+            r"^et\s+(pour|chez)\s+",  # "Et pour les femelles?"
+            r"^même\s+chose",  # "Même chose pour..."
+            r"^à\s+cet\s+[aâ]ge",  # "À cet âge-là?"
+            r"^pour\s+cette\s+race",  # "Pour cette race?"
+            r"^quelle?\s*est",  # "Quel est..." (sans contexte)
+            r"^\?$",  # Juste "?"
         ]
 
     def is_coreference(self, query: str) -> bool:
@@ -143,14 +142,14 @@ class ContextManager:
         # Extract breed
         breed_match = self.breed_pattern.search(query)
         if breed_match:
-            entities['breed'] = breed_match.group(1)
+            entities["breed"] = breed_match.group(1)
 
         # Extract age
         age_match = self.age_pattern.search(query)
         if age_match:
             try:
                 # Store as string for compatibility with 'in' operator in tests
-                entities['age'] = str(age_match.group(1))
+                entities["age"] = str(age_match.group(1))
             except ValueError:
                 pass
 
@@ -158,29 +157,27 @@ class ContextManager:
         sex_match = self.sex_pattern.search(query)
         if sex_match:
             sex_raw = sex_match.group(1).lower()
-            if 'male' in sex_raw or 'mâle' in sex_raw:
-                entities['sex'] = 'male' if 'femel' not in sex_raw else 'female'
-            elif 'femel' in sex_raw:
-                entities['sex'] = 'female'
+            if "male" in sex_raw or "mâle" in sex_raw:
+                entities["sex"] = "male" if "femel" not in sex_raw else "female"
+            elif "femel" in sex_raw:
+                entities["sex"] = "female"
             else:
-                entities['sex'] = 'mixed'
+                entities["sex"] = "mixed"
 
         # Extract metric
         for metric_type, keywords in self.metric_keywords.items():
             for keyword in keywords:
                 if keyword in query.lower():
-                    entities['metric'] = metric_type
+                    entities["metric"] = metric_type
                     break
-            if 'metric' in entities:
+            if "metric" in entities:
                 break
 
         logger.debug(f"Extracted entities from '{query}': {entities}")
         return entities
 
     def update_context(
-        self,
-        query: str,
-        intent_result: Optional[Dict[str, Any]] = None
+        self, query: str, intent_result: Optional[Dict[str, Any]] = None
     ) -> None:
         """
         Update conversation context from query and intent
@@ -198,12 +195,14 @@ class ContextManager:
 
         # Update context (keep previous values if not found in new query)
         self.context = ConversationContext(
-            breed=entities.get('breed') or self.context.breed,
-            age=entities.get('age') or self.context.age,
-            sex=entities.get('sex') or self.context.sex,
-            metric=entities.get('metric') or self.context.metric,
-            intent=intent_result.get('intent') if intent_result else self.context.intent,
-            full_query=query
+            breed=entities.get("breed") or self.context.breed,
+            age=entities.get("age") or self.context.age,
+            sex=entities.get("sex") or self.context.sex,
+            metric=entities.get("metric") or self.context.metric,
+            intent=(
+                intent_result.get("intent") if intent_result else self.context.intent
+            ),
+            full_query=query,
         )
 
         logger.info(
@@ -238,23 +237,25 @@ class ContextManager:
         expanded_parts = []
 
         # Add metric if available
-        metric = new_entities.get('metric') or self.context.metric
+        metric = new_entities.get("metric") or self.context.metric
         if metric:
             expanded_parts.append(metric)
 
         # Add sex (prioritize new entity)
-        sex = new_entities.get('sex') or self.context.sex
+        sex = new_entities.get("sex") or self.context.sex
         if sex:
-            sex_french = 'femelles' if sex == 'female' else 'mâles' if sex == 'male' else 'mixte'
+            sex_french = (
+                "femelles" if sex == "female" else "mâles" if sex == "male" else "mixte"
+            )
             expanded_parts.append(sex_french)
 
         # Add breed (prioritize new entity)
-        breed = new_entities.get('breed') or self.context.breed
+        breed = new_entities.get("breed") or self.context.breed
         if breed:
             expanded_parts.append(breed)
 
         # Add age (prioritize new entity)
-        age = new_entities.get('age') or self.context.age
+        age = new_entities.get("age") or self.context.age
         if age:
             expanded_parts.append(f"à {age} jours")
 
@@ -264,7 +265,7 @@ class ContextManager:
             return query
 
         # Build expanded query
-        expanded = ' '.join(expanded_parts)
+        expanded = " ".join(expanded_parts)
         logger.info(f"Expanded query: '{query}' → '{expanded}'")
 
         return expanded
@@ -316,4 +317,4 @@ def get_context_manager() -> ContextManager:
     return _context_manager_instance
 
 
-__all__ = ['ContextManager', 'ConversationContext', 'get_context_manager']
+__all__ = ["ContextManager", "ConversationContext", "get_context_manager"]

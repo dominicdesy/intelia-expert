@@ -28,10 +28,7 @@ from retrieval.reranker import CohereReranker  # noqa: E402
 @pytest.fixture
 async def reranker():
     """Fixture: Cohere Reranker"""
-    reranker = CohereReranker(
-        model="rerank-multilingual-v3.0",
-        top_n=3
-    )
+    reranker = CohereReranker(model="rerank-multilingual-v3.0", top_n=3)
     await reranker.initialize()
     yield reranker
     await reranker.cleanup()
@@ -51,11 +48,7 @@ async def test_reranker_basic(reranker):
         "Ross 308 à 35 jours: poids moyen 2150g",
     ]
 
-    reranked = await reranker.rerank(
-        query=query,
-        documents=documents,
-        top_n=3
-    )
+    reranked = await reranker.rerank(query=query, documents=documents, top_n=3)
 
     assert len(reranked) <= 3, "Should return top 3"
     assert len(reranked) > 0, "Should return at least 1"
@@ -63,7 +56,9 @@ async def test_reranker_basic(reranker):
     # Les documents reranked devraient avoir des scores
     for doc in reranked:
         assert "score" in doc or "relevance_score" in doc
-        print(f"   Score: {doc.get('score', doc.get('relevance_score')):.3f} | {doc.get('text', doc.get('content'))[:60]}...")
+        print(
+            f"   Score: {doc.get('score', doc.get('relevance_score')):.3f} | {doc.get('text', doc.get('content'))[:60]}..."
+        )
 
     print("\n✅ Test 1 PASSED - Basic reranking")
     print(f"   Top-3 from {len(documents)} documents")
@@ -78,15 +73,16 @@ async def test_reranker_score_improvement(reranker):
     # Documents avec différents niveaux de pertinence
     documents = [
         {"text": "Météo aujourd'hui", "score": 0.5},  # Non pertinent mais score élevé
-        {"text": "Ross 308 poids à 35 jours: 2150g", "score": 0.3},  # Pertinent mais score faible
+        {
+            "text": "Ross 308 poids à 35 jours: 2150g",
+            "score": 0.3,
+        },  # Pertinent mais score faible
         {"text": "Cobb 500 FCR", "score": 0.4},
     ]
 
     # Rerank
     reranked = await reranker.rerank(
-        query=query,
-        documents=[d["text"] for d in documents],
-        top_n=2
+        query=query, documents=[d["text"] for d in documents], top_n=2
     )
 
     # Le document pertinent devrait être en premier après rerank
@@ -94,7 +90,9 @@ async def test_reranker_score_improvement(reranker):
         top_doc = reranked[0]
         top_text = top_doc.get("text", top_doc.get("content", ""))
 
-        assert "Ross 308" in top_text and "35 jours" in top_text, "Most relevant doc should be first"
+        assert (
+            "Ross 308" in top_text and "35 jours" in top_text
+        ), "Most relevant doc should be first"
 
     print("\n✅ Test 2 PASSED - Score improvement")
 
@@ -110,8 +108,8 @@ async def test_reranker_multilingual(reranker):
             "docs": [
                 "Le poids de Ross 308 à 35 jours est de 2150g",
                 "Ross 308 weight at 35 days",
-                "Cobb 500 FCR"
-            ]
+                "Cobb 500 FCR",
+            ],
         },
         {
             "query": "Weight Ross 308 35 days",
@@ -119,8 +117,8 @@ async def test_reranker_multilingual(reranker):
             "docs": [
                 "Ross 308 weight at 35 days is 2150g",
                 "Poids Ross 308 à 35 jours",
-                "Cobb 500 performance"
-            ]
+                "Cobb 500 performance",
+            ],
         },
         {
             "query": "Peso Ross 308 35 días",
@@ -128,16 +126,14 @@ async def test_reranker_multilingual(reranker):
             "docs": [
                 "El peso de Ross 308 a los 35 días es 2150g",
                 "Ross 308 weight performance",
-                "FCR Cobb 500"
-            ]
-        }
+                "FCR Cobb 500",
+            ],
+        },
     ]
 
     for test_case in test_cases:
         reranked = await reranker.rerank(
-            query=test_case["query"],
-            documents=test_case["docs"],
-            top_n=2
+            query=test_case["query"], documents=test_case["docs"], top_n=2
         )
 
         assert len(reranked) > 0
@@ -157,11 +153,7 @@ async def test_reranker_top_n_selection(reranker):
 
     # Test différents top_n
     for top_n in [1, 3, 5]:
-        reranked = await reranker.rerank(
-            query=query,
-            documents=documents,
-            top_n=top_n
-        )
+        reranked = await reranker.rerank(query=query, documents=documents, top_n=top_n)
 
         assert len(reranked) == top_n, f"Should return exactly {top_n} documents"
 
@@ -177,11 +169,7 @@ async def test_reranker_empty_documents(reranker):
     query = "Test query"
 
     # Liste vide
-    reranked = await reranker.rerank(
-        query=query,
-        documents=[],
-        top_n=3
-    )
+    reranked = await reranker.rerank(query=query, documents=[], top_n=3)
 
     assert len(reranked) == 0, "Should return empty list for empty input"
 
@@ -196,11 +184,7 @@ async def test_reranker_single_document(reranker):
 
     documents = ["Ross 308 weight is 2150g at 35 days"]
 
-    reranked = await reranker.rerank(
-        query=query,
-        documents=documents,
-        top_n=3
-    )
+    reranked = await reranker.rerank(query=query, documents=documents, top_n=3)
 
     assert len(reranked) == 1, "Should return 1 document"
 
@@ -218,14 +202,10 @@ async def test_reranker_long_documents(reranker):
     documents = [
         long_doc,
         "Ross 308 weight at 35 days is 2150g",
-        "Cobb 500 performance"
+        "Cobb 500 performance",
     ]
 
-    reranked = await reranker.rerank(
-        query=query,
-        documents=documents,
-        top_n=2
-    )
+    reranked = await reranker.rerank(query=query, documents=documents, top_n=2)
 
     assert len(reranked) > 0
 
@@ -242,14 +222,10 @@ async def test_reranker_special_characters(reranker):
         "Ross 308 @ 35 days: 2150g ± 50g",
         "Température: 32°C (89°F)",
         "FCR = 1.5 kg/kg",
-        "Poids: 2.1-2.3 kg"
+        "Poids: 2.1-2.3 kg",
     ]
 
-    reranked = await reranker.rerank(
-        query=query,
-        documents=documents,
-        top_n=3
-    )
+    reranked = await reranker.rerank(query=query, documents=documents, top_n=3)
 
     assert len(reranked) > 0
 
@@ -264,17 +240,12 @@ async def test_reranker_performance(reranker):
 
     # 20 documents
     documents = [
-        f"Document {i} about Ross 308 weight at various ages"
-        for i in range(20)
+        f"Document {i} about Ross 308 weight at various ages" for i in range(20)
     ]
 
     start = time.time()
 
-    reranked = await reranker.rerank(
-        query=query,
-        documents=documents,
-        top_n=3
-    )
+    reranked = await reranker.rerank(query=query, documents=documents, top_n=3)
 
     duration = time.time() - start
 
@@ -292,7 +263,7 @@ async def test_reranker_batch_queries(reranker):
     queries = [
         "Poids Ross 308 35 jours",
         "FCR Cobb 500 42 jours",
-        "Mortalité poulets semaine 3"
+        "Mortalité poulets semaine 3",
     ]
 
     documents = [
@@ -300,18 +271,14 @@ async def test_reranker_batch_queries(reranker):
         "Cobb 500 FCR at 42 days is 1.6",
         "Mortality rate in week 3 is 0.5%",
         "Temperature control is important",
-        "Water consumption varies by age"
+        "Water consumption varies by age",
     ]
 
     times = []
     for query in queries:
         start = time.time()
 
-        reranked = await reranker.rerank(
-            query=query,
-            documents=documents,
-            top_n=2
-        )
+        reranked = await reranker.rerank(query=query, documents=documents, top_n=2)
 
         duration = time.time() - start
         times.append(duration)
@@ -337,17 +304,13 @@ async def test_reranker_score_distribution(reranker):
         "Météo aujourd'hui",  # Non pertinent
     ]
 
-    reranked = await reranker.rerank(
-        query=query,
-        documents=documents,
-        top_n=4
-    )
+    reranked = await reranker.rerank(query=query, documents=documents, top_n=4)
 
     # Vérifier que les scores sont décroissants
     scores = [doc.get("score", doc.get("relevance_score", 0)) for doc in reranked]
 
     for i in range(len(scores) - 1):
-        assert scores[i] >= scores[i+1], "Scores should be in descending order"
+        assert scores[i] >= scores[i + 1], "Scores should be in descending order"
 
     print("\n✅ Test 11 PASSED - Score distribution")
     print(f"   Scores: {[f'{s:.3f}' for s in scores]}")

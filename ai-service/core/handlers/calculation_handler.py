@@ -36,14 +36,12 @@ class CalculationQueryHandler(BaseQueryHandler):
         self.db_pool = db_pool
         self.calculation_engine = CalculationEngine(db_pool)
         self.reverse_lookup = ReverseLookup(db_pool)
-        logger.info("✅ CalculationQueryHandler initialized with calculation_engine + reverse_lookup")
+        logger.info(
+            "✅ CalculationQueryHandler initialized with calculation_engine + reverse_lookup"
+        )
 
     async def handle(
-        self,
-        query: str,
-        entities: Dict[str, Any],
-        language: str = "fr",
-        **kwargs
+        self, query: str, entities: Dict[str, Any], language: str = "fr", **kwargs
     ) -> Dict[str, Any]:
         """
         Gère une requête de calcul
@@ -104,19 +102,21 @@ class CalculationQueryHandler(BaseQueryHandler):
         if not breed or not target_weight:
             return {
                 "error": "Missing breed or target_weight",
-                "needs_clarification": True
+                "needs_clarification": True,
             }
 
         # Normaliser breed name pour PostgreSQL
         breed_normalized = self._normalize_breed_name(breed)
 
-        logger.info(f"🔍 Reverse lookup: breed={breed_normalized}, sex={sex}, target={target_weight}g")
+        logger.info(
+            f"🔍 Reverse lookup: breed={breed_normalized}, sex={sex}, target={target_weight}g"
+        )
 
         # Trouver l'âge pour le poids cible
-        lookup_result: ReverseLookupResult = await self.reverse_lookup.find_age_for_weight(
-            breed=breed_normalized,
-            sex=sex,
-            target_weight=target_weight
+        lookup_result: ReverseLookupResult = (
+            await self.reverse_lookup.find_age_for_weight(
+                breed=breed_normalized, sex=sex, target_weight=target_weight
+            )
         )
 
         return {
@@ -149,12 +149,14 @@ class CalculationQueryHandler(BaseQueryHandler):
         age_start = entities.get("age_days")
         target_weight = entities.get("target_weight")
 
-        logger.debug(f"🔍 DEBUG: breed={breed}, age_start={age_start}, target_weight={target_weight}")
+        logger.debug(
+            f"🔍 DEBUG: breed={breed}, age_start={age_start}, target_weight={target_weight}"
+        )
 
         if not breed or not age_start:
             return {
                 "error": "Missing breed or starting age",
-                "needs_clarification": True
+                "needs_clarification": True,
             }
 
         # Normaliser breed name
@@ -163,43 +165,51 @@ class CalculationQueryHandler(BaseQueryHandler):
         # Étape 1: Si target_weight fourni, trouver l'âge correspondant
         if target_weight:
             logger.info(f"🔍 Step 1: Finding age for target weight {target_weight}g")
-            lookup_result: ReverseLookupResult = await self.reverse_lookup.find_age_for_weight(
-                breed=breed_normalized,
-                sex=sex,
-                target_weight=target_weight
+            lookup_result: ReverseLookupResult = (
+                await self.reverse_lookup.find_age_for_weight(
+                    breed=breed_normalized, sex=sex, target_weight=target_weight
+                )
             )
             age_end = lookup_result.age_found
 
             if age_end == 0:
                 return {
                     "error": f"Could not find age for target weight {target_weight}g",
-                    "confidence": 0.0
+                    "confidence": 0.0,
                 }
 
             logger.info(f"✅ Target weight {target_weight}g reached at day {age_end}")
         else:
             # Si pas de target_weight, besoin d'un age_end explicite
             age_end = entities.get("age_end")
-            logger.debug(f"🔍 DEBUG: age_end from entities.get('age_end') = {age_end}, type = {type(age_end)}")
+            logger.debug(
+                f"🔍 DEBUG: age_end from entities.get('age_end') = {age_end}, type = {type(age_end)}"
+            )
             logger.debug(f"🔍 DEBUG: 'age_end' in entities = {'age_end' in entities}")
 
             if not age_end:
-                logger.error(f"❌ age_end check failed! entities.keys() = {list(entities.keys())}")
+                logger.error(
+                    f"❌ age_end check failed! entities.keys() = {list(entities.keys())}"
+                )
                 logger.error(f"❌ Full entities dict: {entities}")
                 return {
                     "error": "Need either target_weight or age_end",
-                    "needs_clarification": True
+                    "needs_clarification": True,
                 }
 
         # Étape 2: Calculer consommation totale entre age_start et age_end
-        logger.info(f"🧮 Step 2: Calculating total feed from day {age_start} to day {age_end}")
+        logger.info(
+            f"🧮 Step 2: Calculating total feed from day {age_start} to day {age_end}"
+        )
 
-        calc_result: CalculationResult = await self.calculation_engine.calculate_total_feed(
-            breed=breed_normalized,
-            sex=sex,
-            age_start=age_start,
-            age_end=age_end,
-            target_weight=target_weight  # Pour interpolation proportionnelle
+        calc_result: CalculationResult = (
+            await self.calculation_engine.calculate_total_feed(
+                breed=breed_normalized,
+                sex=sex,
+                age_start=age_start,
+                age_end=age_end,
+                target_weight=target_weight,  # Pour interpolation proportionnelle
+            )
         )
 
         return {
@@ -230,18 +240,17 @@ class CalculationQueryHandler(BaseQueryHandler):
         if not breed or not age_start or not age_end:
             return {
                 "error": "Missing breed, age_start, or age_end",
-                "needs_clarification": True
+                "needs_clarification": True,
             }
 
         breed_normalized = self._normalize_breed_name(breed)
 
-        logger.info(f"📈 Projection: {breed_normalized} from day {age_start} to {age_end}")
+        logger.info(
+            f"📈 Projection: {breed_normalized} from day {age_start} to {age_end}"
+        )
 
         calc_result: CalculationResult = await self.calculation_engine.project_weight(
-            breed=breed_normalized,
-            sex=sex,
-            age_start=age_start,
-            age_end=age_end
+            breed=breed_normalized, sex=sex, age_start=age_start, age_end=age_end
         )
 
         return {
@@ -270,21 +279,20 @@ class CalculationQueryHandler(BaseQueryHandler):
         mortality_pct = entities.get("mortality_pct", 0.0)
 
         if not breed or not age:
-            return {
-                "error": "Missing breed or age",
-                "needs_clarification": True
-            }
+            return {"error": "Missing breed or age", "needs_clarification": True}
 
         breed_normalized = self._normalize_breed_name(breed)
 
-        logger.info(f"🐔 Flock calculation: {flock_size} birds, {breed_normalized}, {age}d")
+        logger.info(
+            f"🐔 Flock calculation: {flock_size} birds, {breed_normalized}, {age}d"
+        )
 
         result = await self.calculation_engine.calculate_flock_totals(
             breed=breed_normalized,
             sex=sex,
             age=age,
             flock_size=flock_size,
-            mortality_pct=mortality_pct
+            mortality_pct=mortality_pct,
         )
 
         return result
@@ -298,25 +306,41 @@ class CalculationQueryHandler(BaseQueryHandler):
         query_lower = query.lower()
 
         # Détection reverse lookup
-        if any(phrase in query_lower for phrase in [
-            "à quel âge", "at what age", "when will", "quand",
-            "reach", "atteindre", "atteint"
-        ]) and entities.get("target_weight"):
+        if any(
+            phrase in query_lower
+            for phrase in [
+                "à quel âge",
+                "at what age",
+                "when will",
+                "quand",
+                "reach",
+                "atteindre",
+                "atteint",
+            ]
+        ) and entities.get("target_weight"):
             entities["calculation_type"] = "reverse_lookup"
             return await self._handle_reverse_lookup(query, entities)
 
         # Détection cumulative feed
-        if any(phrase in query_lower for phrase in [
-            "combien de moulée", "combien d'aliment", "how much feed",
-            "total feed", "consommation totale", "besoin"
-        ]) and entities.get("target_weight"):
+        if any(
+            phrase in query_lower
+            for phrase in [
+                "combien de moulée",
+                "combien d'aliment",
+                "how much feed",
+                "total feed",
+                "consommation totale",
+                "besoin",
+            ]
+        ) and entities.get("target_weight"):
             entities["calculation_type"] = "cumulative_feed"
             return await self._handle_cumulative_feed(query, entities)
 
         # Détection projection
-        if any(phrase in query_lower for phrase in [
-            "quel sera", "what will be", "projet", "futur", "future"
-        ]):
+        if any(
+            phrase in query_lower
+            for phrase in ["quel sera", "what will be", "projet", "futur", "future"]
+        ):
             entities["calculation_type"] = "projection"
             return await self._handle_projection(query, entities)
 
@@ -326,7 +350,7 @@ class CalculationQueryHandler(BaseQueryHandler):
 
         return {
             "error": "Could not determine calculation type",
-            "needs_clarification": True
+            "needs_clarification": True,
         }
 
     def _normalize_breed_name(self, breed: str) -> str:

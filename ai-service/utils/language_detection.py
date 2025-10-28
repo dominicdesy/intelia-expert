@@ -123,61 +123,57 @@ def _detect_language_by_grammar_patterns(text: str) -> Optional[str]:
     # Question words + auxiliaries
     english_indicators = [
         # Question patterns (high weight for certainty) - compiled regex
-        (re.compile(r'^is\s+'), 3.0),  # "Is ..." at start (question)
-        (re.compile(r'^are\s+'), 3.0),  # "Are ..." at start
-        (re.compile(r'^do\s+'), 3.0),  # "Do ..." at start
-        (re.compile(r'^does\s+'), 3.0),  # "Does ..." at start
-        (re.compile(r'^can\s+'), 3.0),  # "Can ..." at start
-        (re.compile(r'^what\s+is\b'), 3.5),  # "What is"
-        (re.compile(r'^what\s+are\b'), 3.5),  # "What are"
-        (re.compile(r'^how\s+to\b'), 3.5),  # "How to"
-        (re.compile(r'^how\s+(can|do)\b'), 3.5),  # "How can", "How do"
-
+        (re.compile(r"^is\s+"), 3.0),  # "Is ..." at start (question)
+        (re.compile(r"^are\s+"), 3.0),  # "Are ..." at start
+        (re.compile(r"^do\s+"), 3.0),  # "Do ..." at start
+        (re.compile(r"^does\s+"), 3.0),  # "Does ..." at start
+        (re.compile(r"^can\s+"), 3.0),  # "Can ..." at start
+        (re.compile(r"^what\s+is\b"), 3.5),  # "What is"
+        (re.compile(r"^what\s+are\b"), 3.5),  # "What are"
+        (re.compile(r"^how\s+to\b"), 3.5),  # "How to"
+        (re.compile(r"^how\s+(can|do)\b"), 3.5),  # "How can", "How do"
         # Mid-sentence patterns
-        (re.compile(r'\bis\s+\w+'), 1.5),  # "is safe", "is vaccination"
-        (re.compile(r'\bare\s+\w+'), 1.5),  # "are birds"
-        (re.compile(r'\bdo\s+\w+'), 1.5),  # "do chickens"
-
+        (re.compile(r"\bis\s+\w+"), 1.5),  # "is safe", "is vaccination"
+        (re.compile(r"\bare\s+\w+"), 1.5),  # "are birds"
+        (re.compile(r"\bdo\s+\w+"), 1.5),  # "do chickens"
         # Articles + prepositions (literal strings)
-        ('the ', 1.5),
-        (' a ', 1.5),
-        (' an ', 1.5),
-        (' of ', 1.0),
-        (' for ', 1.0),
-        (' with ', 1.0),
-        (' safe', 2.0),  # Common English word unlikely in other languages
-        (' dangerous', 2.0),
+        ("the ", 1.5),
+        (" a ", 1.5),
+        (" an ", 1.5),
+        (" of ", 1.0),
+        (" for ", 1.0),
+        (" with ", 1.0),
+        (" safe", 2.0),  # Common English word unlikely in other languages
+        (" dangerous", 2.0),
     ]
 
     # === FRENCH PATTERNS ===
     french_indicators = [
         # Question words (high weight) - using compiled regex for regex patterns
-        (re.compile(r'^quel\s+est\b'), 4.0),  # "Quel est"
-        (re.compile(r'^quelle\s+est\b'), 4.0),  # "Quelle est"
-        (re.compile(r'^quels\s+sont\b'), 4.0),  # "Quels sont"
-        (re.compile(r'^quelles\s+sont\b'), 4.0),  # "Quelles sont"
-        (re.compile(r'^comment\s+'), 4.0),  # "Comment"
-        (re.compile(r'^pourquoi\s+'), 4.0),  # "Pourquoi"
-        (re.compile(r'^est-ce\s+que\b'), 4.0),  # "Est-ce que"
-        (re.compile(r'^qu\'est-ce\b'), 4.0),  # "Qu'est-ce"
-
+        (re.compile(r"^quel\s+est\b"), 4.0),  # "Quel est"
+        (re.compile(r"^quelle\s+est\b"), 4.0),  # "Quelle est"
+        (re.compile(r"^quels\s+sont\b"), 4.0),  # "Quels sont"
+        (re.compile(r"^quelles\s+sont\b"), 4.0),  # "Quelles sont"
+        (re.compile(r"^comment\s+"), 4.0),  # "Comment"
+        (re.compile(r"^pourquoi\s+"), 4.0),  # "Pourquoi"
+        (re.compile(r"^est-ce\s+que\b"), 4.0),  # "Est-ce que"
+        (re.compile(r"^qu\'est-ce\b"), 4.0),  # "Qu'est-ce"
         # Mid-sentence
-        (re.compile(r'\best-ce\s+que\b'), 2.5),  # "est-ce que"
-        (re.compile(r'\bqu\'est-ce\b'), 2.5),  # "qu'est-ce"
-        (re.compile(r'\bquel\s+est\b'), 2.5),  # "quel est"
-        (re.compile(r'\bquelle\s+est\b'), 2.5),  # "quelle est"
-
+        (re.compile(r"\best-ce\s+que\b"), 2.5),  # "est-ce que"
+        (re.compile(r"\bqu\'est-ce\b"), 2.5),  # "qu'est-ce"
+        (re.compile(r"\bquel\s+est\b"), 2.5),  # "quel est"
+        (re.compile(r"\bquelle\s+est\b"), 2.5),  # "quelle est"
         # Articles + prepositions (literal strings)
-        (' le ', 1.5),
-        (' la ', 1.5),
-        (' les ', 1.5),
-        (' un ', 1.5),
-        (' une ', 1.5),
-        (' des ', 1.5),
-        (' du ', 1.5),
-        (' de la ', 2.0),
-        (' pour ', 1.0),
-        (' avec ', 1.0),
+        (" le ", 1.5),
+        (" la ", 1.5),
+        (" les ", 1.5),
+        (" un ", 1.5),
+        (" une ", 1.5),
+        (" des ", 1.5),
+        (" du ", 1.5),
+        (" de la ", 2.0),
+        (" pour ", 1.0),
+        (" avec ", 1.0),
         (" d'un ", 2.0),  # "d'un"
         (" d'une ", 2.0),  # "d'une"
     ]
@@ -185,146 +181,138 @@ def _detect_language_by_grammar_patterns(text: str) -> Optional[str]:
     # === SPANISH PATTERNS ===
     spanish_indicators = [
         # Question words - compiled regex
-        (re.compile(r'^¿?qué\s+es\b'), 3.5),  # "¿Qué es" or "qué es"
-        (re.compile(r'^¿?cuál\s+es\b'), 3.5),  # "¿Cuál es"
-        (re.compile(r'^¿?cómo\s+'), 3.5),  # "¿Cómo"
-        (re.compile(r'^¿?dónde\s+'), 3.5),  # "¿Dónde"
-        (re.compile(r'\bqué\s+es\b'), 2.5),  # "qué es" mid-sentence
-        (re.compile(r'\bcuál\s+es\b'), 2.5),  # "cuál es" mid-sentence
-
+        (re.compile(r"^¿?qué\s+es\b"), 3.5),  # "¿Qué es" or "qué es"
+        (re.compile(r"^¿?cuál\s+es\b"), 3.5),  # "¿Cuál es"
+        (re.compile(r"^¿?cómo\s+"), 3.5),  # "¿Cómo"
+        (re.compile(r"^¿?dónde\s+"), 3.5),  # "¿Dónde"
+        (re.compile(r"\bqué\s+es\b"), 2.5),  # "qué es" mid-sentence
+        (re.compile(r"\bcuál\s+es\b"), 2.5),  # "cuál es" mid-sentence
         # Articles + prepositions (literal strings)
-        (' el ', 1.5),
-        (' la ', 1.5),
-        (' los ', 1.5),
-        (' las ', 1.5),
-        (' un ', 1.5),
-        (' una ', 1.5),
-        (' de ', 1.0),
-        (' para ', 1.0),
-        (' con ', 1.0),
+        (" el ", 1.5),
+        (" la ", 1.5),
+        (" los ", 1.5),
+        (" las ", 1.5),
+        (" un ", 1.5),
+        (" una ", 1.5),
+        (" de ", 1.0),
+        (" para ", 1.0),
+        (" con ", 1.0),
     ]
 
     # === ITALIAN PATTERNS ===
     italian_indicators = [
         # Question words - compiled regex
-        (re.compile(r'^cos\'è\b'), 3.5),  # "Cos'è"
-        (re.compile(r'^che\s+cos\'è\b'), 3.5),  # "Che cos'è"
-        (re.compile(r'^come\s+'), 3.5),  # "Come"
-        (re.compile(r'^qual\s+è\b'), 3.5),  # "Qual è"
-
+        (re.compile(r"^cos\'è\b"), 3.5),  # "Cos'è"
+        (re.compile(r"^che\s+cos\'è\b"), 3.5),  # "Che cos'è"
+        (re.compile(r"^come\s+"), 3.5),  # "Come"
+        (re.compile(r"^qual\s+è\b"), 3.5),  # "Qual è"
         # Mid-sentence
-        (re.compile(r'\bcos\'è\b'), 2.5),  # "cos'è"
-        (re.compile(r'\bcome\s+'), 1.5),  # "come"
-
+        (re.compile(r"\bcos\'è\b"), 2.5),  # "cos'è"
+        (re.compile(r"\bcome\s+"), 1.5),  # "come"
         # Articles + prepositions (literal strings)
-        (' il ', 1.5),
-        (' la ', 1.5),
-        (' gli ', 1.5),
-        (' le ', 1.5),
-        (' un ', 1.5),
-        (' una ', 1.5),
-        (' del ', 1.5),
-        (' della ', 1.5),
+        (" il ", 1.5),
+        (" la ", 1.5),
+        (" gli ", 1.5),
+        (" le ", 1.5),
+        (" un ", 1.5),
+        (" una ", 1.5),
+        (" del ", 1.5),
+        (" della ", 1.5),
     ]
 
     # === GERMAN PATTERNS ===
     german_indicators = [
         # Question words - compiled regex
-        (re.compile(r'^was\s+ist\b'), 3.5),  # "Was ist"
-        (re.compile(r'^wie\s+'), 3.5),  # "Wie"
-        (re.compile(r'^warum\s+'), 3.5),  # "Warum"
-
+        (re.compile(r"^was\s+ist\b"), 3.5),  # "Was ist"
+        (re.compile(r"^wie\s+"), 3.5),  # "Wie"
+        (re.compile(r"^warum\s+"), 3.5),  # "Warum"
         # Articles + prepositions (literal strings)
-        (' der ', 2.0),
-        (' die ', 2.0),
-        (' das ', 2.0),
-        (' den ', 1.5),
-        (' dem ', 1.5),
-        (' ein ', 1.5),
-        (' eine ', 1.5),
-        (' ist ', 1.5),
-        (' sind ', 1.5),
+        (" der ", 2.0),
+        (" die ", 2.0),
+        (" das ", 2.0),
+        (" den ", 1.5),
+        (" dem ", 1.5),
+        (" ein ", 1.5),
+        (" eine ", 1.5),
+        (" ist ", 1.5),
+        (" sind ", 1.5),
     ]
 
     # === PORTUGUESE PATTERNS ===
     portuguese_indicators = [
         # Question words - compiled regex
-        (re.compile(r'^o\s+que\s+é\b'), 3.5),  # "O que é"
-        (re.compile(r'^qual\s+é\b'), 3.5),  # "Qual é"
-        (re.compile(r'^como\s+'), 3.5),  # "Como"
-
+        (re.compile(r"^o\s+que\s+é\b"), 3.5),  # "O que é"
+        (re.compile(r"^qual\s+é\b"), 3.5),  # "Qual é"
+        (re.compile(r"^como\s+"), 3.5),  # "Como"
         # Articles + prepositions (literal strings)
-        (' o ', 1.5),
-        (' a ', 1.5),
-        (' os ', 1.5),
-        (' as ', 1.5),
-        (' um ', 1.5),
-        (' uma ', 1.5),
-        (' de ', 1.0),
-        (' para ', 1.0),
-        (' com ', 1.0),
-        (' são ', 2.0),  # "são" (are)
+        (" o ", 1.5),
+        (" a ", 1.5),
+        (" os ", 1.5),
+        (" as ", 1.5),
+        (" um ", 1.5),
+        (" uma ", 1.5),
+        (" de ", 1.0),
+        (" para ", 1.0),
+        (" com ", 1.0),
+        (" são ", 2.0),  # "são" (are)
     ]
 
     # === DUTCH PATTERNS ===
     dutch_indicators = [
         # Question words - compiled regex
-        (re.compile(r'^wat\s+is\b'), 3.5),  # "Wat is"
-        (re.compile(r'^hoe\s+'), 3.5),  # "Hoe"
-        (re.compile(r'^waarom\s+'), 3.5),  # "Waarom"
-
+        (re.compile(r"^wat\s+is\b"), 3.5),  # "Wat is"
+        (re.compile(r"^hoe\s+"), 3.5),  # "Hoe"
+        (re.compile(r"^waarom\s+"), 3.5),  # "Waarom"
         # Articles + prepositions (literal strings)
-        (' de ', 1.5),
-        (' het ', 1.5),
-        (' een ', 1.5),
-        (' van ', 1.0),
-        (' voor ', 1.0),
-        (' met ', 1.0),
-        (' zijn ', 1.5),
+        (" de ", 1.5),
+        (" het ", 1.5),
+        (" een ", 1.5),
+        (" van ", 1.0),
+        (" voor ", 1.0),
+        (" met ", 1.0),
+        (" zijn ", 1.5),
     ]
 
     # === POLISH PATTERNS ===
     polish_indicators = [
         # Question words - compiled regex
-        (re.compile(r'^co\s+to\s+jest\b'), 3.5),  # "Co to jest"
-        (re.compile(r'^jak\s+'), 3.5),  # "Jak"
-        (re.compile(r'^dlaczego\s+'), 3.5),  # "Dlaczego"
-
+        (re.compile(r"^co\s+to\s+jest\b"), 3.5),  # "Co to jest"
+        (re.compile(r"^jak\s+"), 3.5),  # "Jak"
+        (re.compile(r"^dlaczego\s+"), 3.5),  # "Dlaczego"
         # Common words (literal strings)
-        (' jest ', 2.0),
-        (' są ', 2.0),
-        (' to ', 1.5),
-        (' na ', 1.0),
-        (' w ', 1.0),
-        (' z ', 1.0),
+        (" jest ", 2.0),
+        (" są ", 2.0),
+        (" to ", 1.5),
+        (" na ", 1.0),
+        (" w ", 1.0),
+        (" z ", 1.0),
     ]
 
     # === INDONESIAN PATTERNS ===
     indonesian_indicators = [
         # Question words - compiled regex
-        (re.compile(r'^apa\s+'), 3.5),  # "Apa"
-        (re.compile(r'^bagaimana\s+'), 3.5),  # "Bagaimana"
-        (re.compile(r'^mengapa\s+'), 3.5),  # "Mengapa"
-
+        (re.compile(r"^apa\s+"), 3.5),  # "Apa"
+        (re.compile(r"^bagaimana\s+"), 3.5),  # "Bagaimana"
+        (re.compile(r"^mengapa\s+"), 3.5),  # "Mengapa"
         # Common words (literal strings)
-        (' yang ', 2.0),
-        (' adalah ', 2.0),
-        (' untuk ', 1.5),
-        (' dengan ', 1.5),
-        (' dari ', 1.5),
+        (" yang ", 2.0),
+        (" adalah ", 2.0),
+        (" untuk ", 1.5),
+        (" dengan ", 1.5),
+        (" dari ", 1.5),
     ]
 
     # Calculate scores for each language
     scores = {
-        'en': 0.0,
-        'fr': 0.0,
-        'es': 0.0,
-        'it': 0.0,
-        'de': 0.0,
-        'pt': 0.0,
-        'nl': 0.0,
-        'pl': 0.0,
-        'id': 0.0,
+        "en": 0.0,
+        "fr": 0.0,
+        "es": 0.0,
+        "it": 0.0,
+        "de": 0.0,
+        "pt": 0.0,
+        "nl": 0.0,
+        "pl": 0.0,
+        "id": 0.0,
         # Note: hi (Hindi), th (Thai), zh (Chinese) use Unicode patterns, not grammar patterns
     }
 
@@ -332,88 +320,90 @@ def _detect_language_by_grammar_patterns(text: str) -> Optional[str]:
     for pattern, weight in english_indicators:
         if isinstance(pattern, str):
             if pattern in text_lower:
-                scores['en'] += weight
+                scores["en"] += weight
         else:  # compiled regex pattern
             if pattern.search(text_lower):
-                scores['en'] += weight
+                scores["en"] += weight
 
     # Score French
     for pattern, weight in french_indicators:
         if isinstance(pattern, str):
             if pattern in text_lower:
-                scores['fr'] += weight
+                scores["fr"] += weight
         else:  # compiled regex pattern
             if pattern.search(text_lower):
-                scores['fr'] += weight
+                scores["fr"] += weight
 
     # Score Spanish
     for pattern, weight in spanish_indicators:
         if isinstance(pattern, str):
             if pattern in text_lower:
-                scores['es'] += weight
+                scores["es"] += weight
         else:  # compiled regex pattern
             if pattern.search(text_lower):
-                scores['es'] += weight
+                scores["es"] += weight
 
     # Score Italian
     for pattern, weight in italian_indicators:
         if isinstance(pattern, str):
             if pattern in text_lower:
-                scores['it'] += weight
+                scores["it"] += weight
         else:  # compiled regex pattern
             if pattern.search(text_lower):
-                scores['it'] += weight
+                scores["it"] += weight
 
     # Score German
     for pattern, weight in german_indicators:
         if isinstance(pattern, str):
             if pattern in text_lower:
-                scores['de'] += weight
+                scores["de"] += weight
         else:  # compiled regex pattern
             if pattern.search(text_lower):
-                scores['de'] += weight
+                scores["de"] += weight
 
     # Score Portuguese
     for pattern, weight in portuguese_indicators:
         if isinstance(pattern, str):
             if pattern in text_lower:
-                scores['pt'] += weight
+                scores["pt"] += weight
         else:  # compiled regex pattern
             if pattern.search(text_lower):
-                scores['pt'] += weight
+                scores["pt"] += weight
 
     # Score Dutch
     for pattern, weight in dutch_indicators:
         if isinstance(pattern, str):
             if pattern in text_lower:
-                scores['nl'] += weight
+                scores["nl"] += weight
         else:  # compiled regex pattern
             if pattern.search(text_lower):
-                scores['nl'] += weight
+                scores["nl"] += weight
 
     # Score Polish
     for pattern, weight in polish_indicators:
         if isinstance(pattern, str):
             if pattern in text_lower:
-                scores['pl'] += weight
+                scores["pl"] += weight
         else:  # compiled regex pattern
             if pattern.search(text_lower):
-                scores['pl'] += weight
+                scores["pl"] += weight
 
     # Score Indonesian
     for pattern, weight in indonesian_indicators:
         if isinstance(pattern, str):
             if pattern in text_lower:
-                scores['id'] += weight
+                scores["id"] += weight
         else:  # compiled regex pattern
             if pattern.search(text_lower):
-                scores['id'] += weight
+                scores["id"] += weight
 
     # Find language with highest score
     max_score = max(scores.values())
     if max_score >= 2.0:  # Threshold: need at least score of 2.0
         detected_lang = max(scores, key=scores.get)
-        logger.debug(f"Grammar pattern detected: {detected_lang} (score: {max_score:.1f})")
+        logger.debug(
+            f"Grammar pattern detected: {detected_lang} (score: {max_score:.1f})"
+        )
         return detected_lang
 
     return None
@@ -471,7 +461,9 @@ def _detect_with_universal_patterns(text: str) -> Optional[str]:
     return None
 
 
-def detect_language_enhanced(text: str, default: Optional[str] = None) -> LanguageDetectionResult:
+def detect_language_enhanced(
+    text: str, default: Optional[str] = None
+) -> LanguageDetectionResult:
     """
     Détection de langue multilingue sans compilation FastText
     Version optimisée pour Digital Ocean App Platform

@@ -19,7 +19,7 @@ from .fetchers import (
     SemanticScholarFetcher,
     PubMedFetcher,
     EuropePMCFetcher,
-    FAOFetcher
+    FAOFetcher,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,9 +39,9 @@ class ExternalSourceManager:
     # Source reputation weights for ranking
     SOURCE_WEIGHTS = {
         "semantic_scholar": 1.0,  # Large academic coverage
-        "pubmed": 1.0,            # Peer-reviewed biomedical
-        "europe_pmc": 0.9,        # Peer-reviewed + some grey literature
-        "fao": 0.8                # Authoritative but not peer-reviewed
+        "pubmed": 1.0,  # Peer-reviewed biomedical
+        "europe_pmc": 0.9,  # Peer-reviewed + some grey literature
+        "fao": 0.8,  # Authoritative but not peer-reviewed
     }
 
     def __init__(
@@ -51,7 +51,7 @@ class ExternalSourceManager:
         enable_semantic_scholar: bool = True,
         enable_pubmed: bool = True,
         enable_europe_pmc: bool = True,
-        enable_fao: bool = False  # Disabled by default (placeholder)
+        enable_fao: bool = False,  # Disabled by default (placeholder)
     ):
         """
         Initialize External Source Manager
@@ -61,7 +61,9 @@ class ExternalSourceManager:
             pubmed_api_key: PubMed API key for higher rate limit (optional)
             enable_*: Enable/disable specific sources
         """
-        self.openai_client = AsyncOpenAI(api_key=openai_api_key) if openai_api_key else AsyncOpenAI()
+        self.openai_client = (
+            AsyncOpenAI(api_key=openai_api_key) if openai_api_key else AsyncOpenAI()
+        )
 
         # Initialize fetchers
         self.sources = []
@@ -88,7 +90,7 @@ class ExternalSourceManager:
         query: str,
         language: str = "en",
         max_results_per_source: int = 5,
-        min_year: int = 2015
+        min_year: int = 2015,
     ) -> ExternalSearchResult:
         """
         Search all external sources in parallel
@@ -122,9 +124,7 @@ class ExternalSourceManager:
 
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.warning(
-                    f"❌ Source {self.sources[i].name} failed: {result}"
-                )
+                logger.warning(f"❌ Source {self.sources[i].name} failed: {result}")
                 continue
 
             if result:  # List of documents
@@ -146,7 +146,7 @@ class ExternalSourceManager:
                 unique_results=0,
                 search_duration_ms=duration_ms,
                 query=query,
-                error="No documents found in any source"
+                error="No documents found in any source",
             )
 
         # 3. Deduplicate documents
@@ -171,7 +171,7 @@ class ExternalSourceManager:
             total_results=len(all_docs),
             unique_results=len(unique_docs),
             search_duration_ms=duration_ms,
-            query=query
+            query=query,
         )
 
     def _deduplicate(self, documents: List[ExternalDocument]) -> List[ExternalDocument]:
@@ -196,7 +196,11 @@ class ExternalSourceManager:
         for doc in documents:
             # Method 1: Check unique ID (DOI, PMID, PMCID)
             unique_id = doc.get_unique_id()
-            if unique_id.startswith("doi:") or unique_id.startswith("pmid:") or unique_id.startswith("pmcid:"):
+            if (
+                unique_id.startswith("doi:")
+                or unique_id.startswith("pmid:")
+                or unique_id.startswith("pmcid:")
+            ):
                 if unique_id in seen_ids:
                     logger.debug(f"Duplicate (ID): {doc.title[:60]}")
                     continue
@@ -216,9 +220,7 @@ class ExternalSourceManager:
         return unique
 
     async def _calculate_relevance_scores(
-        self,
-        documents: List[ExternalDocument],
-        query: str
+        self, documents: List[ExternalDocument], query: str
     ) -> List[ExternalDocument]:
         """
         Calculate relevance scores using OpenAI embeddings
@@ -233,8 +235,7 @@ class ExternalSourceManager:
         try:
             # Generate query embedding
             query_response = await self.openai_client.embeddings.create(
-                model="text-embedding-3-small",  # Faster and cheaper
-                input=query
+                model="text-embedding-3-small", input=query  # Faster and cheaper
             )
             query_embedding = query_response.data[0].embedding
 
@@ -245,8 +246,7 @@ class ExternalSourceManager:
             ]
 
             doc_response = await self.openai_client.embeddings.create(
-                model="text-embedding-3-small",
-                input=doc_texts
+                model="text-embedding-3-small", input=doc_texts
             )
 
             # Calculate cosine similarity
@@ -257,7 +257,9 @@ class ExternalSourceManager:
                 similarity = self._cosine_similarity(query_embedding, doc_embedding)
                 doc.relevance_score = similarity
 
-            logger.info(f"✅ Calculated relevance scores for {len(documents)} documents")
+            logger.info(
+                f"✅ Calculated relevance scores for {len(documents)} documents"
+            )
 
         except Exception as e:
             logger.warning(f"⚠️ Failed to calculate relevance scores: {e}")
@@ -278,7 +280,9 @@ class ExternalSourceManager:
 
         return dot_product / (magnitude1 * magnitude2)
 
-    def _rank_documents(self, documents: List[ExternalDocument]) -> List[ExternalDocument]:
+    def _rank_documents(
+        self, documents: List[ExternalDocument]
+    ) -> List[ExternalDocument]:
         """
         Rank documents by composite score
 
@@ -306,7 +310,9 @@ class ExternalSourceManager:
             # 2. Citations score (0.0-1.0, normalized by age)
             years_since_pub = max(current_year - doc.year, 1)
             citations_per_year = doc.citation_count / years_since_pub
-            max_citations_per_year = max_citations / years_since_pub if max_citations > 0 else 1
+            max_citations_per_year = (
+                max_citations / years_since_pub if max_citations > 0 else 1
+            )
             citation_score = min(citations_per_year / max_citations_per_year, 1.0)
 
             # 3. Recency score (0.0-1.0)
@@ -324,10 +330,10 @@ class ExternalSourceManager:
 
             # Composite score
             doc.composite_score = (
-                relevance * 0.40 +
-                citation_score * 0.30 +
-                recency_score * 0.20 +
-                source_score * 0.10
+                relevance * 0.40
+                + citation_score * 0.30
+                + recency_score * 0.20
+                + source_score * 0.10
             )
 
         # Sort by composite score (descending)

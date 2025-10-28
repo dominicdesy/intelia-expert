@@ -62,7 +62,10 @@ class TestQueryRouterV2:
         ]
         for query in queries:
             result = router.route_query(query)
-            assert result in [QueryType.METRICS, QueryType.HYBRID], f"Failed for: {query}"
+            assert result in [
+                QueryType.METRICS,
+                QueryType.HYBRID,
+            ], f"Failed for: {query}"
 
     def test_temporal_metric_query(self, router):
         """Test: Questions temporelles (métriques)"""
@@ -171,17 +174,24 @@ class TestQueryRouterV2:
     def test_regression_target_weight(self, router):
         """Test régression: 'Quel est le poids cible à 35 jours?' doit être METRICS"""
         result = router.route_query("Quel est le poids cible à 35 jours?")
-        assert result == QueryType.METRICS, "Should route to METRICS (contains: quel, poids, cible, 35, jours)"
+        assert (
+            result == QueryType.METRICS
+        ), "Should route to METRICS (contains: quel, poids, cible, 35, jours)"
 
     def test_regression_treatment(self, router):
         """Test régression: 'Comment traiter la coccidiose?' doit être KNOWLEDGE"""
         result = router.route_query("Comment traiter la coccidiose?")
-        assert result == QueryType.KNOWLEDGE, "Should route to KNOWLEDGE (contains: comment, traiter)"
+        assert (
+            result == QueryType.KNOWLEDGE
+        ), "Should route to KNOWLEDGE (contains: comment, traiter)"
 
     def test_regression_comparison(self, router):
         """Test régression: Comparaisons doivent privilégier METRICS"""
         result = router.route_query("Performance Ross 308 vs Cobb 500")
-        assert result in [QueryType.METRICS, QueryType.HYBRID], "Breed comparison should be METRICS or HYBRID"
+        assert result in [
+            QueryType.METRICS,
+            QueryType.HYBRID,
+        ], "Breed comparison should be METRICS or HYBRID"
 
 
 class TestQueryRouterStats:
@@ -207,6 +217,7 @@ class TestQueryRouterStats:
 
 # ===== TEST SUITE COMPLÈTE =====
 
+
 def run_comprehensive_routing_test():
     """
     Test suite complète pour valider le routing v2.0
@@ -214,6 +225,7 @@ def run_comprehensive_routing_test():
     Exécute 30+ cas de test couvrant tous les scénarios
     """
     import logging
+
     logging.basicConfig(level=logging.INFO)
 
     router = QueryRouter()
@@ -232,9 +244,9 @@ def run_comprehensive_routing_test():
     passed = 0
     failed = 0
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("QUERY ROUTER V2.0 - COMPREHENSIVE TEST SUITE")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     for query, expected, description in test_cases:
         result = router.route_query(query)
@@ -248,9 +260,9 @@ def run_comprehensive_routing_test():
             failed += 1
             print(f"       Expected: {expected.value}, Got: {result.value}")
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print(f"RESULTS: {passed} passed, {failed} failed (Total: {len(test_cases)})")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     # Stats
     stats = router.get_routing_stats()

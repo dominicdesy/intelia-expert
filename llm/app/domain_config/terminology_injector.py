@@ -11,7 +11,7 @@ This module provides smart terminology injection into LLM prompts:
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List
 import re
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,9 @@ class TerminologyInjector:
     Intelligent terminology injection system for LLM prompts
     """
 
-    def __init__(self, extended_glossary_path: Path = None, value_chain_path: Path = None):
+    def __init__(
+        self, extended_glossary_path: Path = None, value_chain_path: Path = None
+    ):
         """
         Initialize terminology injector
 
@@ -33,7 +35,7 @@ class TerminologyInjector:
         self.extended_glossary = {}
         self.value_chain_terms = {}
         self.category_index = {}  # category -> [term_keys]
-        self.keyword_index = {}   # keyword -> [term_keys]
+        self.keyword_index = {}  # keyword -> [term_keys]
 
         # Load glossaries
         if extended_glossary_path and extended_glossary_path.exists():
@@ -46,33 +48,37 @@ class TerminologyInjector:
         else:
             logger.warning(f"Value chain terminology not found at {value_chain_path}")
 
-        logger.info(f"[OK] TerminologyInjector initialized with {len(self.extended_glossary)} extended terms")
+        logger.info(
+            f"[OK] TerminologyInjector initialized with {len(self.extended_glossary)} extended terms"
+        )
 
     def _load_extended_glossary(self, path: Path):
         """Load extended glossary from JSON"""
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                self.extended_glossary = data.get('terms', {})
+                self.extended_glossary = data.get("terms", {})
 
             # Build category index
             for term_key, term_data in self.extended_glossary.items():
-                category = term_data.get('category', 'general')
+                category = term_data.get("category", "general")
                 if category not in self.category_index:
                     self.category_index[category] = []
                 self.category_index[category].append(term_key)
 
             # Build keyword index (term words -> term_keys)
             for term_key, term_data in self.extended_glossary.items():
-                term_text = term_data.get('term', '').lower()
+                term_text = term_data.get("term", "").lower()
                 # Extract keywords (2+ character words)
-                keywords = [w for w in re.findall(r'\b\w+\b', term_text) if len(w) >= 2]
+                keywords = [w for w in re.findall(r"\b\w+\b", term_text) if len(w) >= 2]
                 for keyword in keywords:
                     if keyword not in self.keyword_index:
                         self.keyword_index[keyword] = []
                     self.keyword_index[keyword].append(term_key)
 
-            logger.info(f"Loaded {len(self.extended_glossary)} terms across {len(self.category_index)} categories")
+            logger.info(
+                f"Loaded {len(self.extended_glossary)} terms across {len(self.category_index)} categories"
+            )
 
         except Exception as e:
             logger.error(f"Error loading extended glossary: {e}")
@@ -80,34 +86,36 @@ class TerminologyInjector:
     def _load_value_chain_terms(self, path: Path):
         """Load value chain terminology (structured with translations)"""
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 # Flatten all categories
                 for category_key, category_terms in data.items():
-                    if category_key == 'metadata':
+                    if category_key == "metadata":
                         continue
                     for term_key, term_data in category_terms.items():
                         self.value_chain_terms[f"vc_{term_key}"] = {
-                            'term': term_key.replace('_', ' ').title(),
-                            'en': term_data.get('en', ''),
-                            'fr': term_data.get('fr', ''),
-                            'description': term_data.get('description', ''),
-                            'category': category_key
+                            "term": term_key.replace("_", " ").title(),
+                            "en": term_data.get("en", ""),
+                            "fr": term_data.get("fr", ""),
+                            "description": term_data.get("description", ""),
+                            "category": category_key,
                         }
 
             # [FAST] OPTIMIZATION Phase 2: Build keyword index for O(1) value chain lookup (saves ~4ms)
             # Instead of linear search through 100+ terms, we index by keywords
             self.value_chain_index = {}
             for vc_key, vc_data in self.value_chain_terms.items():
-                term_text = vc_data.get('term', '').lower()
+                term_text = vc_data.get("term", "").lower()
                 # Extract keywords (2+ character words)
-                term_words = re.findall(r'\b\w{2,}\b', term_text)
+                term_words = re.findall(r"\b\w{2,}\b", term_text)
                 for word in term_words:
                     if word not in self.value_chain_index:
                         self.value_chain_index[word] = []
                     self.value_chain_index[word].append(vc_key)
 
-            logger.info(f"Loaded {len(self.value_chain_terms)} value chain terms with keyword index")
+            logger.info(
+                f"Loaded {len(self.value_chain_terms)} value chain terms with keyword index"
+            )
 
         except Exception as e:
             logger.error(f"Error loading value chain terms: {e}")
@@ -127,38 +135,107 @@ class TerminologyInjector:
 
         # Category detection keywords
         category_keywords = {
-            'hatchery_incubation': [
-                'hatch', 'incubat', 'egg storage', 'candling', 'setter', 'embryo',
-                'chick quality', 'fertility', 'pip', 'breakout', 'fumigation'
+            "hatchery_incubation": [
+                "hatch",
+                "incubat",
+                "egg storage",
+                "candling",
+                "setter",
+                "embryo",
+                "chick quality",
+                "fertility",
+                "pip",
+                "breakout",
+                "fumigation",
             ],
-            'processing_meat_quality': [
-                'process', 'slaughter', 'carcass', 'yield', 'breast', 'meat',
-                'stunning', 'eviscerat', 'scald', 'debon', 'chilling', 'ph'
+            "processing_meat_quality": [
+                "process",
+                "slaughter",
+                "carcass",
+                "yield",
+                "breast",
+                "meat",
+                "stunning",
+                "eviscerat",
+                "scald",
+                "debon",
+                "chilling",
+                "ph",
             ],
-            'layer_production_egg_quality': [
-                'layer', 'laying', 'egg production', 'hen-day', 'haugh unit',
-                'shell strength', 'yolk color', 'molt', 'point of lay', 'peak'
+            "layer_production_egg_quality": [
+                "layer",
+                "laying",
+                "egg production",
+                "hen-day",
+                "haugh unit",
+                "shell strength",
+                "yolk color",
+                "molt",
+                "point of lay",
+                "peak",
             ],
-            'breeding_genetics': [
-                'breeding', 'genetic', 'selection', 'heritab', 'crossbreed',
-                'heterosis', 'pedigree', 'progeny', 'snp', 'genomic'
+            "breeding_genetics": [
+                "breeding",
+                "genetic",
+                "selection",
+                "heritab",
+                "crossbreed",
+                "heterosis",
+                "pedigree",
+                "progeny",
+                "snp",
+                "genomic",
             ],
-            'nutrition_feed': [
-                'feed', 'nutrition', 'protein', 'energy', 'amino acid',
-                'fcr', 'lysine', 'vitamin', 'mineral', 'calcium', 'ration'
+            "nutrition_feed": [
+                "feed",
+                "nutrition",
+                "protein",
+                "energy",
+                "amino acid",
+                "fcr",
+                "lysine",
+                "vitamin",
+                "mineral",
+                "calcium",
+                "ration",
             ],
-            'health_disease': [
-                'disease', 'health', 'virus', 'bacteria', 'vaccin', 'mortality',
-                'coccidiosis', 'newcastle', 'influenza', 'biosecurity', 'antibiotic'
+            "health_disease": [
+                "disease",
+                "health",
+                "virus",
+                "bacteria",
+                "vaccin",
+                "mortality",
+                "coccidiosis",
+                "newcastle",
+                "influenza",
+                "biosecurity",
+                "antibiotic",
             ],
-            'farm_management_equipment': [
-                'ventilat', 'temperature', 'housing', 'litter', 'drinker',
-                'feeder', 'density', 'stocking', 'lighting', 'ammonia'
+            "farm_management_equipment": [
+                "ventilat",
+                "temperature",
+                "housing",
+                "litter",
+                "drinker",
+                "feeder",
+                "density",
+                "stocking",
+                "lighting",
+                "ammonia",
             ],
-            'anatomy_physiology': [
-                'bone', 'muscle', 'organ', 'blood', 'respiratory', 'digestive',
-                'intestine', 'gizzard', 'feather', 'cloaca'
-            ]
+            "anatomy_physiology": [
+                "bone",
+                "muscle",
+                "organ",
+                "blood",
+                "respiratory",
+                "digestive",
+                "intestine",
+                "gizzard",
+                "feather",
+                "cloaca",
+            ],
         }
 
         # Score each category
@@ -168,7 +245,9 @@ class TerminologyInjector:
                 category_scores[category] = score
 
         # Sort by score (descending)
-        sorted_categories = sorted(category_scores.items(), key=lambda x: x[1], reverse=True)
+        sorted_categories = sorted(
+            category_scores.items(), key=lambda x: x[1], reverse=True
+        )
 
         return [cat for cat, score in sorted_categories]
 
@@ -189,7 +268,7 @@ class TerminologyInjector:
             List of term dictionaries with relevance scores
         """
         query_lower = query.lower()
-        query_words = set(re.findall(r'\b\w{2,}\b', query_lower))
+        query_words = set(re.findall(r"\b\w{2,}\b", query_lower))
 
         matching_terms = {}  # term_key -> (term_data, score)
 
@@ -198,7 +277,10 @@ class TerminologyInjector:
             if word in self.keyword_index:
                 for term_key in self.keyword_index[word]:
                     if term_key not in matching_terms:
-                        matching_terms[term_key] = (self.extended_glossary[term_key], 10)
+                        matching_terms[term_key] = (
+                            self.extended_glossary[term_key],
+                            10,
+                        )
                     else:
                         # Increase score for multiple matches
                         current_data, current_score = matching_terms[term_key]
@@ -206,9 +288,13 @@ class TerminologyInjector:
 
         # 2. Category-based loading (score: 5) - [FAST] OPTIMIZATION: Reduced from 20 to 10 per category
         relevant_categories = self.detect_relevant_categories(query)
-        for category in relevant_categories[:2]:  # Top 2 categories only (reduced from 3)
+        for category in relevant_categories[
+            :2
+        ]:  # Top 2 categories only (reduced from 3)
             if category in self.category_index:
-                for term_key in self.category_index[category][:10]:  # Max 10 per category (reduced from 20)
+                for term_key in self.category_index[category][
+                    :10
+                ]:  # Max 10 per category (reduced from 20)
                     if term_key not in matching_terms:
                         matching_terms[term_key] = (self.extended_glossary[term_key], 5)
 
@@ -220,7 +306,9 @@ class TerminologyInjector:
                         matching_terms[vc_key] = (self.value_chain_terms[vc_key], 8)
 
         # Sort by score and limit
-        sorted_terms = sorted(matching_terms.items(), key=lambda x: x[1][1], reverse=True)
+        sorted_terms = sorted(
+            matching_terms.items(), key=lambda x: x[1][1], reverse=True
+        )
         top_terms = sorted_terms[:max_terms]
 
         # Return term data only
@@ -230,7 +318,7 @@ class TerminologyInjector:
         self,
         query: str,
         max_tokens: int = 600,  # [FAST] OPTIMIZATION: Reduced from 1000 to 600 tokens (~400 token savings)
-        language: str = 'en'
+        language: str = "en",
     ) -> str:
         """
         Format relevant terminology for injection into system prompt
@@ -257,20 +345,20 @@ class TerminologyInjector:
             "## Relevant Technical Terminology",
             "",
             "Use the following precise technical terms when responding:",
-            ""
+            "",
         ]
 
         current_chars = sum(len(line) for line in lines)
         terms_added = 0
 
         for term_data in matching_terms:
-            term_name = term_data.get('term', '')
-            definition = term_data.get('definition', '')
+            term_name = term_data.get("term", "")
+            definition = term_data.get("definition", "")
 
             # For value chain terms, use language-specific translations
-            if 'en' in term_data and 'fr' in term_data:
-                term_display = term_data.get(language, term_data.get('en', term_name))
-                definition = term_data.get('description', definition)
+            if "en" in term_data and "fr" in term_data:
+                term_display = term_data.get(language, term_data.get("en", term_name))
+                definition = term_data.get("description", definition)
             else:
                 term_display = term_name
 
@@ -292,19 +380,21 @@ class TerminologyInjector:
         lines.append(f"_({terms_added} relevant terms loaded)_")
         lines.append("")
 
-        result = '\n'.join(lines)
-        logger.info(f"[BOOK] Injected {terms_added} terminology terms (~{len(result)} chars)")
+        result = "\n".join(lines)
+        logger.info(
+            f"[BOOK] Injected {terms_added} terminology terms (~{len(result)} chars)"
+        )
 
         return result
 
     def get_terminology_stats(self) -> Dict:
         """Get statistics about loaded terminology"""
         return {
-            'extended_glossary_terms': len(self.extended_glossary),
-            'value_chain_terms': len(self.value_chain_terms),
-            'total_terms': len(self.extended_glossary) + len(self.value_chain_terms),
-            'categories': list(self.category_index.keys()),
-            'indexed_keywords': len(self.keyword_index)
+            "extended_glossary_terms": len(self.extended_glossary),
+            "value_chain_terms": len(self.value_chain_terms),
+            "total_terms": len(self.extended_glossary) + len(self.value_chain_terms),
+            "categories": list(self.category_index.keys()),
+            "indexed_keywords": len(self.keyword_index),
         }
 
 
@@ -313,8 +403,7 @@ _terminology_injector = None
 
 
 def get_terminology_injector(
-    extended_glossary_path: Path = None,
-    value_chain_path: Path = None
+    extended_glossary_path: Path = None, value_chain_path: Path = None
 ) -> TerminologyInjector:
     """
     Get singleton instance of terminology injector
@@ -331,16 +420,16 @@ def get_terminology_injector(
     if _terminology_injector is None:
         # Default paths if not provided
         if extended_glossary_path is None:
-            config_dir = Path(__file__).parent / 'domains' / 'aviculture'
-            extended_glossary_path = config_dir / 'extended_glossary.json'
+            config_dir = Path(__file__).parent / "domains" / "aviculture"
+            extended_glossary_path = config_dir / "extended_glossary.json"
 
         if value_chain_path is None:
-            config_dir = Path(__file__).parent / 'domains' / 'aviculture'
-            value_chain_path = config_dir / 'value_chain_terminology.json'
+            config_dir = Path(__file__).parent / "domains" / "aviculture"
+            value_chain_path = config_dir / "value_chain_terminology.json"
 
         _terminology_injector = TerminologyInjector(
             extended_glossary_path=extended_glossary_path,
-            value_chain_path=value_chain_path
+            value_chain_path=value_chain_path,
         )
 
     return _terminology_injector

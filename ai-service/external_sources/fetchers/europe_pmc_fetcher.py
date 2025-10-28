@@ -37,14 +37,11 @@ class EuropePMCFetcher(BaseFetcher):
             base_url="https://www.ebi.ac.uk/europepmc/webservices/rest",
             rate_limit=5.0,  # 5 requests/second
             timeout=30,
-            max_retries=3
+            max_retries=3,
         )
 
     async def _make_request(
-        self,
-        query: str,
-        max_results: int,
-        min_year: int
+        self, query: str, max_results: int, min_year: int
     ) -> Dict[str, Any]:
         """
         Make request to Europe PMC API
@@ -72,7 +69,7 @@ class EuropePMCFetcher(BaseFetcher):
             "format": "json",
             "pageSize": min(max_results, 100),  # API max is 100
             "resultType": "core",
-            "sort": "CITED desc"  # Sort by citations
+            "sort": "CITED desc",  # Sort by citations
         }
 
         response = await self.client.get(url, params=params)
@@ -81,9 +78,7 @@ class EuropePMCFetcher(BaseFetcher):
         return response.json()
 
     def _parse_response(
-        self,
-        response: Dict[str, Any],
-        query: str
+        self, response: Dict[str, Any], query: str
     ) -> List[ExternalDocument]:
         """
         Parse Europe PMC API response
@@ -160,7 +155,7 @@ class EuropePMCFetcher(BaseFetcher):
                     pmcid=pmcid,
                     citation_count=citation_count,
                     journal=journal,
-                    language="en"
+                    language="en",
                 )
 
                 documents.append(doc)

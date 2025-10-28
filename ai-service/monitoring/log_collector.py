@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LogEntry:
     """Entrée de log"""
+
     timestamp: str
     service: str
     level: str
@@ -34,6 +35,7 @@ class LogEntry:
 @dataclass
 class ServiceHealth:
     """État de santé d'un service"""
+
     service: str
     status: str  # "healthy", "degraded", "unhealthy", "unknown"
     last_check: str
@@ -60,11 +62,7 @@ class LogCollector:
         self._lock = asyncio.Lock()
 
     def add_log(
-        self,
-        service: str,
-        level: str,
-        message: str,
-        context: Optional[Dict] = None
+        self, service: str, level: str, message: str, context: Optional[Dict] = None
     ):
         """Ajoute un log"""
         entry = LogEntry(
@@ -72,11 +70,13 @@ class LogCollector:
             service=service,
             level=level,
             message=message,
-            context=context
+            context=context,
         )
         self.logs.append(entry)
 
-    async def check_service_health(self, service_name: str, base_url: str, endpoint: str = "/health"):
+    async def check_service_health(
+        self, service_name: str, base_url: str, endpoint: str = "/health"
+    ):
         """Vérifie la santé d'un service"""
         start = time.time()
 
@@ -97,7 +97,7 @@ class LogCollector:
                     status=status,
                     last_check=datetime.now().isoformat(),
                     response_time_ms=response_time,
-                    error_message=error_msg
+                    error_message=error_msg,
                 )
 
                 async with self._lock:
@@ -108,7 +108,7 @@ class LogCollector:
                     service=service_name,
                     level="INFO" if status == "healthy" else "WARNING",
                     message=f"Health check: {status} ({response_time:.0f}ms)",
-                    context={"response_time_ms": response_time}
+                    context={"response_time_ms": response_time},
                 )
 
                 return health
@@ -119,7 +119,7 @@ class LogCollector:
                 status="unhealthy",
                 last_check=datetime.now().isoformat(),
                 response_time_ms=None,
-                error_message="Connection failed"
+                error_message="Connection failed",
             )
 
             async with self._lock:
@@ -129,7 +129,7 @@ class LogCollector:
                 service=service_name,
                 level="ERROR",
                 message="Health check failed: Connection refused",
-                context={}
+                context={},
             )
 
             return health
@@ -140,7 +140,7 @@ class LogCollector:
                 status="degraded",
                 last_check=datetime.now().isoformat(),
                 response_time_ms=None,
-                error_message="Timeout"
+                error_message="Timeout",
             )
 
             async with self._lock:
@@ -150,7 +150,7 @@ class LogCollector:
                 service=service_name,
                 level="WARNING",
                 message="Health check timeout",
-                context={}
+                context={},
             )
 
             return health
@@ -161,7 +161,7 @@ class LogCollector:
                 status="unknown",
                 last_check=datetime.now().isoformat(),
                 response_time_ms=None,
-                error_message=str(e)
+                error_message=str(e),
             )
 
             async with self._lock:
@@ -171,12 +171,17 @@ class LogCollector:
                 service=service_name,
                 level="ERROR",
                 message=f"Health check error: {e}",
-                context={}
+                context={},
             )
 
             return health
 
-    def get_logs(self, limit: Optional[int] = None, service: Optional[str] = None, level: Optional[str] = None) -> List[Dict]:
+    def get_logs(
+        self,
+        limit: Optional[int] = None,
+        service: Optional[str] = None,
+        level: Optional[str] = None,
+    ) -> List[Dict]:
         """
         Récupère les logs filtrés
 
@@ -217,7 +222,9 @@ class LogCollector:
         errors = sum(1 for log in self.logs if log.level == "ERROR")
         warnings = sum(1 for log in self.logs if log.level == "WARNING")
 
-        healthy_services = sum(1 for s in self.services.values() if s.status == "healthy")
+        healthy_services = sum(
+            1 for s in self.services.values() if s.status == "healthy"
+        )
         total_services = len(self.services)
 
         return {
@@ -226,7 +233,7 @@ class LogCollector:
             "warnings": warnings,
             "total_services": total_services,
             "healthy_services": healthy_services,
-            "last_update": datetime.now().isoformat()
+            "last_update": datetime.now().isoformat(),
         }
 
 

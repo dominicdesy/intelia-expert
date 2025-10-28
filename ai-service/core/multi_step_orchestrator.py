@@ -542,7 +542,7 @@ class MultiStepOrchestrator:
         breed_patterns = [
             r"(?:avec|pour|utilise[rz]?)\s+(?:la souche|le breed)?\s*([A-Za-z]+\s*\d+)",
             r"(?:chang(?:er|ez)|modifi(?:er|ez)|remplace[rz]?)\s+(?:par|avec|pour)\s+([A-Za-z]+\s*\d+)",
-            r"(?:si|avec)\s+([A-Za-z]+\s*\d+)\s+(?:à la place|au lieu)"
+            r"(?:si|avec)\s+([A-Za-z]+\s*\d+)\s+(?:à la place|au lieu)",
         ]
         for pattern in breed_patterns:
             match = re.search(pattern, query, re.IGNORECASE)
@@ -583,7 +583,7 @@ class MultiStepOrchestrator:
         # Parser les modifications de densité
         density_patterns = [
             r"(\d+)\s*(?:oiseaux?|poulets?|sujets?)\s*(?:par|/)\s*m[²2]",
-            r"densité\s*(?:de)?\s*(\d+)"
+            r"densité\s*(?:de)?\s*(\d+)",
         ]
         for pattern in density_patterns:
             match = re.search(pattern, query, re.IGNORECASE)
@@ -634,8 +634,14 @@ class MultiStepOrchestrator:
 
         # Contraintes de poids (min/max)
         weight_patterns = [
-            (r"poids\s+(?:mini(?:mum|mal)?|min)\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*(?:kg|g)?", "min_weight"),
-            (r"poids\s+(?:maxi(?:mum|mal)?|max)\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*(?:kg|g)?", "max_weight"),
+            (
+                r"poids\s+(?:mini(?:mum|mal)?|min)\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*(?:kg|g)?",
+                "min_weight",
+            ),
+            (
+                r"poids\s+(?:maxi(?:mum|mal)?|max)\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*(?:kg|g)?",
+                "max_weight",
+            ),
             (r"au moins\s+(\d+(?:\.\d+)?)\s*(?:kg|g)", "min_weight"),
             (r"maximum\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*(?:kg|g)", "max_weight"),
         ]
@@ -663,8 +669,14 @@ class MultiStepOrchestrator:
 
         # Contraintes de mortalité
         mortality_patterns = [
-            (r"mortalité\s+(?:max|maximum|inférieure?)\s+(?:à|de)?\s+(\d+(?:\.\d+)?)\s*%", "max_mortality"),
-            (r"(?:moins|max)\s+(\d+(?:\.\d+)?)\s*%\s+(?:de\s+)?mortalité", "max_mortality"),
+            (
+                r"mortalité\s+(?:max|maximum|inférieure?)\s+(?:à|de)?\s+(\d+(?:\.\d+)?)\s*%",
+                "max_mortality",
+            ),
+            (
+                r"(?:moins|max)\s+(\d+(?:\.\d+)?)\s*%\s+(?:de\s+)?mortalité",
+                "max_mortality",
+            ),
         ]
         for pattern, key in mortality_patterns:
             match = re.search(pattern, query, re.IGNORECASE)
@@ -673,9 +685,18 @@ class MultiStepOrchestrator:
 
         # Contraintes de gain quotidien
         gain_patterns = [
-            (r"gain\s+(?:quotidien|journalier)\s+(?:min|minimum)\s+(?:de\s+)?(\d+(?:\.\d+)?)", "min_daily_gain"),
-            (r"gain\s+(?:quotidien|journalier)\s+(?:max|maximum)\s+(?:de\s+)?(\d+(?:\.\d+)?)", "max_daily_gain"),
-            (r"(?:au moins|minimum)\s+(\d+(?:\.\d+)?)\s*g?/j(?:our)?", "min_daily_gain"),
+            (
+                r"gain\s+(?:quotidien|journalier)\s+(?:min|minimum)\s+(?:de\s+)?(\d+(?:\.\d+)?)",
+                "min_daily_gain",
+            ),
+            (
+                r"gain\s+(?:quotidien|journalier)\s+(?:max|maximum)\s+(?:de\s+)?(\d+(?:\.\d+)?)",
+                "max_daily_gain",
+            ),
+            (
+                r"(?:au moins|minimum)\s+(\d+(?:\.\d+)?)\s*g?/j(?:our)?",
+                "min_daily_gain",
+            ),
         ]
         for pattern, key in gain_patterns:
             match = re.search(pattern, query, re.IGNORECASE)
@@ -711,8 +732,14 @@ class MultiStepOrchestrator:
 
         # Contraintes de température
         temp_patterns = [
-            (r"température\s+(?:min|minimum)\s+(?:de\s+)?(\d+)\s*°?C?", "min_temperature"),
-            (r"température\s+(?:max|maximum)\s+(?:de\s+)?(\d+)\s*°?C?", "max_temperature"),
+            (
+                r"température\s+(?:min|minimum)\s+(?:de\s+)?(\d+)\s*°?C?",
+                "min_temperature",
+            ),
+            (
+                r"température\s+(?:max|maximum)\s+(?:de\s+)?(\d+)\s*°?C?",
+                "max_temperature",
+            ),
             (r"entre\s+(\d+)\s+et\s+(\d+)\s*°?C", "temp_range"),
         ]
         for pattern, key in temp_patterns:
@@ -727,7 +754,10 @@ class MultiStepOrchestrator:
         # Contraintes de densité
         density_patterns = [
             (r"densité\s+(?:max|maximum)\s+(?:de\s+)?(\d+)", "max_density"),
-            (r"(?:maximum|max)\s+(\d+)\s+(?:oiseaux?|poulets?)\s*(?:/|par)\s*m[²2]", "max_density"),
+            (
+                r"(?:maximum|max)\s+(\d+)\s+(?:oiseaux?|poulets?)\s*(?:/|par)\s*m[²2]",
+                "max_density",
+            ),
         ]
         for pattern, key in density_patterns:
             match = re.search(pattern, query, re.IGNORECASE)

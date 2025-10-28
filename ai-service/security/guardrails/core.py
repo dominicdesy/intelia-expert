@@ -57,7 +57,9 @@ class GuardrailsOrchestrator:
         self.cache = GuardrailCache(cache_size) if enable_cache else None
         self.evidence_checker = EvidenceChecker()
         self.hallucination_detector = HallucinationDetector()
-        self.relevance_checker = RelevanceChecker(client)  # NEW: Add relevance verification
+        self.relevance_checker = RelevanceChecker(
+            client
+        )  # NEW: Add relevance verification
 
         # Get validation thresholds for current level
         self.thresholds = get_thresholds(verification_level)
@@ -104,7 +106,9 @@ class GuardrailsOrchestrator:
                 self.hallucination_detector._detect_hallucination_risk(
                     response, context_docs
                 ),
-                self.relevance_checker.check_response_relevance(query, response),  # NEW: Check relevance
+                self.relevance_checker.check_response_relevance(
+                    query, response
+                ),  # NEW: Check relevance
             ]
 
             # Execute in parallel
@@ -121,17 +125,28 @@ class GuardrailsOrchestrator:
 
             # Analyze violations and warnings
             violations, warnings, corrections = self._analyze_violations(
-                evidence_score, hallucination_risk, is_relevant, relevance_score  # NEW: Pass relevance
+                evidence_score,
+                hallucination_risk,
+                is_relevant,
+                relevance_score,  # NEW: Pass relevance
             )
 
             # Calculate confidence
             confidence = self._calculate_confidence(
-                evidence_score, hallucination_risk, len(violations), len(warnings), relevance_score  # NEW: Pass relevance
+                evidence_score,
+                hallucination_risk,
+                len(violations),
+                len(warnings),
+                relevance_score,  # NEW: Pass relevance
             )
 
             # Make validation decision
             is_valid = self._make_validation_decision(
-                evidence_score, hallucination_risk, len(violations), len(warnings), is_relevant  # NEW: Pass relevance
+                evidence_score,
+                hallucination_risk,
+                len(violations),
+                len(warnings),
+                is_relevant,  # NEW: Pass relevance
             )
 
             processing_time = time.time() - start_time
@@ -213,7 +228,11 @@ class GuardrailsOrchestrator:
         return result
 
     def _analyze_violations(
-        self, evidence_score: float, hallucination_risk: float, is_relevant: bool, relevance_score: float
+        self,
+        evidence_score: float,
+        hallucination_risk: float,
+        is_relevant: bool,
+        relevance_score: float,
     ) -> tuple:
         """
         Analyze violations and generate warnings/corrections
@@ -232,7 +251,9 @@ class GuardrailsOrchestrator:
             violations.append(
                 f"Response is OFF-TOPIC or IRRELEVANT to the query (relevance_score: {relevance_score:.2f})"
             )
-            corrections.append("CRITICAL: Response discusses wrong topic/subject. Regenerate response focused on the actual query.")
+            corrections.append(
+                "CRITICAL: Response discusses wrong topic/subject. Regenerate response focused on the actual query."
+            )
 
         # Check evidence support
         if evidence_score < thresholds["evidence_min"]:
@@ -274,9 +295,9 @@ class GuardrailsOrchestrator:
         """Calculate overall confidence score"""
         # NEW: Weighted combination including relevance
         base_confidence = (
-            (evidence_score * 0.4) +
-            ((1 - hallucination_risk) * 0.3) +
-            (relevance_score * 0.3)  # NEW: Relevance weighs 30%
+            (evidence_score * 0.4)
+            + ((1 - hallucination_risk) * 0.3)
+            + (relevance_score * 0.3)  # NEW: Relevance weighs 30%
         )
 
         # Penalties

@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # Instance globale du traducteur LLM
 _translator = None
 
+
 def _get_translator():
     """Récupère l'instance singleton du traducteur"""
     global _translator
@@ -40,9 +41,7 @@ def _translate(text_en: str, language: str) -> str:
 
     translator = _get_translator()
     return translator.translate(
-        text=text_en,
-        target_language=language,
-        source_language="en"
+        text=text_en, target_language=language, source_language="en"
     )
 
 
@@ -535,8 +534,13 @@ class ComparisonEngine:
                 priority_metric = metric_name.lower()
 
                 # Matching partiel: commence par ou contient la priorité
-                if doc_metric.startswith(priority_metric) or priority_metric in doc_metric:
-                    logger.debug(f"Métrique sélectionnée: {metadata.get('metric_name')} (priorité: {metric_name})")
+                if (
+                    doc_metric.startswith(priority_metric)
+                    or priority_metric in doc_metric
+                ):
+                    logger.debug(
+                        f"Métrique sélectionnée: {metadata.get('metric_name')} (priorité: {metric_name})"
+                    )
                     # Retourner les metadata (pas le doc entier avec "content" et "score")
                     return metadata
 
@@ -743,7 +747,9 @@ class ComparisonEngine:
         """Génère réponse basée sur template (avec traduction)"""
 
         # Template EN avec traduction dynamique
-        intro = _translate("To answer your question about the comparison between", language)
+        intro = _translate(
+            "To answer your question about the comparison between", language
+        )
         diff_label = _translate("Difference", language)
         better_label = _translate("Better performance", language)
 

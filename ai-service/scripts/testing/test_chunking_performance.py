@@ -15,8 +15,7 @@ from core.chunking_service import ChunkingService, ChunkConfig
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -30,10 +29,7 @@ def old_word_based_chunking(text: str, chunk_size=500, overlap=50):
     while start < len(words):
         end = min(start + chunk_size, len(words))
         chunk_text = " ".join(words[start:end])
-        chunks.append({
-            "text": chunk_text,
-            "word_count": end - start
-        })
+        chunks.append({"text": chunk_text, "word_count": end - start})
         start = end - overlap if end < len(words) else end
 
     return chunks
@@ -41,9 +37,9 @@ def old_word_based_chunking(text: str, chunk_size=500, overlap=50):
 
 def test_chunking_performance():
     """Test de performance et qualité"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TEST DE PERFORMANCE - CHUNKING SERVICE UNIFIÉ")
-    print("="*80)
+    print("=" * 80)
 
     # Sample scientific abstract (typical external source document)
     sample_text = """
@@ -102,8 +98,10 @@ def test_chunking_performance():
 
     print(f"Chunks created: {len(old_chunks)}")
     print(f"Execution time: {old_time*1000:.2f}ms")
-    print(f"Avg words/chunk: {sum(c['word_count'] for c in old_chunks) / len(old_chunks):.0f}")
-    print(f"\nFirst chunk preview:")
+    print(
+        f"Avg words/chunk: {sum(c['word_count'] for c in old_chunks) / len(old_chunks):.0f}"
+    )
+    print("\nFirst chunk preview:")
     print(f"  {old_chunks[0]['text'][:150]}...")
 
     # Test 2: New semantic chunking
@@ -117,14 +115,13 @@ def test_chunking_performance():
             overlap_words=240,
             prefer_markdown_sections=True,
             prefer_paragraph_boundaries=True,
-            prefer_sentence_boundaries=True
+            prefer_sentence_boundaries=True,
         )
     )
 
     start = time.time()
     new_chunks = chunking_service.chunk_text(
-        sample_text,
-        metadata={"source": "test_document"}
+        sample_text, metadata={"source": "test_document"}
     )
     new_time = time.time() - start
 
@@ -138,7 +135,7 @@ def test_chunking_performance():
     print(f"Source types: {stats['source_types']}")
 
     if new_chunks:
-        print(f"\nFirst chunk preview:")
+        print("\nFirst chunk preview:")
         print(f"  {new_chunks[0].content[:150]}...")
 
     # Test 3: Qualité - vérifier les frontières sémantiques
@@ -151,20 +148,24 @@ def test_chunking_performance():
 
     print("\nNew chunking (semantic):")
     for i, chunk in enumerate(new_chunks[:2]):
-        print(f"\n  Chunk {i+1} ({chunk.source_type}) ends with: '...{chunk.content[-80:]}'")
+        print(
+            f"\n  Chunk {i+1} ({chunk.source_type}) ends with: '...{chunk.content[-80:]}'"
+        )
 
     # Performance comparison
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("PERFORMANCE SUMMARY")
-    print("="*80)
+    print("=" * 80)
 
-    speedup = old_time / new_time if new_time > 0 else float('inf')
+    speedup = old_time / new_time if new_time > 0 else float("inf")
     print(f"Old system: {old_time*1000:.2f}ms")
     print(f"New system: {new_time*1000:.2f}ms")
     print(f"Speedup: {speedup:.1f}x {'faster' if speedup > 1 else 'slower'}")
 
-    print(f"\nChunks comparison:")
-    print(f"  Old: {len(old_chunks)} chunks (avg {sum(c['word_count'] for c in old_chunks) / len(old_chunks):.0f} words)")
+    print("\nChunks comparison:")
+    print(
+        f"  Old: {len(old_chunks)} chunks (avg {sum(c['word_count'] for c in old_chunks) / len(old_chunks):.0f} words)"
+    )
     print(f"  New: {len(new_chunks)} chunks (avg {stats['avg_words']:.0f} words)")
 
     print("\n[PASS] Quality benefits:")
@@ -178,9 +179,9 @@ def test_chunking_performance():
 
 def test_external_document_chunking():
     """Test avec un document externe typique"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TEST EXTERNAL DOCUMENT CHUNKING")
-    print("="*80)
+    print("=" * 80)
 
     # Simulate external document (from PubMed, Semantic Scholar, etc.)
     external_doc = {
@@ -203,14 +204,13 @@ def test_external_document_chunking():
         by 4 points.
         """,
         "source": "PubMed",
-        "doi": "10.1234/example.2024"
+        "doi": "10.1234/example.2024",
     }
 
     chunking_service = ChunkingService()
 
     chunks = chunking_service.chunk_document(
-        external_doc,
-        metadata={"query_context": "coccidiosis prevention broilers"}
+        external_doc, metadata={"query_context": "coccidiosis prevention broilers"}
     )
 
     print(f"\nDocument: {external_doc['title']}")
@@ -240,9 +240,9 @@ if __name__ == "__main__":
         # Test 2: External document chunking
         test_external_document_chunking()
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("[PASS] ALL TESTS PASSED")
-        print("="*80)
+        print("=" * 80)
         print("\nConclusion:")
         print("  - ChunkingService provides semantic boundaries")
         print("  - Performance is optimal (compiled regex, single-pass)")
@@ -253,4 +253,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n[FAIL] TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()

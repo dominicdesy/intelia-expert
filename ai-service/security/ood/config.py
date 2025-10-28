@@ -13,7 +13,6 @@ pattern matching rules.
 """
 
 import json
-import os
 from pathlib import Path
 from utils.types import Dict, List
 
@@ -186,6 +185,7 @@ to the final score. The weighted score formula is:
 
 # ===== ACRONYM EXPANSIONS =====
 
+
 def _load_acronym_expansions() -> Dict[str, str]:
     """
     Load acronym expansions from poultry_terminology.json.
@@ -232,7 +232,7 @@ def _load_acronym_expansions() -> Dict[str, str]:
 
         return expansions
 
-    except Exception as e:
+    except Exception:
         # Fallback to hardcoded acronyms if loading fails
         # NOTE: This is expected - terminology is now managed by LLM service
         # These fallback acronyms are sufficient for OOD detection query normalization
@@ -244,6 +244,7 @@ def _load_acronym_expansions() -> Dict[str, str]:
             "adg": "average daily gain",
             "bw": "body weight",
         }
+
 
 # Load acronym expansions at module initialization
 ACRONYM_EXPANSIONS: Dict[str, str] = _load_acronym_expansions()

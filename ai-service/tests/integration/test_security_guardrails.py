@@ -130,7 +130,9 @@ async def test_ood_edge_cases(ood_detector):
     for query, expected_in_domain in edge_cases:
         result = await ood_detector.detect(query)
 
-        assert result["is_in_domain"] == expected_in_domain, f"Edge case failed: {query}"
+        assert (
+            result["is_in_domain"] == expected_in_domain
+        ), f"Edge case failed: {query}"
 
         print(f"   {query}: {'IN' if result['is_in_domain'] else 'OUT'}")
 
@@ -212,16 +214,16 @@ async def test_guardrails_output_checking(guardrails):
     test_outputs = [
         {
             "text": "Le poids optimal pour Ross 308 à 35 jours est de 2100-2200g.",
-            "should_pass": True
+            "should_pass": True,
         },
         {
             "text": "Utilisez ce poison pour tuer les poulets rapidement.",
-            "should_pass": False
+            "should_pass": False,
         },
         {
             "text": "Pour des symptômes graves, consultez immédiatement un vétérinaire.",
-            "should_pass": True
-        }
+            "should_pass": True,
+        },
     ]
 
     for test_case in test_outputs:
@@ -234,7 +236,9 @@ async def test_guardrails_output_checking(guardrails):
             print(f"   ✓ PASS: {test_case['text'][:50]}")
         else:
             # Devrait être bloqué ou warning
-            print(f"   ✓ {'BLOCKED' if blocked else 'WARNING'}: {test_case['text'][:50]}")
+            print(
+                f"   ✓ {'BLOCKED' if blocked else 'WARNING'}: {test_case['text'][:50]}"
+            )
 
     print("\n✅ Test 8 PASSED - Output checking")
 
@@ -245,9 +249,17 @@ async def test_ood_vocabulary_coverage(ood_detector):
 
     # Termes avicoles qui doivent être reconnus
     poultry_terms = [
-        "broiler", "layer", "hatchery", "incubation",
-        "feed conversion", "mortality rate", "coccidiosis",
-        "Ross 308", "Cobb 500", "Hubbard", "ISA Brown"
+        "broiler",
+        "layer",
+        "hatchery",
+        "incubation",
+        "feed conversion",
+        "mortality rate",
+        "coccidiosis",
+        "Ross 308",
+        "Cobb 500",
+        "Hubbard",
+        "ISA Brown",
     ]
 
     in_domain_count = 0

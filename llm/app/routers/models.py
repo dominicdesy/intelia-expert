@@ -44,7 +44,7 @@ async def list_models():
         ModelInfo(
             id="intelia-llama-3.1-8b-aviculture",
             created=int(time.time()),
-            owned_by="intelia"
+            owned_by="intelia",
         )
     ]
 
@@ -52,9 +52,7 @@ async def list_models():
     if settings.llm_provider == "huggingface":
         models.append(
             ModelInfo(
-                id=settings.huggingface_model,
-                created=int(time.time()),
-                owned_by="meta"
+                id=settings.huggingface_model, created=int(time.time()), owned_by="meta"
             )
         )
 

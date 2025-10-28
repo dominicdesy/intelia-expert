@@ -35,6 +35,7 @@ class ExternalDocument:
         relevance_score: Semantic similarity to query (0.0-1.0)
         composite_score: Final ranking score (0.0-1.0)
     """
+
     title: str
     abstract: str
     authors: List[str]
@@ -94,7 +95,7 @@ class ExternalDocument:
             "language": self.language,
             "relevance_score": self.relevance_score,
             "composite_score": self.composite_score,
-            "fetched_at": self.fetched_at.isoformat()
+            "fetched_at": self.fetched_at.isoformat(),
         }
 
 
@@ -115,6 +116,7 @@ class ExternalSearchResult:
         query: Original query
         error: Error message (if search failed)
     """
+
     found: bool
     best_document: Optional[ExternalDocument] = None
     all_documents: List[ExternalDocument] = field(default_factory=list)
@@ -140,5 +142,5 @@ class ExternalSearchResult:
             "unique_results": self.unique_results,
             "search_duration_ms": self.search_duration_ms,
             "query": self.query,
-            "error": self.error
+            "error": self.error,
         }

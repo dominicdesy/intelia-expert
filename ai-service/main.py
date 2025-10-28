@@ -298,7 +298,9 @@ async def lifespan(app: FastAPI):
             if rate_limiter_instance:
                 if cache_core and hasattr(cache_core, "client") and cache_core.client:
                     rate_limiter_instance.redis_client = cache_core.client
-                    logger.info("[OK] Rate limiting avec Redis activé (10 req/min/user)")
+                    logger.info(
+                        "[OK] Rate limiting avec Redis activé (10 req/min/user)"
+                    )
                 else:
                     logger.warning(
                         "Warning: Redis non disponible - rate limiting en mémoire"
@@ -333,6 +335,7 @@ async def lifespan(app: FastAPI):
         logger.info("Démarrage des health checks du monitoring...")
         try:
             from api.monitoring_routes import start_health_checks
+
             await start_health_checks()
             logger.info("[OK] Health checks du monitoring démarrés")
         except Exception as e:
@@ -366,6 +369,7 @@ async def lifespan(app: FastAPI):
         # Arrêter les health checks du monitoring
         try:
             from api.monitoring_routes import stop_health_checks
+
             await stop_health_checks()
             logger.info("[OK] Health checks du monitoring arrêtés")
         except Exception as e:
@@ -447,7 +451,9 @@ app.add_middleware(
 )
 
 # Initialize rate limiting middleware (Redis will be configured in lifespan)
-logger.info("Initialisation du rate limiting middleware (Redis sera configuré au démarrage)...")
+logger.info(
+    "Initialisation du rate limiting middleware (Redis sera configuré au démarrage)..."
+)
 try:
     from api.middleware.rate_limiter import RateLimiter
 
@@ -464,6 +470,7 @@ app.include_router(initial_router)
 
 # MONITORING ROUTER: Endpoints pour le monitoring des services
 from api.monitoring_routes import router as monitoring_router
+
 app.include_router(monitoring_router)
 
 logger.info(" ROUTER INITIAL AJOUTÉ - TOUS ENDPOINTS DANS LE ROUTER ")

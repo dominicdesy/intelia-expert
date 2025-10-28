@@ -15,7 +15,7 @@ import logging
 from dotenv import load_dotenv
 
 # Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from llm.core.llm_query_classifier import get_llm_query_classifier
 
@@ -24,8 +24,7 @@ load_dotenv()
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -44,88 +43,82 @@ def test_clarification_generation():
             "language": "en",
             "expected_intent": "management_info",
             "should_need_clarification": False,  # management_info doesn't require breed/age
-            "description": "Ambiguous temperature - should ask broiler vs hatchery"
+            "description": "Ambiguous temperature - should ask broiler vs hatchery",
         },
         {
             "query": "La température me semble désajustée",
             "language": "fr",
             "expected_intent": "management_info",
             "should_need_clarification": False,
-            "description": "Ambiguous temperature (FR) - should ask context"
+            "description": "Ambiguous temperature (FR) - should ask context",
         },
-
         # Feed queries
         {
             "query": "We're having issues with feed this week",
             "language": "en",
             "expected_intent": "management_info",
             "should_need_clarification": False,
-            "description": "Ambiguous feed issue - should ask farm type and specifics"
+            "description": "Ambiguous feed issue - should ask farm type and specifics",
         },
         {
             "query": "La consommation d'aliment me semble basse",
             "language": "fr",
             "expected_intent": "management_info",
             "should_need_clarification": False,
-            "description": "Low feed consumption - should ask for context"
+            "description": "Low feed consumption - should ask for context",
         },
-
         # Water queries
         {
             "query": "Water intake is weird",
             "language": "en",
             "expected_intent": "management_info",
             "should_need_clarification": False,
-            "description": "Ambiguous water - should ask context"
+            "description": "Ambiguous water - should ask context",
         },
-
         # Mortality queries
         {
             "query": "Mortality is high",
             "language": "en",
             "expected_intent": "management_info",
             "should_need_clarification": False,
-            "description": "High mortality - should ask farm context and details"
+            "description": "High mortality - should ask farm context and details",
         },
-
         # Performance queries WITHOUT age (should trigger clarification)
         {
             "query": "What is the weight of a Ross 308 male?",
             "language": "en",
             "expected_intent": "performance_query",
             "should_need_clarification": True,  # Missing age!
-            "description": "Performance query missing age - MUST trigger clarification"
+            "description": "Performance query missing age - MUST trigger clarification",
         },
         {
             "query": "Quel est le poids d'un Cobb 500 mâle?",
             "language": "fr",
             "expected_intent": "performance_query",
             "should_need_clarification": True,  # Missing age!
-            "description": "Performance query missing age (FR) - MUST trigger clarification"
+            "description": "Performance query missing age (FR) - MUST trigger clarification",
         },
-
         # Complete performance queries (should NOT need clarification)
         {
             "query": "What is the weight of a Ross 308 male at 21 days?",
             "language": "en",
             "expected_intent": "performance_query",
             "should_need_clarification": False,  # Has breed + age
-            "description": "Complete performance query - no clarification needed"
+            "description": "Complete performance query - no clarification needed",
         },
-
         # General knowledge (should NOT need clarification)
         {
             "query": "What is Newcastle disease?",
             "language": "en",
             "expected_intent": "disease_info",
             "should_need_clarification": False,
-            "description": "Disease info - no clarification needed"
+            "description": "Disease info - no clarification needed",
         },
     ]
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TESTING LLM-GENERATED CLARIFICATION MESSAGES")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     passed = 0
     failed = 0
@@ -157,7 +150,7 @@ def test_clarification_generation():
             routing_target = classification["routing"]["target"]
             confidence = classification["routing"]["confidence"]
 
-            print(f"\nRESULTS:")
+            print("\nRESULTS:")
             print(f"  Intent: {intent}")
             print(f"  Complete: {is_complete}")
             print(f"  Missing entities: {missing_entities}")
@@ -167,14 +160,16 @@ def test_clarification_generation():
             needs_clarification = not is_complete
 
             if needs_clarification:
-                print(f"\nCLARIFICATION MESSAGE GENERATED:")
+                print("\nCLARIFICATION MESSAGE GENERATED:")
                 if clarification_message:
                     print(f"  {clarification_message}")
-                    print(f"  [OK] LLM generated a clarification message")
+                    print("  [OK] LLM generated a clarification message")
                 else:
-                    print(f"  [WARN] No clarification message (will use template fallback)")
+                    print(
+                        "  [WARN] No clarification message (will use template fallback)"
+                    )
             else:
-                print(f"\n[OK] No clarification needed - query is complete")
+                print("\n[OK] No clarification needed - query is complete")
 
             # Validate expectations
             test_passed = True
@@ -182,7 +177,9 @@ def test_clarification_generation():
 
             # Check intent
             if intent != expected_intent:
-                errors.append(f"Intent mismatch: expected '{expected_intent}', got '{intent}'")
+                errors.append(
+                    f"Intent mismatch: expected '{expected_intent}', got '{intent}'"
+                )
                 test_passed = False
 
             # Check clarification requirement
@@ -199,15 +196,17 @@ def test_clarification_generation():
                     errors.append("Clarification needed but no message generated")
                     test_passed = False
                 elif len(clarification_message) < 10:
-                    errors.append(f"Clarification message too short: '{clarification_message}'")
+                    errors.append(
+                        f"Clarification message too short: '{clarification_message}'"
+                    )
                     test_passed = False
 
             # Print test result
             if test_passed:
-                print(f"\n[PASS] TEST PASSED")
+                print("\n[PASS] TEST PASSED")
                 passed += 1
             else:
-                print(f"\n[FAIL] TEST FAILED")
+                print("\n[FAIL] TEST FAILED")
                 for error in errors:
                     print(f"  - {error}")
                 failed += 1
@@ -219,7 +218,7 @@ def test_clarification_generation():
 
     # Print summary
     print(f"\n{'='*80}")
-    print(f"TEST SUMMARY")
+    print("TEST SUMMARY")
     print(f"{'='*80}")
     print(f"Total tests: {len(test_cases)}")
     print(f"[PASS] Passed: {passed}")

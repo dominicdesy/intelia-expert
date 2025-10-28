@@ -10,11 +10,12 @@ import io
 
 # Fix Windows console encoding
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 sys.path.insert(0, ".")
 
 from app.domain_config.domains.aviculture.config import get_aviculture_config
+
 
 def test_new_system_prompts():
     """Test that new system prompts are loaded"""
@@ -28,10 +29,12 @@ def test_new_system_prompts():
         "hatchery_management",
         "processing_operations",
         "layer_production",
-        "breeding_programs"
+        "breeding_programs",
     ]
 
-    print(f"\n✓ Configuration version: {config.system_prompts.get('metadata', {}).get('version')}")
+    print(
+        f"\n✓ Configuration version: {config.system_prompts.get('metadata', {}).get('version')}"
+    )
     print(f"✓ Coverage: {config.system_prompts.get('metadata', {}).get('coverage')}")
 
     print("\nChecking new specialized prompts:")
@@ -93,7 +96,7 @@ def test_value_chain_terminology():
         "breeding_genetics",
         "nutrition_feed",
         "health_disease",
-        "farm_management_equipment"
+        "farm_management_equipment",
     ]
 
     print("\nTerminology by segment:")
@@ -268,5 +271,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n✗ TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

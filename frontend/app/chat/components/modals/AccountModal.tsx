@@ -5,13 +5,15 @@
  */
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
+import { useRouter } from "next/navigation";
 import { BaseDialog } from "../BaseDialog";
 import { CurrencySelector } from "./CurrencySelector";
 import { redirectToCheckout, redirectToCustomerPortal } from "@/lib/api/stripe";
+import { apiClient } from "@/lib/api/client";
 import { supabase } from "@/lib/supabase/client";
-import { Check, X } from "lucide-react";
+import { Check, X, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface AccountModalProps {
@@ -20,19 +22,50 @@ interface AccountModalProps {
   onClose: () => void;
 }
 
+interface CurrencyInfo {
+  billing_currency: string | null;
+  is_set: boolean;
+  suggested_currency: string;
+  detected_country: string;
+  available_currencies: string[];
+  currency_names: Record<string, string>;
+}
+
 export const AccountModal: React.FC<AccountModalProps> = ({
   isOpen,
   user,
   onClose,
 }) => {
   const { t, currentLanguage } = useTranslation();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [isManaging, setIsManaging] = useState(false);
+  const [currencyInfo, setCurrencyInfo] = useState<CurrencyInfo | null>(null);
+  const [showCurrencyWarning, setShowCurrencyWarning] = useState(false);
+  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
 
   // Map free plan to essential for backwards compatibility
   const currentPlan = user?.plan === "free" ? "essential" : (user?.plan || "essential");
+
+  // Fetch currency info when modal opens
+  useEffect(() => {
+    if (isOpen && user) {
+      fetchCurrencyInfo();
+    }
+  }, [isOpen, user]);
+
+  const fetchCurrencyInfo = async () => {
+    try {
+      const response = await apiClient.getSecure<CurrencyInfo>("billing/currency-preference");
+      if (response.success && response.data) {
+        setCurrencyInfo(response.data);
+      }
+    } catch (error) {
+      console.error("[AccountModal] Error fetching currency info:", error);
+    }
+  };
 
   // Prix mensuels
   const monthlyPrices = { essential: 0, pro: 18, elite: 28 };
@@ -63,6 +96,13 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   };
 
   const handleUpgrade = async (planName: string) => {
+    // Check if currency is set before upgrade
+    if (!currencyInfo?.is_set) {
+      setPendingPlan(planName);
+      setShowCurrencyWarning(true);
+      return;
+    }
+
     setIsLoading(true);
     setSelectedPlan(planName);
 
@@ -101,6 +141,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       setIsLoading(false);
       setSelectedPlan(null);
     }
+  };
+
+  const handleGoToCurrencySelection = () => {
+    onClose();
+    router.push(`/billing/currency?redirect=/chat&plan=${pendingPlan}`);
   };
 
   return (
@@ -521,6 +566,54 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </p>
         </section>
       </div>
+
+      {/* Currency Warning Modal */}
+      {showCurrencyWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+            <div className="flex items-start mb-4">
+              <div className="flex-shrink-0">
+                <div className="bg-amber-100 rounded-full p-3">
+                  <AlertCircle className="w-6 h-6 text-amber-600" />
+                </div>
+              </div>
+              <div className="ml-4 flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {t("billing.currencyRequired")}
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  {t("billing.currencyRequiredDescription")}
+                </p>
+                {currencyInfo && !currencyInfo.is_set && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-blue-900">
+                      <span className="font-semibold">{t("billing.suggested")}:</span>{" "}
+                      {currencyInfo.currency_names[currencyInfo.suggested_currency]}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCurrencyWarning(false);
+                  setPendingPlan(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                onClick={handleGoToCurrencySelection}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                {t("billing.selectCurrency")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </BaseDialog>
   );
 };

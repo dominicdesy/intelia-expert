@@ -3,6 +3,7 @@ Utilitaires communs pour l'API
 Version: 1.4.1
 Last modified: 2025-10-26
 """
+
 """
 Utilitaires communs pour l'API
 Ce module contient des fonctions et objets partagés pour éviter les importations circulaires
