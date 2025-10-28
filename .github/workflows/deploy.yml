@@ -50,30 +50,29 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      # TEMPORARILY DISABLED: GC check disabled until DO support resolves stuck GC issue
-      # - name: Wait for registry garbage collection to complete
-      #   run: |
-      #     echo "Checking if registry garbage collection is in progress..."
-      #     MAX_RETRIES=30
-      #     RETRY_COUNT=0
-      #
-      #     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-      #       GC_STATUS=$(doctl registry garbage-collection get-active --output json || echo "[]")
-      #
-      #       if [ "$GC_STATUS" = "[]" ] || [ "$GC_STATUS" = "null" ]; then
-      #         echo "✅ No active garbage collection. Proceeding with build."
-      #         break
-      #       else
-      #         echo "⏳ Garbage collection in progress. Waiting 30 seconds... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
-      #         sleep 30
-      #         RETRY_COUNT=$((RETRY_COUNT + 1))
-      #       fi
-      #     done
-      #
-      #     if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-      #       echo "❌ Garbage collection still running after 15 minutes. Aborting."
-      #       exit 1
-      #     fi
+      - name: Wait for registry garbage collection to complete
+        run: |
+          echo "Checking if registry garbage collection is in progress..."
+          MAX_RETRIES=30
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            GC_STATUS=$(doctl registry garbage-collection get-active --output json || echo "[]")
+
+            if [ "$GC_STATUS" = "[]" ] || [ "$GC_STATUS" = "null" ]; then
+              echo "No active garbage collection. Proceeding with build."
+              break
+            else
+              echo "Garbage collection in progress. Waiting 30 seconds... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+              sleep 30
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+            fi
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "Garbage collection still running after 15 minutes. Aborting."
+            exit 1
+          fi
 
       - name: Log in to DigitalOcean Container Registry
         run: doctl registry login
@@ -126,30 +125,29 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      # TEMPORARILY DISABLED: GC check disabled until DO support resolves stuck GC issue
-      # - name: Wait for registry garbage collection to complete
-      #   run: |
-      #     echo "Checking if registry garbage collection is in progress..."
-      #     MAX_RETRIES=30
-      #     RETRY_COUNT=0
-      #
-      #     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-      #       GC_STATUS=$(doctl registry garbage-collection get-active --output json || echo "[]")
-      #
-      #       if [ "$GC_STATUS" = "[]" ] || [ "$GC_STATUS" = "null" ]; then
-      #         echo "✅ No active garbage collection. Proceeding with build."
-      #         break
-      #       else
-      #         echo "⏳ Garbage collection in progress. Waiting 30 seconds... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
-      #         sleep 30
-      #         RETRY_COUNT=$((RETRY_COUNT + 1))
-      #       fi
-      #     done
-      #
-      #     if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-      #       echo "❌ Garbage collection still running after 15 minutes. Aborting."
-      #       exit 1
-      #     fi
+      - name: Wait for registry garbage collection to complete
+        run: |
+          echo "Checking if registry garbage collection is in progress..."
+          MAX_RETRIES=30
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            GC_STATUS=$(doctl registry garbage-collection get-active --output json || echo "[]")
+
+            if [ "$GC_STATUS" = "[]" ] || [ "$GC_STATUS" = "null" ]; then
+              echo "No active garbage collection. Proceeding with build."
+              break
+            else
+              echo "Garbage collection in progress. Waiting 30 seconds... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+              sleep 30
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+            fi
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "Garbage collection still running after 15 minutes. Aborting."
+            exit 1
+          fi
 
       - name: Log in to DigitalOcean Container Registry
         run: doctl registry login
@@ -200,30 +198,29 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      # TEMPORARILY DISABLED: GC check disabled until DO support resolves stuck GC issue
-      # - name: Wait for registry garbage collection to complete
-      #   run: |
-      #     echo "Checking if registry garbage collection is in progress..."
-      #     MAX_RETRIES=30
-      #     RETRY_COUNT=0
-      #
-      #     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-      #       GC_STATUS=$(doctl registry garbage-collection get-active --output json || echo "[]")
-      #
-      #       if [ "$GC_STATUS" = "[]" ] || [ "$GC_STATUS" = "null" ]; then
-      #         echo "✅ No active garbage collection. Proceeding with build."
-      #         break
-      #       else
-      #         echo "⏳ Garbage collection in progress. Waiting 30 seconds... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
-      #         sleep 30
-      #         RETRY_COUNT=$((RETRY_COUNT + 1))
-      #       fi
-      #     done
-      #
-      #     if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-      #       echo "❌ Garbage collection still running after 15 minutes. Aborting."
-      #       exit 1
-      #     fi
+      - name: Wait for registry garbage collection to complete
+        run: |
+          echo "Checking if registry garbage collection is in progress..."
+          MAX_RETRIES=30
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            GC_STATUS=$(doctl registry garbage-collection get-active --output json || echo "[]")
+
+            if [ "$GC_STATUS" = "[]" ] || [ "$GC_STATUS" = "null" ]; then
+              echo "No active garbage collection. Proceeding with build."
+              break
+            else
+              echo "Garbage collection in progress. Waiting 30 seconds... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+              sleep 30
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+            fi
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "Garbage collection still running after 15 minutes. Aborting."
+            exit 1
+          fi
 
       - name: Log in to DigitalOcean Container Registry
         run: doctl registry login
@@ -323,30 +320,29 @@ jobs:
         with:
           token: ${{ secrets.DOCR_ACCESS_TOKEN }}
 
-      # TEMPORARILY DISABLED: GC check disabled until DO support resolves stuck GC issue
-      # - name: Wait for registry garbage collection to complete
-      #   run: |
-      #     echo "Checking if registry garbage collection is in progress..."
-      #     MAX_RETRIES=30
-      #     RETRY_COUNT=0
-      #
-      #     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-      #       GC_STATUS=$(doctl registry garbage-collection get-active --output json || echo "[]")
-      #
-      #       if [ "$GC_STATUS" = "[]" ] || [ "$GC_STATUS" = "null" ]; then
-      #         echo "✅ No active garbage collection. Proceeding with build."
-      #         break
-      #       else
-      #         echo "⏳ Garbage collection in progress. Waiting 30 seconds... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
-      #         sleep 30
-      #         RETRY_COUNT=$((RETRY_COUNT + 1))
-      #       fi
-      #     done
-      #
-      #     if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-      #       echo "❌ Garbage collection still running after 15 minutes. Aborting."
-      #       exit 1
-      #     fi
+      - name: Wait for registry garbage collection to complete
+        run: |
+          echo "Checking if registry garbage collection is in progress..."
+          MAX_RETRIES=30
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            GC_STATUS=$(doctl registry garbage-collection get-active --output json || echo "[]")
+
+            if [ "$GC_STATUS" = "[]" ] || [ "$GC_STATUS" = "null" ]; then
+              echo "No active garbage collection. Proceeding with build."
+              break
+            else
+              echo "Garbage collection in progress. Waiting 30 seconds... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+              sleep 30
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+            fi
+          done
+
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "Garbage collection still running after 15 minutes. Aborting."
+            exit 1
+          fi
 
       - name: Log in to DigitalOcean Container Registry
         run: doctl registry login
@@ -386,7 +382,6 @@ jobs:
   # DEPLOY TO DIGITALOCEAN
   # ======================================================
   # CLEANUP REGISTRY - Keep only 10 most recent tags
-  # TEMPORARILY DISABLED: Waiting for DO support to fix stuck garbage collection
   # ======================================================
   cleanup-registry:
     needs:
@@ -395,7 +390,7 @@ jobs:
       - build-ai-service
       - build-llm
       - build-prometheus
-    if: false  # Temporarily disabled until DO fixes garbage collection issue
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
