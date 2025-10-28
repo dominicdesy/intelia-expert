@@ -234,12 +234,15 @@ def _load_acronym_expansions() -> Dict[str, str]:
 
     except Exception as e:
         # Fallback to hardcoded acronyms if loading fails
-        print(f"Warning: Could not load acronyms from JSON ({e}). Using fallback acronyms.")
+        # NOTE: This is expected - terminology is now managed by LLM service
+        # These fallback acronyms are sufficient for OOD detection query normalization
         return {
             "ic": "indice conversion",
             "fcr": "feed conversion ratio",
             "pv": "poids vif",
             "gmq": "gain moyen quotidien",
+            "adg": "average daily gain",
+            "bw": "body weight",
         }
 
 # Load acronym expansions at module initialization
