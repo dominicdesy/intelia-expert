@@ -1,7 +1,8 @@
 """
 Version API - Return application version
 Version: 1.4.1
-Last modified: 2025-10-26
+Last modified: 2025-10-28
+Force rebuild after directory reorganization
 """
 
 import os

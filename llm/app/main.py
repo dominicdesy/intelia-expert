@@ -3,6 +3,7 @@ Intelia LLM Service - Main Application
 FastAPI server providing OpenAI-compatible LLM inference API
 
 Version: 1.0.0
+Last modified: 2025-10-28
 """
 
 from fastapi import FastAPI, Request

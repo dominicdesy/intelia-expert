@@ -2,7 +2,8 @@
 """
 Version tracking for deployment verification
 Version: 1.4.1
-Last modified: 2025-10-26
+Last modified: 2025-10-28
+Force rebuild after directory reorganization
 """
 """
 Version tracking for deployment verification

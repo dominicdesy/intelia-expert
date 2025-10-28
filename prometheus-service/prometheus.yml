@@ -1,6 +1,7 @@
 # Prometheus configuration for Intelia Expert
 # Registry: prometheus
 # Scrapes metrics from services via internal networking
+# Last modified: 2025-10-28
 
 global:
   scrape_interval: 60s
