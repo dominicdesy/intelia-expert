@@ -523,8 +523,8 @@ export default function RootLayout({
                   },
                 }}
               />
-              {/* PWA Install Prompts */}
-              <PWAManager />
+              {/* PWA Service Worker Registration (no install prompts in layout) */}
+              <PWAManager showInstallPrompts={false} />
               {/* <VoiceRealtimeProvider /> */}
             </MenuProvider>
           </LanguageProvider>

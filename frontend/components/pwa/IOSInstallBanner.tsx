@@ -1,15 +1,18 @@
 /**
  * IOSInstallBanner Component - iOS Safari Installation Instructions
- * Version: 1.1.1
- * Last modified: 2025-10-26
+ * Version: 1.2.0
+ * Last modified: 2025-10-28
+ * Changes: Added i18n multilingual support, changed app name to "Intelia Cognito"
  */
 
 "use client";
 
 import { useState, useEffect } from "react";
 import { X, Share, Plus, Square } from "lucide-react";
+import { useTranslation } from "@/lib/languages/i18n";
 
 export default function IOSInstallBanner() {
+  const { t } = useTranslation();
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
@@ -61,23 +64,23 @@ export default function IOSInstallBanner() {
             <div className="w-12 h-12 bg-blue-100 rounded-xl p-2">
               <img
                 src="/images/logo.png"
-                alt="Intelia Expert"
+                alt="Intelia Cognito"
                 className="w-full h-full object-contain"
               />
             </div>
             <div>
               <h3 className="font-bold text-gray-900">
-                Installer Intelia Expert
+                {t("pwa.ios.title")}
               </h3>
               <p className="text-sm text-gray-600">
-                Ajoutez l'app à votre écran d'accueil
+                {t("pwa.ios.subtitle")}
               </p>
             </div>
           </div>
           <button
             onClick={handleDismiss}
             className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-            aria-label="Fermer"
+            aria-label={t("pwa.ios.close")}
           >
             <X size={24} className="text-gray-500" />
           </button>
@@ -86,7 +89,7 @@ export default function IOSInstallBanner() {
         {/* Visual Instructions */}
         <div className="bg-gray-50 rounded-lg p-4 space-y-3">
           <p className="text-sm font-medium text-gray-700">
-            Pour installer cette app :
+            {t("pwa.ios.instructions")}
           </p>
 
           {/* Step 1 */}
@@ -96,11 +99,10 @@ export default function IOSInstallBanner() {
             </div>
             <div className="flex-1">
               <p className="text-sm text-gray-800">
-                Appuyez sur le bouton <strong>Partager</strong>
+                {t("pwa.ios.step1")}
               </p>
               <div className="mt-1 flex items-center gap-2 text-blue-600">
                 <Share size={20} />
-                <span className="text-xs">(en bas de Safari)</span>
               </div>
             </div>
           </div>
@@ -112,12 +114,11 @@ export default function IOSInstallBanner() {
             </div>
             <div className="flex-1">
               <p className="text-sm text-gray-800">
-                Sélectionnez <strong>"Sur l'écran d'accueil"</strong>
+                {t("pwa.ios.step2")}
               </p>
               <div className="mt-1 flex items-center gap-2 text-blue-600">
                 <Plus size={20} />
                 <Square size={16} />
-                <span className="text-xs">(faites défiler vers le bas)</span>
               </div>
             </div>
           </div>
@@ -129,16 +130,11 @@ export default function IOSInstallBanner() {
             </div>
             <div className="flex-1">
               <p className="text-sm text-gray-800">
-                Appuyez sur <strong>"Ajouter"</strong> en haut à droite
+                {t("pwa.ios.step3")}
               </p>
             </div>
           </div>
         </div>
-
-        {/* Footer Note */}
-        <p className="mt-3 text-xs text-gray-500 text-center">
-          L'icône apparaîtra sur votre écran d'accueil
-        </p>
       </div>
     </div>
   );

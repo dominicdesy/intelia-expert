@@ -54,6 +54,7 @@ import { VoiceRealtimeButton } from "@/components/VoiceRealtimeButton";
 import { useVoiceRealtime } from "@/lib/hooks/useVoiceRealtime";
 import { SatisfactionSurvey } from "./components/SatisfactionSurvey";
 import { AdProvider } from "@/components/AdSystem/AdProvider";
+import PWAManager from "@/components/pwa/PWAManager";
 import "./mobile-styles.css";
 
 // Composant ChatInput optimisé avec React.memo - Mobile First Design
@@ -1857,6 +1858,9 @@ function ChatInterface() {
       />
 
       <VoiceRealtimeButton />
+
+      {/* PWA Install Prompts - Only show on authenticated chat page */}
+      <PWAManager showInstallPrompts={true} />
     </AdProvider>
   );
 }

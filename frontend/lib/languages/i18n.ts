@@ -26,6 +26,21 @@ export interface TranslationKeys {
   "app.description": string;
 
   // ===========================================
+  // PWA (PROGRESSIVE WEB APP) INSTALL PROMPTS
+  // ===========================================
+  "pwa.install.title": string;
+  "pwa.install.subtitle": string;
+  "pwa.install.button": string;
+  "pwa.install.dismiss": string;
+  "pwa.ios.title": string;
+  "pwa.ios.subtitle": string;
+  "pwa.ios.instructions": string;
+  "pwa.ios.step1": string;
+  "pwa.ios.step2": string;
+  "pwa.ios.step3": string;
+  "pwa.ios.close": string;
+
+  // ===========================================
   // RESET PASSWORD - NOUVELLES CLÉS AJOUTÉES
   // ===========================================
   "resetPassword.title": string;

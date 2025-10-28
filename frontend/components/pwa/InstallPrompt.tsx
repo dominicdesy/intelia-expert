@@ -1,13 +1,15 @@
 /**
- * InstallPrompt Component - PWA Installation for Android
- * Version: 1.1.1
- * Last modified: 2025-10-26
+ * InstallPrompt Component - PWA Installation for Android/Desktop
+ * Version: 1.2.0
+ * Last modified: 2025-10-28
+ * Changes: Added i18n multilingual support, changed app name to "Intelia Cognito"
  */
 
 "use client";
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import { useTranslation } from "@/lib/languages/i18n";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -15,6 +17,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function InstallPrompt() {
+  const { t } = useTranslation();
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -90,16 +93,16 @@ export default function InstallPrompt() {
           <div className="w-12 h-12 bg-white rounded-lg p-2 flex-shrink-0">
             <img
               src="/images/logo.png"
-              alt="Intelia Expert"
+              alt="Intelia Cognito"
               className="w-full h-full object-contain"
             />
           </div>
           <div className="flex-1">
             <h3 className="font-semibold text-sm md:text-base">
-              Installer Intelia Expert
+              {t("pwa.install.title")}
             </h3>
             <p className="text-xs md:text-sm text-blue-100">
-              Accédez rapidement depuis votre écran d'accueil
+              {t("pwa.install.subtitle")}
             </p>
           </div>
         </div>
@@ -109,12 +112,12 @@ export default function InstallPrompt() {
             onClick={handleInstall}
             className="px-4 py-2 bg-white text-blue-600 rounded-lg font-medium text-sm hover:bg-blue-50 transition-colors"
           >
-            Installer
+            {t("pwa.install.button")}
           </button>
           <button
             onClick={handleDismiss}
             className="p-2 hover:bg-blue-800 rounded-lg transition-colors"
-            aria-label="Fermer"
+            aria-label={t("pwa.install.dismiss")}
           >
             <X size={20} />
           </button>
