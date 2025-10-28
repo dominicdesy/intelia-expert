@@ -48,10 +48,12 @@ class ServiceStatus(BaseModel):
 
 class MonitoringSummary(BaseModel):
     """Overall monitoring summary"""
-    timestamp: str = Field(..., description="Current timestamp")
-    system: SystemMetrics = Field(..., description="System metrics")
-    services: List[ServiceStatus] = Field(..., description="Service statuses")
-    overall_status: str = Field(..., description="Overall system status: healthy, degraded, unhealthy")
+    total_logs: int = Field(..., description="Total number of logs")
+    errors: int = Field(..., description="Number of error logs")
+    warnings: int = Field(..., description="Number of warning logs")
+    total_services: int = Field(..., description="Total number of services")
+    healthy_services: int = Field(..., description="Number of healthy services")
+    last_update: str = Field(..., description="Last update timestamp")
 
 
 class LogEntry(BaseModel):
@@ -299,14 +301,23 @@ async def get_monitoring_summary():
                     error_message=str(service) if isinstance(service, Exception) else "Unknown error"
                 ))
 
-        # Determine overall status
-        overall_status = determine_overall_status(valid_services)
+        # Calculate summary statistics
+        total_services = len(valid_services)
+        healthy_services = sum(1 for s in valid_services if s.status == "healthy")
+
+        # For now, use mock values for logs since we don't have real log aggregation
+        # TODO: Implement actual log counting from log files or logging system
+        total_logs = 100
+        errors = 5
+        warnings = 15
 
         return MonitoringSummary(
-            timestamp=datetime.utcnow().isoformat(),
-            system=system_metrics,
-            services=valid_services,
-            overall_status=overall_status
+            total_logs=total_logs,
+            errors=errors,
+            warnings=warnings,
+            total_services=total_services,
+            healthy_services=healthy_services,
+            last_update=datetime.utcnow().isoformat()
         )
     except Exception as e:
         logger.error(f"Error generating monitoring summary: {e}")
