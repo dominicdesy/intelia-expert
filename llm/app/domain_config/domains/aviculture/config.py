@@ -357,7 +357,7 @@ class AvicultureConfig:
             "cost_sensitivity": "medium",  # Balance cost vs quality
             "latency_tolerance": "low",  # Users expect fast responses
             "max_tokens_default": 1500,  # Technical responses can be detailed
-            "temperature": 0.7,  # Balanced creativity/precision
+            "temperature": 0.3,  # Lower temperature for higher factuality and reduced hallucinations (v3.2.0)
         }
 
     def is_domain_query(self, query: str, intent_result: Optional[Dict] = None) -> bool:
