@@ -22,6 +22,9 @@ prometheus-client==0.19.0
 # Utilities
 python-dotenv==1.0.0
 
+# Redis for semantic caching
+redis==5.0.1
+
 # Optional: LLM observability (commented out for Phase 1)
 # langfuse==2.6.0
 
