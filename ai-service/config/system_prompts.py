@@ -51,9 +51,8 @@ class SystemPromptsManager:
         self.prompts_path = self._resolve_config_path(prompts_path)
         self.prompts = self._load_prompts()
 
-        # Charger le glossaire de terminologie
-        self.terminology_path = self._resolve_terminology_path(terminology_path)
-        self.terminology = self._load_terminology()
+        # Terminology is now handled by LLM service - kept empty for compatibility
+        self.terminology = {}
 
         # Log conditionnel pour éviter messages contradictoires
         if self.prompts:
@@ -63,10 +62,7 @@ class SystemPromptsManager:
                 "❌ SystemPromptsManager non chargé - fichier absent ou invalide"
             )
 
-        if self.terminology:
-            logger.info(f"✅ Terminologie avicole chargée depuis {self.terminology_path}")
-        else:
-            logger.warning("⚠️ Terminologie avicole non chargée - fichier absent ou invalide")
+
 
     def _resolve_config_path(self, prompts_path: Optional[str]) -> Path:
         """
