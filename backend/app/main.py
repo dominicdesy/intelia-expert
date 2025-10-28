@@ -38,6 +38,45 @@ try:
 except ImportError:
     pass
 
+# === SENTRY CONFIGURATION ===
+# Configure Sentry for error tracking (optional)
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+SENTRY_ENVIRONMENT = os.getenv("SENTRY_ENVIRONMENT", "production")
+
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            environment=SENTRY_ENVIRONMENT,
+            traces_sample_rate=0.1,  # 10% of transactions for performance monitoring
+            profiles_sample_rate=0.1,  # 10% profiling
+            integrations=[
+                FastApiIntegration(),
+                LoggingIntegration(
+                    level=logging.INFO,  # Capture info and above as breadcrumbs
+                    event_level=logging.ERROR  # Send errors as events
+                ),
+            ],
+            # Release tracking (optional)
+            release=os.getenv("APP_VERSION", "1.4.1"),
+            # Ignore health check endpoints
+            ignore_errors=[
+                "HTTPException",  # Don't report 4xx errors
+            ],
+            before_send=lambda event, hint: None if "healthz" in event.get("request", {}).get("url", "") else event,
+        )
+        logging.getLogger("app.main").info(f"✅ Sentry initialized: {SENTRY_ENVIRONMENT}")
+    except ImportError:
+        logging.getLogger("app.main").warning("⚠️ sentry-sdk not installed, error tracking disabled")
+    except Exception as e:
+        logging.getLogger("app.main").error(f"❌ Sentry initialization failed: {e}")
+else:
+    logging.getLogger("app.main").info("ℹ️ Sentry DSN not configured, error tracking disabled")
+
 # === LOGGING GLOBAL ===
 logger = logging.getLogger("app.main")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))

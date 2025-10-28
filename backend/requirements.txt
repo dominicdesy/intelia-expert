@@ -10,6 +10,7 @@ psycopg2-binary>=2.9
 asyncpg>=0.29.0
 sqlalchemy>=2.0.0
 supabase==2.9.1
+redis>=5.0.0  # Redis for Voice Realtime session storage & rate limiting
 
 # Data Processing (requis par le code)
 pandas==2.2.2
@@ -31,6 +32,7 @@ typing-extensions>=4.8.0
 tenacity>=8.2.2
 toml==0.10.2
 prometheus-client>=0.19.0  # Metrics export for Grafana
+sentry-sdk[fastapi]>=1.40.0  # Error tracking and performance monitoring
 
 # Security & Serialization
 msgpack>=1.0.7  # Secure serialization (replaces pickle)

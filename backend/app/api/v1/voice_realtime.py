@@ -86,11 +86,14 @@ OPENAI_REALTIME_URL = f"wss://api.openai.com/v1/realtime?model={OPENAI_REALTIME_
 router = APIRouter()
 
 # ============================================================
-# RATE LIMITING (In-Memory - TODO: Redis en production)
+# RATE LIMITING (Redis avec fallback in-memory)
 # ============================================================
 
+# Import Redis session service
+from app.services.redis_session_service import redis_session_service
+
 class RateLimiter:
-    """Rate limiter simple en mémoire (TODO: migrer vers Redis)"""
+    """Rate limiter simple en mémoire (DEPRECATED: use redis_session_service)"""
 
     def __init__(self):
         self.sessions_per_user = defaultdict(list)  # user_id (UUID string) -> [timestamps]
@@ -114,6 +117,7 @@ class RateLimiter:
         self.sessions_per_user[user_id].append(now)
         return True
 
+# DEPRECATED: use redis_session_service.check_rate_limit() instead
 rate_limiter = RateLimiter()
 
 # ============================================================
@@ -684,8 +688,12 @@ async def voice_realtime_endpoint(
         await websocket.close(code=1011, reason="Plan verification failed")
         return
 
-    # Rate limiting
-    if not rate_limiter.check_rate_limit(user_id):
+    # Rate limiting (using Redis with fallback)
+    if not redis_session_service.check_rate_limit(
+        user_id=user_id,
+        max_sessions=MAX_SESSIONS_PER_USER_PER_HOUR,
+        window_seconds=RATE_LIMIT_WINDOW
+    ):
         await websocket.close(
             code=1008,
             reason=f"Rate limit exceeded ({MAX_SESSIONS_PER_USER_PER_HOUR} sessions/hour max)"
@@ -712,11 +720,14 @@ async def voice_realtime_endpoint(
 @router.get("/voice/health")
 async def voice_health():
     """Health check pour voice realtime"""
+    redis_health = redis_session_service.health_check()
+
     return {
         "status": "healthy" if ENABLE_VOICE_REALTIME else "disabled",
         "feature_enabled": ENABLE_VOICE_REALTIME,
         "openai_configured": bool(OPENAI_API_KEY),
         "weaviate_enabled": weaviate_service.enabled,
+        "redis": redis_health,
         "timestamp": datetime.now().isoformat()
     }
 
