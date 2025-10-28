@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "Wróć"
-  }
+  },
+  "chat.imageQuotaUnlimited": "Masz nieograniczone przesyłanie obrazów.",
+  "chat.imageQuotaRemaining": "Możesz przesłać jeszcze {remaining} obraz(ów) w tym miesiącu.",
+  "chat.imageQuotaExceeded": "Osiągnięto miesięczny limit obrazów ({used}/{limit}). Twój limit zostanie zresetowany w przyszłym miesiącu lub uaktualnij do planu Elite, aby uzyskać nieograniczone obrazy.",
+  "chat.imageQuotaPlanNotAllowed": "Twój plan '{plan}' nie pozwala na przesyłanie obrazów. Uaktualnij do planu Pro, aby przesłać do 50 obrazów/miesiąc.",
+  "chat.imageQuotaNoPlan": "Nie znaleziono planu subskrypcji. Proszę zasubskrybować plan, aby przesyłać obrazy.",
+  "chat.imageQuotaCheckError": "Błąd podczas sprawdzania limitu. Spróbuj ponownie."
 }

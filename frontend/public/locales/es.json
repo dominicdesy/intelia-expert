@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "Volver"
-  }
+  },
+  "chat.imageQuotaUnlimited": "Tienes cuota ilimitada de imágenes.",
+  "chat.imageQuotaRemaining": "Puedes subir {remaining} imagen(es) más este mes.",
+  "chat.imageQuotaExceeded": "Cuota mensual de imágenes alcanzada ({used}/{limit}). Tu cuota se restablecerá el próximo mes o actualiza al plan Elite para imágenes ilimitadas.",
+  "chat.imageQuotaPlanNotAllowed": "Tu plan '{plan}' no permite subir imágenes. Actualiza al plan Pro para subir hasta 50 imágenes/mes.",
+  "chat.imageQuotaNoPlan": "No se encontró ningún plan de suscripción. Por favor suscríbete a un plan para subir imágenes.",
+  "chat.imageQuotaCheckError": "Error al verificar la cuota. Por favor intenta de nuevo."
 }

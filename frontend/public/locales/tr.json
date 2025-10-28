@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "Geri Dön"
-  }
+  },
+  "chat.imageQuotaUnlimited": "Sınırsız görsel yükleme hakkınız var.",
+  "chat.imageQuotaRemaining": "Bu ay {remaining} daha görsel yükleyebilirsiniz.",
+  "chat.imageQuotaExceeded": "Aylık görsel kotası doldu ({used}/{limit}). Kotanız gelecek ay sıfırlanacak veya sınırsız görseller için Elite planına yükseltin.",
+  "chat.imageQuotaPlanNotAllowed": "'{plan}' planınız görsel yüklemeye izin vermiyor. Ayda 50 görsele kadar yüklemek için Pro planına yükseltin.",
+  "chat.imageQuotaNoPlan": "Abonelik planı bulunamadı. Görsel yüklemek için lütfen bir plana abone olun.",
+  "chat.imageQuotaCheckError": "Kota kontrolünde hata oluştu. Lütfen tekrar deneyin."
 }

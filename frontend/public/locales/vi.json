@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "Quay lại"
-  }
+  },
+  "chat.imageQuotaUnlimited": "Bạn có tải lên hình ảnh không giới hạn.",
+  "chat.imageQuotaRemaining": "Bạn có thể tải lên thêm {remaining} hình ảnh trong tháng này.",
+  "chat.imageQuotaExceeded": "Đã đạt hạn ngạch hình ảnh hàng tháng ({used}/{limit}). Hạn ngạch của bạn sẽ được đặt lại vào tháng sau hoặc nâng cấp lên gói Elite để có hình ảnh không giới hạn.",
+  "chat.imageQuotaPlanNotAllowed": "Gói '{plan}' của bạn không cho phép tải lên hình ảnh. Nâng cấp lên gói Pro để tải lên tối đa 50 hình ảnh/tháng.",
+  "chat.imageQuotaNoPlan": "Không tìm thấy gói đăng ký. Vui lòng đăng ký gói để tải lên hình ảnh.",
+  "chat.imageQuotaCheckError": "Lỗi khi kiểm tra hạn ngạch. Vui lòng thử lại."
 }

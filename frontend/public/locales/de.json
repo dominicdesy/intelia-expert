@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "Zurück"
-  }
+  },
+  "chat.imageQuotaUnlimited": "Sie haben unbegrenzte Bild-Uploads.",
+  "chat.imageQuotaRemaining": "Sie können diesen Monat noch {remaining} Bild(er) hochladen.",
+  "chat.imageQuotaExceeded": "Monatliches Bildkontingent erreicht ({used}/{limit}). Ihr Kontingent wird nächsten Monat zurückgesetzt oder upgraden Sie auf den Elite-Plan für unbegrenzte Bilder.",
+  "chat.imageQuotaPlanNotAllowed": "Ihr '{plan}'-Plan erlaubt keine Bild-Uploads. Upgraden Sie auf den Pro-Plan, um bis zu 50 Bilder/Monat hochzuladen.",
+  "chat.imageQuotaNoPlan": "Kein Abonnementplan gefunden. Bitte abonnieren Sie einen Plan, um Bilder hochzuladen.",
+  "chat.imageQuotaCheckError": "Fehler beim Überprüfen des Kontingents. Bitte versuchen Sie es erneut."
 }

@@ -6,9 +6,11 @@
 // app/chat/components/ImageUploadAccumulator.tsx
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { uploadTempImage, deleteTempImages } from "../services/apiService";
 import { secureLog } from "@/lib/utils/secureLogger";
+import { useAuthStore } from "@/lib/stores/auth";
+import { useTranslation } from "react-i18next";
 
 interface UploadedImage {
   image_id: string;
@@ -25,16 +27,81 @@ interface ImageUploadAccumulatorProps {
   disabled?: boolean;
 }
 
+interface QuotaInfo {
+  plan_name: string;
+  quota_limit: number | null;
+  quota_used: number;
+  quota_remaining: number | null;
+}
+
 export const ImageUploadAccumulator: React.FC<ImageUploadAccumulatorProps> = ({
   sessionId,
   onImagesReady,
   onAnalyzeClick,
   disabled = false,
 }) => {
+  const { t } = useTranslation();
+  const { user } = useAuthStore();
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [quotaInfo, setQuotaInfo] = useState<QuotaInfo | null>(null);
+  const [canUpload, setCanUpload] = useState(true);
+  const [quotaChecking, setQuotaChecking] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Vérifier le quota au chargement
+  useEffect(() => {
+    const checkQuota = async () => {
+      if (!user?.email) return;
+
+      setQuotaChecking(true);
+      try {
+        const response = await fetch(`/api/v1/images/quota/${encodeURIComponent(user.email)}`);
+        const data = await response.json();
+
+        if (data.success) {
+          setQuotaInfo(data.quota_info);
+          setCanUpload(data.can_upload);
+
+          if (!data.can_upload && data.error_code) {
+            // Afficher message d'erreur traduit
+            const errorMsg = getQuotaErrorMessage(data.error_code, data.quota_info);
+            setUploadError(errorMsg);
+          }
+        }
+      } catch (error) {
+        secureLog.error("[ImageUploader] Quota check error:", error);
+        // En cas d'erreur, autoriser l'upload (fail-open)
+        setCanUpload(true);
+      } finally {
+        setQuotaChecking(false);
+      }
+    };
+
+    checkQuota();
+  }, [user?.email]);
+
+  // Fonction pour traduire les codes d'erreur
+  const getQuotaErrorMessage = (errorCode: string, quota: QuotaInfo | null): string => {
+    switch (errorCode) {
+      case "IMAGE_QUOTA_EXCEEDED":
+        return t("chat.imageQuotaExceeded", {
+          used: quota?.quota_used || 0,
+          limit: quota?.quota_limit || 0,
+        });
+      case "IMAGE_QUOTA_PLAN_NOT_ALLOWED":
+        return t("chat.imageQuotaPlanNotAllowed", {
+          plan: quota?.plan_name || "unknown",
+        });
+      case "IMAGE_QUOTA_NO_PLAN":
+        return t("chat.imageQuotaNoPlan");
+      case "IMAGE_QUOTA_CHECK_ERROR":
+        return t("chat.imageQuotaCheckError");
+      default:
+        return t("chat.imageQuotaCheckError");
+    }
+  };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -42,16 +109,24 @@ export const ImageUploadAccumulator: React.FC<ImageUploadAccumulatorProps> = ({
 
     const file = files[0];
 
-    // Validation
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      setUploadError("Type de fichier non supporté. Utilisez JPG, PNG ou WebP.");
+    // 1. Vérification quota
+    if (!canUpload) {
+      // Quota déjà dépassé, ne pas permettre l'upload
+      secureLog.warn("[ImageUploader] Upload blocked: quota exceeded");
       return;
     }
 
+    // 2. Validation type de fichier
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError(t("chat.uploadImageInvalidType") || "Type de fichier non supporté. Utilisez JPG, PNG ou WebP.");
+      return;
+    }
+
+    // 3. Validation taille
     const maxSize = 10 * 1024 * 1024; // 10 MB
     if (file.size > maxSize) {
-      setUploadError("Image trop volumineuse. Maximum 10 MB.");
+      setUploadError(t("chat.uploadImageTooLarge") || "Image trop volumineuse. Maximum 10 MB.");
       return;
     }
 
@@ -144,7 +219,7 @@ export const ImageUploadAccumulator: React.FC<ImageUploadAccumulatorProps> = ({
           type="file"
           accept="image/jpeg,image/jpg,image/png,image/webp"
           onChange={handleFileSelect}
-          disabled={disabled || uploading}
+          disabled={disabled || uploading || !canUpload || quotaChecking}
           className="hidden"
           id="image-upload-input"
           aria-label="Sélectionner une image à télécharger"
@@ -153,12 +228,12 @@ export const ImageUploadAccumulator: React.FC<ImageUploadAccumulatorProps> = ({
         <label
           htmlFor="image-upload-input"
           className={`
-            flex-1 px-4 py-3 border-2 border-dashed rounded-lg text-center cursor-pointer
+            flex-1 px-4 py-3 border-2 border-dashed rounded-lg text-center
             transition-all duration-200
             ${
-              disabled || uploading
+              disabled || uploading || !canUpload || quotaChecking
                 ? "border-gray-300 bg-gray-50 text-gray-400 cursor-not-allowed"
-                : "border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:border-blue-400"
+                : "border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:border-blue-400 cursor-pointer"
             }
           `}
         >
@@ -177,7 +252,13 @@ export const ImageUploadAccumulator: React.FC<ImageUploadAccumulatorProps> = ({
               />
             </svg>
             <span className="font-medium">
-              {uploading ? "Upload en cours..." : "Ajouter une image"}
+              {quotaChecking
+                ? t("chat.loading") || "Chargement..."
+                : uploading
+                  ? t("chat.sending") || "Upload en cours..."
+                  : !canUpload
+                    ? t("chat.quotaExceeded") || "Quota atteint"
+                    : t("chat.addImages") || "Ajouter une image"}
             </span>
           </div>
         </label>
@@ -314,6 +395,21 @@ export const ImageUploadAccumulator: React.FC<ImageUploadAccumulatorProps> = ({
           <p className="text-xs">
             Ajoutez une ou plusieurs images pour analyse comparative
           </p>
+        </div>
+      )}
+
+      {/* Affichage quota */}
+      {quotaInfo && !quotaChecking && (
+        <div className="text-center py-2 text-sm">
+          {quotaInfo.quota_remaining !== null ? (
+            <p className={quotaInfo.quota_remaining > 0 ? "text-gray-600" : "text-red-600 font-semibold"}>
+              {t("chat.imageQuotaRemaining", { remaining: quotaInfo.quota_remaining })}
+            </p>
+          ) : (
+            <p className="text-green-600 font-semibold">
+              {t("chat.imageQuotaUnlimited")}
+            </p>
+          )}
         </div>
       )}
     </div>

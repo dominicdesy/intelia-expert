@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "返回"
-  }
+  },
+  "chat.imageQuotaUnlimited": "您拥有无限图片上传。",
+  "chat.imageQuotaRemaining": "本月您还可以上传 {remaining} 张图片。",
+  "chat.imageQuotaExceeded": "已达到每月图片配额 ({used}/{limit})。您的配额将在下个月重置，或升级到精英计划以获得无限图片。",
+  "chat.imageQuotaPlanNotAllowed": "您的'{plan}'计划不允许上传图片。升级到专业计划可每月上传多达50张图片。",
+  "chat.imageQuotaNoPlan": "未找到订阅计划。请订阅计划以上传图片。",
+  "chat.imageQuotaCheckError": "检查配额时出错。请重试。"
 }

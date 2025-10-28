@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "العودة"
-  }
+  },
+  "chat.imageQuotaUnlimited": "لديك تحميلات صور غير محدودة.",
+  "chat.imageQuotaRemaining": "يمكنك تحميل {remaining} صورة إضافية هذا الشهر.",
+  "chat.imageQuotaExceeded": "تم الوصول إلى حصة الصور الشهرية ({used}/{limit}). ستتم إعادة تعيين حصتك الشهر القادم أو قم بالترقية إلى خطة Elite للحصول على صور غير محدودة.",
+  "chat.imageQuotaPlanNotAllowed": "خطتك '{plan}' لا تسمح بتحميل الصور. قم بالترقية إلى خطة Pro لتحميل ما يصل إلى 50 صورة/شهر.",
+  "chat.imageQuotaNoPlan": "لم يتم العثور على خطة اشتراك. يرجى الاشتراك في خطة لتحميل الصور.",
+  "chat.imageQuotaCheckError": "خطأ في التحقق من الحصة. يرجى المحاولة مرة أخرى."
 }

@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "戻る"
-  }
+  },
+  "chat.imageQuotaUnlimited": "無制限の画像アップロードがあります。",
+  "chat.imageQuotaRemaining": "今月あと{remaining}枚の画像をアップロードできます。",
+  "chat.imageQuotaExceeded": "月間画像クォータに達しました（{used}/{limit}）。クォータは来月リセットされるか、Eliteプランにアップグレードして無制限の画像を取得してください。",
+  "chat.imageQuotaPlanNotAllowed": "'{plan}'プランでは画像のアップロードはできません。Proプランにアップグレードして月最大50枚の画像をアップロードしてください。",
+  "chat.imageQuotaNoPlan": "サブスクリプションプランが見つかりません。画像をアップロードするにはプランに登録してください。",
+  "chat.imageQuotaCheckError": "クォータの確認中にエラーが発生しました。もう一度お試しください。"
 }

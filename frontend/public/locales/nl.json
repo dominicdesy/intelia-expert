@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "Terug"
-  }
+  },
+  "chat.imageQuotaUnlimited": "U heeft onbeperkte afbeelding uploads.",
+  "chat.imageQuotaRemaining": "U kunt deze maand nog {remaining} afbeelding(en) uploaden.",
+  "chat.imageQuotaExceeded": "Maandelijks afbeeldingsquotum bereikt ({used}/{limit}). Uw quotum wordt volgende maand gereset of upgrade naar het Elite-plan voor onbeperkte afbeeldingen.",
+  "chat.imageQuotaPlanNotAllowed": "Uw '{plan}'-plan staat geen afbeelding uploads toe. Upgrade naar het Pro-plan om tot 50 afbeeldingen/maand te uploaden.",
+  "chat.imageQuotaNoPlan": "Geen abonnementsplan gevonden. Neem een abonnement om afbeeldingen te uploaden.",
+  "chat.imageQuotaCheckError": "Fout bij het controleren van het quotum. Probeer het opnieuw."
 }

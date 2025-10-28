@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "Voltar"
-  }
+  },
+  "chat.imageQuotaUnlimited": "Você tem uploads ilimitados de imagens.",
+  "chat.imageQuotaRemaining": "Você pode fazer upload de mais {remaining} imagem(ns) este mês.",
+  "chat.imageQuotaExceeded": "Cota mensal de imagens atingida ({used}/{limit}). Sua cota será redefinida no próximo mês ou faça upgrade para o plano Elite para imagens ilimitadas.",
+  "chat.imageQuotaPlanNotAllowed": "Seu plano '{plan}' não permite upload de imagens. Faça upgrade para o plano Pro para fazer upload de até 50 imagens/mês.",
+  "chat.imageQuotaNoPlan": "Nenhum plano de assinatura encontrado. Por favor assine um plano para fazer upload de imagens.",
+  "chat.imageQuotaCheckError": "Erro ao verificar a cota. Por favor tente novamente."
 }

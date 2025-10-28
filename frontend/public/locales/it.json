@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "Torna indietro"
-  }
+  },
+  "chat.imageQuotaUnlimited": "Hai caricamenti di immagini illimitati.",
+  "chat.imageQuotaRemaining": "Puoi caricare altre {remaining} immagine/i questo mese.",
+  "chat.imageQuotaExceeded": "Quota mensile di immagini raggiunta ({used}/{limit}). La tua quota verrà ripristinata il mese prossimo o passa al piano Elite per immagini illimitate.",
+  "chat.imageQuotaPlanNotAllowed": "Il tuo piano '{plan}' non consente il caricamento di immagini. Passa al piano Pro per caricare fino a 50 immagini/mese.",
+  "chat.imageQuotaNoPlan": "Nessun piano di abbonamento trovato. Per favore iscriviti a un piano per caricare immagini.",
+  "chat.imageQuotaCheckError": "Errore durante il controllo della quota. Per favore riprova."
 }

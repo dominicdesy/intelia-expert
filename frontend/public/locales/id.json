@@ -1123,5 +1123,11 @@
   },
   "common": {
     "goBack": "Kembali"
-  }
+  },
+  "chat.imageQuotaUnlimited": "Anda memiliki unggahan gambar tak terbatas.",
+  "chat.imageQuotaRemaining": "Anda dapat mengunggah {remaining} gambar lagi bulan ini.",
+  "chat.imageQuotaExceeded": "Kuota gambar bulanan tercapai ({used}/{limit}). Kuota Anda akan direset bulan depan atau tingkatkan ke paket Elite untuk gambar tak terbatas.",
+  "chat.imageQuotaPlanNotAllowed": "Paket '{plan}' Anda tidak mengizinkan pengunggahan gambar. Tingkatkan ke paket Pro untuk mengunggah hingga 50 gambar/bulan.",
+  "chat.imageQuotaNoPlan": "Paket langganan tidak ditemukan. Silakan berlangganan paket untuk mengunggah gambar.",
+  "chat.imageQuotaCheckError": "Kesalahan memeriksa kuota. Silakan coba lagi."
 }

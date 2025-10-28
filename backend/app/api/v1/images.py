@@ -39,6 +39,15 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
+# Quotas d'images par plan (images/mois)
+IMAGE_QUOTA = {
+    'essential': 0,        # Pas d'images
+    'pro': 50,             # 50 images/mois
+    'elite': None,         # Illimité
+    'intelia': None,       # Illimité (employés)
+    'free': 0              # Legacy - pas d'images
+}
+
 
 # === HELPERS ===
 def get_s3_client():
@@ -101,11 +110,152 @@ def generate_spaces_key(user_id: str, original_filename: str) -> str:
     return f"medical-images/{user_id}/{now.year}/{now.month:02d}/{unique_id}_{safe_filename}"
 
 
+def check_image_quota(user_email: str) -> tuple[bool, Optional[str], Optional[dict]]:
+    """
+    Vérifie si l'utilisateur peut uploader une image selon son plan et quota mensuel.
+
+    Args:
+        user_email: Email de l'utilisateur
+
+    Returns:
+        (can_upload, error_code, quota_info)
+        error_code: Code d'erreur i18n (ex: "IMAGE_QUOTA_EXCEEDED")
+        quota_info = {
+            'plan_name': str,
+            'quota_limit': int | None,
+            'quota_used': int,
+            'quota_remaining': int | None
+        }
+    """
+    try:
+        from app.core.database import get_supabase_client
+
+        supabase = get_supabase_client()
+
+        # Récupérer les infos de billing de l'utilisateur
+        response = supabase.table("user_billing_info").select(
+            "plan_name, images_uploaded_this_month, last_image_reset_date"
+        ).eq("user_email", user_email).execute()
+
+        if not response.data or len(response.data) == 0:
+            # Utilisateur sans billing info = traiter comme 'free' (0 images)
+            return False, "IMAGE_QUOTA_NO_PLAN", None
+
+        user_billing = response.data[0]
+        plan_name = user_billing.get('plan_name', 'free')
+        images_used = user_billing.get('images_uploaded_this_month', 0)
+
+        # Récupérer la limite du plan
+        quota_limit = IMAGE_QUOTA.get(plan_name, 0)
+
+        # Plans illimités (elite, intelia)
+        if quota_limit is None:
+            return True, None, {
+                'plan_name': plan_name,
+                'quota_limit': None,
+                'quota_used': images_used,
+                'quota_remaining': None  # Illimité
+            }
+
+        # Plans avec quota = 0 (essential, free)
+        if quota_limit == 0:
+            return False, "IMAGE_QUOTA_PLAN_NOT_ALLOWED", {
+                'plan_name': plan_name,
+                'quota_limit': 0,
+                'quota_used': 0,
+                'quota_remaining': 0
+            }
+
+        # Plans avec quota limité (pro = 50)
+        if images_used >= quota_limit:
+            return False, "IMAGE_QUOTA_EXCEEDED", {
+                'plan_name': plan_name,
+                'quota_limit': quota_limit,
+                'quota_used': images_used,
+                'quota_remaining': 0
+            }
+
+        # Quota OK
+        return True, None, {
+            'plan_name': plan_name,
+            'quota_limit': quota_limit,
+            'quota_used': images_used,
+            'quota_remaining': quota_limit - images_used
+        }
+
+    except Exception as e:
+        logger.error(f"Erreur vérification quota: {e}")
+        # En cas d'erreur, bloquer l'upload par sécurité
+        return False, "IMAGE_QUOTA_CHECK_ERROR", None
+
+
+def increment_image_quota(user_email: str) -> bool:
+    """
+    Incrémente le compteur d'images uploadées pour l'utilisateur.
+
+    Args:
+        user_email: Email de l'utilisateur
+
+    Returns:
+        True si succès, False sinon
+    """
+    try:
+        from app.core.database import get_supabase_client
+
+        supabase = get_supabase_client()
+
+        # Incrémenter le compteur
+        # Note: Le trigger reset_monthly_image_quota() en DB gérera le reset automatique
+        response = supabase.rpc(
+            'increment_user_image_count',
+            {'p_user_email': user_email}
+        ).execute()
+
+        # Si la fonction RPC n'existe pas encore, fallback sur UPDATE manuel
+        if not response or not response.data:
+            # UPDATE manuel avec raw SQL
+            supabase.table("user_billing_info").update({
+                "images_uploaded_this_month": supabase.postgrest.PostgrestQueryBuilder(
+                    "images_uploaded_this_month + 1"
+                )
+            }).eq("user_email", user_email).execute()
+
+        logger.info(f"Compteur images incrémenté pour {user_email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Erreur incrémentation compteur: {e}")
+        # Fallback: Essayer avec UPDATE direct via raw SQL
+        try:
+            from app.core.database import get_supabase_client
+            supabase = get_supabase_client()
+
+            # Récupérer valeur actuelle
+            response = supabase.table("user_billing_info").select(
+                "images_uploaded_this_month"
+            ).eq("user_email", user_email).execute()
+
+            if response.data and len(response.data) > 0:
+                current_count = response.data[0].get('images_uploaded_this_month', 0)
+
+                # Mettre à jour avec nouvelle valeur
+                supabase.table("user_billing_info").update({
+                    "images_uploaded_this_month": current_count + 1
+                }).eq("user_email", user_email).execute()
+
+                logger.info(f"Compteur images incrémenté (fallback) pour {user_email}")
+                return True
+        except Exception as fallback_error:
+            logger.error(f"Erreur fallback incrémentation: {fallback_error}")
+            return False
+
+
 # === ENDPOINTS ===
 @router.post("/upload")
 async def upload_medical_image(
     file: UploadFile = File(...),
     user_id: str = Form(...),
+    user_email: str = Form(...),
     description: Optional[str] = Form(None),
 ):
     """
@@ -114,6 +264,7 @@ async def upload_medical_image(
     Args:
         file: Image à uploader (JPG, PNG, WEBP, max 10MB)
         user_id: ID de l'utilisateur
+        user_email: Email de l'utilisateur (pour vérification quota)
         description: Description optionnelle
 
     Returns:
@@ -122,13 +273,33 @@ async def upload_medical_image(
             "image_id": "uuid",
             "url": "https://...",
             "spaces_key": "medical-images/...",
-            "size_bytes": 123456
+            "size_bytes": 123456,
+            "quota_info": {
+                "plan_name": "pro",
+                "quota_limit": 50,
+                "quota_used": 25,
+                "quota_remaining": 25
+            }
         }
     """
     try:
-        logger.info(f"[BACKEND] Upload image: user={user_id}, file={file.filename}")
+        logger.info(f"[BACKEND] Upload image: user={user_id}, email={user_email}, file={file.filename}")
 
-        # 1. Validation
+        # 1. Vérifier quota d'images
+        can_upload, error_code, quota_info = check_image_quota(user_email)
+        if not can_upload:
+            logger.warning(f"Quota dépassé pour {user_email}: {error_code}")
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error_code": error_code,
+                    "quota_info": quota_info
+                }
+            )
+
+        logger.info(f"Quota OK pour {user_email}: {quota_info}")
+
+        # 2. Validation fichier
         is_valid, error_msg = validate_image(file)
         if not is_valid:
             logger.warning(f"Validation échouée: {error_msg}")
@@ -205,7 +376,17 @@ async def upload_medical_image(
             # Non-bloquant si table n'existe pas
             logger.warning(f"[BACKEND] Enregistrement DB échoué (non-bloquant): {e}")
 
-        # 7. Retour succès
+        # 7. Incrémenter compteur quota
+        increment_success = increment_image_quota(user_email)
+        if not increment_success:
+            logger.warning(f"Échec incrémentation compteur pour {user_email} (non-bloquant)")
+
+        # 8. Mettre à jour quota_info après incrémentation
+        if quota_info and quota_info.get('quota_remaining') is not None:
+            quota_info['quota_used'] = quota_info['quota_used'] + 1
+            quota_info['quota_remaining'] = quota_info['quota_remaining'] - 1
+
+        # 9. Retour succès
         return JSONResponse(
             status_code=200,
             content={
@@ -216,6 +397,7 @@ async def upload_medical_image(
                 "size_bytes": len(file_content),
                 "content_type": file.content_type,
                 "expires_in_hours": 24,
+                "quota_info": quota_info,
                 "message": "Image uploadée avec succès"
             }
         )
@@ -224,6 +406,68 @@ async def upload_medical_image(
         raise
     except Exception as e:
         logger.exception(f"[BACKEND] Erreur upload: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/quota/{user_email}")
+async def get_image_quota(user_email: str):
+    """
+    Récupère les informations de quota d'images pour un utilisateur.
+
+    Args:
+        user_email: Email de l'utilisateur
+
+    Returns:
+        {
+            "success": true,
+            "can_upload": true,
+            "quota_info": {
+                "plan_name": "pro",
+                "quota_limit": 50,
+                "quota_used": 25,
+                "quota_remaining": 25
+            },
+            "message": "Vous pouvez uploader 25 images supplémentaires ce mois."
+        }
+    """
+    try:
+        can_upload, error_code, quota_info = check_image_quota(user_email)
+
+        if not can_upload:
+            # Retourner le quota info même si quota dépassé (pour affichage UI)
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "can_upload": False,
+                    "quota_info": quota_info,
+                    "error_code": error_code  # Frontend utilisera i18n pour afficher le message
+                }
+            )
+
+        # Quota OK - déterminer code de message
+        if quota_info:
+            quota_limit = quota_info.get('quota_limit')
+
+            if quota_limit is None:
+                message_code = "IMAGE_QUOTA_UNLIMITED"
+            else:
+                message_code = "IMAGE_QUOTA_REMAINING"
+        else:
+            message_code = "IMAGE_QUOTA_REMAINING"
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "can_upload": True,
+                "quota_info": quota_info,
+                "message_code": message_code  # Frontend utilisera i18n
+            }
+        )
+
+    except Exception as e:
+        logger.exception(f"Erreur récupération quota: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
