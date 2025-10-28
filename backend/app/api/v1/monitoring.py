@@ -167,7 +167,8 @@ async def check_llm_service_health() -> ServiceStatus:
     """Check LLM service health"""
     start_time = datetime.utcnow()
 
-    llm_service_url = os.getenv("LLM_SERVICE_URL", "http://localhost:8081")
+    # Use internal Kubernetes URL if available, fallback to localhost
+    llm_service_url = os.getenv("LLM_SERVICE_INTERNAL_URL") or os.getenv("LLM_SERVICE_URL", "http://localhost:8081")
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -198,7 +199,8 @@ async def check_ai_service_health() -> ServiceStatus:
     """Check AI service health"""
     start_time = datetime.utcnow()
 
-    ai_service_url = os.getenv("AI_SERVICE_URL", "http://localhost:8000")
+    # Use internal Kubernetes URL if available, fallback to localhost
+    ai_service_url = os.getenv("AI_SERVICE_INTERNAL_URL") or os.getenv("AI_SERVICE_URL", "http://localhost:8000")
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
