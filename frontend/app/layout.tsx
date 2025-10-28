@@ -52,11 +52,11 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: {
     icon: [
-      { url: "/images/favicon.png", sizes: "any" },
-      { url: "/images/icon-192x192.png", sizes: "192x192", type: "image/png" },
-      { url: "/images/icon-512x512.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/images/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/images/favicon-16x16.png", sizes: "16x16", type: "image/png" },
     ],
-    shortcut: "/images/favicon.png",
+    shortcut: "/favicon.ico",
     apple: [
       { url: "/images/icon-152x152.png", sizes: "152x152", type: "image/png" },
       { url: "/images/icon-192x192.png", sizes: "192x192", type: "image/png" },
@@ -65,14 +65,14 @@ export const metadata: Metadata = {
       {
         rel: "icon",
         type: "image/png",
-        sizes: "96x96",
-        url: "/images/icon-96x96.png",
+        sizes: "192x192",
+        url: "/images/icon-192x192.png",
       },
       {
         rel: "icon",
         type: "image/png",
-        sizes: "144x144",
-        url: "/images/icon-144x144.png",
+        sizes: "512x512",
+        url: "/images/icon-512x512.png",
       },
     ],
   },
@@ -240,9 +240,11 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#2563eb" />
         <meta name="msapplication-tap-highlight" content="no" />
 
-        {/* Icons existants */}
-        <link rel="icon" href="/images/favicon.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/images/favicon.png" />
+        {/* Favicon optimisé pour navigateurs */}
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/images/favicon-32x32.png" type="image/png" sizes="32x32" />
+        <link rel="icon" href="/images/favicon-16x16.png" type="image/png" sizes="16x16" />
+        <link rel="apple-touch-icon" href="/images/icon-152x152.png" />
         <meta name="theme-color" content="#2563eb" />
 
         {/* CSS inline critique pour éviter FOUC mobile + ANTI-FLASH */}
