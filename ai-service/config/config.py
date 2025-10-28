@@ -28,7 +28,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 # ===== LANGSMITH CONFIGURATION =====
 LANGSMITH_ENABLED = os.getenv("LANGSMITH_ENABLED", "true").lower() == "true"
 LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY")
-LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT", "intelia-aviculture")
+LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT", "intelia-cognito")
 LANGSMITH_ENVIRONMENT = os.getenv("LANGSMITH_ENVIRONMENT", "production")
 
 # Validation LangSmith
