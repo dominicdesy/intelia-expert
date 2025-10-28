@@ -11,7 +11,9 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
     model_config = {
-        "protected_namespaces": ()  # Disable model_ namespace protection
+        "protected_namespaces": (),  # Disable model_ namespace protection
+        "env_file": ".env",
+        "case_sensitive": False
     }
 
     # Service info
@@ -56,10 +58,6 @@ class Settings(BaseSettings):
     # Optional: Langfuse tracing
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
 
 
 # Global settings instance
