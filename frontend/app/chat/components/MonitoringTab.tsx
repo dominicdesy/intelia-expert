@@ -264,7 +264,7 @@ export const MonitoringTab: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All Services</option>
-              <option value="ai-service">AI Service</option>
+              <option value="rag">RAG Service</option>
               <option value="llm-service">LLM Service</option>
             </select>
           </div>

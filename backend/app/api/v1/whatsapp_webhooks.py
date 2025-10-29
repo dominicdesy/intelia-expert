@@ -731,7 +731,7 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
         }
 
         # Étape 3: Appeler l'endpoint vision du LLM
-        ai_vision_endpoint = f"{AI_SERVICE_URL}/chat-with-image"
+        ai_vision_endpoint = f"{RAG_URL}/chat-with-image"
         logger.info(f"🔧 Calling AI Vision service: {ai_vision_endpoint}")
 
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -1260,11 +1260,11 @@ async def whatsapp_status():
     Retourne le statut de la configuration WhatsApp
     """
     # Test AI Service connectivity
-    ai_service_available = False
+    rag_service_available = False
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{AI_SERVICE_URL}/health")
-            ai_service_available = response.status_code == 200
+            response = await client.get(f"{RAG_URL}/health")
+            rag_service_available = response.status_code == 200
     except Exception as e:
         logger.warning(f"⚠️ AI Service health check failed: {e}")
 
@@ -1275,8 +1275,8 @@ async def whatsapp_status():
         "signature_validation": request_validator is not None,
         "ai_integration": {
             "architecture": "microservices_http",
-            "ai_service_url": AI_SERVICE_URL,
-            "ai_service_available": ai_service_available,
+            "rag_service_url": RAG_URL,
+            "rag_service_available": rag_service_available,
             "endpoint": RAG_CHAT_ENDPOINT,
             "version": "2.1_microservices",
         }

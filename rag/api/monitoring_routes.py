@@ -29,7 +29,7 @@ async def periodic_health_check():
 
     # Services à surveiller
     services = [
-        ("ai-service", "http://localhost:8000", "/health"),
+        ("rag", "http://localhost:8000", "/health"),
         ("llm-service", "http://localhost:8081", "/health"),
     ]
 

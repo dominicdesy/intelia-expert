@@ -215,16 +215,16 @@ async def check_llm_service_health() -> ServiceStatus:
         )
 
 
-async def check_ai_service_health() -> ServiceStatus:
+async def check_rag_service_health() -> ServiceStatus:
     """Check AI service health"""
     start_time = datetime.utcnow()
 
     # Use internal Kubernetes URL if available, fallback to localhost
-    ai_service_url = os.getenv("AI_SERVICE_INTERNAL_URL") or os.getenv("AI_SERVICE_URL", "http://localhost:8000")
+    rag_service_url = os.getenv("RAG_INTERNAL_URL") or os.getenv("RAG_URL", "http://localhost:8000")
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{ai_service_url}/health")
+            response = await client.get(f"{rag_service_url}/health")
             response.raise_for_status()
 
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
@@ -234,7 +234,7 @@ async def check_ai_service_health() -> ServiceStatus:
             status="healthy",
             response_time_ms=round(response_time, 2),
             last_check=datetime.utcnow().isoformat(),
-            details={"url": ai_service_url}
+            details={"url": rag_service_url}
         )
     except Exception as e:
         response_time = (datetime.utcnow() - start_time).total_seconds() * 1000
@@ -245,7 +245,7 @@ async def check_ai_service_health() -> ServiceStatus:
             response_time_ms=round(response_time, 2),
             last_check=datetime.utcnow().isoformat(),
             error_message=str(e),
-            details={"url": ai_service_url}
+            details={"url": rag_service_url}
         )
 
 
@@ -282,7 +282,7 @@ async def get_monitoring_summary():
             check_database_health(),
             check_supabase_health(),
             check_llm_service_health(),
-            check_ai_service_health(),
+            check_rag_service_health(),
             return_exceptions=True
         )
 
@@ -338,7 +338,7 @@ async def get_services_status():
             check_database_health(),
             check_supabase_health(),
             check_llm_service_health(),
-            check_ai_service_health(),
+            check_rag_service_health(),
             return_exceptions=True
         )
 

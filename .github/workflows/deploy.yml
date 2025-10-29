@@ -349,12 +349,12 @@ jobs:
             echo "Only $TAG_COUNT tags found, no cleanup needed (keeping all)"
           fi
 
-      - name: Cleanup old ai-service tags
+      - name: Cleanup old rag tags
         if: needs.build-rag.result == 'success'
         run: |
-          echo "Cleaning up old ai-service tags (keeping 10 most recent)..."
+          echo "Cleaning up old rag tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/ai-service --output json || echo "[]")
+          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/rag --output json || echo "[]")
 
           TAG_COUNT=$(echo "$TAGS" | jq '. | length')
           echo "Found $TAG_COUNT tags total"
@@ -364,7 +364,7 @@ jobs:
             echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/ai-service "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/rag "$tag" --force || true
               fi
             done
           else

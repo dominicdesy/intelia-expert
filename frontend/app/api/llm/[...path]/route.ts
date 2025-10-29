@@ -1,8 +1,8 @@
 /**
- * SÉCURITÉ: Proxy générique pour tous les endpoints AI Service
- * Version: 1.5.0
- * Last modified: 2025-10-27
- * Updated: Renamed from LLM to AI Service
+ * SÉCURITÉ: Proxy générique pour tous les endpoints RAG Service
+ * Version: 1.6.0
+ * Last modified: 2025-10-28
+ * Updated: Renamed from AI Service to RAG
  */
 // app/api/llm/[...path]/route.ts
 
@@ -10,29 +10,29 @@ import { type NextRequest } from "next/server";
 import { secureLog } from "@/lib/utils/secureLogger";
 
 /**
- * SÉCURITÉ: Proxy générique pour tous les endpoints AI Service
- * Redirige les requêtes /api/llm/* vers http://ai-service:8080/* (réseau interne)
- * Permet de bloquer l'accès public au service AI pour une sécurité accrue
+ * SÉCURITÉ: Proxy générique pour tous les endpoints RAG Service
+ * Redirige les requêtes /api/llm/* vers http://rag:8080/* (réseau interne)
+ * Permet de bloquer l'accès public au service RAG pour une sécurité accrue
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const AI_SERVICE_INTERNAL_URL =
-  process.env.AI_SERVICE_INTERNAL_URL ?? "https://expert.intelia.com/api/llm";
+const RAG_SERVICE_INTERNAL_URL =
+  process.env.RAG_INTERNAL_URL ?? "https://expert.intelia.com/api/llm";
 
 /**
- * Proxy générique pour toutes les méthodes HTTP vers le AI Service
+ * Proxy générique pour toutes les méthodes HTTP vers le RAG Service
  */
-async function proxyToAIService(req: NextRequest, params: { path: string[] }) {
+async function proxyToRAGService(req: NextRequest, params: { path: string[] }) {
   const { path } = params;
   const targetPath = path.join("/");
-  const targetUrl = `${AI_SERVICE_INTERNAL_URL}/${targetPath}`;
+  const targetUrl = `${RAG_SERVICE_INTERNAL_URL}/${targetPath}`;
 
   // Copier les query params
   const searchParams = req.nextUrl.searchParams.toString();
   const fullUrl = searchParams ? `${targetUrl}?${searchParams}` : targetUrl;
 
-  secureLog.log(`[ai-service-proxy] ${req.method} ${fullUrl}`);
+  secureLog.log(`[rag-service-proxy] ${req.method} ${fullUrl}`);
 
   try {
     // Copier le body si présent
@@ -85,10 +85,10 @@ async function proxyToAIService(req: NextRequest, params: { path: string[] }) {
       headers: responseHeaders,
     });
   } catch (error) {
-    secureLog.error(`[ai-service-proxy] Erreur: ${error}`);
+    secureLog.error(`[rag-service-proxy] Erreur: ${error}`);
     return new Response(
       JSON.stringify({
-        error: "Service AI temporairement indisponible",
+        error: "Service RAG temporairement indisponible",
         detail: String(error),
       }),
       {
