@@ -875,9 +875,13 @@ class IntelligentRRFFusion:
             return
 
         try:
+            # Convert QueryType enum to string for JSON serialization
+            query_type = context.get("query_type", "unknown")
+            context_type_str = str(query_type.value) if hasattr(query_type, 'value') else str(query_type)
+
             metric = RRFPerformanceMetric(
                 query_hash=context["query_hash"],
-                context_type=context.get("query_type", "unknown"),
+                context_type=context_type_str,
                 genetic_line=context.get("genetic_line", "none"),
                 rrf_method="intelligent_weighted",
                 relevance_score=self._calculate_relevance_score(results),

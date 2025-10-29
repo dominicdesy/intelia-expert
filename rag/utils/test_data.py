@@ -47,3 +47,4 @@ def setup_logging(level: str = "INFO") -> None:
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("anthropic").setLevel(logging.INFO)
     logging.getLogger("openai").setLevel(logging.INFO)
+    logging.getLogger("filelock").setLevel(logging.WARNING)  # Réduction verbosité filelock
