@@ -421,9 +421,11 @@ class ConversationService:
         try:
             with get_pg_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Nettoyer et préparer le terme de recherche
+                    # Nettoyer et préparer le terme de recherche avec wildcard pour recherches partielles
+                    # Ajouter ':*' à chaque terme pour permettre le matching partiel (ex: "conve" → "conversion")
                     # Remplacer les espaces par & pour recherche AND
-                    search_term = ' & '.join(search_query.strip().split())
+                    search_terms = search_query.strip().split()
+                    search_term = ' & '.join([f"{term}:*" for term in search_terms])
 
                     # Recherche full-text dans les conversations et messages
                     cur.execute(

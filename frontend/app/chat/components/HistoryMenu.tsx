@@ -137,17 +137,23 @@ export const HistoryMenu = React.memo(() => {
     [t]
   );
 
+  // Ref pour gérer le debounce cleanup
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
   const handleSearchInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       setSearchQuery(value);
 
-      // Debounce: rechercher après 500ms d'inactivité
-      const timeoutId = setTimeout(() => {
-        handleSearch(value);
-      }, 500);
+      // Clear le timer précédent
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
 
-      return () => clearTimeout(timeoutId);
+      // Debounce: rechercher après 300ms d'inactivité (réduit de 500ms pour meilleure réactivité)
+      debounceTimerRef.current = setTimeout(() => {
+        handleSearch(value);
+      }, 300);
     },
     [handleSearch]
   );
