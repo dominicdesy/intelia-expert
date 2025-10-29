@@ -1,7 +1,7 @@
 {
   "name": "Intelia Cognito",
   "short_name": "Intelia Cognito",
-  "description": "Assistant IA Expert pour la Santé et Nutrition Animale",
+  "description": "Specialized GPT for the poultry industry.",
   "start_url": "/",
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone", "minimal-ui"],

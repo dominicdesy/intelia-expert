@@ -27,8 +27,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Intelia Cognito - AI Advisor",
-  description: "Assistant IA spécialisé pour les producteurs avicoles",
+  title: "Intelia Cognito",
+  description: "Specialized GPT for the poultry industry.",
   keywords: "agriculture, IA, santé animale, nutrition, élevage, expert",
   authors: [{ name: "Intelia" }],
   creator: "Intelia",
@@ -39,12 +39,12 @@ export const metadata: Metadata = {
     telephone: false,
   },
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "https://intelia-expert.com",
+    process.env.NEXT_PUBLIC_APP_URL || "https://expert.intelia.com",
   ),
   openGraph: {
-    title: "Intelia Cognito - Assistant IA Agriculture",
-    description: "Assistant IA spécialisé en santé et nutrition animale",
-    url: "https://intelia-expert.com",
+    title: "Intelia Cognito",
+    description: "Specialized GPT for the poultry industry.",
+    url: "https://expert.intelia.com",
     siteName: "Intelia Cognito",
     locale: "fr_CA",
     type: "website",
