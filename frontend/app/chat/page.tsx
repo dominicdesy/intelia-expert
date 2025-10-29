@@ -1655,6 +1655,7 @@ function ChatInterface() {
       >
         <header
           className={`bg-white border-b border-gray-100 px-2 sm:px-4 flex-shrink-0 ${isMobileDevice ? 'sticky top-0 z-50' : ''} py-3`}
+          style={isMobileDevice ? { paddingTop: 'max(0.75rem, env(safe-area-inset-top))' } : {}}
         >
           <div className="flex items-center justify-between h-full">
             {/* Left side - Adaptatif mobile/desktop */}
