@@ -170,7 +170,7 @@ class LLMRouter:
 
         # Rule 3: Complex queries (comparative, temporal, calculation) → Claude
         if intent_result and self.claude_client:
-            query_type = intent_result.get("intent_type", "")
+            query_type = getattr(intent_result, "intent_type", "")
             if query_type in ["comparative", "temporal", "calculation"]:
                 logger.info(f"🔀 Route → Claude 3.5 Sonnet ({query_type} query)")
                 return LLMProvider.CLAUDE_35_SONNET
@@ -301,8 +301,8 @@ class LLMRouter:
 
         # Check domain from intent result
         if intent_result:
-            domain = intent_result.get("domain", "")
-            intent_type = intent_result.get("intent", "")
+            domain = getattr(intent_result, "domain", "")
+            intent_type = getattr(intent_result, "intent_type", "")
 
             # Check for aviculture-related domains
             if domain in [

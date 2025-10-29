@@ -197,8 +197,8 @@ class ResponseGenerator:
                 temperature=0.1,
                 max_tokens=None,  # Let adaptive length calculate optimal value
                 query=query,
-                entities=intent_result.get("entities") if intent_result else None,
-                query_type=intent_result.get("query_type") if intent_result else None,
+                entities=getattr(intent_result, "detected_entities", None) if intent_result else None,
+                query_type=getattr(intent_result, "intent_type", None) if intent_result else None,
                 context_docs=context_dicts,
             )
 
@@ -216,7 +216,7 @@ class ResponseGenerator:
                 query=query,
                 response=enhanced_response,
                 intent_result=intent_result,
-                entities=intent_result.get("entities") if intent_result else None,
+                entities=getattr(intent_result, "detected_entities", None) if intent_result else None,
                 language=lang,
             )
 

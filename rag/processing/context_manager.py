@@ -200,7 +200,7 @@ class ContextManager:
             sex=entities.get("sex") or self.context.sex,
             metric=entities.get("metric") or self.context.metric,
             intent=(
-                intent_result.get("intent") if intent_result else self.context.intent
+                getattr(intent_result, "intent_type", None) if intent_result else self.context.intent
             ),
             full_query=query,
         )

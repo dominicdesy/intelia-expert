@@ -592,7 +592,7 @@ class ProactiveAssistant:
         entities = entities or {}
 
         # Health-related queries
-        if intent_result and intent_result.get("domain") == "health":
+        if intent_result and getattr(intent_result, "domain", None) == "health":
             return AssistanceContext.HEALTH_CONCERN
 
         health_keywords = [
@@ -613,7 +613,7 @@ class ProactiveAssistant:
             return AssistanceContext.HEALTH_CONCERN
 
         # Comparison queries
-        if intent_result and intent_result.get("query_type") in [
+        if intent_result and getattr(intent_result, "intent_type", None) in [
             "comparative",
             "comparison",
         ]:
