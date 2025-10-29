@@ -317,7 +317,8 @@ jobs:
             echo "Deleting $TAGS_TO_DELETE old tags..."
 
             # Get tags to delete (skip first 10, which are the most recent)
-            doctl registry repository list-tags frontend --format Tag --no-header | tail -n +11 | while read -r tag; do
+            # Extract only the tag name (first column) using awk
+            doctl registry repository list-tags frontend --format Tag --no-header | tail -n +11 | awk '{print $1}' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
                 doctl registry repository delete-tag frontend "$tag" --force || echo "Failed to delete $tag"
@@ -339,7 +340,8 @@ jobs:
             TAGS_TO_DELETE=$(($TAG_COUNT - 10))
             echo "Deleting $TAGS_TO_DELETE old tags..."
 
-            doctl registry repository list-tags backend --format Tag --no-header | tail -n +11 | while read -r tag; do
+            # Extract only the tag name (first column) using awk
+            doctl registry repository list-tags backend --format Tag --no-header | tail -n +11 | awk '{print $1}' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
                 doctl registry repository delete-tag backend "$tag" --force || echo "Failed to delete $tag"
@@ -361,7 +363,8 @@ jobs:
             TAGS_TO_DELETE=$(($TAG_COUNT - 10))
             echo "Deleting $TAGS_TO_DELETE old tags..."
 
-            doctl registry repository list-tags rag --format Tag --no-header | tail -n +11 | while read -r tag; do
+            # Extract only the tag name (first column) using awk
+            doctl registry repository list-tags rag --format Tag --no-header | tail -n +11 | awk '{print $1}' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
                 doctl registry repository delete-tag rag "$tag" --force || echo "Failed to delete $tag"
@@ -383,7 +386,8 @@ jobs:
             TAGS_TO_DELETE=$(($TAG_COUNT - 10))
             echo "Deleting $TAGS_TO_DELETE old tags..."
 
-            doctl registry repository list-tags llm --format Tag --no-header | tail -n +11 | while read -r tag; do
+            # Extract only the tag name (first column) using awk
+            doctl registry repository list-tags llm --format Tag --no-header | tail -n +11 | awk '{print $1}' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
                 doctl registry repository delete-tag llm "$tag" --force || echo "Failed to delete $tag"
@@ -405,7 +409,8 @@ jobs:
             TAGS_TO_DELETE=$(($TAG_COUNT - 10))
             echo "Deleting $TAGS_TO_DELETE old tags..."
 
-            doctl registry repository list-tags prometheus --format Tag --no-header | tail -n +11 | while read -r tag; do
+            # Extract only the tag name (first column) using awk
+            doctl registry repository list-tags prometheus --format Tag --no-header | tail -n +11 | awk '{print $1}' | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
                 doctl registry repository delete-tag prometheus "$tag" --force || echo "Failed to delete $tag"
