@@ -69,7 +69,7 @@ interface AuthState {
   setHasHydrated: (v: boolean) => void;
   handleAuthError: (error: any, ctx?: string) => void;
   clearAuthErrors: () => void;
-  checkAuth: () => Promise<void>;
+  checkAuth: (forceRefresh?: boolean) => Promise<void>;
   initializeSession: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (
@@ -294,14 +294,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       // CHECK AUTH : Utilise /auth/me avec cache de 5 minutes
-      checkAuth: async () => {
+      checkAuth: async (forceRefresh: boolean = false) => {
         try {
           // Cache: Ne pas appeler /auth/me si vérifié il y a moins de 5 minutes
+          // SAUF si forceRefresh est true (utilisé après login/logout)
           const now = Date.now();
           const lastCheck = get().lastAuthCheck;
           const CACHE_DURATION = 300000; // 5 minutes
 
-          if (lastCheck && (now - lastCheck) < CACHE_DURATION) {
+          if (!forceRefresh && lastCheck && (now - lastCheck) < CACHE_DURATION) {
             secureLog.log("[AuthStore] Using cached auth data (checked " + Math.round((now - lastCheck) / 1000) + "s ago)");
             return;
           }
@@ -428,7 +429,8 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem("intelia-expert-auth", JSON.stringify(authData));
 
           // Vérifier l'auth pour récupérer les données utilisateur
-          await get().checkAuth();
+          // IMPORTANT: forceRefresh=true pour ignorer le cache après login
+          await get().checkAuth(true);
 
           // NOUVEAU: Démarrer le tracking de session après login réussi
           if (get().isAuthenticated) {

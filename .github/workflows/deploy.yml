@@ -307,20 +307,20 @@ jobs:
         run: |
           echo "Cleaning up old frontend tags (keeping 10 most recent)..."
 
-          # List all tags sorted by update time (newest first) in JSON format
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/frontend --output json || echo "[]")
-
-          # Count total tags
-          TAG_COUNT=$(echo "$TAGS" | jq '. | length')
+          # List all tags sorted by update time (newest first) and count them
+          TAG_COUNT=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/frontend --format Tag --no-header | wc -l | tr -d ' ')
           echo "Found $TAG_COUNT tags total"
 
           # Only cleanup if we have more than 10 tags
           if [ "$TAG_COUNT" -gt 10 ]; then
-            echo "Deleting $(($TAG_COUNT - 10)) old tags..."
-            echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
+            TAGS_TO_DELETE=$(($TAG_COUNT - 10))
+            echo "Deleting $TAGS_TO_DELETE old tags..."
+
+            # Get tags to delete (skip first 10, which are the most recent)
+            doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/frontend --format Tag --no-header | tail -n +11 | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/frontend "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/frontend "$tag" --force || echo "Failed to delete $tag"
               fi
             done
           else
@@ -332,17 +332,17 @@ jobs:
         run: |
           echo "Cleaning up old backend tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/backend --output json || echo "[]")
-
-          TAG_COUNT=$(echo "$TAGS" | jq '. | length')
+          TAG_COUNT=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/backend --format Tag --no-header | wc -l | tr -d ' ')
           echo "Found $TAG_COUNT tags total"
 
           if [ "$TAG_COUNT" -gt 10 ]; then
-            echo "Deleting $(($TAG_COUNT - 10)) old tags..."
-            echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
+            TAGS_TO_DELETE=$(($TAG_COUNT - 10))
+            echo "Deleting $TAGS_TO_DELETE old tags..."
+
+            doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/backend --format Tag --no-header | tail -n +11 | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/backend "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/backend "$tag" --force || echo "Failed to delete $tag"
               fi
             done
           else
@@ -354,17 +354,17 @@ jobs:
         run: |
           echo "Cleaning up old rag tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/rag --output json || echo "[]")
-
-          TAG_COUNT=$(echo "$TAGS" | jq '. | length')
+          TAG_COUNT=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/rag --format Tag --no-header | wc -l | tr -d ' ')
           echo "Found $TAG_COUNT tags total"
 
           if [ "$TAG_COUNT" -gt 10 ]; then
-            echo "Deleting $(($TAG_COUNT - 10)) old tags..."
-            echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
+            TAGS_TO_DELETE=$(($TAG_COUNT - 10))
+            echo "Deleting $TAGS_TO_DELETE old tags..."
+
+            doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/rag --format Tag --no-header | tail -n +11 | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/rag "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/rag "$tag" --force || echo "Failed to delete $tag"
               fi
             done
           else
@@ -376,17 +376,17 @@ jobs:
         run: |
           echo "Cleaning up old llm tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/llm --output json || echo "[]")
-
-          TAG_COUNT=$(echo "$TAGS" | jq '. | length')
+          TAG_COUNT=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/llm --format Tag --no-header | wc -l | tr -d ' ')
           echo "Found $TAG_COUNT tags total"
 
           if [ "$TAG_COUNT" -gt 10 ]; then
-            echo "Deleting $(($TAG_COUNT - 10)) old tags..."
-            echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
+            TAGS_TO_DELETE=$(($TAG_COUNT - 10))
+            echo "Deleting $TAGS_TO_DELETE old tags..."
+
+            doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/llm --format Tag --no-header | tail -n +11 | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/llm "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/llm "$tag" --force || echo "Failed to delete $tag"
               fi
             done
           else
@@ -398,17 +398,17 @@ jobs:
         run: |
           echo "Cleaning up old prometheus tags (keeping 10 most recent)..."
 
-          TAGS=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/prometheus --output json || echo "[]")
-
-          TAG_COUNT=$(echo "$TAGS" | jq '. | length')
+          TAG_COUNT=$(doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/prometheus --format Tag --no-header | wc -l | tr -d ' ')
           echo "Found $TAG_COUNT tags total"
 
           if [ "$TAG_COUNT" -gt 10 ]; then
-            echo "Deleting $(($TAG_COUNT - 10)) old tags..."
-            echo "$TAGS" | jq -r '.[10:] | .[].tag' | while read -r tag; do
+            TAGS_TO_DELETE=$(($TAG_COUNT - 10))
+            echo "Deleting $TAGS_TO_DELETE old tags..."
+
+            doctl registry repository list-tags ${{ secrets.DOCR_NAME }}/prometheus --format Tag --no-header | tail -n +11 | while read -r tag; do
               if [ ! -z "$tag" ] && [ "$tag" != "latest" ] && [ "$tag" != "buildcache" ]; then
                 echo "Deleting tag: $tag"
-                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/prometheus "$tag" --force || true
+                doctl registry repository delete-tag ${{ secrets.DOCR_NAME }}/prometheus "$tag" --force || echo "Failed to delete $tag"
               fi
             done
           else
