@@ -61,17 +61,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Heartbeat initial après 30 secondes
+    // Heartbeat initial après 1 minute
     const initialHeartbeat = setTimeout(() => {
       sendHeartbeat();
-    }, 30000);
+    }, 60000);
 
-    // Heartbeat régulier toutes les 2 minutes
+    // Heartbeat régulier toutes les 5 minutes
     const heartbeatInterval = setInterval(() => {
       sendHeartbeat();
-    }, 120000); // 2 minutes
+    }, 300000); // 5 minutes
 
-    secureLog.log("[AuthProvider] Heartbeat automatique activé");
+    secureLog.log("[AuthProvider] Heartbeat automatique activé (intervalle: 5 min)");
 
     return () => {
       clearTimeout(initialHeartbeat);
@@ -123,20 +123,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        // Page cachée, potentiellement fermée
-        handleBeforeUnload({} as BeforeUnloadEvent);
-      }
-    };
-
-    // Écouter les événements de fermeture
+    // Écouter seulement l'événement de fermeture réelle du navigateur
+    // Note: visibilitychange supprimé car il causait des logouts involontaires
+    // lors de changements d'onglets ou pendant le chargement initial
     window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isAuthenticated]);
 

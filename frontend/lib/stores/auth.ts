@@ -155,7 +155,7 @@ export const useAuthStore = create<AuthState>()(
           } catch (error) {
             secureLog.error('[SessionTracking] Heartbeat error', error);
           }
-        }, 30000); // Toutes les 30 secondes
+        }, 300000); // Toutes les 5 minutes
         
         set({
           sessionStart: now,
@@ -293,13 +293,13 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // CHECK AUTH : Utilise /auth/me avec cache de 30 secondes
+      // CHECK AUTH : Utilise /auth/me avec cache de 5 minutes
       checkAuth: async () => {
         try {
-          // Cache: Ne pas appeler /auth/me si vérifié il y a moins de 30 secondes
+          // Cache: Ne pas appeler /auth/me si vérifié il y a moins de 5 minutes
           const now = Date.now();
           const lastCheck = get().lastAuthCheck;
-          const CACHE_DURATION = 30000; // 30 secondes
+          const CACHE_DURATION = 300000; // 5 minutes
 
           if (lastCheck && (now - lastCheck) < CACHE_DURATION) {
             secureLog.log("[AuthStore] Using cached auth data (checked " + Math.round((now - lastCheck) / 1000) + "s ago)");
