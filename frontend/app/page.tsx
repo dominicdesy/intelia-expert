@@ -575,8 +575,8 @@ function LoginPageContent() {
         };
         localStorage.setItem("intelia-expert-auth", JSON.stringify(authData));
 
-        // Check auth to load user data
-        await checkAuth();
+        // IMPORTANT: Force refresh to bypass cache and update auth state immediately
+        await checkAuth(true);
 
         // Start session tracking if authenticated
         if (isAuthenticated) {
