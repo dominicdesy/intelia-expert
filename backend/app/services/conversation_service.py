@@ -390,6 +390,148 @@ class ConversationService:
             raise
 
     @staticmethod
+    def search_conversations(
+        user_id: str,
+        search_query: str,
+        limit: int = 50,
+        offset: int = 0
+    ) -> Dict[str, Any]:
+        """
+        Recherche des conversations par contenu (questions et réponses)
+
+        Utilise PostgreSQL full-text search pour chercher dans:
+        - Le titre de la conversation
+        - Le contenu des messages (questions et réponses)
+
+        Args:
+            user_id: ID de l'utilisateur
+            search_query: Terme de recherche
+            limit: Nombre maximum de résultats
+            offset: Offset pour pagination
+
+        Returns:
+            {
+                "conversations": [...],
+                "total": int,
+                "query": str,
+                "limit": int,
+                "offset": int
+            }
+        """
+        try:
+            with get_pg_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    # Nettoyer et préparer le terme de recherche
+                    # Remplacer les espaces par & pour recherche AND
+                    search_term = ' & '.join(search_query.strip().split())
+
+                    # Recherche full-text dans les conversations et messages
+                    cur.execute(
+                        """
+                        WITH matching_conversations AS (
+                            SELECT DISTINCT
+                                c.id,
+                                c.session_id,
+                                c.user_id,
+                                c.title,
+                                c.language,
+                                c.message_count,
+                                c.first_message_preview,
+                                c.last_message_preview,
+                                c.status,
+                                c.created_at,
+                                c.updated_at,
+                                c.last_activity_at,
+                                -- Score de pertinence: recherche dans titre + messages
+                                GREATEST(
+                                    ts_rank(to_tsvector('simple', COALESCE(c.title, '')), to_tsquery('simple', %s)),
+                                    MAX(ts_rank(to_tsvector('simple', COALESCE(m.content, '')), to_tsquery('simple', %s)))
+                                ) as relevance_score
+                            FROM conversations c
+                            LEFT JOIN messages m ON m.conversation_id = c.id
+                            WHERE c.user_id = %s
+                                AND c.status = 'active'
+                                AND (
+                                    to_tsvector('simple', COALESCE(c.title, '')) @@ to_tsquery('simple', %s)
+                                    OR to_tsvector('simple', COALESCE(m.content, '')) @@ to_tsquery('simple', %s)
+                                )
+                            GROUP BY c.id
+                        )
+                        SELECT
+                            id::text,
+                            session_id::text,
+                            user_id,
+                            title,
+                            language,
+                            message_count,
+                            first_message_preview,
+                            last_message_preview,
+                            status,
+                            created_at,
+                            updated_at,
+                            last_activity_at,
+                            relevance_score
+                        FROM matching_conversations
+                        ORDER BY relevance_score DESC, last_activity_at DESC
+                        LIMIT %s OFFSET %s
+                        """,
+                        (search_term, search_term, user_id, search_term, search_term, limit, offset)
+                    )
+
+                    rows = cur.fetchall()
+
+                    # Compter le total de résultats
+                    cur.execute(
+                        """
+                        SELECT COUNT(DISTINCT c.id) as total
+                        FROM conversations c
+                        LEFT JOIN messages m ON m.conversation_id = c.id
+                        WHERE c.user_id = %s
+                            AND c.status = 'active'
+                            AND (
+                                to_tsvector('simple', COALESCE(c.title, '')) @@ to_tsquery('simple', %s)
+                                OR to_tsvector('simple', COALESCE(m.content, '')) @@ to_tsquery('simple', %s)
+                            )
+                        """,
+                        (user_id, search_term, search_term)
+                    )
+
+                    total = cur.fetchone()["total"]
+
+                    conversations = []
+                    for row in rows:
+                        conversations.append({
+                            "id": row["id"],
+                            "session_id": row["session_id"],
+                            "user_id": row["user_id"],
+                            "title": row["title"],
+                            "language": row["language"],
+                            "message_count": row["message_count"],
+                            "first_message_preview": row["first_message_preview"],
+                            "preview": row["first_message_preview"],  # Alias pour compatibilité
+                            "last_message_preview": row["last_message_preview"],
+                            "status": row["status"],
+                            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                            "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+                            "last_activity_at": row["last_activity_at"].isoformat() if row["last_activity_at"] else None,
+                            "relevance_score": float(row["relevance_score"])
+                        })
+
+                    logger.info(f"Recherche '{search_query}' pour {user_id}: {total} résultats")
+
+                    return {
+                        "conversations": conversations,
+                        "total": total,
+                        "query": search_query,
+                        "limit": limit,
+                        "offset": offset
+                    }
+
+        except Exception as e:
+            logger.error(f"Erreur recherche conversations: {e}")
+            raise
+
+    @staticmethod
     def delete_conversation(conversation_id: str) -> bool:
         """
         Supprime (archive) une conversation

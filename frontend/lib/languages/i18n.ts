@@ -494,12 +494,18 @@ export interface TranslationKeys {
   "history.newConversation": string;
   "history.noConversations": string;
   "history.noResults": string;
+  "history.noSearchResults": string;
   "history.refresh": string;
   "history.renderState": string;
+  "history.resultsFound": string;
   "history.retrievingHistory": string;
   "history.search": string;
+  "history.searchError": string;
+  "history.searchPlaceholder": string;
+  "history.searching": string;
   "history.startQuestion": string;
   "history.toggleClicked": string;
+  "history.tryDifferentSearch": string;
   "history.userPresent": string;
   "invitation.accountCreatedPleaseLogin": string;
   "invitation.backendValidation": string;

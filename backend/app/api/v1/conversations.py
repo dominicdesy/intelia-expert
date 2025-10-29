@@ -342,6 +342,69 @@ async def get_user_conversations_endpoint(
         )
 
 
+@router.get("/search")
+async def search_conversations_endpoint(
+    q: str = Query(..., min_length=1, description="Search query"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Recherche dans les conversations de l'utilisateur connecté
+
+    Recherche dans:
+    - Titres des conversations
+    - Contenu des messages (questions et réponses)
+
+    Args:
+        q: Terme de recherche (min 1 caractère)
+        limit: Nombre de résultats (max 200)
+        offset: Offset pour pagination
+
+    Returns:
+        Liste des conversations trouvées triées par pertinence
+    """
+    try:
+        user_id = current_user.get("user_id", "")
+        user_email = current_user.get("email", "unknown")
+
+        logger.info(
+            f"[Search] User {user_email} searching for: '{q}' "
+            f"(limit={limit}, offset={offset})"
+        )
+
+        # Effectuer la recherche
+        result = conversation_service.search_conversations(
+            user_id=user_id,
+            search_query=q,
+            limit=limit,
+            offset=offset
+        )
+
+        logger.info(
+            f"[Search] Found {result['total']} results for query '{q}' "
+            f"(user={user_email})"
+        )
+
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "query": result["query"],
+            "conversations": result["conversations"],
+            "total_count": result["total"],
+            "limit": result["limit"],
+            "offset": result["offset"],
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except Exception as e:
+        logger.exception(f"Erreur recherche conversations: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la recherche: {str(e)}",
+        )
+
+
 # ===== ENDPOINT RÉCUPÉRATION MESSAGES D'UNE CONVERSATION =====
 
 @router.get("/{conversation_id}/messages")
