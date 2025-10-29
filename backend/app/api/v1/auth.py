@@ -768,7 +768,8 @@ async def logout(
             result = analytics.end_session(session_id, request.reason or "manual")
 
             duration = result.get("duration") if result else None
-            logger.info(f"[Logout] Session terminée: {user_email}, durée: {duration}s")
+            duration_str = f"{duration}s" if duration is not None else "unknown"
+            logger.info(f"[Logout] Session terminée: {user_email}, durée: {duration_str}")
 
             return LogoutResponse(
                 success=True, message="Déconnexion réussie", session_duration=duration

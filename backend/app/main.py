@@ -968,9 +968,9 @@ def verify_metrics_credentials(credentials: HTTPBasicCredentials = Depends(secur
 
 # === ENDPOINT PROMETHEUS METRICS ===
 @app.get("/metrics", tags=["Monitoring"])
-async def prometheus_metrics(username: str = Depends(verify_metrics_credentials)):
+async def prometheus_metrics():
     """
-    Export Prometheus metrics for Grafana Cloud
+    Export Prometheus metrics for Grafana Cloud (Public endpoint for Prometheus scraping)
 
     Returns metrics in Prometheus text format:
     - LLM costs and token usage

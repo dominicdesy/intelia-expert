@@ -81,7 +81,7 @@ if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
 else:
     logger.warning("⚠️ Twilio credentials not configured - WhatsApp disabled")
 
-logger.info(f"✅ AI Service configured at: {RAG_CHAT_ENDPOINT}")
+logger.info(f"✅ RAG Service configured at: {RAG_CHAT_ENDPOINT}")
 
 
 # ==================== HELPERS ====================
@@ -324,7 +324,7 @@ async def handle_text_message(
             conversation_id = generate_whatsapp_session_uuid(from_number)
 
         logger.info(f"📝 WhatsApp message from {user_email} ({user_name}): {body[:100]}...")
-        logger.info(f"🔧 Calling AI Service: {RAG_CHAT_ENDPOINT}")
+        logger.info(f"🔧 Calling RAG Service: {RAG_CHAT_ENDPOINT}")
 
         # Créer un JWT token pour l'utilisateur WhatsApp
         auth_token = create_whatsapp_user_token(user_info)
@@ -1259,14 +1259,14 @@ async def whatsapp_status():
     """
     Retourne le statut de la configuration WhatsApp
     """
-    # Test AI Service connectivity
+    # Test RAG Service connectivity
     rag_service_available = False
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(f"{RAG_URL}/health")
             rag_service_available = response.status_code == 200
     except Exception as e:
-        logger.warning(f"⚠️ AI Service health check failed: {e}")
+        logger.warning(f"⚠️ RAG Service health check failed: {e}")
 
     return {
         "whatsapp_enabled": twilio_client is not None,

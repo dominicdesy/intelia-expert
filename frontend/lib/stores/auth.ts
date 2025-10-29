@@ -293,9 +293,19 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // CHECK AUTH : Utilise /auth/me
+      // CHECK AUTH : Utilise /auth/me avec cache de 30 secondes
       checkAuth: async () => {
         try {
+          // Cache: Ne pas appeler /auth/me si vérifié il y a moins de 30 secondes
+          const now = Date.now();
+          const lastCheck = get().lastAuthCheck;
+          const CACHE_DURATION = 30000; // 30 secondes
+
+          if (lastCheck && (now - lastCheck) < CACHE_DURATION) {
+            secureLog.log("[AuthStore] Using cached auth data (checked " + Math.round((now - lastCheck) / 1000) + "s ago)");
+            return;
+          }
+
           secureLog.log("[AuthStore] Checking auth via /auth/me");
 
           // NOUVEAU: Rafraîchir le token si nécessaire avant de vérifier l'auth
