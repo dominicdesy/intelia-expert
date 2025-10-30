@@ -676,6 +676,12 @@ class HybridEntityExtractor:
                 if key not in all_entities or not all_entities[key]:
                     all_entities[key] = value
 
+        # 🆕 TIER 4: Barn number extraction (fast regex, Compass integration)
+        barn_result = self._extract_barn_number(query)
+        if barn_result["value"]:
+            all_entities["barn_number"] = barn_result["value"]
+            logger.info(f"🏚️ Numéro de poulailler détecté: {barn_result['value']} (pattern: '{barn_result['match_text']}')")
+
         # Structured logging
         structured_logger.info(
             "hybrid_extraction_completed",
@@ -714,6 +720,46 @@ class HybridEntityExtractor:
             return False
 
         return True
+
+    def _extract_barn_number(self, query: str) -> Dict[str, Any]:
+        """
+        🆕 Extract barn/poulailler number for Compass integration (Phase 1)
+
+        Patterns supported:
+        - "poulailler 1", "poulailler 2", etc.
+        - "barn 1", "barn 2", etc.
+        - "mon poulailler 3", "le poulailler 2", etc.
+        - "bâtiment 1", "batiment 2", etc.
+
+        Returns:
+            Dict with 'value', 'confidence', 'explicit', 'match_text'
+        """
+        query_lower = query.lower()
+
+        # Patterns to detect barn number
+        patterns = [
+            r'\b(?:poulailler|barn|bâtiment|batiment)\s+(\d+)\b',
+            r'\b(?:mon|ma|le|la|du|de la|dans le|au)\s+(?:poulailler|barn|bâtiment|batiment)\s+(\d+)\b',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, query_lower, re.IGNORECASE)
+            if match:
+                barn_num = match.group(1)
+                return {
+                    "value": barn_num,
+                    "confidence": 0.95,
+                    "explicit": True,
+                    "match_text": match.group(0),
+                }
+
+        # No barn number detected
+        return {
+            "value": None,
+            "confidence": 0.0,
+            "explicit": False,
+            "match_text": None,
+        }
 
 
 # ============================================================================
