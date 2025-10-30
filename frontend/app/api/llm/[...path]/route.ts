@@ -1,13 +1,15 @@
 /**
  * SÉCURITÉ: Proxy générique pour tous les endpoints RAG Service
- * Version: 1.6.0
- * Last modified: 2025-10-28
- * Updated: Renamed from AI Service to RAG
+ * Version: 1.7.0
+ * Last modified: 2025-10-30
+ * Updated: Pass Authorization header for Compass integration
  */
 // app/api/llm/[...path]/route.ts
 
 import { type NextRequest } from "next/server";
 import { secureLog } from "@/lib/utils/secureLogger";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 
 /**
  * SÉCURITÉ: Proxy générique pour tous les endpoints RAG Service
@@ -35,6 +37,24 @@ async function proxyToRAGService(req: NextRequest, params: { path: string[] }) {
   secureLog.log(`[rag-service-proxy] ${req.method} ${fullUrl}`);
 
   try {
+    // 🆕 Get Supabase JWT token for Compass API authentication
+    let authToken: string | null = null;
+    try {
+      const supabase = createRouteHandlerClient({ cookies });
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      authToken = session?.access_token ?? null;
+
+      if (authToken) {
+        secureLog.log(`[rag-service-proxy] ✅ Auth token obtained for user`);
+      } else {
+        secureLog.warn(`[rag-service-proxy] ⚠️ No auth token available - user not authenticated`);
+      }
+    } catch (authError) {
+      secureLog.warn(`[rag-service-proxy] Auth token retrieval failed: ${authError}`);
+    }
+
     // Copier le body si présent
     let body: BodyInit | undefined = undefined;
     if (req.method !== "GET" && req.method !== "HEAD") {
@@ -49,13 +69,21 @@ async function proxyToRAGService(req: NextRequest, params: { path: string[] }) {
       }
     }
 
-    // Appel au AI Service interne
+    // 🆕 Build headers with Authorization token
+    const headers: HeadersInit = {
+      "Content-Type": req.headers.get("content-type") ?? "application/json",
+      Accept: req.headers.get("accept") ?? "*/*",
+    };
+
+    // Add Authorization header if token available
+    if (authToken) {
+      headers["Authorization"] = `Bearer ${authToken}`;
+    }
+
+    // Appel au RAG Service interne
     const response = await fetch(fullUrl, {
       method: req.method,
-      headers: {
-        "Content-Type": req.headers.get("content-type") ?? "application/json",
-        Accept: req.headers.get("accept") ?? "*/*",
-      },
+      headers,
       body,
     });
 
