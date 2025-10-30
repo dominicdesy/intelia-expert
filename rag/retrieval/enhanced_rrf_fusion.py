@@ -697,7 +697,7 @@ class IntelligentRRFFusion:
                         # Vérifier aussi tous les aliases
                         aliases = self.breeds_registry.get_aliases(normalized)
                         for alias in aliases:
-                            if alias.lower() in query_lower:
+                            if alias and alias.lower() in query_lower:
                                 logger.debug(
                                     f"Lignée détectée via alias '{alias}': {normalized}"
                                 )
@@ -743,6 +743,8 @@ class IntelligentRRFFusion:
                 sorted_aliases = sorted(aliases, key=len, reverse=True)
 
                 for alias in sorted_aliases:
+                    if not alias:  # ✅ Skip None/empty aliases
+                        continue
                     alias_lower = alias.lower()
 
                     # Recherche simple dans la requête
