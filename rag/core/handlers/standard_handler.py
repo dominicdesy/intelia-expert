@@ -73,7 +73,7 @@ class StandardQueryHandler(BaseQueryHandler):
                 self.semantic_reranker = False  # Flag to avoid retry
         return self.semantic_reranker if self.semantic_reranker is not False else None
 
-    def _detect_poultry_type(self, query: str) -> str:
+    def _detect_poultry_type(self, query: str) -> Optional[str]:
         """
         Detect poultry type (broiler vs layer) from query for RAG filtering.
 
@@ -81,9 +81,25 @@ class StandardQueryHandler(BaseQueryHandler):
             query: User query
 
         Returns:
-            'layers' or 'broilers' (Weaviate species field values)
+            'layers', 'broilers', or None (for Intelia products - no species filter)
         """
         query_lower = query.lower()
+
+        # Intelia products keywords (priority - no species filter)
+        intelia_products = [
+            "compass",
+            "nano",
+            "unity",
+            "farmhub",
+            "cognito",
+        ]
+
+        # Detect Intelia products first (no species filter)
+        if any(product in query_lower for product in intelia_products):
+            logger.info(
+                "📦 Intelia product detected - no species filter applied"
+            )
+            return None
 
         # Layer keywords (same as generators.py)
         layer_keywords = [
@@ -545,7 +561,8 @@ class StandardQueryHandler(BaseQueryHandler):
         try:
             # 🐔 OPTION 3: Detect poultry type and filter Weaviate by species
             poultry_species = self._detect_poultry_type(query)
-            filters["species"] = poultry_species
+            if poultry_species is not None:
+                filters["species"] = poultry_species
 
             # Use top_k directly (no reduction for optimization)
             # The 10x multiplier + re-ranker will handle filtering
