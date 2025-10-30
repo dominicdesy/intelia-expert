@@ -810,7 +810,7 @@ MÉTRIQUES CLÉS BROILERS:
         logger.debug(f"Query: '{query[:50]}...'")
 
         # ✅ NOUVEAU: Détecter l'espèce cible depuis la query
-        query_lower = query.lower()
+        query_lower = (query or "").lower()
         target_species = None
 
         # Détection multilingue de l'espèce

@@ -570,9 +570,9 @@ class IntelligentRRFFusion:
     def _calculate_poultry_boost(self, doc: Dict, context: Dict) -> float:
         """NOUVELLE VERSION: Calcule le boost spécialisé aviculture avec priorité lignée génétique"""
 
-        content = doc.get("content", "").lower()
+        content = (doc.get("content") or "").lower()
         metadata = doc.get("metadata", {})
-        genetic_line_doc = metadata.get("geneticLine", "").lower()
+        genetic_line_doc = (metadata.get("geneticLine") or "").lower()
 
         boost = 1.0
 
