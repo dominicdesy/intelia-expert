@@ -47,6 +47,7 @@ import { LoadingMessage } from "./components/LoadingMessage";
 import ShareConversationButton from "./components/ShareConversationButton";
 import ExportPDFButton from "./components/ExportPDFButton";
 import { HelpButton, HelpTour } from "./components/HelpTour";
+import { WhatsNewButton } from "./components/WhatsNewButton";
 import { secureLog } from "@/lib/utils/secureLogger";
 import { VoiceInput } from "./components/VoiceInput";
 import { TypewriterMessage } from "./components/TypewriterMessage";
@@ -1705,6 +1706,11 @@ function ChatInterface() {
                   <ShareConversationButton conversationId={currentConversation.id} />
                 </div>
               )}
+
+              {/* What's New button - Toujours visible */}
+              <div className="flex-shrink-0">
+                <WhatsNewButton />
+              </div>
 
               {/* Help button - Toujours visible */}
               <div className="flex-shrink-0">

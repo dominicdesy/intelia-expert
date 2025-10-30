@@ -1147,6 +1147,7 @@ export interface TranslationKeys {
   "widget.placeholder": string;
   "widget.sendButton": string;
   "widget.welcomeMessage": string;
+  "whatsNew.buttonTitle": string;
 };
 
 // Cache pour les traductions chargées

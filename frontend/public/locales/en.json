@@ -1153,5 +1153,8 @@
     "portal": {
       "error": "Error accessing customer portal"
     }
+  },
+  "whatsNew": {
+    "buttonTitle": "What's New"
   }
 }
