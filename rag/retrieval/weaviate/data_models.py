@@ -53,7 +53,7 @@ class WeaviateSchema:
 
     @staticmethod
     def get_collection_config(
-        collection_name: str = "InteliaExpertKnowledge",
+        collection_name: str = "InteliaKnowledge",
     ) -> Dict[str, Any]:
         """
         Returns Weaviate v4 collection configuration
