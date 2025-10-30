@@ -368,7 +368,14 @@ class WeaviateCore(InitializableMixin):
         """Initialise le retriever hybride avec RRF intelligent"""
 
         try:
-            self.retriever = HybridWeaviateRetriever(self.weaviate_client)
+            # Read collection name from environment variable (with fallback)
+            collection_name = os.getenv("WEAVIATE_COLLECTION_NAME", "InteliaKnowledge")
+            logger.info(f"🔧 Using Weaviate collection: {collection_name}")
+
+            self.retriever = HybridWeaviateRetriever(
+                self.weaviate_client,
+                collection_name=collection_name
+            )
 
             # RRF Intelligent
             if self.intelligent_rrf and hasattr(self.retriever, "set_intelligent_rrf"):

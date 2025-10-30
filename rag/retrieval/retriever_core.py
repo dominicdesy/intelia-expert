@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class HybridWeaviateRetriever(SearchMixin, AdaptiveMixin, RRFMixin):
     """Retriever hybride avec dimension vectorielle correcte dès le départ"""
 
-    def __init__(self, client, collection_name: str = "InteliaExpertKnowledge"):
+    def __init__(self, client, collection_name: str = "InteliaKnowledge"):
         self.client = client
         self.collection_name = collection_name
         self.is_v4 = hasattr(client, "collections")
@@ -64,7 +64,7 @@ class HybridWeaviateRetriever(SearchMixin, AdaptiveMixin, RRFMixin):
         # CORRECTION CRITIQUE: Dimension vectorielle correcte dès l'initialisation
         # text-embedding-3-small utilise 1536 dimensions (pas 384)
         self.working_vector_dimension = (
-            1536  # CORRIGÉ: OpenAI text-embedding-3-small = 1536
+            3072  # UPDATED: OpenAI text-embedding-3-large = 3072
         )
         self.dimension_detection_attempted = False
         self.dimension_detection_success = False
@@ -141,7 +141,7 @@ class HybridWeaviateRetriever(SearchMixin, AdaptiveMixin, RRFMixin):
 
         except Exception as e:
             logger.error(f"Erreur détection dimension: {e}")
-            self.working_vector_dimension = 1536  # CORRIGÉ: Fallback sur 1536
+            self.working_vector_dimension = 3072  # UPDATED: Fallback to 3072
             self.api_capabilities["api_stability"] = "degraded"
             return 1536
 
