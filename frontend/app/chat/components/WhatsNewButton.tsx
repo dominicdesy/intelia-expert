@@ -45,10 +45,6 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
               selector: '#headway-badge',
               trigger: '#headway-trigger-button',
               account: 'JVoZPy',
-              position: {
-                x: 'right',
-                y: 'top'
-              },
               callbacks: {
                 onWidgetReady: (widget: any) => {
                   console.log('[Headway] Widget ready!', widget);
