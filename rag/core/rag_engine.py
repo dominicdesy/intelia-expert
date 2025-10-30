@@ -367,6 +367,7 @@ class InteliaRAGEngine(InitializableMixin):
         conversation_context: List[Dict] = None,
         language: Optional[str] = None,
         enable_preprocessing: bool = True,
+        auth_token: Optional[str] = None,  # 🆕 Auth token for Compass API
         **kwargs,
     ) -> RAGResult:
         """
@@ -435,6 +436,7 @@ class InteliaRAGEngine(InitializableMixin):
                 original_query=query,
                 language=effective_language,
                 user_id=tenant_id,  # 🆕 Pass tenant_id as user_id for profiling
+                auth_token=auth_token,  # 🆕 Pass auth token for Compass
             )
 
             self.optimization_stats["routing_success"] += 1
@@ -522,6 +524,7 @@ class InteliaRAGEngine(InitializableMixin):
                 original_query=query,
                 language=effective_language,
                 user_id=tenant_id,  # 🆕 Pass tenant_id as user_id for profiling
+                auth_token=None,  # No auth_token available in this method
             )
 
             self.optimization_stats["routing_success"] += 1

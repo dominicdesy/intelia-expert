@@ -67,6 +67,7 @@ class RAGResponseGenerator:
         original_query: str,
         language: str,
         user_id: str = None,  # 🆕 User profiling
+        auth_token: str = None,  # 🆕 Auth token for Compass API
     ) -> RAGResult:
         """
         Ensure RAGResult has a generated answer
@@ -81,10 +82,72 @@ class RAGResponseGenerator:
             preprocessed_data: Preprocessed data (contains contextual_history)
             original_query: Original query
             language: Query language
+            user_id: User ID for profiling
+            auth_token: Auth token for Compass API calls
 
         Returns:
             RAGResult with generated answer and optional follow-up
         """
+        # 🆕 SPECIAL HANDLING FOR COMPASS_DATA - Fetch real-time barn data
+        if result.source == RAGSource.COMPASS_DATA:
+            logger.info("🏚️ Compass data request detected - fetching real barn data")
+
+            try:
+                from extensions.compass_extension import get_compass_extension
+                import httpx
+                import os
+
+                # Extract metadata from result
+                barn_number = result.metadata.get("barn_number")
+                query_type = result.metadata.get("query_type", "current_temperature")
+
+                if not barn_number:
+                    logger.error("No barn_number in metadata for COMPASS_DATA")
+                    result.answer = "Je n'ai pas pu identifier le numéro du poulailler dans votre question."
+                    return result
+
+                if not auth_token:
+                    logger.warning("No auth_token available for Compass API call")
+                    result.answer = "Je ne peux pas accéder aux données temps réel de votre poulailler en ce moment. Veuillez réessayer."
+                    return result
+
+                # Fetch real-time barn data from Compass API
+                backend_url = os.getenv("BACKEND_API_URL", "https://expert.intelia.com/api")
+                compass_url = f"{backend_url}/v1/compass/me/barns/{barn_number}"
+
+                logger.info(f"📡 Fetching Compass data from: {compass_url}")
+
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.get(
+                        compass_url,
+                        headers={"Authorization": f"Bearer {auth_token}"}
+                    )
+
+                    if response.status_code != 200:
+                        logger.error(f"Compass API error: {response.status_code}")
+                        result.answer = f"Je n'ai pas pu récupérer les données du poulailler {barn_number}. Veuillez vérifier que ce poulailler existe."
+                        return result
+
+                    barn_data = response.json()
+                    logger.info(f"✅ Compass data fetched: {barn_data}")
+
+                # Generate natural language response based on query type
+                result.answer = self._generate_compass_answer(
+                    barn_data, query_type, barn_number, language
+                )
+
+                # Update metadata with actual data fetched
+                result.metadata["compass_data_fetched"] = True
+                result.metadata["barn_data"] = barn_data
+
+                logger.info(f"✅ Compass answer generated: {result.answer[:100]}...")
+                return result
+
+            except Exception as e:
+                logger.error(f"Error fetching Compass data: {e}", exc_info=True)
+                result.answer = f"Je n'ai pas pu accéder aux données temps réel du poulailler {barn_number}. Erreur: {str(e)}"
+                return result
+
         # If answer NOT already present, generate via LLM
         if not (result.answer and result.answer.strip()):
             # DEFENSIVE: Ensure context_docs is never None
@@ -339,3 +402,82 @@ class RAGResponseGenerator:
             if not result.metadata:
                 result.metadata = {}
             result.metadata["llm_fallback_error"] = str(e)
+
+    def _generate_compass_answer(
+        self, barn_data: dict, query_type: str, barn_number: str, language: str
+    ) -> str:
+        """
+        Generate natural language answer from Compass barn data
+
+        Args:
+            barn_data: Barn data from Compass API
+            query_type: Type of query (current_temperature, today_min_max_temperature, etc.)
+            barn_number: Barn number
+            language: Response language
+
+        Returns:
+            Natural language answer
+        """
+        barn_name = barn_data.get("name", f"Poulailler {barn_number}")
+
+        # Current temperature
+        if query_type == "current_temperature":
+            temp = barn_data.get("temperature")
+            if temp is not None:
+                return f"La température actuelle dans le {barn_name} (poulailler {barn_number}) est de {temp}°C."
+            else:
+                return f"Désolé, la température actuelle du {barn_name} n'est pas disponible en ce moment."
+
+        # Today's min/max temperature
+        elif query_type == "today_min_max_temperature":
+            temp_min = barn_data.get("temperature_min_today")
+            temp_max = barn_data.get("temperature_max_today")
+
+            if temp_min is not None and temp_max is not None:
+                return f"Aujourd'hui dans le {barn_name} (poulailler {barn_number}):\n- Température minimale: {temp_min}°C\n- Température maximale: {temp_max}°C"
+            elif temp_max is not None:
+                return f"Aujourd'hui, la température maximale dans le {barn_name} (poulailler {barn_number}) a été de {temp_max}°C."
+            elif temp_min is not None:
+                return f"Aujourd'hui, la température minimale dans le {barn_name} (poulailler {barn_number}) a été de {temp_min}°C."
+            else:
+                return f"Désolé, les données de température min/max d'aujourd'hui ne sont pas disponibles pour le {barn_name}."
+
+        # Yesterday's average temperature
+        elif query_type == "yesterday_avg_temperature":
+            temp_avg = barn_data.get("temperature_avg_yesterday")
+            if temp_avg is not None:
+                return f"Hier, la température moyenne dans le {barn_name} (poulailler {barn_number}) était de {temp_avg}°C."
+            else:
+                return f"Désolé, la température moyenne d'hier n'est pas disponible pour le {barn_name}."
+
+        # Yesterday's min/max temperature
+        elif query_type == "yesterday_min_max_temperature":
+            temp_min = barn_data.get("temperature_min_yesterday")
+            temp_max = barn_data.get("temperature_max_yesterday")
+
+            if temp_min is not None and temp_max is not None:
+                return f"Hier dans le {barn_name} (poulailler {barn_number}):\n- Température minimale: {temp_min}°C\n- Température maximale: {temp_max}°C"
+            elif temp_max is not None:
+                return f"Hier, la température maximale dans le {barn_name} (poulailler {barn_number}) était de {temp_max}°C."
+            elif temp_min is not None:
+                return f"Hier, la température minimale dans le {barn_name} (poulailler {barn_number}) était de {temp_min}°C."
+            else:
+                return f"Désolé, les données de température min/max d'hier ne sont pas disponibles pour le {barn_name}."
+
+        # Generic temperature query (yesterday or today)
+        elif query_type in ("yesterday_temperature", "today_temperature"):
+            temp = barn_data.get("temperature")
+            if temp is not None:
+                period = "hier" if "yesterday" in query_type else "aujourd'hui"
+                return f"La température {period} dans le {barn_name} (poulailler {barn_number}) est de {temp}°C."
+            else:
+                period = "d'hier" if "yesterday" in query_type else "d'aujourd'hui"
+                return f"Désolé, la température {period} n'est pas disponible pour le {barn_name}."
+
+        # Default fallback
+        else:
+            temp = barn_data.get("temperature")
+            if temp is not None:
+                return f"La température actuelle dans le {barn_name} (poulailler {barn_number}) est de {temp}°C."
+            else:
+                return f"Désolé, les données de température ne sont pas disponibles pour le {barn_name} en ce moment."

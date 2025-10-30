@@ -267,6 +267,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 use_json_search=use_json_search,
                 genetic_line_filter=genetic_line_filter,
                 performance_context=performance_context,
+                auth_token=auth_token,  # 🆕 Pass auth token for Compass API
             )
 
             # Fallback si RAG indisponible

@@ -92,6 +92,7 @@ class ChatHandlers:
         use_json_search: bool = True,
         genetic_line_filter: Optional[str] = None,
         performance_context: Optional[Dict[str, Any]] = None,
+        auth_token: Optional[str] = None,  # 🆕 Auth token for Compass API
     ):
         """
         Génère une réponse via le RAG Engine
@@ -144,6 +145,7 @@ class ChatHandlers:
                 genetic_line_filter=genetic_line_filter,
                 performance_context=performance_context,
                 enable_preprocessing=True,
+                auth_token=auth_token,  # 🆕 Pass auth token for Compass
             )
 
             # Le router a géré la validation et le contexte
