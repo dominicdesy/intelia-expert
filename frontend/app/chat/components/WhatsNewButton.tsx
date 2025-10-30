@@ -38,21 +38,34 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
       setTimeout(() => {
         if ((window as any).Headway) {
           console.log('[Headway] Headway object found, initializing...');
-          (window as any).Headway.init({
-            selector: '#headway-badge',
-            trigger: '#headway-trigger-button',
-            account: 'JVoZPy',
-            callbacks: {
-              onWidgetReady: (widget: any) => {
-                console.log('[Headway] Widget ready!', widget);
-              },
-              onShowWidget: () => {
-                console.log('[Headway] Widget shown!');
-                if (onClick) onClick();
+
+          try {
+            const result = (window as any).Headway.init({
+              selector: '#headway-badge',
+              trigger: '#headway-trigger-button',
+              account: 'JVoZPy',
+              callbacks: {
+                onWidgetReady: (widget: any) => {
+                  console.log('[Headway] Widget ready!', widget);
+                  console.log('[Headway] Unseen count:', widget?.getUnseenCount?.());
+                },
+                onShowWidget: () => {
+                  console.log('[Headway] Widget shown!');
+                  if (onClick) onClick();
+                },
+                onReadMore: () => {
+                  console.log('[Headway] Read more clicked');
+                },
+                onHideWidget: () => {
+                  console.log('[Headway] Widget hidden');
+                }
               }
-            }
-          });
-          (window as any).headwayInitialized = true;
+            });
+            console.log('[Headway] Init result:', result);
+            (window as any).headwayInitialized = true;
+          } catch (error) {
+            console.error('[Headway] Init error:', error);
+          }
         } else {
           console.error('[Headway] Headway object not found after script load');
         }
