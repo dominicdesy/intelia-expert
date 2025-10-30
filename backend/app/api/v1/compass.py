@@ -12,7 +12,7 @@ import logging
 
 # Import authentication
 from .auth import get_current_user
-from app.core.database import get_pg_connection
+from app.core.database import get_pg_connection, get_user_from_supabase
 from app.services.compass_api_service import get_compass_service, CompassBarnData
 from psycopg2.extras import RealDictCursor
 import json
@@ -150,26 +150,33 @@ async def get_all_users_compass_config() -> List[Dict]:
     try:
         with get_pg_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Join with users table to get email
+                # Get all configs from PostgreSQL
                 cur.execute(
                     """
                     SELECT
-                        ucc.id,
-                        ucc.user_id,
-                        ucc.compass_enabled,
-                        ucc.barns,
-                        ucc.created_at,
-                        ucc.updated_at,
-                        COALESCE(u.email, 'unknown') as email
-                    FROM user_compass_config ucc
-                    LEFT JOIN users u ON u.auth_user_id = ucc.user_id
-                    ORDER BY ucc.created_at DESC
+                        id,
+                        user_id,
+                        compass_enabled,
+                        barns,
+                        created_at,
+                        updated_at
+                    FROM user_compass_config
+                    ORDER BY created_at DESC
                     """
                 )
                 results = cur.fetchall()
 
-                # Convert to list of dicts
-                configs = [dict(row) for row in results]
+                # Convert to list of dicts and enrich with user emails from Supabase
+                configs = []
+                for row in results:
+                    config = dict(row)
+                    user_id = config["user_id"]
+
+                    # Get user email from Supabase
+                    user_info = get_user_from_supabase(user_id)
+                    config["email"] = user_info.get("email", "unknown") if user_info else "unknown"
+
+                    configs.append(config)
 
                 logger.info(f"Retrieved {len(configs)} user Compass configurations")
                 return configs
