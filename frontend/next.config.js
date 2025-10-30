@@ -52,7 +52,7 @@ const nextConfig = {
   },
 
   // Headers de sécurité - 7 headers pour score A/A+ sur SecurityHeaders.com
-  // CSP mis à jour pour supporter Canny SDK (What's New feature)
+  // CSP mis à jour pour supporter Headway widget (What's New feature)
   async headers() {
     return [
       {
@@ -80,7 +80,7 @@ const nextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://canny.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://expert.intelia.com wss://expert.intelia.com https://*.supabase.co wss://*.supabase.co https://restcountries.com https://canny.io; frame-src 'self' https://*.grafana.net https://*.ondigitalocean.app; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri https://expert.intelia.com/api/v1/csp-report",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.headwayapp.co; style-src 'self' 'unsafe-inline' https://cdn.headwayapp.co; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://expert.intelia.com wss://expert.intelia.com https://*.supabase.co wss://*.supabase.co https://restcountries.com https://cdn.headwayapp.co; frame-src 'self' https://*.grafana.net https://*.ondigitalocean.app; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri https://expert.intelia.com/api/v1/csp-report",
           },
           {
             key: "Permissions-Policy",

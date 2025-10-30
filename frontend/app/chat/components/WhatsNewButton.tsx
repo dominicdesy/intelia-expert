@@ -1,8 +1,8 @@
 /**
  * WhatsNewButton
- * Version: 1.0.0
- * Last modified: 2025-10-29
- * Canny What's New integration
+ * Version: 2.0.0
+ * Last modified: 2025-10-30
+ * Headway What's New integration
  */
 "use client";
 
@@ -17,10 +17,17 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
   const { t } = useTranslation();
 
   useEffect(() => {
-    // Load Canny SDK script
-    if (typeof window !== 'undefined' && !(window as any).Canny) {
+    // Load Headway widget script
+    if (typeof window !== 'undefined') {
+      // Configure Headway
+      (window as any).HW_config = {
+        selector: "#headway-widget-trigger",
+        account: "JVoZPy"
+      };
+
+      // Load Headway SDK
       const script = document.createElement('script');
-      script.src = 'https://canny.io/sdk.js';
+      script.src = 'https://cdn.headwayapp.co/widget.js';
       script.async = true;
       document.body.appendChild(script);
 
@@ -38,29 +45,11 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
     if (onClick) {
       onClick();
     }
-
-    // Open Canny changelog
-    if (typeof window !== 'undefined' && (window as any).Canny) {
-      const cannyConfig: any = {
-        position: 'bottom',
-        align: 'right',
-      };
-
-      // Use APP ID if available, otherwise use subdomain
-      if (process.env.NEXT_PUBLIC_CANNY_APP_ID) {
-        cannyConfig.appID = process.env.NEXT_PUBLIC_CANNY_APP_ID;
-      } else {
-        cannyConfig.subdomain = 'intelia';
-      }
-
-      (window as any).Canny('initChangelog', cannyConfig);
-    } else {
-      console.warn('[WhatsNew] Canny SDK not loaded yet');
-    }
   };
 
   return (
     <button
+      id="headway-widget-trigger"
       onClick={handleClick}
       className="w-10 h-10 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center border border-gray-200 hover:border-blue-300"
       title={t("whatsNew.buttonTitle")}
