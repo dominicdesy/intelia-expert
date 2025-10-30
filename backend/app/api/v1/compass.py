@@ -12,8 +12,10 @@ import logging
 
 # Import authentication
 from .auth import get_current_user
-from app.core.database import get_supabase_client
+from app.core.database import get_pg_connection
 from app.services.compass_api_service import get_compass_service, CompassBarnData
+from psycopg2.extras import RealDictCursor
+import json
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/compass", tags=["Compass"])
@@ -114,15 +116,22 @@ def require_admin(current_user: Dict = Depends(get_current_user)) -> Dict:
 async def get_user_config(user_id: str) -> Optional[Dict]:
     """Get user's Compass configuration from database"""
     try:
-        supabase = get_supabase_client()
-        result = supabase.table("user_compass_config") \
-            .select("*") \
-            .eq("user_id", user_id) \
-            .execute()
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT id, user_id, compass_enabled, barns, created_at, updated_at
+                    FROM user_compass_config
+                    WHERE user_id = %s
+                    """,
+                    (user_id,)
+                )
+                result = cur.fetchone()
 
-        if result.data and len(result.data) > 0:
-            return result.data[0]
-        return None
+                if result:
+                    # Convert to dict and ensure proper JSON handling
+                    return dict(result)
+                return None
     except Exception as e:
         logger.error(f"Error fetching user config: {e}")
         return None
@@ -139,36 +148,31 @@ async def get_all_users_compass_config() -> List[Dict]:
         List of user configurations with email and settings
     """
     try:
-        supabase = get_supabase_client()
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Join with users table to get email
+                cur.execute(
+                    """
+                    SELECT
+                        ucc.id,
+                        ucc.user_id,
+                        ucc.compass_enabled,
+                        ucc.barns,
+                        ucc.created_at,
+                        ucc.updated_at,
+                        COALESCE(u.email, 'unknown') as email
+                    FROM user_compass_config ucc
+                    LEFT JOIN users u ON u.auth_user_id = ucc.user_id
+                    ORDER BY ucc.created_at DESC
+                    """
+                )
+                results = cur.fetchall()
 
-        # Get all configs
-        result = supabase.table("user_compass_config") \
-            .select("*") \
-            .execute()
+                # Convert to list of dicts
+                configs = [dict(row) for row in results]
 
-        if not result.data:
-            return []
-
-        # Enrich with user emails
-        configs = []
-        for config in result.data:
-            user_id = config["user_id"]
-
-            # Get user email from auth.users
-            user_result = supabase.table("users") \
-                .select("email") \
-                .eq("auth_user_id", user_id) \
-                .execute()
-
-            email = user_result.data[0]["email"] if user_result.data else "unknown"
-
-            configs.append({
-                **config,
-                "email": email
-            })
-
-        logger.info(f"Retrieved {len(configs)} user Compass configurations")
-        return configs
+                logger.info(f"Retrieved {len(configs)} user Compass configurations")
+                return configs
 
     except Exception as e:
         logger.error(f"Error fetching all user configs: {e}")
@@ -211,29 +215,36 @@ async def update_user_compass_config(
         Success response with updated data
     """
     try:
-        supabase = get_supabase_client()
-
         # Convert barns to dict format
         barns_data = [barn.dict() for barn in config.barns]
+        barns_json = json.dumps(barns_data)
 
-        data = {
-            "user_id": user_id,
-            "compass_enabled": config.compass_enabled,
-            "barns": barns_data,
-        }
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Upsert (insert or update) using ON CONFLICT
+                cur.execute(
+                    """
+                    INSERT INTO user_compass_config (user_id, compass_enabled, barns, created_at, updated_at)
+                    VALUES (%s, %s, %s, NOW(), NOW())
+                    ON CONFLICT (user_id)
+                    DO UPDATE SET
+                        compass_enabled = EXCLUDED.compass_enabled,
+                        barns = EXCLUDED.barns,
+                        updated_at = NOW()
+                    RETURNING id, user_id, compass_enabled, barns, created_at, updated_at
+                    """,
+                    (user_id, config.compass_enabled, barns_json)
+                )
+                result = cur.fetchone()
+                conn.commit()
 
-        # Upsert (insert or update)
-        result = supabase.table("user_compass_config") \
-            .upsert(data, on_conflict="user_id") \
-            .execute()
+                logger.info(f"Updated Compass config for user {user_id}: {len(barns_data)} barns, "
+                           f"enabled={config.compass_enabled}")
 
-        logger.info(f"Updated Compass config for user {user_id}: {len(barns_data)} barns, "
-                   f"enabled={config.compass_enabled}")
-
-        return {
-            "success": True,
-            "data": result.data[0] if result.data else data
-        }
+                return {
+                    "success": True,
+                    "data": dict(result) if result else None
+                }
 
     except Exception as e:
         logger.error(f"Error updating user config: {e}")
