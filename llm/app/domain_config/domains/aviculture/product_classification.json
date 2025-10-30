@@ -1,0 +1,168 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Domain knowledge for poultry product classification - Critical distinctions",
+    "last_updated": "2025-10-29",
+    "purpose": "Provide LLM with structured knowledge about product types and critical differentiations",
+    "language": "en"
+  },
+
+  "eggs": {
+    "classification_principle": "Eggs must ALWAYS be classified by their intended purpose: consumption vs reproduction. This distinction fundamentally affects production systems, management practices, and all metrics.",
+
+    "table_eggs": {
+      "names": ["table egg", "consumption egg", "shell egg", "eating egg", "commercial egg", "œuf de consommation", "œuf de table"],
+
+      "definition": "Eggs produced by commercial layer hens for direct human consumption. NOT fertile.",
+
+      "production_system": {
+        "site_type": "layer_farm",
+        "flock_type": "commercial_layers",
+        "genetic_lines": ["Hy-Line Brown", "Hy-Line W-36", "Lohmann Brown", "Lohmann LSL", "ISA Brown", "Bovans Brown"],
+        "male_birds": "ABSENT - no roosters in layer flocks"
+      },
+
+      "characteristics": {
+        "fertile": false,
+        "grading": ["Grade AA", "Grade A", "Grade B", "Extra", "Category A", "Category B"],
+        "storage_temperature_celsius": "4-7",
+        "humidity_percent": "70-80",
+        "shelf_life_days": "28-35",
+        "quality_metrics": ["shell_strength", "haugh_unit", "yolk_color", "shell_cleanliness"]
+      },
+
+      "destination": "retail, food_service, food_processing (direct to consumer)",
+
+      "keywords": [
+        "layer", "laying hen", "egg production", "dozen", "carton",
+        "shell quality", "yolk color", "consumer", "retail", "grocery",
+        "hen-day production", "laying rate", "pondeuse", "ponte"
+      ]
+    },
+
+    "hatching_eggs": {
+      "names": ["hatching egg", "fertile egg", "breeding egg", "incubation egg", "settable egg", "œuf à couver", "œuf fertile"],
+
+      "definition": "Fertile eggs produced by breeding flocks (parent stock) specifically for incubation to produce day-old chicks. MUST be fertile.",
+
+      "production_system": {
+        "site_type": "breeding_farm",
+        "flock_type": "parent_stock_breeders",
+        "genetic_lines": ["Ross 308 PS", "Ross 308 FF PS", "Cobb 500 PS", "Cobb 500 FF PS", "Hubbard JA87 PS"],
+        "male_birds": "REQUIRED - roosters present for fertilization",
+        "male_to_female_ratio": "1:10 to 1:12"
+      },
+
+      "characteristics": {
+        "fertile": true,
+        "fertilization_rate_target": "95%+",
+        "hatchability_target": "85%+",
+        "storage_temperature_celsius": "12-18",
+        "humidity_percent": "75-80",
+        "max_storage_days": "7 (optimal: 3-5)",
+        "storage_position": "large_end_up or horizontal",
+        "quality_metrics": ["fertility", "hatchability", "embryo_mortality", "chick_quality"]
+      },
+
+      "destination": "hatchery for incubation (21 days) → day-old chicks",
+
+      "processing_flow": "breeding_farm → collection → storage → hatchery → incubation → chicks",
+
+      "keywords": [
+        "breeder", "parent stock", "PS", "fertile", "hatchery", "incubation",
+        "settable", "fertility rate", "hatchability", "embryo", "setter",
+        "candling", "chick production", "rooster", "male", "reproducteur", "couvoir"
+      ]
+    },
+
+    "critical_distinctions": {
+      "purpose": {
+        "table_eggs": "human_consumption (end product)",
+        "hatching_eggs": "chick_production (intermediate product)"
+      },
+      "fertility": {
+        "table_eggs": "NOT FERTILE (no males in flock)",
+        "hatching_eggs": "FERTILE (males required for reproduction)"
+      },
+      "flock_composition": {
+        "table_eggs": "females only",
+        "hatching_eggs": "females AND males"
+      },
+      "storage_temperature": {
+        "table_eggs": "4-7°C (refrigerated)",
+        "hatching_eggs": "12-18°C (cool room, NOT refrigerated)"
+      },
+      "storage_duration": {
+        "table_eggs": "28-35 days",
+        "hatching_eggs": "maximum 7 days (optimal 3-5 days)"
+      },
+      "genetic_selection": {
+        "table_eggs": "selected for high egg production, shell quality, feed efficiency",
+        "hatching_eggs": "selected for offspring performance (growth rate, FCR for broilers; egg production for layers)"
+      },
+      "key_metrics": {
+        "table_eggs": ["hen_day_production", "feed_per_dozen", "shell_strength", "mortality"],
+        "hatching_eggs": ["eggs_per_hen_housed", "fertility_rate", "hatchability", "chicks_per_hen"]
+      }
+    },
+
+    "clarification_scenarios": {
+      "when_user_says_eggs": "ALWAYS clarify: Are you referring to table eggs (consumption) or hatching eggs (incubation)?",
+
+      "context_clues": {
+        "indicates_table_eggs": ["layer", "laying", "dozen", "consumer", "retail", "shell quality", "pondeuse"],
+        "indicates_hatching_eggs": ["breeder", "parent stock", "hatchery", "fertile", "incubation", "PS", "reproducteur"]
+      },
+
+      "site_type_mapping": {
+        "layer_farm": "produces table_eggs",
+        "breeding_farm": "produces hatching_eggs",
+        "hatchery": "receives hatching_eggs"
+      },
+
+      "example_queries_requiring_clarification": [
+        "What is the optimal storage temperature for eggs?",
+        "How long can eggs be stored?",
+        "What affects egg quality?",
+        "How to improve egg production?",
+        "What are the key performance indicators for eggs?"
+      ]
+    }
+  },
+
+  "meat_birds": {
+    "note": "Broiler chickens are NOT the same as layer chickens - different genetics, management, objectives, and lifecycle.",
+
+    "broilers": {
+      "names": ["broiler", "meat chicken", "broiler chicken", "poulet de chair"],
+      "purpose": "meat_production",
+      "genetic_lines": ["Ross 308", "Ross 708", "Cobb 500", "Cobb 700", "Hubbard JA87"],
+      "grow_out_days": "28-56 days",
+      "primary_metrics": ["body_weight", "FCR", "mortality", "carcass_yield"]
+    },
+
+    "layers": {
+      "names": ["layer", "laying hen", "commercial layer", "pondeuse"],
+      "purpose": "egg_production (table eggs for consumption)",
+      "genetic_lines": ["Hy-Line Brown", "Hy-Line W-36", "Lohmann Brown", "ISA Brown"],
+      "production_cycle_weeks": "72-80 weeks",
+      "primary_metrics": ["hen_day_production", "egg_mass", "feed_per_dozen", "mortality"]
+    }
+  },
+
+  "llm_usage_rules": {
+    "rule_1": "When user mentions 'eggs' without specifying type, ALWAYS ask for clarification: table eggs or hatching eggs?",
+
+    "rule_2": "Use context clues to infer egg type when possible (layer = table eggs, breeder = hatching eggs, hatchery = hatching eggs)",
+
+    "rule_3": "Use site_type for automatic classification: layer_farm = table eggs, breeding_farm = hatching eggs, hatchery = hatching eggs",
+
+    "rule_4": "Storage advice differs COMPLETELY between egg types - never give generic egg storage advice without clarifying type",
+
+    "rule_5": "Quality metrics differ fundamentally - table eggs focus on shell/yolk quality, hatching eggs focus on fertility/hatchability",
+
+    "rule_6": "When providing standards or recommendations, ALWAYS specify which egg type the information applies to",
+
+    "rule_7": "If user query is ambiguous and context is insufficient, explicitly ask rather than assume"
+  }
+}
