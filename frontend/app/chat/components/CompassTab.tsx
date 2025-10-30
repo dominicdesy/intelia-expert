@@ -11,6 +11,7 @@ import { apiClient } from "@/lib/api/client";
 import { secureLog } from "@/lib/utils/secureLogger";
 import { BarnConfigModal } from "./BarnConfigModal";
 import { BarnDataPreview } from "./BarnDataPreview";
+import { UserSelectModal } from "./UserSelectModal";
 
 // Types
 interface BarnConfig {
@@ -55,6 +56,7 @@ export const CompassTab: React.FC = () => {
   // Modal state
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserCompassConfig | null>(null);
+  const [showUserSelectModal, setShowUserSelectModal] = useState(false);
 
   // Preview state
   const [showPreview, setShowPreview] = useState(false);
@@ -152,6 +154,35 @@ export const CompassTab: React.FC = () => {
         error: String(err)
       });
     }
+  };
+
+  const handleAddConfiguration = () => {
+    secureLog.log("[CompassTab] Opening user selection modal");
+    setShowUserSelectModal(true);
+  };
+
+  const handleUserSelected = (userId: string, email: string) => {
+    secureLog.log("[CompassTab] User selected:", email);
+    setShowUserSelectModal(false);
+
+    // Check if user already has a config
+    const existingConfig = userConfigs.find(c => c.user_id === userId);
+
+    if (existingConfig) {
+      // Edit existing config
+      setSelectedUser(existingConfig);
+    } else {
+      // Create new config
+      const newConfig: UserCompassConfig = {
+        user_id: userId,
+        user_email: email,
+        compass_enabled: false,
+        barns: []
+      };
+      setSelectedUser(newConfig);
+    }
+
+    setShowConfigModal(true);
   };
 
   const handleEditUser = (config: UserCompassConfig) => {
@@ -259,15 +290,26 @@ export const CompassTab: React.FC = () => {
               Configure Compass barn mappings for users
             </p>
           </div>
-          <button
-            onClick={loadAllData}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span>Actualiser</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handleAddConfiguration}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Ajouter une configuration</span>
+            </button>
+            <button
+              onClick={loadAllData}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Actualiser</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -393,6 +435,13 @@ export const CompassTab: React.FC = () => {
       </div>
 
       {/* Modals */}
+      {showUserSelectModal && (
+        <UserSelectModal
+          onSelect={handleUserSelected}
+          onClose={() => setShowUserSelectModal(false)}
+        />
+      )}
+
       {showConfigModal && selectedUser && (
         <BarnConfigModal
           userConfig={selectedUser}

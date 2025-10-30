@@ -305,6 +305,67 @@ async def test_compass_connection() -> Dict[str, Any]:
         }
 
 
+@router.get("/admin/available-users", dependencies=[Depends(require_admin)])
+async def get_available_users() -> List[Dict]:
+    """
+    Get list of all users available for Compass configuration (admin only)
+
+    Returns:
+        List of users with their IDs, emails, and Compass config status
+    """
+    try:
+        # Get all users from Supabase
+        from app.core.database import get_supabase_client
+        supabase = get_supabase_client()
+
+        users_response = supabase.table("users").select("auth_user_id, email, name").execute()
+
+        if not users_response.data:
+            return []
+
+        # Get existing Compass configs from PostgreSQL
+        with get_pg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT user_id, compass_enabled
+                    FROM user_compass_config
+                    """
+                )
+                configs = cur.fetchall()
+
+                # Create a map of user_id -> has_config
+                config_map = {
+                    str(config["user_id"]): config["compass_enabled"]
+                    for config in configs
+                }
+
+        # Build response with config status
+        available_users = []
+        for user in users_response.data:
+            user_id = user.get("auth_user_id")
+            if not user_id:
+                continue
+
+            available_users.append({
+                "user_id": user_id,
+                "email": user.get("email", ""),
+                "name": user.get("name"),
+                "has_compass_config": user_id in config_map,
+                "compass_enabled": config_map.get(user_id, False)
+            })
+
+        # Sort: users without config first, then by email
+        available_users.sort(key=lambda u: (u["has_compass_config"], u["email"].lower()))
+
+        logger.info(f"Retrieved {len(available_users)} available users for Compass configuration")
+        return available_users
+
+    except Exception as e:
+        logger.error(f"Error fetching available users: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== USER ENDPOINTS ====================
 
 @router.get("/me")

@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from "react";
 import { secureLog } from "@/lib/utils/secureLogger";
+import { SearchableSelect, SearchableSelectItem } from "./SearchableSelect";
 
 // Types
 interface BarnConfig {
@@ -251,18 +252,24 @@ export const BarnConfigModal: React.FC<BarnConfigModalProps> = ({
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Appareil Compass
                         </label>
-                        <select
-                          value={barn.compass_device_id}
-                          onChange={(e) => handleBarnChange(index, 'compass_device_id', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="">Sélectionner...</option>
-                          {devices.map((device) => (
-                            <option key={device.id} value={device.id}>
-                              {device.name} (#{device.id})
-                            </option>
-                          ))}
-                        </select>
+                        <SearchableSelect
+                          items={devices.map(device => ({
+                            id: device.id.toString(),
+                            label: device.name,
+                            subtitle: `ID: ${device.id}${device.entity_id ? ` • Entity: ${device.entity_id}` : ''}`,
+                            data: device
+                          }))}
+                          onSelect={(item) => {
+                            handleBarnChange(index, 'compass_device_id', item.id);
+                            // Auto-fill name if empty
+                            if (!barn.name || barn.name.startsWith('Poulailler')) {
+                              handleBarnChange(index, 'name', item.label);
+                            }
+                          }}
+                          selectedId={barn.compass_device_id}
+                          placeholder="Rechercher un appareil..."
+                          emptyMessage="Aucun appareil trouvé"
+                        />
                       </div>
 
                       {/* Client Number */}
