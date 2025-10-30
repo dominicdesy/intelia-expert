@@ -26,13 +26,20 @@ try:
 except ImportError:
     INTELLIGENT_RRF_AVAILABLE = False
 
+# === NOUVEAU: Import Advanced Boosting ===
+try:
+    from retrieval.advanced_boosting import AdvancedResultBoosting
+    ADVANCED_BOOSTING_AVAILABLE = True
+except ImportError:
+    ADVANCED_BOOSTING_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
 class OptimizedHybridRetriever:
     """Retriever hybride avec fusion optimisée des scores"""
 
-    def __init__(self, client, collection_name: str = "InteliaExpertKnowledge"):
+    def __init__(self, client, collection_name: str = "InteliaKnowledge", enable_advanced_boosting: bool = True):
         self.client = client
         self.collection_name = collection_name
         self.is_v4 = hasattr(client, "collections")
@@ -50,6 +57,18 @@ class OptimizedHybridRetriever:
         self.intelligent_rrf = None
         if INTELLIGENT_RRF_AVAILABLE and ENABLE_INTELLIGENT_RRF:
             logger.info("🧠 RRF Intelligent disponible pour HybridRetriever")
+
+        # === NOUVEAU: Advanced Boosting ===
+        self.advanced_booster = None
+        self.enable_advanced_boosting = enable_advanced_boosting
+        if ADVANCED_BOOSTING_AVAILABLE and enable_advanced_boosting:
+            self.advanced_booster = AdvancedResultBoosting(
+                quality_boost_weight=0.2,  # +20% max for quality
+                breed_boost_multiplier=1.3,  # +30% for breed match
+                disease_boost_multiplier=1.2,  # +20% for disease match
+                medication_boost_multiplier=1.15  # +15% for medication match
+            )
+            logger.info("✨ Advanced Boosting activé pour HybridRetriever")
 
     def set_intelligent_rrf(self, intelligent_rrf: "IntelligentRRFFusion"):
         """Configure le RRF intelligent (appelé depuis RAG Engine)"""
@@ -315,12 +334,26 @@ class OptimizedHybridRetriever:
                     },
                     "score": hybrid_score,
                     "search_type": "hybrid_native_v4",
+                    # Add quality and entity fields for boosting
+                    "quality_score": obj.properties.get("quality_score"),
+                    "breeds": obj.properties.get("breeds", []),
+                    "diseases": obj.properties.get("diseases", []),
+                    "medications": obj.properties.get("medications", []),
                 }
                 documents.append(doc)
 
             logger.debug(
                 f"Recherche hybride v4: {len(documents)} documents (alpha={alpha})"
             )
+
+            # === NOUVEAU: Apply Advanced Boosting ===
+            if self.advanced_booster and documents:
+                documents = self.advanced_booster.boost_results(
+                    results=documents,
+                    query_text=query_text
+                )
+                logger.debug(f"Advanced boosting applied to {len(documents)} results")
+
             return documents
 
         except Exception as e:
@@ -616,7 +649,7 @@ async def hybrid_search(
     query_vector: List[float],
     query_text: str,
     client,
-    collection_name: str = "InteliaExpertKnowledge",
+    collection_name: str = "InteliaKnowledge",
     top_k: int = 15,
     where_filter: Optional[Dict] = None,
     alpha: float = 0.7,
