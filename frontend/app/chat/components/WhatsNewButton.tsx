@@ -96,8 +96,15 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
 
   return (
     <div className="relative">
-      {/* Hidden badge container for Headway */}
-      <div id="headway-badge" className="hidden" />
+      {/*
+        Badge container for Headway - positioned absolutely to overlay the button
+        The widget popover anchors to this badge, not the trigger button
+      */}
+      <div
+        id="headway-badge"
+        className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
+        style={{ opacity: 0 }}
+      />
 
       {/* Custom trigger button */}
       <button
