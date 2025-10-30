@@ -64,6 +64,11 @@ POULTRY VALUE CHAIN includes:
 - Economics: profitability, costs, efficiency, pricing, production quotas, supply management
 - Regulations & policy: production quotas, supply management systems, licensing, permits, agricultural regulations, market regulations
 
+INTELIA PRODUCTS (equipment and systems FOR poultry production - ALWAYS IN-DOMAIN):
+- Nano: Environmental control system for poultry farms (temperature, humidity, heating, cooling, ventilation)
+- Logix: Data management and production tracking system for poultry operations
+- Any questions about configuring, using, or troubleshooting Intelia products are IN-DOMAIN because they are tools FOR poultry production
+
 OUT-OF-DOMAIN includes:
 - General knowledge (history, geography, politics)
 - Other animals (pets, cattle, pigs, fish, seafood)
@@ -77,6 +82,7 @@ IMPORTANT CLARIFICATIONS:
 - Assume the context is poultry production unless clearly stated otherwise
 - Questions about USING tools/technology FOR poultry production are IN-DOMAIN
 - Questions mentioning "chicken", "broiler", "layer", "poultry", "poulet", "volaille", "egg", "hen", etc. are ALWAYS IN-DOMAIN
+- Questions about Intelia products (Nano, Logix, etc.) are ALWAYS IN-DOMAIN because they are tools for poultry production
 - Questions about agricultural regulations, quotas, licensing related to poultry are IN-DOMAIN
 - Examples of IN-DOMAIN questions:
   * "Can I use a vaccine after its expiry date?" → YES (poultry vaccination)
@@ -90,6 +96,9 @@ IMPORTANT CLARIFICATIONS:
   * "How does the chicken quota system work?" → YES (poultry regulations/economics)
   * "What are the supply management rules for poultry?" → YES (poultry policy)
   * "How to get a chicken production license?" → YES (poultry regulations)
+  * "Comment on configure le chauffage dans le nano ?" → YES (Intelia Nano product for poultry)
+  * "How do I use the Nano system?" → YES (Intelia product for poultry farms)
+  * "What is the Logix system?" → YES (Intelia product for poultry operations)
 - Examples of OUT-OF-DOMAIN questions:
   * "What is artificial intelligence?" → NO (general tech, not about poultry)
   * "How does solar energy work?" → NO (general tech, not about poultry)

@@ -53,6 +53,7 @@ try:
 
     # 🔧 MIGRATION: LLM-based OOD detection au lieu de keyword-based
     from security.llm_ood_detector import LLMOODDetector
+    from security.hybrid_ood_detector import HybridOODDetector
 
     RETRIEVAL_COMPONENTS_AVAILABLE = True
 except ImportError as e:
@@ -335,16 +336,29 @@ class WeaviateCore(InitializableMixin):
             self.memory = ConversationMemory(self.openai_client)
             logger.info("✅ Embedder and Memory initialized")
 
-            # 🔧 MIGRATION: LLM-based OOD detector (100% coverage, zero maintenance)
+            # 🔧 EVOLUTION: Hybrid OOD detector (LLM + Weaviate content search)
+            # Benefits: Auto-adaptive, recognizes new products when docs are ingested
             try:
-                self.ood_detector = LLMOODDetector(model="gpt-4o-mini")
-                logger.info("✅ LLMOODDetector initialized successfully")
+                # Create LLM detector first
+                llm_detector = LLMOODDetector(model="gpt-4o-mini")
+                logger.info("✅ LLMOODDetector created")
+
+                # Wrap it in HybridOODDetector with Weaviate fallback
+                self.ood_detector = HybridOODDetector(
+                    llm_detector=llm_detector,
+                    weaviate_client=self,  # WeaviateManager has hybrid_search method
+                    llm_high_confidence_threshold=0.9,  # LLM must be 90% confident to skip Weaviate
+                    weaviate_score_threshold=0.7,  # Min score to accept as IN-DOMAIN
+                    weaviate_top_k=5,  # Check top 5 documents
+                    weaviate_alpha=0.5  # Balance vector + keyword search
+                )
+                logger.info("✅ HybridOODDetector initialized successfully (LLM + Weaviate)")
             except Exception as ood_error:
-                logger.error(f"❌ Failed to initialize LLMOODDetector: {ood_error}")
+                logger.error(f"❌ Failed to initialize HybridOODDetector: {ood_error}")
                 logger.exception("Full traceback:")
                 self.ood_detector = None
 
-            logger.info("✅ Composants de base initialisés (LLM OOD detector)")
+            logger.info("✅ Composants de base initialisés (Hybrid OOD detector)")
         except Exception as e:
             logger.error(f"Erreur composants de base: {e}")
             logger.exception("Full traceback:")
