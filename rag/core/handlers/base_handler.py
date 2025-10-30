@@ -43,7 +43,14 @@ class BaseQueryHandler:
     def _is_qualitative_query(self, entities: Dict[str, Any]) -> bool:
         """
         Vérifie si la requête est qualitative (sans âge/métrique précis)
+
+        🆕 Exception: Les queries sur produits Intelia sont toujours qualitatives
+        même si elles contiennent des métriques (ex: "nano: température")
         """
+        # 🆕 Produits Intelia = toujours qualitative (routing Weaviate)
+        if entities.get("intelia_product"):
+            return True
+
         has_age = entities.get("age_days") is not None
         has_metric = entities.get("metric_type") is not None
 

@@ -49,6 +49,7 @@ class ExtractedEntities:
     sex: Optional[str] = None
     metric_type: Optional[str] = None
     genetic_line: Optional[str] = None
+    intelia_product: Optional[str] = None  # 🆕 Produit Intelia détecté (nano, compass, unity, etc.)
 
     # Métadonnées d'extraction
     confidence: float = 1.0
@@ -69,6 +70,7 @@ class ExtractedEntities:
             "sex": self.sex,
             "metric_type": self.metric_type,
             "genetic_line": self.genetic_line,
+            "intelia_product": self.intelia_product,  # 🆕 Include product in output
             "confidence": self.confidence,
             "has_explicit_sex": self.has_explicit_sex,
             "has_explicit_age": self.has_explicit_age,
@@ -422,6 +424,13 @@ class EntityExtractor:
         if metric_result["value"]:
             entities.raw_matches["metric"] = metric_result["match_text"]
 
+        # 🆕 Extraction produit Intelia (nano, compass, unity, etc.)
+        product_result = self._extract_intelia_product(query, query_lower)
+        entities.intelia_product = product_result["value"]
+        entities.confidence_breakdown["intelia_product"] = product_result["confidence"]
+        if product_result["value"]:
+            entities.raw_matches["intelia_product"] = product_result["match_text"]
+
         # Extraction genetic line (dérivé du breed via registry)
         if entities.breed:
             entities.genetic_line = self._derive_genetic_line(entities.breed)
@@ -633,6 +642,64 @@ class EntityExtractor:
             "confidence": best_confidence,
             "explicit": best_match is not None,
             "match_text": match_text,
+        }
+
+    def _extract_intelia_product(self, query: str, query_lower: str) -> Dict[str, Any]:
+        """
+        🆕 Extrait les produits Intelia avec support syntaxe explicite et détection auto
+
+        Syntaxes supportées:
+        - Explicite (priorité): "nano: comment configurer..." → nano (confidence=1.0)
+        - Auto-détection: "dans le nano", "le compass", "avec unity" → produit (confidence=0.9)
+
+        Returns:
+            Dict avec 'value', 'confidence', 'explicit', 'match_text'
+        """
+        # Liste des produits Intelia supportés
+        INTELIA_PRODUCTS = {
+            "nano": ["nano"],
+            "compass": ["compass"],
+            "unity": ["unity"],
+            "farmhub": ["farmhub", "farm hub"],
+            "cognito": ["cognito"],
+        }
+
+        # PRIORITÉ 1: Syntaxe explicite "produit:" (confidence=1.0)
+        explicit_pattern = r'^(nano|compass|unity|farmhub|cognito)\s*:\s*'
+        explicit_match = re.match(explicit_pattern, query_lower, re.IGNORECASE)
+
+        if explicit_match:
+            product = explicit_match.group(1).lower()
+            logger.info(f"📦 Produit Intelia explicite détecté: {product} (syntax: '{product}:')")
+            return {
+                "value": product,
+                "confidence": 1.0,
+                "explicit": True,
+                "match_text": f"{product}:",
+            }
+
+        # PRIORITÉ 2: Détection automatique dans le texte (confidence=0.9)
+        for product_key, keywords in INTELIA_PRODUCTS.items():
+            for keyword in keywords:
+                # Pattern pour détecter "le nano", "dans nano", "du compass", etc.
+                # Utilise word boundaries pour éviter les faux positifs
+                pattern = r'\b(?:le|la|l\'|du|de la|dans le|avec le|sur le)?\s*' + re.escape(keyword) + r'\b'
+
+                if re.search(pattern, query_lower, re.IGNORECASE):
+                    logger.info(f"📦 Produit Intelia auto-détecté: {product_key} (keyword: '{keyword}')")
+                    return {
+                        "value": product_key,
+                        "confidence": 0.9,
+                        "explicit": True,  # Considéré explicite car trouvé directement
+                        "match_text": keyword,
+                    }
+
+        # Aucun produit détecté
+        return {
+            "value": None,
+            "confidence": 0.0,
+            "explicit": False,
+            "match_text": None,
         }
 
     def _derive_genetic_line(self, breed: str) -> str:

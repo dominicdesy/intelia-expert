@@ -593,6 +593,23 @@ class QueryRouter:
 
         start_time = time.time()
 
+        # 🆕 STEP 0: Detect explicit product syntax (nano:, compass:, etc.)
+        explicit_product = None
+        cleaned_query = query
+        product_prefix_pattern = r'^(nano|compass|unity|farmhub|cognito)\s*:\s*'
+        product_match = re.match(product_prefix_pattern, query.lower(), re.IGNORECASE)
+
+        if product_match:
+            explicit_product = product_match.group(1).lower()
+            # Clean query: remove "nano: " prefix
+            cleaned_query = re.sub(product_prefix_pattern, '', query, flags=re.IGNORECASE).strip()
+            logger.info(f"📦 Syntaxe explicite détectée: {explicit_product}: → query nettoyée")
+            logger.debug(f"   Original: '{query}'")
+            logger.debug(f"   Cleaned: '{cleaned_query}'")
+
+            # Use cleaned query for all subsequent processing
+            query = cleaned_query
+
         # Load conversation context if available
         previous_context = self.context_store.get(user_id)
 
@@ -647,6 +664,11 @@ class QueryRouter:
         for key, value in hybrid_entities.items():
             if key not in entities or not entities[key]:
                 entities[key] = value
+
+        # 🆕 Inject explicit product if detected via syntax (highest priority)
+        if explicit_product:
+            entities["intelia_product"] = explicit_product
+            logger.info(f"📦 Produit Intelia injecté dans entities: {explicit_product}")
 
         # Extract multi-breed entities for comparisons
         comparison_entities = []
@@ -1212,6 +1234,12 @@ class QueryRouter:
         Returns:
             (destination, reason)
         """
+
+        # 🆕 PRIORITÉ 0: Produit Intelia détecté → toujours Weaviate
+        if entities.get("intelia_product"):
+            product = entities["intelia_product"]
+            logger.info(f"📦 Produit Intelia détecté ({product}) → routing Weaviate prioritaire")
+            return ("weaviate", f"intelia_product_{product}")
 
         # 🆕 PRIORITÉ 1: Utiliser routing LLM si disponible
         if validation_details:

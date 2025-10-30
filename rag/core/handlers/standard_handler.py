@@ -261,7 +261,12 @@ class StandardQueryHandler(BaseQueryHandler):
         # STEP 2: Handle Weaviate routing
         if routing_hint == "weaviate":
             if self._is_qualitative_query(entities):
-                logger.info("Weaviate routing for qualitative query")
+                # 🆕 Log spécifique si produit Intelia détecté
+                if entities.get("intelia_product"):
+                    logger.info(f"📦 Weaviate routing for Intelia product: {entities['intelia_product']}")
+                else:
+                    logger.info("Weaviate routing for qualitative query")
+
                 return await self._search_weaviate_direct(
                     query,
                     entities,
