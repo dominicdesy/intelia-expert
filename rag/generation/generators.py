@@ -546,10 +546,11 @@ MÉTRIQUES CLÉS BROILERS:
             Valeur de la métadonnée
         """
         if isinstance(doc, dict):
-            return doc.get("metadata", {}).get(key, default)
-        metadata = getattr(doc, "metadata", {})
+            metadata = doc.get("metadata") or {}  # ✅ None-safe
+            return metadata.get(key, default) or default  # ✅ Fallback if value is None
+        metadata = getattr(doc, "metadata", None) or {}  # ✅ None-safe
         if isinstance(metadata, dict):
-            return metadata.get(key, default)
+            return metadata.get(key, default) or default  # ✅ Fallback if value is None
         return default
 
     async def generate_response(
