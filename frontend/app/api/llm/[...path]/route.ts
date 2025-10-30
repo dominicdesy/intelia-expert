@@ -40,19 +40,49 @@ async function proxyToRAGService(req: NextRequest, params: { path: string[] }) {
     // 🆕 Get Supabase JWT token for Compass API authentication
     let authToken: string | null = null;
     try {
-      const supabase = createRouteHandlerClient({ cookies });
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      authToken = session?.access_token ?? null;
+      // Extract Supabase token directly from cookies
+      const cookieStore = cookies();
 
-      if (authToken) {
-        secureLog.log(`[rag-service-proxy] ✅ Auth token obtained for user`);
-      } else {
-        secureLog.warn(`[rag-service-proxy] ⚠️ No auth token available - user not authenticated`);
+      // Try to get the access token from Supabase auth cookies
+      // Supabase stores tokens with pattern: sb-{project-ref}-auth-token
+      const allCookies = cookieStore.getAll();
+
+      for (const cookie of allCookies) {
+        if (cookie.name.includes('sb-') && cookie.name.includes('-auth-token')) {
+          try {
+            // Supabase stores the session as a JSON string in the cookie
+            const sessionData = JSON.parse(cookie.value);
+            authToken = sessionData?.access_token || sessionData?.[0]?.access_token || null;
+
+            if (authToken) {
+              secureLog.log(`[rag-service-proxy] ✅ Auth token extracted from cookie: ${cookie.name}`);
+              break;
+            }
+          } catch (parseError) {
+            // If JSON parse fails, the cookie might contain the token directly
+            // or be in a different format
+            continue;
+          }
+        }
+      }
+
+      // Fallback: try createRouteHandlerClient approach
+      if (!authToken) {
+        const supabase = createRouteHandlerClient({ cookies });
+        const { data: { session } } = await supabase.auth.getSession();
+        authToken = session?.access_token ?? null;
+
+        if (authToken) {
+          secureLog.log(`[rag-service-proxy] ✅ Auth token obtained via Supabase client`);
+        }
+      }
+
+      if (!authToken) {
+        secureLog.warn(`[rag-service-proxy] ⚠️ No auth token found - user not authenticated`);
+        secureLog.log(`[rag-service-proxy] Available cookies: ${allCookies.map(c => c.name).join(', ')}`);
       }
     } catch (authError) {
-      secureLog.warn(`[rag-service-proxy] Auth token retrieval failed: ${authError}`);
+      secureLog.error(`[rag-service-proxy] Auth token retrieval failed: ${authError}`);
     }
 
     // Copier le body si présent
