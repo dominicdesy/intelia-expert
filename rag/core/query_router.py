@@ -1235,7 +1235,13 @@ class QueryRouter:
             (destination, reason)
         """
 
-        # 🆕 PRIORITÉ 0: Produit Intelia détecté → toujours Weaviate
+        # 🆕 PRIORITÉ 0A: Numéro de poulailler détecté → router vers extension Compass
+        if entities.get("barn_number"):
+            barn_num = entities["barn_number"]
+            logger.info(f"🏚️ Numéro de poulailler détecté ({barn_num}) → routing vers Compass extension")
+            return ("compass_extension", f"barn_data_{barn_num}")
+
+        # 🆕 PRIORITÉ 0B: Produit Intelia détecté → toujours Weaviate
         if entities.get("intelia_product"):
             product = entities["intelia_product"]
             logger.info(f"📦 Produit Intelia détecté ({product}) → routing Weaviate prioritaire")

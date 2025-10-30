@@ -50,6 +50,7 @@ class ExtractedEntities:
     metric_type: Optional[str] = None
     genetic_line: Optional[str] = None
     intelia_product: Optional[str] = None  # 🆕 Produit Intelia détecté (nano, compass, unity, etc.)
+    barn_number: Optional[str] = None  # 🆕 Numéro de poulailler détecté (1, 2, 3, etc.)
 
     # Métadonnées d'extraction
     confidence: float = 1.0
@@ -71,6 +72,7 @@ class ExtractedEntities:
             "metric_type": self.metric_type,
             "genetic_line": self.genetic_line,
             "intelia_product": self.intelia_product,  # 🆕 Include product in output
+            "barn_number": self.barn_number,  # 🆕 Include barn number in output
             "confidence": self.confidence,
             "has_explicit_sex": self.has_explicit_sex,
             "has_explicit_age": self.has_explicit_age,
@@ -431,6 +433,13 @@ class EntityExtractor:
         if product_result["value"]:
             entities.raw_matches["intelia_product"] = product_result["match_text"]
 
+        # 🆕 Extraction numéro de poulailler
+        barn_result = self._extract_barn_number(query, query_lower)
+        entities.barn_number = barn_result["value"]
+        entities.confidence_breakdown["barn_number"] = barn_result["confidence"]
+        if barn_result["value"]:
+            entities.raw_matches["barn_number"] = barn_result["match_text"]
+
         # Extraction genetic line (dérivé du breed via registry)
         if entities.breed:
             entities.genetic_line = self._derive_genetic_line(entities.breed)
@@ -695,6 +704,45 @@ class EntityExtractor:
                     }
 
         # Aucun produit détecté
+        return {
+            "value": None,
+            "confidence": 0.0,
+            "explicit": False,
+            "match_text": None,
+        }
+
+    def _extract_barn_number(self, query: str, query_lower: str) -> Dict[str, Any]:
+        """
+        🆕 Extrait les numéros de poulailler/barn
+
+        Patterns supportés:
+        - "poulailler 1", "poulailler 2", etc.
+        - "barn 1", "barn 2", etc.
+        - "mon poulailler 3", "le poulailler 2", etc.
+        - "bâtiment 1", "batiment 2", etc.
+
+        Returns:
+            Dict avec 'value', 'confidence', 'explicit', 'match_text'
+        """
+        # Patterns pour détecter numéro de poulailler
+        patterns = [
+            r'\b(?:poulailler|barn|bâtiment|batiment)\s+(\d+)\b',
+            r'\b(?:mon|ma|le|la|du|de la|dans le|au)\s+(?:poulailler|barn|bâtiment|batiment)\s+(\d+)\b',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, query_lower, re.IGNORECASE)
+            if match:
+                barn_num = match.group(1)
+                logger.info(f"🏚️ Numéro de poulailler détecté: {barn_num} (pattern: '{match.group(0)}')")
+                return {
+                    "value": barn_num,
+                    "confidence": 0.95,
+                    "explicit": True,
+                    "match_text": match.group(0),
+                }
+
+        # Aucun numéro de poulailler détecté
         return {
             "value": None,
             "confidence": 0.0,

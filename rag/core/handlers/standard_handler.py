@@ -258,6 +258,15 @@ class StandardQueryHandler(BaseQueryHandler):
             if result:
                 return result
 
+        # STEP 1A: Handle Compass extension routing (real-time barn data)
+        if routing_hint == "compass_extension":
+            logger.info(f"🏚️ Compass extension routing for barn {entities.get('barn_number')}")
+            result = await self._handle_compass_routing(
+                query, entities, language, preprocessed_data, start_time
+            )
+            if result:
+                return result
+
         # STEP 2: Handle Weaviate routing
         if routing_hint == "weaviate":
             if self._is_qualitative_query(entities):
@@ -501,6 +510,114 @@ class StandardQueryHandler(BaseQueryHandler):
             logger.warning("PostgreSQL not available despite routing hint")
 
         return None
+
+    async def _handle_compass_routing(
+        self,
+        query: str,
+        entities: Dict[str, Any],
+        language: str,
+        preprocessed_data: Optional[Dict[str, Any]],
+        start_time: float,
+    ) -> Optional[RAGResult]:
+        """
+        Handle Compass extension routing for real-time barn data queries
+
+        Scope limité (Phase 1):
+        - Température actuelle
+        - Température moyenne/min/max (hier/aujourd'hui)
+
+        Args:
+            query: User query
+            entities: Extracted entities (must contain barn_number)
+            language: Query language
+            preprocessed_data: Preprocessed data
+            start_time: Query start time
+
+        Returns:
+            RAGResult with COMPASS_DATA source indicating data fetch needed
+        """
+        logger.info("=" * 80)
+        logger.info("Compass extension routing detected")
+        logger.info("=" * 80)
+
+        barn_number = entities.get("barn_number")
+        if not barn_number:
+            logger.warning("Compass routing called but no barn_number in entities")
+            return None
+
+        # Détecter le type de données demandées (limité à température pour Phase 1)
+        query_lower = query.lower()
+
+        # Mots-clés supportés (température uniquement pour l'instant)
+        temperature_keywords = [
+            "température", "temperature", "temp", "chaleur", "froid",
+            "chaud", "hot", "cold", "warm"
+        ]
+
+        # Temporalité
+        current_keywords = ["actuelle", "current", "maintenant", "now", "en ce moment"]
+        yesterday_keywords = ["hier", "yesterday"]
+        today_keywords = ["aujourd'hui", "today"]
+        average_keywords = ["moyenne", "average", "avg", "moyen"]
+        min_max_keywords = ["min", "max", "minimum", "maximum", "minimale", "maximale"]
+
+        # Vérifier si c'est une query de température
+        is_temperature_query = any(kw in query_lower for kw in temperature_keywords)
+
+        if not is_temperature_query:
+            logger.info(f"Query ne concerne pas la température (non supporté en Phase 1)")
+            return RAGResult(
+                source=RAGSource.INSUFFICIENT_CONTEXT,
+                answer=f"Pour l'instant, seules les questions sur la température du poulailler {barn_number} sont supportées.",
+                metadata={
+                    "source_type": "compass_unsupported_query",
+                    "barn_number": barn_number,
+                    "query_type": "unsupported",
+                    "processing_time": time.time() - start_time,
+                }
+            )
+
+        # Déterminer le type de requête température
+        is_current = any(kw in query_lower for kw in current_keywords)
+        is_yesterday = any(kw in query_lower for kw in yesterday_keywords)
+        is_today = any(kw in query_lower for kw in today_keywords)
+        is_average = any(kw in query_lower for kw in average_keywords)
+        is_min_max = any(kw in query_lower for kw in min_max_keywords)
+
+        # Construire le type de requête
+        if is_current:
+            query_type = "current_temperature"
+        elif is_yesterday and is_average:
+            query_type = "yesterday_avg_temperature"
+        elif is_yesterday and is_min_max:
+            query_type = "yesterday_min_max_temperature"
+        elif is_today and is_min_max:
+            query_type = "today_min_max_temperature"
+        elif is_yesterday:
+            query_type = "yesterday_temperature"
+        elif is_today:
+            query_type = "today_temperature"
+        else:
+            query_type = "current_temperature"  # Par défaut
+
+        logger.info(f"🏚️ Compass query detected: barn={barn_number}, type={query_type}")
+
+        # Retourner un RAGResult spécial qui indique qu'il faut fetcher les données Compass
+        # L'API handler (ou rag_engine) devra intercepter ce source et appeler l'extension Compass
+        return RAGResult(
+            source=RAGSource.COMPASS_DATA,  # 🆕 Nouveau source type
+            answer="",  # Sera rempli par l'extension Compass
+            context_docs=[],
+            metadata={
+                "source_type": "compass_extension",
+                "barn_number": barn_number,
+                "query_type": query_type,
+                "data_requested": "temperature",
+                "language_used": language,
+                "processing_time": time.time() - start_time,
+                "requires_compass_fetch": True,  # Flag pour l'API handler
+            }
+        )
 
     async def _search_postgresql_once(
         self,

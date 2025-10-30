@@ -44,9 +44,15 @@ class BaseQueryHandler:
         """
         Vérifie si la requête est qualitative (sans âge/métrique précis)
 
-        🆕 Exception: Les queries sur produits Intelia sont toujours qualitatives
-        même si elles contiennent des métriques (ex: "nano: température")
+        🆕 Exceptions:
+        - Les queries sur produits Intelia sont toujours qualitatives
+        - Les queries avec numéro de poulailler sont toujours qualitatives
+        même si elles contiennent des métriques (ex: "température poulailler 2")
         """
+        # 🆕 Numéro de poulailler = toujours qualitative (routing Compass extension)
+        if entities.get("barn_number"):
+            return True
+
         # 🆕 Produits Intelia = toujours qualitative (routing Weaviate)
         if entities.get("intelia_product"):
             return True

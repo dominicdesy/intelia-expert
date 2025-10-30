@@ -23,6 +23,7 @@ class RAGSource(Enum):
     RAG_KNOWLEDGE = "rag_knowledge"  # Maintenu pour compatibilité
     RAG_VERIFIED = "rag_verified"
     RETRIEVAL_SUCCESS = "retrieval_success"
+    COMPASS_DATA = "compass_data"  # 🆕 Données temps réel Compass
 
     # Sources de fallback/filtrage
     FALLBACK_NEEDED = "fallback_needed"
@@ -55,6 +56,7 @@ class RAGSource(Enum):
             self.RAG_KNOWLEDGE,
             self.RAG_VERIFIED,
             self.RETRIEVAL_SUCCESS,
+            self.COMPASS_DATA,  # 🆕 Compass data is success
         }
 
     @property
@@ -108,6 +110,11 @@ class RAGResult:
     verification_status: Optional[Dict] = None
     intent_result: Optional[Any] = None  # IntentResult
     timestamp: float = field(default_factory=time.time)
+
+    # Chain of Thought fields
+    cot_thinking: Optional[str] = None
+    cot_analysis: Optional[str] = None
+    has_cot_structure: bool = False
 
     def __post_init__(self):
         """Post-initialisation avec validation"""
