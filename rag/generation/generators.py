@@ -144,7 +144,7 @@ class EnhancedResponseGenerator:
         Returns:
             'broiler' ou 'layer' selon les mots-clés détectés
         """
-        query_lower = query.lower()
+        query_lower = (query or "").lower()
 
         # Mots-clés pour les poules pondeuses (layer) - 33 keywords
         layer_keywords = [
@@ -372,7 +372,7 @@ MÉTRIQUES CLÉS BROILERS:
         Returns:
             True si c'est une question vétérinaire nécessitant un disclaimer
         """
-        query_lower = query.lower()
+        query_lower = (query or "").lower()
 
         # Mots-clés vétérinaires cross-language (maladies, traitements, symptômes)
         veterinary_keywords = [
@@ -948,7 +948,7 @@ FORMATTING RULES - CLEAN & MODERN:
                 )
 
                 # Check if query is optimization/improvement focused
-                query_lower = query.lower()
+                query_lower = (query or "").lower()
                 optimization_keywords = [
                     "améliorer",
                     "optimiser",
