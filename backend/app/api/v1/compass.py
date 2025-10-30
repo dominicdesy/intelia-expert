@@ -318,7 +318,7 @@ async def get_available_users() -> List[Dict]:
         from app.core.database import get_supabase_client
         supabase = get_supabase_client()
 
-        users_response = supabase.table("users").select("auth_user_id, email, name").execute()
+        users_response = supabase.table("users").select("auth_user_id, email, full_name").execute()
 
         if not users_response.data:
             return []
@@ -350,7 +350,7 @@ async def get_available_users() -> List[Dict]:
             available_users.append({
                 "user_id": user_id,
                 "email": user.get("email", ""),
-                "name": user.get("name"),
+                "full_name": user.get("full_name"),
                 "has_compass_config": user_id in config_map,
                 "compass_enabled": config_map.get(user_id, False)
             })

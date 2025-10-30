@@ -13,7 +13,7 @@ import { SearchableSelect, SearchableSelectItem } from "./SearchableSelect";
 interface AvailableUser {
   user_id: string;
   email: string;
-  name?: string;
+  full_name?: string;
   has_compass_config: boolean;
   compass_enabled: boolean;
 }
