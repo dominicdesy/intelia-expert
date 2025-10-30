@@ -41,10 +41,10 @@ class OpenAIEmbedder:
         )
 
         # Support dimensions réduites pour text-embedding-3-large/small
-        # Réduit storage de 50% avec -2% quality (3072 → 1536)
+        # Native: 3072 (optimal) | Reduced: 1536 (50% storage, -2% quality)
         self.dimensions = None
         if "text-embedding-3" in self.model:
-            self.dimensions = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
+            self.dimensions = int(os.getenv("WEAVIATE_VECTOR_DIMENSIONS", "3072"))
             logger.info(
                 f"Embedder initialisé avec {self.model} (dimensions: {self.dimensions})"
             )
