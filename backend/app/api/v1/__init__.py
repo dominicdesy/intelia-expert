@@ -764,6 +764,19 @@ except Exception as e:
     logger.error(f"ERREUR import satisfaction router: {e}")
     satisfaction_router = None
 
+# Compass Integration (intégration Compass pour données temps réel des poulaillers)
+COMPASS_AVAILABLE = False
+try:
+    from .compass import router as compass_router
+    COMPASS_AVAILABLE = True
+    logger.debug("Compass router importé avec %d routes", len(compass_router.routes))
+except ImportError as e:
+    logger.warning(f"Compass router import failed: {e}")
+    compass_router = None
+except Exception as e:
+    logger.error(f"ERREUR import compass router: {e}")
+    compass_router = None
+
 if SATISFACTION_AVAILABLE and satisfaction_router:
     router.include_router(satisfaction_router, prefix="/satisfaction", tags=["Satisfaction"])
     logger.debug("Satisfaction router monté")
@@ -834,6 +847,15 @@ if WIDGET_AVAILABLE and widget_router:
     logger.info("Widget activé (intégration chat sur sites externes)!")
 else:
     logger.warning("Widget router non monté (module non disponible)")
+
+# Compass Integration (intégration Compass)
+if COMPASS_AVAILABLE and compass_router:
+    router.include_router(compass_router, tags=["Compass"])
+    logger.debug("Compass router monté")
+    logger.debug("Compass router maintenant disponible sur /v1/compass/*")
+    logger.info("Compass Integration activée (données temps réel des poulaillers)!")
+else:
+    logger.warning("Compass router non monté (module non disponible)")
 
 # Résumé final
 total_routes = len(router.routes)

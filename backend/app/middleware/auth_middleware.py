@@ -118,6 +118,8 @@ PROTECTED_PATTERNS = [
     "/api/v1/qa-quality/analyze-batch",  # 🔒 Analyse batch
     "/api/v1/qa-quality/analyze-cot",  # 🔒 Analyse CoT (Extended Thinking)
     "/api/v1/qa-quality/",  # 🔒 Autres endpoints qa-quality (review, etc.)
+    # === ENDPOINTS COMPASS ADMIN (admin only) ===
+    "/api/v1/compass/admin",  # 🔒 NOUVEAU: Configuration Compass (admin uniquement)
 ]
 
 # PATTERNS POUR UTILISATEURS AUTHENTIFIÉS (niveau intermédiaire)
@@ -152,6 +154,8 @@ AUTHENTICATED_USER_PATTERNS = [
     # === VOICE REALTIME WEBSOCKET (authentification requise, admin vérifié dans l'endpoint) ===
     "/api/v1/ws/voice",
     "/v1/ws/voice",
+    # === ENDPOINTS COMPASS UTILISATEUR (données personnelles des poulaillers) ===
+    "/api/v1/compass/me",  # 🔒 Mes poulaillers et données temps réel
 ]
 
 # PATTERNS PUBLICS ÉTENDUS (pour les vérifications par pattern)
