@@ -18,11 +18,22 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
 
   useEffect(() => {
     // Load Headway widget script
-    if (typeof window !== 'undefined') {
-      // Configure Headway
+    if (typeof window !== 'undefined' && !(window as any).Headway) {
+      // Configure Headway BEFORE loading the script
       (window as any).HW_config = {
         selector: "#headway-widget-trigger",
-        account: "JVoZPy"
+        account: "JVoZPy",
+        callbacks: {
+          onWidgetReady: () => {
+            console.log('[Headway] Widget ready');
+          },
+          onShowWidget: () => {
+            console.log('[Headway] Widget shown');
+            if (onClick) {
+              onClick();
+            }
+          }
+        }
       };
 
       // Load Headway SDK
@@ -38,19 +49,12 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
         }
       };
     }
-  }, []);
-
-  const handleClick = () => {
-    // Call optional parent onClick
-    if (onClick) {
-      onClick();
-    }
-  };
+  }, [onClick]);
 
   return (
     <button
       id="headway-widget-trigger"
-      onClick={handleClick}
+      type="button"
       className="w-10 h-10 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center border border-gray-200 hover:border-blue-300"
       title={t("whatsNew.buttonTitle")}
       aria-label={t("whatsNew.buttonTitle")}
