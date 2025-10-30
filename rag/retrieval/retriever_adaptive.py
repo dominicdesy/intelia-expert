@@ -46,9 +46,8 @@ class AdaptiveMixin:
             # Ajuster les paramètres selon la stratégie
             adjusted_params = self._adjust_search_parameters(search_strategy, top_k)
 
-            # Construire le filtre where si des entités sont détectées
-            where_filter = None
-            if intent_result and hasattr(intent_result, "detected_entities"):
+            # Construire le filtre where si des entités sont détectées (seulement si pas déjà fourni)
+            if where_filter is None and intent_result and hasattr(intent_result, "detected_entities"):
                 from utils.utilities import build_where_filter
 
                 where_filter = build_where_filter(intent_result)

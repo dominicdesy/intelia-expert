@@ -522,6 +522,7 @@ class WeaviateCore(InitializableMixin):
                 language=language or "fr",
                 start_time=time.time(),
                 tenant_id=tenant_id,
+                filters=filters,
             )
 
             logger.debug(f"WeaviateCore.search résultat: {result.source}")
@@ -542,6 +543,7 @@ class WeaviateCore(InitializableMixin):
         language: str,
         start_time: float,
         tenant_id: str,
+        filters: Dict[str, Any] = None,
     ) -> RAGResult:
         """Génération de réponse Weaviate Core"""
 
@@ -663,11 +665,13 @@ class WeaviateCore(InitializableMixin):
 
                     else:
                         documents = await self.retriever.adaptive_search(
-                            query_vector,
-                            search_query,
-                            RAG_SIMILARITY_TOP_K,
-                            where_filter,
+                            query_vector=query_vector,
+                            query_text=search_query,
+                            top_k=RAG_SIMILARITY_TOP_K,
+                            intent_result=intent_result,
+                            where_filter=where_filter,
                             alpha=search_alpha,
+                            filters=filters,
                         )
 
                     if any(doc.metadata.get("hybrid_used") for doc in documents):
