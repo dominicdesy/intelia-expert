@@ -69,7 +69,7 @@ class CompassAPIService:
         self.session = requests.Session()
         self.session.headers.update(self.headers)
 
-        logger.info(f"CompassAPIService initialized with base URL: {self.base_url}")
+        logger.info(f"CompassAPIService initialized with base URL: {self.base_url} (v1.0.1)")
 
     def _get(self, endpoint: str, params: Optional[Dict] = None) -> Optional[Dict]:
         """
