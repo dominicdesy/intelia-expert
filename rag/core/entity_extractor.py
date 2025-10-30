@@ -713,7 +713,7 @@ class EntityExtractor:
 
     def _extract_barn_number(self, query: str, query_lower: str) -> Dict[str, Any]:
         """
-        🆕 Extrait les numéros de poulailler/barn
+        🆕 Extrait les numéros de poulailler/barn (Phase 1: température uniquement)
 
         Patterns supportés:
         - "poulailler 1", "poulailler 2", etc.
