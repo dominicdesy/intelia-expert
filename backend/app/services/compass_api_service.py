@@ -117,12 +117,20 @@ class CompassAPIService:
         params = {"entity_id": entity_id} if entity_id else None
         response = self._get("/devices", params)
 
+        # Debug logging to see what we received
+        if response is None:
+            logger.error("Device list API returned None (connection or auth error)")
+            return []
+
+        logger.info(f"Device list API response keys: {list(response.keys()) if isinstance(response, dict) else 'not a dict'}")
+        logger.info(f"Device list API full response: {response}")
+
         if response and "devices" in response:
             devices = response["devices"]
             logger.info(f"Retrieved {len(devices)} devices from Compass")
             return devices
 
-        logger.warning("Failed to retrieve device list")
+        logger.warning(f"Failed to retrieve device list - response structure unexpected: {response}")
         return []
 
     def get_device_info(self, device_id: str) -> Optional[Dict]:
