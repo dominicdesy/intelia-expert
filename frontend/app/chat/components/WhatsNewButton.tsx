@@ -17,38 +17,52 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
   const { t } = useTranslation();
 
   useEffect(() => {
-    // Load Headway widget script
-    if (typeof window !== 'undefined' && !(window as any).Headway) {
-      // Configure Headway BEFORE loading the script
-      (window as any).HW_config = {
-        selector: "#headway-widget-trigger",
-        account: "JVoZPy",
-        callbacks: {
-          onWidgetReady: () => {
-            console.log('[Headway] Widget ready');
-          },
-          onShowWidget: () => {
-            console.log('[Headway] Widget shown');
-            if (onClick) {
-              onClick();
-            }
+    if (typeof window === 'undefined') return;
+
+    const config = {
+      selector: "#headway-widget-trigger",
+      account: "JVoZPy",
+      callbacks: {
+        onWidgetReady: (widget: any) => {
+          console.log('[Headway] Widget ready', widget);
+        },
+        onShowWidget: () => {
+          console.log('[Headway] Widget shown');
+          if (onClick) {
+            onClick();
           }
         }
-      };
+      }
+    };
 
-      // Load Headway SDK
+    // Check if Headway is already loaded
+    if ((window as any).Headway) {
+      // Headway is already loaded, just reinitialize
+      console.log('[Headway] Reinitializing widget');
+      (window as any).Headway.init(config);
+    } else {
+      // Load Headway SDK for the first time
+      (window as any).HW_config = config;
+
       const script = document.createElement('script');
       script.src = 'https://cdn.headwayapp.co/widget.js';
       script.async = true;
-      document.body.appendChild(script);
-
-      return () => {
-        // Cleanup script on unmount
-        if (script.parentNode) {
-          script.parentNode.removeChild(script);
+      script.onload = () => {
+        console.log('[Headway] Script loaded');
+        // For SPAs, explicitly call init after script loads
+        if ((window as any).Headway) {
+          (window as any).Headway.init(config);
         }
       };
+      document.body.appendChild(script);
     }
+
+    // Cleanup: destroy widget instance on unmount
+    return () => {
+      if ((window as any).Headway) {
+        console.log('[Headway] Cleaning up widget');
+      }
+    };
   }, [onClick]);
 
   return (
