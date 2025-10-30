@@ -52,6 +52,7 @@ const nextConfig = {
   },
 
   // Headers de sécurité - 7 headers pour score A/A+ sur SecurityHeaders.com
+  // CSP mis à jour pour supporter Canny SDK (What's New feature)
   async headers() {
     return [
       {
