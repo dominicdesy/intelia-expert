@@ -250,7 +250,7 @@ class IntelligentRRFFusion:
     async def _analyze_query_context(self, query_context: Dict, intent_result) -> Dict:
         """CORRECTION CRITIQUE: Analyse contextuelle avec gestion robuste des types intent_result"""
 
-        query = query_context.get("query", "")
+        query = query_context.get("query") or ""
         query_lower = query.lower()
 
         # CORRECTION: Extraction entités depuis intent_result avec gestion complète des types

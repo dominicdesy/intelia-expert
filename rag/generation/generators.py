@@ -695,6 +695,7 @@ MÉTRIQUES CLÉS BROILERS:
                 )
 
             # 🧠 DEBUG: Log raw LLM response to check for CoT tags
+            generated_response = generated_response or ""
             logger.info(f"🔍 Raw LLM response length: {len(generated_response)} chars")
             logger.info(
                 f"🔍 Has <thinking> tag: {'<thinking>' in generated_response.lower()}"
