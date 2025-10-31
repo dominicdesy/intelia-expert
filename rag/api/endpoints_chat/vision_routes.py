@@ -19,6 +19,7 @@ from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 
 from config.config import BASE_PATH, MAX_REQUEST_SIZE
+from config.messages import get_message
 from utils.utilities import detect_language_enhanced
 from ..endpoints import metrics_collector
 
@@ -94,10 +95,12 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             # Si message vide, générer un message par défaut selon le nombre d'images
             if not message or not message.strip():
+                # Detect language early for auto-generated message (default to French)
+                default_language = "fr"
                 if images_count == 1:
-                    message = "Analysez cette image et donnez un diagnostic vétérinaire détaillé."
+                    message = get_message("vision_analyze_single_image", default_language)
                 else:
-                    message = f"Analysez ces {images_count} images et donnez un diagnostic vétérinaire comparatif détaillé."
+                    message = get_message("vision_analyze_multiple_images", default_language).format(count=images_count)
                 logger.info(f"[VISION] Message auto-généré: '{message}'")
 
             if len(message) > MAX_REQUEST_SIZE:
@@ -445,7 +448,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
             if not temp_dir.exists():
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Aucune image trouvée pour la session {session_id}",
+                    detail=get_message("error_session_not_found", "fr"),
                 )
 
             # Lire les métadonnées et charger les images
@@ -454,7 +457,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             if len(metadata_files) == 0:
                 raise HTTPException(
-                    status_code=404, detail=f"Aucune image dans la session {session_id}"
+                    status_code=404, detail=get_message("error_no_images_in_session", "fr")
                 )
 
             logger.info(
@@ -504,7 +507,7 @@ def create_vision_routes(get_service: Callable[[str], Any]) -> APIRouter:
             if len(images_data) == 0:
                 raise HTTPException(
                     status_code=404,
-                    detail="Aucune image valide trouvée dans la session",
+                    detail=get_message("error_no_valid_images", "fr"),
                 )
 
             images_count = len(images_data)

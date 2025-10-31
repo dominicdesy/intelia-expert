@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 
 from config.config import BASE_PATH
+from config.messages import get_message
 from ..endpoints import safe_serialize_for_json
 from ..chat_models import JSONValidationRequest, IngestionRequest
 
@@ -50,11 +51,11 @@ def create_json_routes(get_service: Callable[[str], Any]) -> APIRouter:
         try:
             rag_engine = get_rag_engine()
             if not rag_engine:
-                raise HTTPException(status_code=503, detail="RAG Engine non disponible")
+                raise HTTPException(status_code=503, detail=get_message("error_service_unavailable", "fr"))
 
             if not hasattr(rag_engine, "validate_json_document"):
                 raise HTTPException(
-                    status_code=501, detail="Validation JSON non disponible"
+                    status_code=501, detail=get_message("error_feature_unavailable", "fr")
                 )
 
             result = await rag_engine.validate_json_document(
@@ -91,11 +92,11 @@ def create_json_routes(get_service: Callable[[str], Any]) -> APIRouter:
         try:
             rag_engine = get_rag_engine()
             if not rag_engine:
-                raise HTTPException(status_code=503, detail="RAG Engine non disponible")
+                raise HTTPException(status_code=503, detail=get_message("error_service_unavailable", "fr"))
 
             if not hasattr(rag_engine, "ingest_json_documents"):
                 raise HTTPException(
-                    status_code=501, detail="Ingestion JSON non disponible"
+                    status_code=501, detail=get_message("error_feature_unavailable", "fr")
                 )
 
             result = await rag_engine.ingest_json_documents(
@@ -138,11 +139,11 @@ def create_json_routes(get_service: Callable[[str], Any]) -> APIRouter:
         try:
             rag_engine = get_rag_engine()
             if not rag_engine:
-                raise HTTPException(status_code=503, detail="RAG Engine non disponible")
+                raise HTTPException(status_code=503, detail=get_message("error_service_unavailable", "fr"))
 
             if not hasattr(rag_engine, "search_json_enhanced"):
                 raise HTTPException(
-                    status_code=501, detail="Recherche JSON non disponible"
+                    status_code=501, detail=get_message("error_feature_unavailable", "fr")
                 )
 
             parsed_metrics = None
@@ -207,7 +208,7 @@ def create_json_routes(get_service: Callable[[str], Any]) -> APIRouter:
         try:
             if len(files) > 50:
                 raise HTTPException(
-                    status_code=413, detail="Maximum 50 fichiers par upload"
+                    status_code=413, detail=get_message("error_max_files_exceeded", "fr").format(max_files=50)
                 )
 
             json_files = []
@@ -217,7 +218,7 @@ def create_json_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 try:
                     if not file.filename.endswith(".json"):
                         errors.append(
-                            f"{file.filename}: Format non supporté (JSON requis)"
+                            get_message("error_unsupported_format", "fr").format(filename=file.filename)
                         )
                         continue
 
@@ -233,13 +234,13 @@ def create_json_routes(get_service: Callable[[str], Any]) -> APIRouter:
                     )
 
                 except json.JSONDecodeError as e:
-                    errors.append(f"{file.filename}: JSON invalide - {str(e)}")
+                    errors.append(get_message("error_invalid_json_file", "fr").format(filename=file.filename))
                 except Exception as e:
-                    errors.append(f"{file.filename}: Erreur lecture - {str(e)}")
+                    errors.append(get_message("error_file_read", "fr").format(filename=file.filename))
 
             if not json_files:
                 raise HTTPException(
-                    status_code=400, detail="Aucun fichier JSON valide trouvé"
+                    status_code=400, detail=get_message("error_no_valid_files", "fr")
                 )
 
             validation_results = []

@@ -30,6 +30,7 @@ import logging
 from utils.types import List, Optional, Union
 from core.data_models import Document
 from utils.utilities import METRICS
+from config.messages import get_message
 
 # Import modular components
 from .models import ContextEnrichment
@@ -270,7 +271,7 @@ class ResponseGenerator:
                 return error_msg
 
         # Fallback message
-        return "Je n'ai pas trouvé d'informations pertinentes dans ma base de connaissances pour répondre à votre question. Pouvez-vous reformuler ou être plus spécifique ?"
+        return get_message("no_information_found", language)
 
     def _track_semantic_cache_metrics(self):
         """Track semantic cache hit metrics if available"""

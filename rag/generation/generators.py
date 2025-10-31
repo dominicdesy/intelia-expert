@@ -583,7 +583,7 @@ MÉTRIQUES CLÉS BROILERS:
                 if error_msg:
                     return error_msg
 
-            return "Je n'ai pas trouvé d'informations pertinentes dans ma base de connaissances pour répondre à votre question. Pouvez-vous reformuler ou être plus spécifique ?"
+            return get_message("no_information_found", lang)
 
         # ✅ LOG CRITIQUE: Vérifier le type et contenu des documents
         logger.info(f"📄 Received {len(context_docs)} documents for generation")

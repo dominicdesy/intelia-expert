@@ -19,6 +19,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 
 from config.config import BASE_PATH, MAX_REQUEST_SIZE
+from config.messages import get_message
 from utils.utilities import (
     detect_language_enhanced,
 )
@@ -65,11 +66,13 @@ async def check_user_quota(user_email: str, auth_token: str) -> dict:
                 # Si le quota est dépassé
                 if quota_info.get("can_ask") is False:
                     logger.warning(f"Quota dépassé pour {user_email}: {quota_info}")
+                    # Detect language for error message
+                    error_language = "fr"  # Default fallback
                     raise HTTPException(
                         status_code=429,
                         detail={
                             "error": "quota_exceeded",
-                            "message": "Vous avez atteint votre limite mensuelle de questions.",
+                            "message": get_message("quota_exceeded", error_language),
                             "quota": quota_info,
                         },
                     )
@@ -194,7 +197,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
             try:
                 body = await request.json()
             except Exception as e:
-                raise HTTPException(status_code=400, detail=f"JSON invalide: {e}")
+                raise HTTPException(status_code=400, detail=get_message("error_invalid_json", "fr"))
 
             message = body.get("message", "").strip()
             tenant_id = body.get("tenant_id", str(uuid.uuid4())[:8])
@@ -210,7 +213,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             # Validation basique
             if not message:
-                raise HTTPException(status_code=400, detail="Message vide")
+                raise HTTPException(status_code=400, detail=get_message("error_empty_message", "fr"))
 
             # ============================================================
             # 🆕 QUOTA CHECKING - Vérifier la limite mensuelle
@@ -234,7 +237,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
             if len(message) > MAX_REQUEST_SIZE:
                 raise HTTPException(
                     status_code=413,
-                    detail=f"Message trop long (max {MAX_REQUEST_SIZE})",
+                    detail=get_message("error_message_too_long", "fr").format(max_size=MAX_REQUEST_SIZE),
                 )
 
             # Détection automatique de la langue
@@ -352,7 +355,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
             monitoring_collector.record_request("/chat", error_duration, error=True)
 
             return JSONResponse(
-                status_code=500, content={"error": f"Erreur traitement: {str(e)}"}
+                status_code=500, content={"error": get_message("error_processing", "fr")}
             )
 
     @router.post(f"{BASE_PATH}/chat/stream")
@@ -378,7 +381,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
             try:
                 body = await request.json()
             except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+                raise HTTPException(status_code=400, detail=get_message("error_invalid_json", "en"))
 
             message = body.get("message", "").strip()
             tenant_id = body.get("tenant_id", str(uuid.uuid4())[:8])
@@ -386,12 +389,12 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
 
             # Basic validation
             if not message:
-                raise HTTPException(status_code=400, detail="Empty message")
+                raise HTTPException(status_code=400, detail=get_message("error_empty_message", "en"))
 
             if len(message) > MAX_REQUEST_SIZE:
                 raise HTTPException(
                     status_code=413,
-                    detail=f"Message too long (max {MAX_REQUEST_SIZE})",
+                    detail=get_message("error_message_too_long", "en").format(max_size=MAX_REQUEST_SIZE),
                 )
 
             # Detect language
@@ -496,7 +499,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
         except Exception as e:
             logger.error(f"[ERROR] Chat stream endpoint: {e}", exc_info=True)
             return JSONResponse(
-                status_code=500, content={"error": f"Processing error: {str(e)}"}
+                status_code=500, content={"error": get_message("error_processing", "en")}
             )
 
     # ==================== LANGUAGE DETECTION ENDPOINT ====================
@@ -529,7 +532,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
             if not text:
                 return JSONResponse(
                     status_code=400,
-                    content={"error": "Missing 'text' parameter"}
+                    content={"error": get_message("error_missing_parameter", "en")}
                 )
 
             # Utiliser detect_language_enhanced du RAG
@@ -558,7 +561,7 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
             logger.error(f"[ERROR] Language detection endpoint: {e}", exc_info=True)
             return JSONResponse(
                 status_code=500,
-                content={"error": f"Language detection error: {str(e)}"}
+                content={"error": get_message("error_language_detection", "en")}
             )
 
     return router
