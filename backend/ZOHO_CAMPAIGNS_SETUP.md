@@ -64,14 +64,75 @@ Response will include:
 
 8. Copy the **refresh_token** value (starts with `1000.`)
 
-### 3. Get Your Campaigns List Key
+### 3. Get Your Campaigns List Key for "Intelia Cognito"
 
 1. Log into **Zoho Campaigns**
 2. Go to **"Contacts"** → **"Mailing Lists"**
-3. Click on the list where you want to add new users
+3. Find and click on the list named **"Intelia Cognito"**
+   - If this list doesn't exist yet, create it first:
+     - Click **"Create Mailing List"**
+     - Name: **Intelia Cognito**
+     - Click **"Create"**
 4. Copy the **List Key** from the URL:
    - URL format: `https://campaigns.zoho.com/campaigns/OrgViewMailingList.zc?listkey=ABC123XYZ`
    - Your list key is: `ABC123XYZ`
+
+**IMPORTANT**: Make sure you're using the list key for "Intelia Cognito" specifically.
+
+## Syncing Existing Users (One-Time Setup)
+
+The integration only syncs **NEW** users who register after configuration. To sync existing users already in your database, use the provided script:
+
+### 1. Test First (Dry Run)
+
+```bash
+cd backend
+python scripts/sync_existing_users_to_zoho.py --dry-run --limit 5
+```
+
+This will show what would happen without making changes.
+
+### 2. Sync a Few Users (Test)
+
+```bash
+python scripts/sync_existing_users_to_zoho.py --limit 10
+```
+
+This syncs only 10 users to verify everything works.
+
+### 3. Sync All Users
+
+```bash
+python scripts/sync_existing_users_to_zoho.py
+```
+
+This syncs ALL existing users to the "Intelia Cognito" list in Zoho Campaigns.
+
+**Notes**:
+- The script automatically handles duplicates (won't re-add existing contacts)
+- Rate limiting is built-in (~170 requests/minute to respect Zoho's 200/min limit)
+- Progress is shown for each user
+- Run this **ONCE** after initial setup
+
+### Script Output Example:
+
+```
+[1/150] user1@example.com
+  ✅ Ajouté à Zoho
+[2/150] user2@example.com
+  ℹ️  Déjà existant dans Zoho
+[3/150] user3@example.com
+  ✅ Ajouté à Zoho
+...
+================================================================================
+RÉSUMÉ DE LA SYNCHRONISATION
+================================================================================
+Total traités:        150
+✅ Nouveaux ajoutés:  145
+ℹ️  Déjà existants:    5
+❌ Erreurs:           0
+================================================================================
+```
 
 ## Testing the Integration
 
