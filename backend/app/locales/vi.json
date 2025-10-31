@@ -14,6 +14,7 @@
   "whatsapp.analyzingText": "Đang phân tích câu hỏi của bạn...",
   "whatsapp.analyzingImage": "Đang phân tích hình ảnh của bạn...",
   "whatsapp.analyzingAudio": "Đang phiên âm và phân tích tin nhắn thoại của bạn...",
+  "whatsapp.imageAnalysisTimeout": "Xin lỗi, phân tích hình ảnh của bạn đang mất quá nhiều thời gian. Vui lòng thử lại.",
   "stripe.proPlanName": "Gói Pro",
   "stripe.proPlanDescription": "Đăng ký hàng tháng Intelia Expert - PRO",
   "stripe.elitePlanName": "Gói Elite",

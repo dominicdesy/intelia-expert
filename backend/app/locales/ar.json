@@ -14,6 +14,7 @@
   "whatsapp.analyzingText": "جاري تحليل سؤالك...",
   "whatsapp.analyzingImage": "جاري تحليل صورتك...",
   "whatsapp.analyzingAudio": "جاري نسخ وتحليل رسالتك الصوتية...",
+  "whatsapp.imageAnalysisTimeout": "عذرًا، تحليل صورتك يستغرق وقتًا طويلاً. يرجى المحاولة مرة أخرى.",
   "stripe.proPlanName": "الخطة الاحترافية",
   "stripe.proPlanDescription": "اشتراك شهري Intelia Expert - احترافي",
   "stripe.elitePlanName": "الخطة النخبة",

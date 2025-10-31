@@ -14,6 +14,7 @@
   "whatsapp.analyzingText": "Sorunuz analiz ediliyor...",
   "whatsapp.analyzingImage": "Resminiz analiz ediliyor...",
   "whatsapp.analyzingAudio": "Sesli mesajınız yazıya dönüştürülüyor ve analiz ediliyor...",
+  "whatsapp.imageAnalysisTimeout": "Üzgünüz, görüntünüzün analizi çok uzun sürüyor. Lütfen tekrar deneyin.",
   "stripe.proPlanName": "Pro Planı",
   "stripe.proPlanDescription": "Intelia Expert Aylık Abonelik - PRO",
   "stripe.elitePlanName": "Elite Planı",

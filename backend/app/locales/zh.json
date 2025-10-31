@@ -14,6 +14,7 @@
   "whatsapp.analyzingText": "正在分析您的问题...",
   "whatsapp.analyzingImage": "正在分析您的图片...",
   "whatsapp.analyzingAudio": "正在转录和分析您的语音消息...",
+  "whatsapp.imageAnalysisTimeout": "抱歉，您的图像分析时间过长。请重试。",
   "stripe.proPlanName": "专业版套餐",
   "stripe.proPlanDescription": "Intelia Expert 月度订阅 - 专业版",
   "stripe.elitePlanName": "精英版套餐",

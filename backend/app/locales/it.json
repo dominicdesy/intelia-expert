@@ -14,6 +14,7 @@
   "whatsapp.analyzingText": "Analisi della tua domanda in corso...",
   "whatsapp.analyzingImage": "Analisi della tua immagine in corso...",
   "whatsapp.analyzingAudio": "Trascrizione e analisi del tuo messaggio vocale in corso...",
+  "whatsapp.imageAnalysisTimeout": "Spiacente, l'analisi della tua immagine sta richiedendo troppo tempo. Per favore, riprova.",
   "stripe.proPlanName": "Piano Pro",
   "stripe.proPlanDescription": "Abbonamento mensile Intelia Expert - PRO",
   "stripe.elitePlanName": "Piano Elite",

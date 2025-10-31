@@ -14,6 +14,7 @@
   "whatsapp.analyzingText": "Menganalisis pertanyaan Anda...",
   "whatsapp.analyzingImage": "Menganalisis gambar Anda...",
   "whatsapp.analyzingAudio": "Mentranskripsi dan menganalisis pesan suara Anda...",
+  "whatsapp.imageAnalysisTimeout": "Maaf, analisis gambar Anda memakan waktu terlalu lama. Silakan coba lagi.",
   "stripe.proPlanName": "Paket Pro",
   "stripe.proPlanDescription": "Langganan Bulanan Intelia Expert - PRO",
   "stripe.elitePlanName": "Paket Elite",

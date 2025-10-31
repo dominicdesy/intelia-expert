@@ -14,6 +14,7 @@
   "whatsapp.analyzingText": "आपके प्रश्न का विश्लेषण किया जा रहा है...",
   "whatsapp.analyzingImage": "आपकी छवि का विश्लेषण किया जा रहा है...",
   "whatsapp.analyzingAudio": "आपके ध्वनि संदेश को ट्रांसक्राइब और विश्लेषण किया जा रहा है...",
+  "whatsapp.imageAnalysisTimeout": "क्षमा करें, आपकी छवि का विश्लेषण बहुत लंबा समय ले रहा है। कृपया पुनः प्रयास करें।",
   "stripe.proPlanName": "प्रो योजना",
   "stripe.proPlanDescription": "Intelia Expert मासिक सदस्यता - प्रो",
   "stripe.elitePlanName": "एलीट योजना",

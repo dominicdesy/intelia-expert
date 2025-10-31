@@ -11,6 +11,7 @@
   "pdf.assistantLabel": "Intelia Cognito",
   "pdf.page": "Página",
   "pdf.yourIntelligentAssistant": "Tu asistente inteligente en avicultura",
+  "whatsapp.imageAnalysisTimeout": "Lo siento, el análisis de su imagen está tardando demasiado. Por favor, inténtelo de nuevo.",
   "whatsapp.analyzingText": "Analizando tu pregunta...",
   "whatsapp.analyzingImage": "Analizando tu imagen...",
   "whatsapp.analyzingAudio": "Transcribiendo y analizando tu mensaje de voz...",

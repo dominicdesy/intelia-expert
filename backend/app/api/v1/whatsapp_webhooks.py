@@ -753,7 +753,7 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
         ai_vision_endpoint = f"{RAG_URL}/chat-with-image"
         logger.info(f"🔧 Calling AI Vision service: {ai_vision_endpoint}")
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:  # Increased from 60s to 120s for complex image analysis
             vision_response = await client.post(
                 ai_vision_endpoint,
                 files=files,
@@ -835,7 +835,12 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
 
     except httpx.TimeoutException:
         logger.error("❌ LLM Vision service timeout")
-        return "Désolé, l'analyse de votre image prend trop de temps. Veuillez réessayer."
+        # Detect language from message_text for proper error message
+        try:
+            error_lang = await detect_language(message_text or "")
+        except:
+            error_lang = "en"  # Default to English
+        return t("whatsapp.imageAnalysisTimeout", error_lang)
     except httpx.RequestError as e:
         logger.error(f"❌ LLM Vision request error: {e}")
         return "Désolé, impossible de contacter le service d'analyse d'images. Veuillez réessayer plus tard."

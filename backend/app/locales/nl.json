@@ -14,6 +14,7 @@
   "whatsapp.analyzingText": "Je vraag wordt geanalyseerd...",
   "whatsapp.analyzingImage": "Je afbeelding wordt geanalyseerd...",
   "whatsapp.analyzingAudio": "Je spraakbericht wordt getranscribeerd en geanalyseerd...",
+  "whatsapp.imageAnalysisTimeout": "Sorry, de analyse van uw afbeelding duurt te lang. Probeer het opnieuw.",
   "stripe.proPlanName": "Pro Abonnement",
   "stripe.proPlanDescription": "Intelia Expert Maandelijks Abonnement - PRO",
   "stripe.elitePlanName": "Elite Abonnement",
