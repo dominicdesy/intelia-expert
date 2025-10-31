@@ -108,8 +108,8 @@ class RAGResponseGenerator:
                     result.answer = "Je ne peux pas identifier l'utilisateur pour accéder aux données du poulailler."
                     return result
 
-                # Call Backend endpoint (service-to-service via internal network, no JWT needed)
-                # Use internal URL to avoid Cloudflare blocking
+                # Call Backend endpoint (service-to-service via Digital Ocean App Platform internal network)
+                # Backend ports: 8080 (public/external), 8081 (internal between services)
                 backend_url = os.getenv("BACKEND_INTERNAL_URL", "http://backend:8081/api")
                 compass_url = f"{backend_url}/v1/compass/internal/user/{user_id}/barns/{barn_number}"
 
