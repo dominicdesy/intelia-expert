@@ -109,8 +109,8 @@ class RAGResponseGenerator:
                     return result
 
                 # Call Backend endpoint (service-to-service via Digital Ocean App Platform internal network)
-                # Backend ports: 8080 (public/external), 8081 (internal between services)
-                backend_url = os.getenv("BACKEND_INTERNAL_URL", "http://backend:8081/api")
+                # Use the actual port Backend is listening on (8080)
+                backend_url = os.getenv("BACKEND_INTERNAL_URL", "http://backend:8080/api")
                 compass_url = f"{backend_url}/v1/compass/internal/user/{user_id}/barns/{barn_number}"
 
                 logger.info(f"📡 Fetching Compass data from internal endpoint: {compass_url}")
