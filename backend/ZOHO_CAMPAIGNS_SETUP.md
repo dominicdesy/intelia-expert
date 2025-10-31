@@ -81,58 +81,59 @@ Response will include:
 
 ## Syncing Existing Users (One-Time Setup)
 
-The integration only syncs **NEW** users who register after configuration. To sync existing users already in your database, use the provided script:
+The integration only syncs **NEW** users who register after configuration. To sync existing users already in your database, use one of these methods:
 
-### 1. Test First (Dry Run)
+### Method 1: Simple Browser Console Command (Recommended)
+
+1. **Set the Admin Secret** in Digital Ocean environment variables:
+   ```
+   ADMIN_SYNC_SECRET=your-secret-here-change-me
+   ```
+
+2. **Open Browser Console** on https://expert.intelia.com and run:
+
+```javascript
+// Test with 5 users first (dry-run)
+fetch('https://expert-app-cngws.ondigitalocean.app/api/v1/auth/admin/sync-zoho-simple?secret=your-secret-here&dry_run=true&limit=5', {
+  method: 'POST'
+}).then(r => r.json()).then(console.log)
+
+// Then sync all users (real sync)
+fetch('https://expert-app-cngws.ondigitalocean.app/api/v1/auth/admin/sync-zoho-simple?secret=your-secret-here&dry_run=false', {
+  method: 'POST'
+}).then(r => r.json()).then(console.log)
+```
+
+Replace `your-secret-here` with the value of `ADMIN_SYNC_SECRET`.
+
+**Console Output Example**:
+```json
+{
+  "success": true,
+  "message": "Synchronisation terminée",
+  "statistics": {
+    "total_processed": 150,
+    "newly_added": 145,
+    "already_existed": 5,
+    "errors": 0
+  }
+}
+```
+
+### Method 2: Python Script (Alternative)
 
 ```bash
 cd backend
-python scripts/sync_existing_users_to_zoho.py --dry-run --limit 5
+python scripts/sync_existing_users_to_zoho.py --dry-run --limit 5  # Test
+python scripts/sync_existing_users_to_zoho.py --limit 10           # Sync 10
+python scripts/sync_existing_users_to_zoho.py                       # Sync all
 ```
-
-This will show what would happen without making changes.
-
-### 2. Sync a Few Users (Test)
-
-```bash
-python scripts/sync_existing_users_to_zoho.py --limit 10
-```
-
-This syncs only 10 users to verify everything works.
-
-### 3. Sync All Users
-
-```bash
-python scripts/sync_existing_users_to_zoho.py
-```
-
-This syncs ALL existing users to the "Intelia Cognito" list in Zoho Campaigns.
 
 **Notes**:
-- The script automatically handles duplicates (won't re-add existing contacts)
+- The endpoint automatically handles duplicates (won't re-add existing contacts)
 - Rate limiting is built-in (~170 requests/minute to respect Zoho's 200/min limit)
-- Progress is shown for each user
 - Run this **ONCE** after initial setup
-
-### Script Output Example:
-
-```
-[1/150] user1@example.com
-  ✅ Ajouté à Zoho
-[2/150] user2@example.com
-  ℹ️  Déjà existant dans Zoho
-[3/150] user3@example.com
-  ✅ Ajouté à Zoho
-...
-================================================================================
-RÉSUMÉ DE LA SYNCHRONISATION
-================================================================================
-Total traités:        150
-✅ Nouveaux ajoutés:  145
-ℹ️  Déjà existants:    5
-❌ Erreurs:           0
-================================================================================
-```
+- Keep your `ADMIN_SYNC_SECRET` secure and never commit it to git
 
 ## Testing the Integration
 

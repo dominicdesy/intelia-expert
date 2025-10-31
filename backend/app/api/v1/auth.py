@@ -2675,6 +2675,176 @@ async def debug_session_config():
     }
 
 
+# === ENDPOINT SIMPLE: SYNC EXISTING USERS TO ZOHO (SECRET-BASED) ===
+@router.post("/admin/sync-zoho-simple")
+async def sync_zoho_simple(
+    secret: str,
+    limit: Optional[int] = None,
+    dry_run: bool = False
+):
+    """
+    Synchronise les utilisateurs existants vers Zoho Campaigns - VERSION SIMPLIFIÉE
+
+    Uses secret key instead of JWT for easy one-time use
+
+    Args:
+        secret: Secret key (must match ADMIN_SYNC_SECRET env var)
+        limit: Limite le nombre d'utilisateurs (optionnel, pour tester)
+        dry_run: Si True, affiche seulement ce qui serait fait
+
+    Returns:
+        Statistiques de synchronisation
+    """
+    # Vérifier le secret
+    expected_secret = os.getenv("ADMIN_SYNC_SECRET", "change-me-in-production")
+
+    if secret != expected_secret:
+        logger.warning(f"[Admin] Tentative sync Zoho avec mauvais secret")
+        raise HTTPException(
+            status_code=403,
+            detail="Secret invalide"
+        )
+
+    logger.info(f"[Admin] Sync Zoho démarrée avec secret valide (limit={limit}, dry_run={dry_run})")
+
+    # Import du service Zoho
+    try:
+        from app.services.zoho_campaigns_service import zoho_campaigns_service
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="Service Zoho Campaigns non disponible"
+        )
+
+    # Vérifier configuration Zoho
+    if not zoho_campaigns_service.is_configured():
+        raise HTTPException(
+            status_code=400,
+            detail="Zoho Campaigns non configuré - variables d'environnement manquantes"
+        )
+
+    # Connexion Supabase
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+
+    if not supabase_url or not supabase_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Configuration Supabase manquante"
+        )
+
+    supabase: Client = create_client(supabase_url, supabase_key)
+
+    # Récupérer les utilisateurs
+    try:
+        query = supabase.table('users').select(
+            'email, first_name, last_name, country, company_name, '
+            'phone, language, production_type, category, created_at'
+        ).order('created_at', desc=False)
+
+        if limit:
+            query = query.limit(limit)
+
+        response = query.execute()
+        users = response.data if response.data else []
+
+        logger.info(f"[Admin] {len(users)} utilisateurs récupérés depuis Supabase")
+
+    except Exception as e:
+        logger.error(f"[Admin] Erreur récupération utilisateurs: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur récupération utilisateurs: {str(e)}"
+        )
+
+    if not users:
+        return {
+            "success": True,
+            "message": "Aucun utilisateur à synchroniser",
+            "stats": {
+                "total": 0,
+                "synced": 0,
+                "already_exists": 0,
+                "errors": 0
+            }
+        }
+
+    # Synchroniser chaque utilisateur
+    total = len(users)
+    synced = 0
+    already_exists = 0
+    errors = 0
+    error_details = []
+
+    for i, user in enumerate(users, 1):
+        email = user.get('email', 'N/A')
+
+        if dry_run:
+            logger.info(f"[Admin][DRY-RUN] [{i}/{total}] {email}")
+            synced += 1
+            continue
+
+        try:
+            result = await zoho_campaigns_service.sync_new_user(
+                email=email,
+                first_name=user.get('first_name'),
+                last_name=user.get('last_name'),
+                country=user.get('country'),
+                company_name=user.get('company_name'),
+                phone=user.get('phone'),
+                language=user.get('language'),
+                production_type=user.get('production_type'),
+                category=user.get('category')
+            )
+
+            if result.get('success'):
+                if result.get('already_exists'):
+                    already_exists += 1
+                    logger.info(f"[Admin] [{i}/{total}] {email} - Déjà existant")
+                else:
+                    synced += 1
+                    logger.info(f"[Admin] [{i}/{total}] {email} - ✅ Synchronisé")
+            else:
+                errors += 1
+                error_msg = result.get('error', 'Erreur inconnue')
+                logger.error(f"[Admin] [{i}/{total}] {email} - ❌ {error_msg}")
+                error_details.append({"email": email, "error": error_msg})
+
+        except Exception as e:
+            errors += 1
+            error_msg = str(e)
+            logger.error(f"[Admin] [{i}/{total}] {email} - ❌ Exception: {error_msg}")
+            error_details.append({"email": email, "error": error_msg})
+
+        # Rate limiting (170 req/min pour respecter limite Zoho de 200/min)
+        if not dry_run and i < total:
+            import asyncio
+            await asyncio.sleep(0.35)
+
+    # Résultat
+    result_data = {
+        "success": True,
+        "message": f"Synchronisation {'simulée' if dry_run else 'terminée'}",
+        "dry_run": dry_run,
+        "stats": {
+            "total": total,
+            "synced": synced,
+            "already_exists": already_exists,
+            "errors": errors
+        }
+    }
+
+    if error_details and len(error_details) <= 10:
+        result_data["error_details"] = error_details
+    elif error_details:
+        result_data["error_sample"] = error_details[:10]
+        result_data["note"] = f"{len(error_details)} erreurs au total, 10 premières affichées"
+
+    logger.info(f"[Admin] Synchronisation terminée: {synced} synced, {already_exists} already_exists, {errors} errors")
+
+    return result_data
+
+
 # === ENDPOINT ADMIN: SYNC EXISTING USERS TO ZOHO ===
 @router.post("/admin/sync-zoho-users")
 async def sync_existing_users_to_zoho(
