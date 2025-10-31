@@ -156,6 +156,8 @@ AUTHENTICATED_USER_PATTERNS = [
     "/v1/ws/voice",
     # === ENDPOINTS COMPASS UTILISATEUR (données personnelles des poulaillers) ===
     "/api/v1/compass/me",  # 🔒 Mes poulaillers et données temps réel
+    # === ENDPOINTS HEADWAY (tracking articles vus - persistance navigation privée) ===
+    "/api/v1/headway/",  # 🔒 Tracking articles What's New vus par utilisateur
 ]
 
 # PATTERNS PUBLICS ÉTENDUS (pour les vérifications par pattern)

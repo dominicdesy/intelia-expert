@@ -777,6 +777,19 @@ except Exception as e:
     logger.error(f"ERREUR import compass router: {e}")
     compass_router = None
 
+# Headway Tracking (track articles viewed to persist across private browsing)
+HEADWAY_AVAILABLE = False
+try:
+    from .headway import router as headway_router
+    HEADWAY_AVAILABLE = True
+    logger.debug("Headway router importé avec %d routes", len(headway_router.routes))
+except ImportError as e:
+    logger.warning(f"Headway router import failed: {e}")
+    headway_router = None
+except Exception as e:
+    logger.error(f"ERREUR import headway router: {e}")
+    headway_router = None
+
 if SATISFACTION_AVAILABLE and satisfaction_router:
     router.include_router(satisfaction_router, prefix="/satisfaction", tags=["Satisfaction"])
     logger.debug("Satisfaction router monté")
@@ -856,6 +869,15 @@ if COMPASS_AVAILABLE and compass_router:
     logger.info("Compass Integration activée (données temps réel des poulaillers)!")
 else:
     logger.warning("Compass router non monté (module non disponible)")
+
+# Headway Tracking (persist viewed articles across private browsing)
+if HEADWAY_AVAILABLE and headway_router:
+    router.include_router(headway_router, tags=["Headway"])
+    logger.debug("Headway router monté")
+    logger.debug("Headway router maintenant disponible sur /v1/headway/*")
+    logger.info("Headway Tracking activé (articles vus persistent en navigation privée)!")
+else:
+    logger.warning("Headway router non monté (module non disponible)")
 
 # Résumé final
 total_routes = len(router.routes)

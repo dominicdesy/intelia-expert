@@ -1,13 +1,14 @@
 /**
  * WhatsNewButton
- * Version: 4.0.0
- * Last modified: 2025-10-30
- * Headway What's New integration - With notification badge and custom positioning
+ * Version: 5.0.0
+ * Last modified: 2025-10-31
+ * Headway What's New integration - With notification badge and server sync for private browsing
  */
 "use client";
 
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/languages/i18n";
+import { useHeadwaySync } from "@/lib/hooks/useHeadwaySync";
 
 interface WhatsNewButtonProps {
   onClick?: () => void;
@@ -16,6 +17,7 @@ interface WhatsNewButtonProps {
 export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
   const { t } = useTranslation();
   const [unseenCount, setUnseenCount] = useState<number>(0);
+  const { synced, syncFromServer, markAsViewed } = useHeadwaySync();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -48,6 +50,12 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
               callbacks: {
                 onWidgetReady: (widget: any) => {
                   console.log('[Headway] Widget ready!', widget);
+
+                  // Sync from server first (load previously viewed articles)
+                  if (synced) {
+                    syncFromServer();
+                  }
+
                   const count = widget?.getUnseenCount?.() || 0;
                   console.log('[Headway] Unseen count:', count);
                   setUnseenCount(count);
@@ -56,8 +64,13 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
                   console.log('[Headway] Widget shown!');
                   if (onClick) onClick();
                 },
-                onReadMore: () => {
-                  console.log('[Headway] Read more clicked');
+                onReadMore: (articleId: string) => {
+                  console.log('[Headway] Read more clicked:', articleId);
+
+                  // Save to server when user reads an article
+                  if (articleId) {
+                    markAsViewed(articleId);
+                  }
                 },
                 onHideWidget: () => {
                   console.log('[Headway] Widget hidden');
@@ -92,7 +105,7 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
         script.parentNode.removeChild(script);
       }
     };
-  }, [onClick]);
+  }, [onClick, synced, syncFromServer, markAsViewed]);
 
   return (
     <div className="relative">
