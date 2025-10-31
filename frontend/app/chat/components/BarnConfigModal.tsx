@@ -131,8 +131,8 @@ export const BarnConfigModal: React.FC<BarnConfigModalProps> = ({
 
     // Check for empty device IDs
     const emptyDevices = config.barns.filter(b => !b.compass_device_id);
-    if (emptyDevices.length > 0 && config.compass_enabled) {
-      alert("Tous les poulaillers doivent avoir un appareil Compass sélectionné");
+    if (emptyDevices.length > 0) {
+      alert("Tous les poulaillers doivent avoir un appareil Compass sélectionné.\nSi vous voulez supprimer un poulailler, utilisez le bouton de suppression.");
       return;
     }
 
@@ -253,23 +253,39 @@ export const BarnConfigModal: React.FC<BarnConfigModalProps> = ({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {/* Compass Device */}
+                    <div className="space-y-3">
+                      {/* Compass Device Selection */}
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Appareil Compass
                         </label>
                         <SearchableSelect
-                          items={devices.map(device => ({
-                            id: device.id.toString(),
-                            label: device.name,
-                            subtitle: `ID: ${device.id}${device.entity_id ? ` • Entity: ${device.entity_id}` : ''}`,
-                            data: device
-                          }))}
+                          items={devices.map(device => {
+                            // Ensure device.id exists and is converted to string
+                            const deviceId = device.id ? String(device.id) : '';
+                            if (!deviceId) {
+                              secureLog.warn('[BarnConfigModal] Device with missing ID:', device);
+                            }
+                            return {
+                              id: deviceId,
+                              label: device.name || `Device ${deviceId}`,
+                              subtitle: `ID: ${deviceId}${device.entity_id ? ` • Entity: ${device.entity_id}` : ''}`,
+                              data: device
+                            };
+                          }).filter(item => item.id !== '')} // Filter out devices without IDs
                           onSelect={(item) => {
-                            handleBarnChange(index, 'compass_device_id', item.id);
-                            // Always update name when device changes to keep them in sync
-                            handleBarnChange(index, 'name', item.label);
+                            secureLog.log(`[BarnConfigModal] Device selected: ID=${item.id}, Label=${item.label}`);
+                            // Update both compass_device_id AND name in a single state update
+                            const newBarns = [...config.barns];
+                            newBarns[index] = {
+                              ...newBarns[index],
+                              compass_device_id: item.id,
+                              name: item.label
+                            };
+                            setConfig({
+                              ...config,
+                              barns: newBarns
+                            });
                           }}
                           selectedId={barn.compass_device_id}
                           placeholder="Rechercher un appareil..."
@@ -277,8 +293,24 @@ export const BarnConfigModal: React.FC<BarnConfigModalProps> = ({
                         />
                       </div>
 
-                      {/* Client Number */}
-                      <div>
+                      {/* Display selected device ID for validation */}
+                      {barn.compass_device_id && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="text-xs font-medium text-blue-900 mb-1">
+                            ✓ Appareil sélectionné
+                          </div>
+                          <div className="text-sm text-blue-800">
+                            <strong>ID Compass:</strong> {barn.compass_device_id}
+                          </div>
+                          <div className="text-sm text-blue-800">
+                            <strong>Nom:</strong> {barn.name}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {/* Client Number */}
+                        <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Numéro client
                         </label>
@@ -292,23 +324,24 @@ export const BarnConfigModal: React.FC<BarnConfigModalProps> = ({
                         <p className="text-xs text-gray-500 mt-1">
                           Numéro que l'utilisateur utilisera ("poulailler 2")
                         </p>
-                      </div>
+                        </div>
 
-                      {/* Barn Name */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Nom du poulailler
-                        </label>
-                        <input
-                          type="text"
-                          value={barn.name}
-                          onChange={(e) => handleBarnChange(index, 'name', e.target.value)}
-                          placeholder="Poulailler Est"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Nom affiché dans les réponses
-                        </p>
+                        {/* Barn Name */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Nom du poulailler
+                          </label>
+                          <input
+                            type="text"
+                            value={barn.name}
+                            onChange={(e) => handleBarnChange(index, 'name', e.target.value)}
+                            placeholder="Poulailler Est"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Nom affiché dans les réponses
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
