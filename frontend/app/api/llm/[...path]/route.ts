@@ -1,15 +1,13 @@
 /**
  * SÉCURITÉ: Proxy générique pour tous les endpoints RAG Service
- * Version: 1.7.0
+ * Version: 1.8.0
  * Last modified: 2025-10-30
- * Updated: Pass Authorization header for Compass integration
+ * Updated: Removed JWT authentication (uses internal endpoints with tenant_id)
  */
 // app/api/llm/[...path]/route.ts
 
 import { type NextRequest } from "next/server";
 import { secureLog } from "@/lib/utils/secureLogger";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
 
 /**
  * SÉCURITÉ: Proxy générique pour tous les endpoints RAG Service
@@ -37,54 +35,6 @@ async function proxyToRAGService(req: NextRequest, params: { path: string[] }) {
   secureLog.log(`[rag-service-proxy] ${req.method} ${fullUrl}`);
 
   try {
-    // 🆕 Get Supabase JWT token for Compass API authentication
-    let authToken: string | null = null;
-    try {
-      // Extract Supabase token directly from cookies
-      const cookieStore = cookies();
-
-      // Try to get the access token from Supabase auth cookies
-      // Supabase stores tokens with pattern: sb-{project-ref}-auth-token
-      const allCookies = cookieStore.getAll();
-
-      for (const cookie of allCookies) {
-        if (cookie.name.includes('sb-') && cookie.name.includes('-auth-token')) {
-          try {
-            // Supabase stores the session as a JSON string in the cookie
-            const sessionData = JSON.parse(cookie.value);
-            authToken = sessionData?.access_token || sessionData?.[0]?.access_token || null;
-
-            if (authToken) {
-              secureLog.log(`[rag-service-proxy] ✅ Auth token extracted from cookie: ${cookie.name}`);
-              break;
-            }
-          } catch (parseError) {
-            // If JSON parse fails, the cookie might contain the token directly
-            // or be in a different format
-            continue;
-          }
-        }
-      }
-
-      // Fallback: try createRouteHandlerClient approach
-      if (!authToken) {
-        const supabase = createRouteHandlerClient({ cookies });
-        const { data: { session } } = await supabase.auth.getSession();
-        authToken = session?.access_token ?? null;
-
-        if (authToken) {
-          secureLog.log(`[rag-service-proxy] ✅ Auth token obtained via Supabase client`);
-        }
-      }
-
-      if (!authToken) {
-        secureLog.warn(`[rag-service-proxy] ⚠️ No auth token found - user not authenticated`);
-        secureLog.log(`[rag-service-proxy] Available cookies: ${allCookies.map(c => c.name).join(', ')}`);
-      }
-    } catch (authError) {
-      secureLog.error(`[rag-service-proxy] Auth token retrieval failed: ${authError}`);
-    }
-
     // Copier le body si présent
     let body: BodyInit | undefined = undefined;
     if (req.method !== "GET" && req.method !== "HEAD") {
@@ -99,16 +49,11 @@ async function proxyToRAGService(req: NextRequest, params: { path: string[] }) {
       }
     }
 
-    // 🆕 Build headers with Authorization token
+    // Build headers
     const headers: HeadersInit = {
       "Content-Type": req.headers.get("content-type") ?? "application/json",
       Accept: req.headers.get("accept") ?? "*/*",
     };
-
-    // Add Authorization header if token available
-    if (authToken) {
-      headers["Authorization"] = `Bearer ${authToken}`;
-    }
 
     // Appel au RAG Service interne
     const response = await fetch(fullUrl, {

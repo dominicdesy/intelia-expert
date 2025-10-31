@@ -66,8 +66,7 @@ class RAGResponseGenerator:
         preprocessed_data: Dict[str, Any],
         original_query: str,
         language: str,
-        user_id: str = None,  # 🆕 User profiling
-        auth_token: str = None,  # 🆕 Auth token for Compass API
+        user_id: str = None,  # 🆕 User profiling and Compass user identification
     ) -> RAGResult:
         """
         Ensure RAGResult has a generated answer
@@ -82,8 +81,7 @@ class RAGResponseGenerator:
             preprocessed_data: Preprocessed data (contains contextual_history)
             original_query: Original query
             language: Query language
-            user_id: User ID for profiling
-            auth_token: Auth token for Compass API calls
+            user_id: User ID for profiling and Compass barn identification
 
         Returns:
             RAGResult with generated answer and optional follow-up
@@ -93,7 +91,6 @@ class RAGResponseGenerator:
             logger.info("🏚️ Compass data request detected - fetching real barn data")
 
             try:
-                from extensions.compass_extension import get_compass_extension
                 import httpx
                 import os
 
@@ -106,26 +103,27 @@ class RAGResponseGenerator:
                     result.answer = "Je n'ai pas pu identifier le numéro du poulailler dans votre question."
                     return result
 
-                if not auth_token:
-                    logger.warning("No auth_token available for Compass API call")
-                    result.answer = "Je ne peux pas accéder aux données temps réel de votre poulailler en ce moment. Veuillez réessayer."
+                if not user_id:
+                    logger.error("No user_id available for Compass API call")
+                    result.answer = "Je ne peux pas identifier l'utilisateur pour accéder aux données du poulailler."
                     return result
 
-                # Fetch real-time barn data from Compass API
-                backend_url = os.getenv("BACKEND_API_URL", "https://expert.intelia.com/api")
-                compass_url = f"{backend_url}/v1/compass/me/barns/{barn_number}"
+                # Call internal Backend endpoint (service-to-service, no JWT needed)
+                # Backend URL should point to internal backend service
+                backend_url = os.getenv("BACKEND_INTERNAL_URL", "http://backend:8000")
+                compass_url = f"{backend_url}/api/v1/compass/internal/user/{user_id}/barns/{barn_number}"
 
-                logger.info(f"📡 Fetching Compass data from: {compass_url}")
+                logger.info(f"📡 Fetching Compass data from internal endpoint: {compass_url}")
 
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    response = await client.get(
-                        compass_url,
-                        headers={"Authorization": f"Bearer {auth_token}"}
-                    )
+                    response = await client.get(compass_url)
 
                     if response.status_code != 200:
-                        logger.error(f"Compass API error: {response.status_code}")
-                        result.answer = f"Je n'ai pas pu récupérer les données du poulailler {barn_number}. Veuillez vérifier que ce poulailler existe."
+                        logger.error(f"Backend Compass API error: {response.status_code} - {response.text}")
+                        if response.status_code == 404:
+                            result.answer = f"Le poulailler {barn_number} n'a pas été trouvé dans votre configuration, ou Compass n'est pas activé pour votre compte."
+                        else:
+                            result.answer = f"Je n'ai pas pu récupérer les données du poulailler {barn_number}."
                         return result
 
                     barn_data = response.json()

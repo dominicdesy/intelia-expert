@@ -436,6 +436,75 @@ async def get_my_barns_data(
     return barn_data_list
 
 
+@router.get("/internal/user/{user_id}/barns/{client_number}")
+async def get_barn_data_internal(
+    user_id: str,
+    client_number: str
+) -> BarnDataResponse:
+    """
+    Get real-time data for specific barn by client number (internal service-to-service call)
+
+    This endpoint is for internal use by RAG engine - no JWT authentication required.
+
+    Args:
+        user_id: User ID (tenant_id from RAG)
+        client_number: User's custom barn number (e.g., "2")
+
+    Returns:
+        Barn data with sensor readings
+
+    Raises:
+        HTTPException: If barn not found or Compass not enabled
+    """
+    config = await get_user_config(user_id)
+
+    if not config or not config.get("compass_enabled", False):
+        raise HTTPException(
+            status_code=404,
+            detail="Compass not enabled for this user"
+        )
+
+    barns = config.get("barns", [])
+
+    # Find barn by client_number
+    barn = next((b for b in barns if b["client_number"] == client_number), None)
+
+    if not barn:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Barn '{client_number}' not found in user configuration"
+        )
+
+    if not barn.get("enabled", True):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Barn '{client_number}' is disabled"
+        )
+
+    # Fetch real-time data
+    try:
+        compass_service = get_compass_service()
+        device_id = barn["compass_device_id"]
+        data = compass_service.get_barn_realtime_data(device_id)
+
+        logger.info(f"[INTERNAL] Retrieved barn data for user {user_id}, barn {client_number}")
+
+        return BarnDataResponse(
+            device_id=device_id,
+            client_number=barn["client_number"],
+            name=barn["name"],
+            temperature=data.temperature,
+            humidity=data.humidity,
+            average_weight=data.average_weight,
+            age_days=data.age_days,
+            timestamp=data.timestamp
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching barn data: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/me/barns/{client_number}")
 async def get_barn_data_by_client_number(
     client_number: str,
