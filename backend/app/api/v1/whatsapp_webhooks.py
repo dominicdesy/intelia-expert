@@ -1,14 +1,18 @@
 """
 WhatsApp Webhook Handler via Twilio
-Version: 1.4.1
-Last modified: 2025-10-26
+Version: 1.5.0
+Last modified: 2025-10-31
 """
 # app/api/v1/whatsapp_webhooks.py
 # -*- coding: utf-8 -*-
 """
 WhatsApp Webhook Handler via Twilio
 Traite les messages WhatsApp entrants et envoie les réponses
-Version: 2.3 - Message truncation + rate limiting fixes
+Version: 2.4 - Enhanced language detection using RAG's detect_language_enhanced
+
+CHANGELOG:
+- v2.4: Use RAG's detect_language_enhanced() instead of simple keyword matching
+- v2.4: Pass detected language to RAG service for consistent responses
 """
 
 import os
@@ -113,10 +117,16 @@ def generate_whatsapp_session_uuid(phone_number: str) -> str:
     return str(session_uuid)
 
 
-def detect_language(text: str) -> str:
+async def detect_language(text: str) -> str:
     """
-    Détecte la langue du texte (simple détection basée sur des mots-clés communs)
-    Fallback: français par défaut
+    Détecte la langue du texte en utilisant le système évolué du RAG
+
+    Cette fonction appelle l'API RAG pour utiliser detect_language_enhanced()
+    qui offre une détection multi-niveaux :
+    - Patterns grammaticaux (priorité 1, confiance 0.95)
+    - FastText-LangDetect (fallback ML)
+    - Patterns Unicode pour langues asiatiques
+    - Patterns universels avec termes techniques
 
     Args:
         text: Texte à analyser
@@ -124,47 +134,51 @@ def detect_language(text: str) -> str:
     Returns:
         Code langue ISO (en, fr, es, de, etc.)
     """
-    if not text:
-        return "fr"
+    if not text or len(text.strip()) < 2:
+        return "fr"  # Fallback pour texte vide
 
+    try:
+        # Appeler l'API RAG pour détection de langue
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{RAG_URL}/detect-language",
+                json={"text": text}
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                detected_lang = result.get("language", "fr")
+                confidence = result.get("confidence", 0.0)
+                source = result.get("source", "unknown")
+
+                logger.info(
+                    f"🌍 Language detected via RAG: {detected_lang} "
+                    f"(confidence: {confidence:.2f}, source: {source})"
+                )
+
+                return detected_lang
+            else:
+                logger.warning(f"⚠️ RAG language detection failed: {response.status_code}")
+
+    except Exception as e:
+        logger.warning(f"⚠️ RAG language detection error: {e}")
+
+    # Fallback simple si RAG indisponible
+    logger.info("Using simple keyword-based language detection (RAG unavailable)")
     text_lower = text.lower()
 
-    # Dictionnaire de mots-clés pour chaque langue
-    language_keywords = {
-        "en": ["the", "what", "how", "when", "where", "why", "is", "are", "can", "could", "would"],
-        "fr": ["le", "la", "les", "est", "sont", "comment", "quand", "pourquoi", "quel", "quelle"],
-        "es": ["el", "la", "los", "las", "es", "son", "cómo", "cuándo", "por qué", "qué"],
-        "de": ["der", "die", "das", "ist", "sind", "wie", "wann", "warum", "was"],
-        "it": ["il", "la", "gli", "è", "sono", "come", "quando", "perché", "cosa"],
-        "pt": ["o", "a", "os", "as", "é", "são", "como", "quando", "por que", "o que"],
-        "nl": ["de", "het", "is", "zijn", "hoe", "wanneer", "waarom", "wat"],
-        "pl": ["jest", "są", "jak", "kiedy", "dlaczego", "co"],
-        "ar": ["ما", "كيف", "متى", "لماذا", "هل", "هو", "هي"],
-        "hi": ["क्या", "कैसे", "कब", "क्यों", "है", "हैं"],
-        "ja": ["は", "です", "ます", "何", "どう", "いつ", "なぜ"],
-        "zh": ["是", "的", "什么", "怎么", "为什么", "吗"],
-        "id": ["adalah", "apa", "bagaimana", "kapan", "mengapa"],
-        "th": ["คือ", "อะไร", "อย่างไร", "เมื่อไหร่", "ทำไม"],
-        "tr": ["ne", "nasıl", "ne zaman", "neden", "mi", "mı"],
-        "vi": ["là", "gì", "như thế nào", "khi nào", "tại sao"]
-    }
+    # Détection simplifiée par mots-clés (fallback uniquement)
+    if any(word in text_lower for word in ["the", "what", "how", "is", "are"]):
+        return "en"
+    elif any(word in text_lower for word in ["le", "la", "les", "est", "sont", "comment"]):
+        return "fr"
+    elif any(word in text_lower for word in ["el", "la", "los", "es", "son", "cómo"]):
+        return "es"
 
-    # Compter les correspondances pour chaque langue
-    scores = {}
-    for lang, keywords in language_keywords.items():
-        score = sum(1 for keyword in keywords if keyword in text_lower)
-        if score > 0:
-            scores[lang] = score
-
-    # Retourner la langue avec le score le plus élevé
-    if scores:
-        return max(scores, key=scores.get)
-
-    # Fallback: français
-    return "fr"
+    return "fr"  # Fallback par défaut
 
 
-def get_acknowledgment_message(message_type: str, text: str = "") -> str:
+async def get_acknowledgment_message(message_type: str, text: str = "") -> str:
     """
     Obtient le message d'accusé de réception approprié dans la langue détectée
 
@@ -175,8 +189,8 @@ def get_acknowledgment_message(message_type: str, text: str = "") -> str:
     Returns:
         Message d'accusé de réception dans la langue appropriée
     """
-    # Détecter la langue
-    lang = detect_language(text) if text else "en"
+    # Détecter la langue (async)
+    lang = await detect_language(text) if text else "en"
 
     # Mapper le type de message vers la clé de traduction
     translation_keys = {
@@ -326,6 +340,10 @@ async def handle_text_message(
         logger.info(f"📝 WhatsApp message from {user_email} ({user_name}): {body[:100]}...")
         logger.info(f"🔧 Calling RAG Service: {RAG_CHAT_ENDPOINT}")
 
+        # Détecter la langue de la question (AVANT l'appel au RAG)
+        detected_language = await detect_language(body)
+        logger.info(f"🌍 Detected language for WhatsApp message: {detected_language}")
+
         # Créer un JWT token pour l'utilisateur WhatsApp
         auth_token = create_whatsapp_user_token(user_info)
         if not auth_token:
@@ -339,6 +357,7 @@ async def handle_text_message(
             "conversation_id": conversation_id,
             "use_json_search": True,
             "user_email": user_email,
+            "language": detected_language,  # ✅ NOUVEAU: Envoyer la langue détectée au RAG
         }
 
         # Headers avec authentification
@@ -411,8 +430,8 @@ async def handle_text_message(
         try:
             user_id = user_info.get("user_id")
             if user_id:
-                # Detect language from user message
-                detected_language = detect_language(body)
+                # Language already detected above (no need to detect again)
+                # detected_language is already available from line 344
 
                 # conversation_id is already a deterministic UUID from phone number
                 # Check if conversation already exists for this WhatsApp number
@@ -769,7 +788,7 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
                 user_id = user_info.get("user_id")
                 if user_id:
                     # Detect language from message_text
-                    detected_language = detect_language(message_text)
+                    detected_language = await detect_language(message_text)
 
                     # Generate deterministic UUID from WhatsApp number (same as text messages)
                     conversation_id = generate_whatsapp_session_uuid(from_number)
@@ -1113,7 +1132,7 @@ async def whatsapp_webhook(
             if MediaContentType0 and MediaContentType0.startswith("audio/"):
                 message_type = "audio"
                 # Envoyer immédiatement l'accusé de réception pour audio
-                ack_message = get_acknowledgment_message("audio", Body or "")
+                ack_message = await get_acknowledgment_message("audio", Body or "")
                 send_whatsapp_message(From, ack_message)
                 logger.info(f"📤 Acknowledgment sent (audio): {ack_message}")
 
@@ -1121,7 +1140,7 @@ async def whatsapp_webhook(
             elif MediaContentType0 and MediaContentType0.startswith("image/"):
                 message_type = "image"
                 # Envoyer immédiatement l'accusé de réception pour image
-                ack_message = get_acknowledgment_message("image", Body or "")
+                ack_message = await get_acknowledgment_message("image", Body or "")
                 send_whatsapp_message(From, ack_message)
                 logger.info(f"📤 Acknowledgment sent (image): {ack_message}")
 
@@ -1134,7 +1153,7 @@ async def whatsapp_webhook(
             # Message texte
             message_type = "text"
             # Envoyer immédiatement l'accusé de réception pour texte
-            ack_message = get_acknowledgment_message("text", Body)
+            ack_message = await get_acknowledgment_message("text", Body)
             send_whatsapp_message(From, ack_message)
             logger.info(f"📤 Acknowledgment sent (text): {ack_message}")
 

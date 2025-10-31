@@ -499,4 +499,66 @@ def create_chat_routes(get_service: Callable[[str], Any]) -> APIRouter:
                 status_code=500, content={"error": f"Processing error: {str(e)}"}
             )
 
+    # ==================== LANGUAGE DETECTION ENDPOINT ====================
+
+    @router.post("/detect-language")
+    async def detect_language_endpoint(request: Request):
+        """
+        Endpoint pour détecter la langue d'un texte
+
+        Utilisé par WhatsApp pour obtenir une détection de langue précise
+        avant d'envoyer la question au RAG.
+
+        Body:
+            {
+                "text": "What is the FCR for Ross 308?"
+            }
+
+        Returns:
+            {
+                "language": "en",
+                "confidence": 0.95,
+                "source": "grammar_patterns",
+                "processing_time_ms": 5
+            }
+        """
+        try:
+            body = await request.json()
+            text = body.get("text", "")
+
+            if not text:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Missing 'text' parameter"}
+                )
+
+            # Utiliser detect_language_enhanced du RAG
+            result = detect_language_enhanced(text)
+
+            # result est un LanguageDetectionResult avec to_dict()
+            if hasattr(result, "to_dict"):
+                response_data = result.to_dict()
+            else:
+                # Fallback si ce n'est pas un objet LanguageDetectionResult
+                response_data = {
+                    "language": result.get("language", "fr") if isinstance(result, dict) else str(result),
+                    "confidence": result.get("confidence", 0.0) if isinstance(result, dict) else 0.0,
+                    "source": result.get("source", "unknown") if isinstance(result, dict) else "unknown",
+                    "processing_time_ms": result.get("processing_time_ms", 0) if isinstance(result, dict) else 0
+                }
+
+            logger.info(
+                f"🌍 Language detection request: '{text[:50]}...' → "
+                f"{response_data['language']} (confidence: {response_data['confidence']:.2f})"
+            )
+
+            return JSONResponse(content=response_data)
+
+        except Exception as e:
+            logger.error(f"[ERROR] Language detection endpoint: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Language detection error: {str(e)}"}
+            )
+
     return router
