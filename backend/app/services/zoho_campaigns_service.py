@@ -209,6 +209,60 @@ class ZohoCampaignsService:
                 "error": f"Exception: {str(e)}"
             }
 
+    async def get_all_mailing_lists(self) -> Dict[str, Any]:
+        """
+        Liste toutes les mailing lists disponibles dans Zoho Campaigns
+        Utile pour trouver le bon list key
+
+        Returns:
+            Dict avec success: bool et liste des mailing lists
+        """
+        if not self.is_configured():
+            return {
+                "success": False,
+                "error": "Zoho Campaigns non configuré"
+            }
+
+        try:
+            access_token = await self.get_access_token()
+            if not access_token:
+                return {
+                    "success": False,
+                    "error": "Impossible d'obtenir un access token"
+                }
+
+            url = f"{self.api_base_url}/json/getmailinglists"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    url,
+                    params={"resfmt": "JSON"},
+                    headers={"Authorization": f"Zoho-oauthtoken {access_token}"},
+                    timeout=10.0
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.info(f"[Zoho] Mailing lists récupérées: {len(data.get('list_of_details', []))} listes")
+                    return {
+                        "success": True,
+                        "mailing_lists": data.get("list_of_details", []),
+                        "data": data
+                    }
+                else:
+                    logger.error(f"[Zoho] Erreur HTTP {response.status_code}: {response.text}")
+                    return {
+                        "success": False,
+                        "error": f"Erreur HTTP {response.status_code}"
+                    }
+
+        except Exception as e:
+            logger.error(f"[Zoho] Exception lors de la récupération des listes: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Exception: {str(e)}"
+            }
+
     async def sync_new_user(
         self,
         email: str,

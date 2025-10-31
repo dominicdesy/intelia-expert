@@ -2845,6 +2845,58 @@ async def sync_zoho_simple(
     return result_data
 
 
+# === ENDPOINT ADMIN: GET ZOHO MAILING LISTS ===
+@router.get("/admin/zoho-lists")
+async def get_zoho_mailing_lists(secret: str):
+    """
+    Liste toutes les mailing lists disponibles dans Zoho Campaigns
+    Utile pour trouver le bon list key
+
+    Args:
+        secret: Secret admin pour autoriser l'accès
+
+    Returns:
+        Liste des mailing lists avec leurs list keys
+    """
+    # Vérifier le secret
+    expected_secret = os.getenv("ADMIN_SYNC_SECRET", "change-me-in-production")
+
+    if secret != expected_secret:
+        logger.warning(f"[Admin] Tentative d'accès aux listes Zoho avec mauvais secret")
+        raise HTTPException(status_code=403, detail="Secret invalide")
+
+    # Import du service Zoho
+    try:
+        from app.services.zoho_campaigns_service import zoho_campaigns_service
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="Service Zoho Campaigns non disponible"
+        )
+
+    # Vérifier configuration Zoho
+    if not zoho_campaigns_service.is_configured():
+        raise HTTPException(
+            status_code=400,
+            detail="Zoho Campaigns non configuré"
+        )
+
+    result = await zoho_campaigns_service.get_all_mailing_lists()
+
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=500,
+            detail=result.get("error", "Erreur inconnue")
+        )
+
+    return {
+        "success": True,
+        "mailing_lists": result.get("mailing_lists", []),
+        "count": len(result.get("mailing_lists", [])),
+        "configured_list_key": zoho_campaigns_service.list_key
+    }
+
+
 # === ENDPOINT ADMIN: SYNC EXISTING USERS TO ZOHO ===
 @router.post("/admin/sync-zoho-users")
 async def sync_existing_users_to_zoho(

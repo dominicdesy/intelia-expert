@@ -79,6 +79,7 @@ PUBLIC_ENDPOINTS = {
     "/v1/metrics/sync-prometheus-metrics-cron",
     # === ENDPOINTS ZOHO SYNC PUBLIC (avec secret) ===
     "/api/v1/auth/admin/sync-zoho-simple",
+    "/api/v1/auth/admin/zoho-lists",
     # === ENDPOINTS SANS PREFIX /api ===
     "/",
     "/docs",
