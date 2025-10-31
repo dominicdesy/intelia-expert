@@ -726,6 +726,12 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
         # Étape 2: Préparer la requête pour le service LLM Vision
         tenant_id = from_number.replace("whatsapp:", "").strip()
 
+        # Detect language from message_text for vision analysis
+        try:
+            detected_lang = await detect_language(message_text or "")
+        except:
+            detected_lang = "en"  # Default to English for WhatsApp images
+
         # Message par défaut si pas de texte
         if not message_text:
             message_text = "Qu'est-ce que vous voyez dans cette image liée à l'aviculture ?"
@@ -741,7 +747,7 @@ async def handle_image_message(from_number: str, media_url: str, user_info: Dict
         data = {
             'message': message_text,
             'tenant_id': tenant_id,
-            'language': 'fr',
+            'language': detected_lang,  # Use detected language instead of hardcoded 'fr'
             'use_rag_context': 'true'
         }
 

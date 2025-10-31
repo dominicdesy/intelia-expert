@@ -1096,8 +1096,18 @@ class WeaviateCore(InitializableMixin):
                 if cached_response and isinstance(cached_response, bytes):
                     cached_response = cached_response.decode("utf-8")
 
+                # Parse JSON string to dict if needed
+                if cached_response and isinstance(cached_response, str):
+                    import json
+                    try:
+                        cached_response = json.loads(cached_response)
+                    except json.JSONDecodeError:
+                        # If not JSON, treat as plain text (legacy cache format)
+                        pass
+
             if cached_response:
                 if isinstance(cached_response, str):
+                    # Legacy format: plain text answer
                     return RAGResult(
                         source=RAGSource.RAG_SUCCESS,
                         answer=cached_response,
