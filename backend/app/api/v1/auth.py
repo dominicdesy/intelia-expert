@@ -1641,6 +1641,30 @@ async def register_user(user_data: UserRegister, request: Request):
                 logger.error(f"[Register] Failed to track signup country: {e}")
                 # Don't fail registration if tracking fails
 
+        # Sync new user to Zoho Campaigns
+        try:
+            from app.services.zoho_campaigns_service import zoho_campaigns_service
+
+            zoho_result = await zoho_campaigns_service.sync_new_user(
+                email=user_data.email,
+                first_name=user_data.first_name,
+                last_name=user_data.last_name,
+                country=user_data.country,
+                company_name=user_data.company,
+                phone=user_data.phone,
+                language=user_data.preferred_language,
+                production_type=user_data.production_type,
+                category=user_data.category
+            )
+
+            if zoho_result.get("success"):
+                logger.info(f"[Register] ✅ Zoho Campaigns sync successful: {user_data.email}")
+            elif not zoho_result.get("skipped"):
+                logger.warning(f"[Register] ⚠️ Zoho Campaigns sync failed: {zoho_result.get('error')}")
+        except Exception as e:
+            logger.error(f"[Register] Exception during Zoho sync: {str(e)}")
+            # Don't fail registration if Zoho sync fails
+
         return AuthResponse(
             success=True,
             message="Compte créé avec succès. Veuillez vérifier votre email pour confirmer votre compte.",
