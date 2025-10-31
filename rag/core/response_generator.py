@@ -108,10 +108,15 @@ class RAGResponseGenerator:
                     result.answer = "Je ne peux pas identifier l'utilisateur pour accéder aux données du poulailler."
                     return result
 
+                # Remove "user_" prefix if present (tenant_id format -> UUID format for PostgreSQL)
+                clean_user_id = (
+                    user_id.replace("user_", "") if user_id.startswith("user_") else user_id
+                )
+
                 # Call Backend endpoint using same method as quota checking in chat_routes.py
                 # This is proven to work - Backend logs show /v1/usage/check requests arriving
-                backend_url = os.getenv("BACKEND_API_URL", "https://expert.intelia.com/api")
-                compass_url = f"{backend_url}/v1/compass/internal/user/{user_id}/barns/{barn_number}"
+                backend_url = os.getenv("BACKEND_API_URL", "http://backend:8080")
+                compass_url = f"{backend_url}/v1/compass/internal/user/{clean_user_id}/barns/{barn_number}"
 
                 logger.info(f"📡 Fetching Compass data from internal endpoint: {compass_url}")
 
