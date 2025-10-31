@@ -108,9 +108,9 @@ class RAGResponseGenerator:
                     result.answer = "Je ne peux pas identifier l'utilisateur pour accéder aux données du poulailler."
                     return result
 
-                # Call Backend endpoint (service-to-service via public API, no JWT needed)
-                # Use same BACKEND_API_URL as chat_routes.py
-                backend_url = os.getenv("BACKEND_API_URL", "https://expert.intelia.com/api")
+                # Call Backend endpoint (service-to-service via internal network, no JWT needed)
+                # Use internal URL to avoid Cloudflare blocking
+                backend_url = os.getenv("BACKEND_INTERNAL_URL", "http://backend:8081/api")
                 compass_url = f"{backend_url}/v1/compass/internal/user/{user_id}/barns/{barn_number}"
 
                 logger.info(f"📡 Fetching Compass data from internal endpoint: {compass_url}")
