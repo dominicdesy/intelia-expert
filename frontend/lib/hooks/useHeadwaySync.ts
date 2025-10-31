@@ -88,24 +88,10 @@ export function useHeadwaySync() {
   }, []);
 
   /**
-   * Sync on mount (fetch server state and apply to Headway)
+   * NOTE: Sync is now called directly in WhatsNewButton's onWidgetReady callback
+   * This ensures sync happens AFTER Headway is fully initialized
+   * No need for useEffect polling here
    */
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !synced) {
-      // Wait for Headway to be ready
-      const checkHeadway = setInterval(() => {
-        if (window.Headway) {
-          clearInterval(checkHeadway);
-          syncFromServer();
-        }
-      }, 100);
-
-      // Clear interval after 5 seconds if Headway doesn't load
-      setTimeout(() => clearInterval(checkHeadway), 5000);
-
-      return () => clearInterval(checkHeadway);
-    }
-  }, [synced, syncFromServer]);
 
   return {
     synced,

@@ -52,13 +52,18 @@ export function WhatsNewButton({ onClick }: WhatsNewButtonProps) {
                   console.log('[Headway] Widget ready!', widget);
 
                   // Sync from server first (load previously viewed articles)
-                  if (synced) {
-                    syncFromServer();
-                  }
-
-                  const count = widget?.getUnseenCount?.() || 0;
-                  console.log('[Headway] Unseen count:', count);
-                  setUnseenCount(count);
+                  // CRITICAL: Always sync, don't check synced flag (it starts false)
+                  syncFromServer().then(() => {
+                    // After sync, get the unseen count
+                    const count = widget?.getUnseenCount?.() || 0;
+                    console.log('[Headway] Unseen count after sync:', count);
+                    setUnseenCount(count);
+                  }).catch((err) => {
+                    console.error('[Headway] Sync error:', err);
+                    // Even if sync fails, show badge
+                    const count = widget?.getUnseenCount?.() || 0;
+                    setUnseenCount(count);
+                  });
                 },
                 onShowWidget: () => {
                   console.log('[Headway] Widget shown!');
