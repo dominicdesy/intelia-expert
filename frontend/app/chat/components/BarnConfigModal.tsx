@@ -268,10 +268,8 @@ export const BarnConfigModal: React.FC<BarnConfigModalProps> = ({
                           }))}
                           onSelect={(item) => {
                             handleBarnChange(index, 'compass_device_id', item.id);
-                            // Auto-fill name if empty
-                            if (!barn.name || barn.name.startsWith('Poulailler')) {
-                              handleBarnChange(index, 'name', item.label);
-                            }
+                            // Always update name when device changes to keep them in sync
+                            handleBarnChange(index, 'name', item.label);
                           }}
                           selectedId={barn.compass_device_id}
                           placeholder="Rechercher un appareil..."
