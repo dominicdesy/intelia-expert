@@ -119,27 +119,29 @@ class ZohoCampaignsService:
                 }
 
             # Construire les données du contact au format Zoho
-            # Zoho attend un format XML spécifique
-            contact_info_fields = []
+            # Format requis: <xml><fl val="Field Name">value</fl></xml>
+            contact_fields = []
+
+            # Contact Email est obligatoire
+            contact_fields.append(f'<fl val="Contact Email">{email}</fl>')
 
             # Ajouter les champs standards
             if first_name:
-                contact_info_fields.append(f'<field name="First Name"><value>{first_name}</value></field>')
+                contact_fields.append(f'<fl val="First Name">{first_name}</fl>')
             if last_name:
-                contact_info_fields.append(f'<field name="Last Name"><value>{last_name}</value></field>')
+                contact_fields.append(f'<fl val="Last Name">{last_name}</fl>')
             if country:
-                contact_info_fields.append(f'<field name="Country"><value>{country}</value></field>')
+                contact_fields.append(f'<fl val="Country">{country}</fl>')
 
             # Ajouter les champs supplémentaires
             for key, value in extra_fields.items():
                 if value:
                     # Convertir snake_case en Title Case pour Zoho
                     field_name = key.replace("_", " ").title()
-                    contact_info_fields.append(f'<field name="{field_name}"><value>{value}</value></field>')
+                    contact_fields.append(f'<fl val="{field_name}">{value}</fl>')
 
             # Construire le XML complet
-            contact_info_xml = "".join(contact_info_fields)
-            xml_data = f'<contact><contact_email>{email}</contact_email><contact_info>{contact_info_xml}</contact_info></contact>'
+            xml_data = f'<xml>{"".join(contact_fields)}</xml>'
 
             # Appeler l'API Zoho Campaigns pour ajouter le contact
             url = f"{self.api_base_url}/xml/listsubscribe"
