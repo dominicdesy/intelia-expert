@@ -73,15 +73,22 @@ export const BarnConfigModal: React.FC<BarnConfigModalProps> = ({
   };
 
   const handleAddBarn = () => {
-    const newBarnNumber = (config.barns.length + 1).toString();
+    // Find the smallest available barn number
+    const existingNumbers = config.barns.map(b => parseInt(b.client_number, 10)).filter(n => !isNaN(n));
+    let newBarnNumber = 1;
+    while (existingNumbers.includes(newBarnNumber)) {
+      newBarnNumber++;
+    }
+    const newBarnNumberStr = newBarnNumber.toString();
+
     setConfig({
       ...config,
       barns: [
         ...config.barns,
         {
           compass_device_id: "",
-          client_number: newBarnNumber,
-          name: `Poulailler ${newBarnNumber}`,
+          client_number: newBarnNumberStr,
+          name: `Poulailler ${newBarnNumberStr}`,
           enabled: true
         }
       ]
