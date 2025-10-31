@@ -319,6 +319,90 @@ class ZohoCampaignsService:
 
         return result
 
+    async def remove_contact(self, email: str) -> Dict[str, Any]:
+        """
+        Supprime un contact de Zoho Campaigns (GDPR Right to Erasure)
+
+        Args:
+            email: Email du contact à supprimer
+
+        Returns:
+            Dict avec success: bool et détails
+        """
+        if not self.is_configured():
+            logger.warning("[Zoho] Service non configuré - suppression ignorée")
+            return {
+                "success": False,
+                "error": "Zoho Campaigns non configuré",
+                "skipped": True
+            }
+
+        try:
+            # Obtenir un access token valide
+            access_token = await self.get_access_token()
+            if not access_token:
+                return {
+                    "success": False,
+                    "error": "Impossible d'obtenir un access token"
+                }
+
+            # Appeler l'API Zoho Campaigns pour supprimer le contact
+            url = f"{self.api_base_url}/json/listunsubscribe"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    params={
+                        "resfmt": "JSON",
+                        "listkey": self.list_key,
+                        "contactinfo": email
+                    },
+                    headers={
+                        "Authorization": f"Zoho-oauthtoken {access_token}"
+                    },
+                    timeout=10.0
+                )
+
+                response_data = response.json()
+
+                if response.status_code == 200:
+                    zoho_code = response_data.get("code")
+
+                    if zoho_code == "0":
+                        logger.info(f"[Zoho] Contact supprimé avec succès: {email}")
+                        return {
+                            "success": True,
+                            "message": "Contact supprimé de Zoho Campaigns",
+                            "data": response_data
+                        }
+                    else:
+                        error_msg = response_data.get("message", "Erreur inconnue")
+                        logger.error(f"[Zoho] Erreur API suppression (code {zoho_code}): {error_msg}")
+                        return {
+                            "success": False,
+                            "error": f"Erreur Zoho: {error_msg}",
+                            "zoho_code": zoho_code
+                        }
+                else:
+                    logger.error(f"[Zoho] Erreur HTTP {response.status_code}: {response.text}")
+                    return {
+                        "success": False,
+                        "error": f"Erreur HTTP {response.status_code}"
+                    }
+
+        except httpx.TimeoutException:
+            logger.error(f"[Zoho] Timeout lors de la suppression du contact: {email}")
+            return {
+                "success": False,
+                "error": "Timeout lors de la connexion à Zoho"
+            }
+        except Exception as e:
+            logger.error(f"[Zoho] Exception lors de la suppression du contact {email}: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Exception: {str(e)}"
+            }
+
 
 # Instance globale du service
 zoho_campaigns_service = ZohoCampaignsService()

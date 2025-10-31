@@ -2390,16 +2390,121 @@ async def exchange_invitation_token(request: ExchangeInvitationTokenRequest):
 async def delete_user_data(current_user: Dict[str, Any] = Depends(get_current_user)):
     """
     Request data deletion for GDPR compliance.
+    Anonymizes user data immediately and removes from Zoho Campaigns.
+
+    GDPR Article 17 - Right to Erasure
     """
     user_id = current_user["user_id"]
     user_email = current_user["email"]
-    logger.info("GDPR deletion requested for %s (%s)", user_email, user_id)
-    return {
-        "success": True,
-        "message": "Demande de suppression enregistrée",
-        "note": "Vos données seront supprimées sous 30 jours",
-        "timestamp": datetime.utcnow(),
-    }
+    logger.info(f"[GDPR] Deletion requested for {user_email} ({user_id})")
+
+    try:
+        # 1. Supprimer de Zoho Campaigns (si configuré)
+        try:
+            from app.services.zoho_campaigns_service import zoho_campaigns_service
+
+            if zoho_campaigns_service.is_configured():
+                logger.info(f"[GDPR] Removing {user_email} from Zoho Campaigns...")
+                zoho_result = await zoho_campaigns_service.remove_contact(user_email)
+
+                if zoho_result.get("success"):
+                    logger.info(f"[GDPR] ✅ {user_email} removed from Zoho Campaigns")
+                elif zoho_result.get("skipped"):
+                    logger.debug(f"[GDPR] ⊘ Zoho removal skipped (not configured)")
+                else:
+                    logger.warning(f"[GDPR] ⚠️ Zoho removal failed: {zoho_result.get('error')}")
+            else:
+                logger.debug(f"[GDPR] Zoho Campaigns not configured, skipping removal")
+        except Exception as zoho_err:
+            logger.error(f"[GDPR] Error removing from Zoho: {zoho_err}")
+            # Continue with account deletion even if Zoho fails
+
+        # 2. Anonymiser les données dans Supabase
+        if SUPABASE_AVAILABLE:
+            url = os.getenv("SUPABASE_URL")
+            service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+            if url and service_key:
+                supabase = create_client(url, service_key)
+
+                # Anonymiser le profil utilisateur
+                anonymous_email = f"deleted_{user_id}@anonymized.local"
+                supabase.table("users").update({
+                    "email": anonymous_email,
+                    "first_name": "Deleted",
+                    "last_name": "User",
+                    "full_name": "Deleted User",
+                    "phone": None,
+                    "phone_number": None,
+                    "whatsapp_number": None,
+                    "company_name": None,
+                    "company_website": None,
+                    "linkedin_profile": None,
+                    "linkedin_corporate": None,
+                    "facebook_profile": None,
+                    "country": None,
+                    "country_code": None,
+                    "area_code": None,
+                    "production_type": None,
+                    "category": None,
+                    "category_other": None,
+                    "avatar_url": None,
+                }).eq("auth_user_id", user_id).execute()
+
+                logger.info(f"[GDPR] ✅ User profile anonymized for {user_email}")
+
+        # 3. Anonymiser dans PostgreSQL (conversations, billing, etc.)
+        try:
+            import psycopg2
+            with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+                with conn.cursor() as cur:
+                    anonymous_id = f"anon_{user_id}"
+
+                    # Anonymiser les conversations
+                    cur.execute("""
+                        UPDATE question_logs
+                        SET user_email = %s
+                        WHERE user_email = %s
+                    """, (anonymous_id, user_email))
+
+                    # Anonymiser les invitations
+                    cur.execute("""
+                        UPDATE invitations
+                        SET inviter_email = %s
+                        WHERE inviter_email = %s
+                    """, (anonymous_id, user_email))
+
+                    cur.execute("""
+                        UPDATE invitations
+                        SET invitee_email = %s
+                        WHERE invitee_email = %s
+                    """, (anonymous_id, user_email))
+
+                    # Anonymiser la facturation (garder pour obligations légales)
+                    cur.execute("""
+                        UPDATE user_billing_info
+                        SET user_email = %s
+                        WHERE user_email = %s
+                    """, (anonymous_id, user_email))
+
+                    conn.commit()
+                    logger.info(f"[GDPR] ✅ PostgreSQL data anonymized for {user_email}")
+        except Exception as pg_err:
+            logger.error(f"[GDPR] Error anonymizing PostgreSQL data: {pg_err}")
+
+        return {
+            "success": True,
+            "message": "Compte supprimé et données anonymisées",
+            "note": "Vos données personnelles ont été immédiatement anonymisées conformément au RGPD. Les données de facturation sont conservées de manière anonyme pour obligations légales (10 ans).",
+            "timestamp": datetime.utcnow(),
+        }
+
+    except Exception as e:
+        logger.error(f"[GDPR] Error during account deletion: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la suppression du compte: {str(e)}"
+        )
 
 
 @router.get("/me")
