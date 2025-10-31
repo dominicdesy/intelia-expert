@@ -51,7 +51,7 @@ async def get_viewed_articles(
         List of article IDs that user has viewed
     """
     try:
-        user_id = current_user.get("auth_user_id")
+        user_id = current_user.get("user_id")  # Fixed: was "auth_user_id"
 
         with get_pg_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -95,7 +95,7 @@ async def mark_article_as_viewed(
         Success response
     """
     try:
-        user_id = current_user.get("auth_user_id")
+        user_id = current_user.get("user_id")  # Fixed: was "auth_user_id"
 
         with get_pg_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -141,7 +141,7 @@ async def mark_multiple_articles_as_viewed(
         Success response with count
     """
     try:
-        user_id = current_user.get("auth_user_id")
+        user_id = current_user.get("user_id")  # Fixed: was "auth_user_id"
 
         if not article_ids:
             return {"success": True, "count": 0}
