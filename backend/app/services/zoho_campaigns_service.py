@@ -118,42 +118,43 @@ class ZohoCampaignsService:
                     "error": "Impossible d'obtenir un access token"
                 }
 
-            # Construire les données du contact
-            contact_data = {
-                "contact_email": email,
-                "contact_info": {}
-            }
+            # Construire les données du contact au format Zoho
+            # Zoho attend un format XML spécifique
+            contact_info_fields = []
 
             # Ajouter les champs standards
             if first_name:
-                contact_data["contact_info"]["First Name"] = first_name
+                contact_info_fields.append(f'<field name="First Name"><value>{first_name}</value></field>')
             if last_name:
-                contact_data["contact_info"]["Last Name"] = last_name
+                contact_info_fields.append(f'<field name="Last Name"><value>{last_name}</value></field>')
             if country:
-                contact_data["contact_info"]["Country"] = country
+                contact_info_fields.append(f'<field name="Country"><value>{country}</value></field>')
 
             # Ajouter les champs supplémentaires
             for key, value in extra_fields.items():
                 if value:
                     # Convertir snake_case en Title Case pour Zoho
                     field_name = key.replace("_", " ").title()
-                    contact_data["contact_info"][field_name] = value
+                    contact_info_fields.append(f'<field name="{field_name}"><value>{value}</value></field>')
+
+            # Construire le XML complet
+            contact_info_xml = "".join(contact_info_fields)
+            xml_data = f'<contact><contact_email>{email}</contact_email><contact_info>{contact_info_xml}</contact_info></contact>'
 
             # Appeler l'API Zoho Campaigns pour ajouter le contact
-            url = f"{self.api_base_url}/json/listsubscribe"
+            url = f"{self.api_base_url}/xml/listsubscribe"
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     url,
                     params={
                         "resfmt": "JSON",
-                        "listkey": self.list_key
+                        "listkey": self.list_key,
+                        "contactinfo": xml_data
                     },
                     headers={
-                        "Authorization": f"Zoho-oauthtoken {access_token}",
-                        "Content-Type": "application/json"
+                        "Authorization": f"Zoho-oauthtoken {access_token}"
                     },
-                    json=contact_data,
                     timeout=10.0
                 )
 
