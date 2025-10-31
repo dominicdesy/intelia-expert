@@ -427,7 +427,7 @@ class RAGResponseGenerator:
         if query_type == "current_temperature":
             temp = barn_data.get("temperature")
             if temp is not None:
-                return f"La température actuelle dans le {barn_name} (poulailler {barn_number}) est de {temp}°C."
+                return f"La température actuelle dans le {barn_name} (poulailler {barn_number}) est de {temp:.1f}°C."
             else:
                 return f"Désolé, la température actuelle du {barn_name} n'est pas disponible en ce moment."
 
@@ -437,11 +437,11 @@ class RAGResponseGenerator:
             temp_max = barn_data.get("temperature_max_today")
 
             if temp_min is not None and temp_max is not None:
-                return f"Aujourd'hui dans le {barn_name} (poulailler {barn_number}):\n- Température minimale: {temp_min}°C\n- Température maximale: {temp_max}°C"
+                return f"Aujourd'hui dans le {barn_name} (poulailler {barn_number}):\n- Température minimale: {temp_min:.1f}°C\n- Température maximale: {temp_max:.1f}°C"
             elif temp_max is not None:
-                return f"Aujourd'hui, la température maximale dans le {barn_name} (poulailler {barn_number}) a été de {temp_max}°C."
+                return f"Aujourd'hui, la température maximale dans le {barn_name} (poulailler {barn_number}) a été de {temp_max:.1f}°C."
             elif temp_min is not None:
-                return f"Aujourd'hui, la température minimale dans le {barn_name} (poulailler {barn_number}) a été de {temp_min}°C."
+                return f"Aujourd'hui, la température minimale dans le {barn_name} (poulailler {barn_number}) a été de {temp_min:.1f}°C."
             else:
                 return f"Désolé, les données de température min/max d'aujourd'hui ne sont pas disponibles pour le {barn_name}."
 
@@ -449,7 +449,7 @@ class RAGResponseGenerator:
         elif query_type == "yesterday_avg_temperature":
             temp_avg = barn_data.get("temperature_avg_yesterday")
             if temp_avg is not None:
-                return f"Hier, la température moyenne dans le {barn_name} (poulailler {barn_number}) était de {temp_avg}°C."
+                return f"Hier, la température moyenne dans le {barn_name} (poulailler {barn_number}) était de {temp_avg:.1f}°C."
             else:
                 return f"Désolé, la température moyenne d'hier n'est pas disponible pour le {barn_name}."
 
@@ -459,11 +459,11 @@ class RAGResponseGenerator:
             temp_max = barn_data.get("temperature_max_yesterday")
 
             if temp_min is not None and temp_max is not None:
-                return f"Hier dans le {barn_name} (poulailler {barn_number}):\n- Température minimale: {temp_min}°C\n- Température maximale: {temp_max}°C"
+                return f"Hier dans le {barn_name} (poulailler {barn_number}):\n- Température minimale: {temp_min:.1f}°C\n- Température maximale: {temp_max:.1f}°C"
             elif temp_max is not None:
-                return f"Hier, la température maximale dans le {barn_name} (poulailler {barn_number}) était de {temp_max}°C."
+                return f"Hier, la température maximale dans le {barn_name} (poulailler {barn_number}) était de {temp_max:.1f}°C."
             elif temp_min is not None:
-                return f"Hier, la température minimale dans le {barn_name} (poulailler {barn_number}) était de {temp_min}°C."
+                return f"Hier, la température minimale dans le {barn_name} (poulailler {barn_number}) était de {temp_min:.1f}°C."
             else:
                 return f"Désolé, les données de température min/max d'hier ne sont pas disponibles pour le {barn_name}."
 
@@ -472,7 +472,7 @@ class RAGResponseGenerator:
             temp = barn_data.get("temperature")
             if temp is not None:
                 period = "hier" if "yesterday" in query_type else "aujourd'hui"
-                return f"La température {period} dans le {barn_name} (poulailler {barn_number}) est de {temp}°C."
+                return f"La température {period} dans le {barn_name} (poulailler {barn_number}) est de {temp:.1f}°C."
             else:
                 period = "d'hier" if "yesterday" in query_type else "d'aujourd'hui"
                 return f"Désolé, la température {period} n'est pas disponible pour le {barn_name}."
@@ -481,6 +481,6 @@ class RAGResponseGenerator:
         else:
             temp = barn_data.get("temperature")
             if temp is not None:
-                return f"La température actuelle dans le {barn_name} (poulailler {barn_number}) est de {temp}°C."
+                return f"La température actuelle dans le {barn_name} (poulailler {barn_number}) est de {temp:.1f}°C."
             else:
                 return f"Désolé, les données de température ne sont pas disponibles pour le {barn_name} en ce moment."
