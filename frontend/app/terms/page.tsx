@@ -286,7 +286,55 @@ export default function TermsPage() {
                 </p>
 
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                  5.4 Your Data Rights (GDPR)
+                  5.4 Marketing Communications
+                </h3>
+                <p className="text-gray-700 leading-relaxed mb-4">
+                  By creating an account and using our Services, you consent to receive:
+                </p>
+                <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
+                  <li>
+                    <strong>Essential Service Communications:</strong> Account notifications,
+                    security alerts, billing statements, and critical service updates.
+                    These communications are necessary for the operation of your account
+                    and cannot be opted out of while you maintain an active account.
+                  </li>
+                  <li>
+                    <strong>Marketing Communications:</strong> Product updates, feature
+                    announcements, newsletters, and promotional materials about our Services
+                    and related offerings. You may opt-out of these communications at any
+                    time without affecting your use of our Services.
+                  </li>
+                </ul>
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+                  <p className="text-blue-800 font-medium mb-2">
+                    Your Rights Regarding Marketing Communications
+                  </p>
+                  <p className="text-blue-700 text-sm mb-2">
+                    You have the right to opt-out of marketing communications at any time by:
+                  </p>
+                  <ul className="list-disc pl-6 text-blue-700 text-sm space-y-1">
+                    <li>Clicking the "Unsubscribe" link in any marketing email</li>
+                    <li>Updating your communication preferences in your account settings</li>
+                    <li>Contacting us at confidentialite@intelia.com</li>
+                  </ul>
+                  <p className="text-blue-700 text-sm mt-2">
+                    We will process your opt-out request within 10 business days as required
+                    by applicable law (including CASL and CAN-SPAM Act). Opting out of marketing
+                    communications will not affect essential service notifications.
+                  </p>
+                </div>
+                <p className="text-gray-700 leading-relaxed mb-4">
+                  Our marketing communications comply with:
+                </p>
+                <ul className="list-disc pl-6 text-gray-700 space-y-1 mb-4">
+                  <li>Canada's Anti-Spam Legislation (CASL)</li>
+                  <li>General Data Protection Regulation (GDPR) Article 6 and 21</li>
+                  <li>CAN-SPAM Act (United States)</li>
+                  <li>Other applicable data protection and privacy laws</li>
+                </ul>
+
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                  5.5 Your Data Rights (GDPR)
                 </h3>
                 <p className="text-gray-700 leading-relaxed mb-4">
                   In accordance with the General Data Protection Regulation (GDPR)

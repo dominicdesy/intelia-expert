@@ -295,7 +295,67 @@ export default function PrivacyPage() {
                       <li>
                         To notify you about changes to our Services or policies
                       </li>
+                      <li>
+                        To send you marketing communications, product updates, and newsletters (with your consent where required by law)
+                      </li>
                     </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                      2.3.1 Marketing Communications and Newsletter
+                    </h3>
+                    <p className="text-gray-700 mb-4">
+                      By creating an account with Intelia, you may receive marketing communications,
+                      product updates, feature announcements, and newsletters about our Services.
+                      We use this information to keep you informed about new features, improvements,
+                      and industry insights relevant to your use of our Services.
+                    </p>
+                    <p className="text-gray-700 mb-4">
+                      <strong>Legal Basis:</strong> Our marketing communications are based on:
+                    </p>
+                    <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
+                      <li>
+                        <strong>Your consent</strong> (GDPR Article 6(1)(a)) where required by applicable law
+                      </li>
+                      <li>
+                        <strong>Legitimate interest</strong> (GDPR Article 6(1)(f)) to inform existing customers
+                        about similar products and services
+                      </li>
+                      <li>
+                        <strong>Implied consent</strong> under Canadian Anti-Spam Legislation (CASL) for
+                        existing business relationships
+                      </li>
+                    </ul>
+                    <div className="bg-green-50 border-l-4 border-green-400 p-4">
+                      <p className="text-green-800 font-semibold mb-2">
+                        Your Right to Opt-Out
+                      </p>
+                      <p className="text-green-700 text-sm mb-2">
+                        You can opt-out of marketing communications at any time without affecting
+                        your use of our Services. Essential service communications (account security,
+                        billing notifications, critical service updates) will continue.
+                      </p>
+                      <p className="text-green-700 text-sm font-medium mb-2">
+                        How to unsubscribe:
+                      </p>
+                      <ul className="list-disc pl-6 text-green-700 text-sm space-y-1">
+                        <li>Click the "Unsubscribe" link at the bottom of any marketing email</li>
+                        <li>Update your communication preferences in your account settings</li>
+                        <li>
+                          Contact us at{" "}
+                          <a
+                            href="mailto:confidentialite@intelia.com"
+                            className="text-green-600 hover:text-green-800 underline"
+                          >
+                            confidentialite@intelia.com
+                          </a>
+                        </li>
+                      </ul>
+                      <p className="text-green-700 text-sm mt-2">
+                        We will process your opt-out request within 10 business days as required by CASL.
+                      </p>
+                    </div>
                   </div>
 
                   <div>
