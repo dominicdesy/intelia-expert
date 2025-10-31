@@ -25,6 +25,10 @@ def parse_contextual_history(preprocessed_data: Dict[str, Any]) -> List[Dict[str
 
     Returns:
         List of dicts with 'question' and 'answer' keys
+
+    NOTE: Answers are EXCLUDED from context to prevent language contamination.
+    Previous answers in different languages can cause the LLM to respond in the wrong language.
+    Only questions are included to maintain conversation continuity without language influence.
     """
     contextual_history = preprocessed_data.get("contextual_history", "")
 
@@ -43,18 +47,20 @@ def parse_contextual_history(preprocessed_data: Dict[str, Any]) -> List[Dict[str
             if "Q:" in exchange and "R:" in exchange:
                 try:
                     q_part = exchange.split("R:")[0].replace("Q:", "").strip()
-                    r_part = exchange.split("R:")[1].strip()
+                    # r_part = exchange.split("R:")[1].strip()  # ❌ EXCLUDED - prevents language contamination
 
-                    if q_part and r_part:
+                    if q_part:
+                        # Only include the question, not the answer
+                        # This prevents previous answers in different languages from influencing the response language
                         conversation_context_list.append(
-                            {"question": q_part, "answer": r_part}
+                            {"question": q_part, "answer": ""}  # Empty answer to maintain structure
                         )
                 except IndexError:
                     logger.warning(f"Cannot parse exchange: {exchange[:50]}...")
                     continue
 
         logger.info(
-            f"Context parsed: {len(conversation_context_list)} exchanges extracted"
+            f"Context parsed: {len(conversation_context_list)} exchanges extracted (answers excluded to prevent language contamination)"
         )
 
     return conversation_context_list
