@@ -94,12 +94,12 @@ The integration only syncs **NEW** users who register after configuration. To sy
 
 ```javascript
 // Test with 5 users first (dry-run)
-fetch('https://expert-app-cngws.ondigitalocean.app/api/v1/auth/admin/sync-zoho-simple?secret=your-secret-here&dry_run=true&limit=5', {
+fetch('https://expert.intelia.com/api/v1/auth/admin/sync-zoho-simple?secret=your-secret-here&dry_run=true&limit=5', {
   method: 'POST'
 }).then(r => r.json()).then(console.log)
 
 // Then sync all users (real sync)
-fetch('https://expert-app-cngws.ondigitalocean.app/api/v1/auth/admin/sync-zoho-simple?secret=your-secret-here&dry_run=false', {
+fetch('https://expert.intelia.com/api/v1/auth/admin/sync-zoho-simple?secret=your-secret-here&dry_run=false', {
   method: 'POST'
 }).then(r => r.json()).then(console.log)
 ```
