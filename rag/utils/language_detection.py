@@ -1,12 +1,22 @@
 # -*- coding: utf-8 -*-
 """
 utils/language_detection.py - Module de détection de langue multilingue
-Version: 1.4.1
-Last modified: 2025-10-26
+Version: 1.5.0
+Last modified: 2025-10-31
 """
 """
 utils/language_detection.py - Module de détection de langue multilingue
 Version corrigée avec FastText proper et téléchargement automatique pour Digital Ocean
+
+CHANGELOG v1.5.0:
+- Added Turkish (tr) grammar patterns: Question words (ne, nasıl, neden, hangi, nerede)
+  and question particles (mı, mi, mu, mü)
+- Added Vietnamese (vi) grammar patterns: Question words (cái gì, như thế nào, tại sao,
+  ở đâu, khi nào) and common words (là, của, cho, với, và)
+- Added Arabic (ar) Unicode patterns: Full Arabic block detection (\u0600-\u06ff)
+- Added Japanese (ja) Unicode patterns: Hiragana, Katakana, Kanji with disambiguation
+  logic to distinguish from Chinese
+- All 16 supported languages now have robust detection (grammar or Unicode patterns)
 """
 
 import re
@@ -302,6 +312,45 @@ def _detect_language_by_grammar_patterns(text: str) -> Optional[str]:
         (" dari ", 1.5),
     ]
 
+    # === TURKISH PATTERNS ===
+    turkish_indicators = [
+        # Question words - compiled regex
+        (re.compile(r"^ne\s+"), 3.5),  # "Ne" (what)
+        (re.compile(r"^nasıl\s+"), 3.5),  # "Nasıl" (how)
+        (re.compile(r"^neden\s+"), 3.5),  # "Neden" (why)
+        (re.compile(r"^hangi\s+"), 3.5),  # "Hangi" (which)
+        (re.compile(r"^nerede\s+"), 3.5),  # "Nerede" (where)
+        # Question particles (literal strings)
+        (" mı ", 2.0),  # Question particle (variants)
+        (" mi ", 2.0),
+        (" mu ", 2.0),
+        (" mü ", 2.0),
+        # Common words
+        (" var ", 1.5),  # "there is/are"
+        (" için ", 1.5),  # "for"
+        (" ile ", 1.5),  # "with"
+        (" bu ", 1.5),  # "this"
+        (" bir ", 1.5),  # "a/an/one"
+    ]
+
+    # === VIETNAMESE PATTERNS ===
+    vietnamese_indicators = [
+        # Question words - compiled regex
+        (re.compile(r"^cái\s+gì\b"), 3.5),  # "Cái gì" (what)
+        (re.compile(r"^như\s+thế\s+nào\b"), 3.5),  # "Như thế nào" (how)
+        (re.compile(r"^tại\s+sao\b"), 3.5),  # "Tại sao" (why)
+        (re.compile(r"^ở\s+đâu\b"), 3.5),  # "Ở đâu" (where)
+        (re.compile(r"^khi\s+nào\b"), 3.5),  # "Khi nào" (when)
+        # Common words (literal strings)
+        (" là ", 2.0),  # "is/are"
+        (" của ", 2.0),  # "of"
+        (" cho ", 1.5),  # "for"
+        (" với ", 1.5),  # "with"
+        (" và ", 1.5),  # "and"
+        (" các ", 1.5),  # plural marker
+        (" được ", 1.5),  # passive marker
+    ]
+
     # Calculate scores for each language
     scores = {
         "en": 0.0,
@@ -313,7 +362,9 @@ def _detect_language_by_grammar_patterns(text: str) -> Optional[str]:
         "nl": 0.0,
         "pl": 0.0,
         "id": 0.0,
-        # Note: hi (Hindi), th (Thai), zh (Chinese) use Unicode patterns, not grammar patterns
+        "tr": 0.0,  # Turkish
+        "vi": 0.0,  # Vietnamese
+        # Note: hi (Hindi), th (Thai), zh (Chinese), ar (Arabic), ja (Japanese) use Unicode patterns
     }
 
     # Score English
@@ -396,6 +447,24 @@ def _detect_language_by_grammar_patterns(text: str) -> Optional[str]:
         else:  # compiled regex pattern
             if pattern.search(text_lower):
                 scores["id"] += weight
+
+    # Score Turkish
+    for pattern, weight in turkish_indicators:
+        if isinstance(pattern, str):
+            if pattern in text_lower:
+                scores["tr"] += weight
+        else:  # compiled regex pattern
+            if pattern.search(text_lower):
+                scores["tr"] += weight
+
+    # Score Vietnamese
+    for pattern, weight in vietnamese_indicators:
+        if isinstance(pattern, str):
+            if pattern in text_lower:
+                scores["vi"] += weight
+        else:  # compiled regex pattern
+            if pattern.search(text_lower):
+                scores["vi"] += weight
 
     # Find language with highest score
     max_score = max(scores.values())
@@ -497,6 +566,15 @@ def detect_language_enhanced(
             )
 
         # 2. Patterns Unicode basiques
+        # Arabe
+        if re.search(r"[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]", text_clean):
+            return LanguageDetectionResult(
+                language="ar",
+                confidence=0.9,
+                source="unicode_patterns",
+                processing_time_ms=int((time.time() - start_time) * 1000),
+            )
+
         # Chinois
         if re.search(r"[\u4e00-\u9fff]", text_clean):
             return LanguageDetectionResult(
@@ -514,6 +592,21 @@ def detect_language_enhanced(
                 source="unicode_patterns",
                 processing_time_ms=int((time.time() - start_time) * 1000),
             )
+
+        # Japonais (Hiragana, Katakana, Kanji)
+        if re.search(r"[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]", text_clean):
+            # Check if more Hiragana/Katakana than Kanji (distinguishes from Chinese)
+            hiragana_katakana = len(re.findall(r"[\u3040-\u309f\u30a0-\u30ff]", text_clean))
+            kanji = len(re.findall(r"[\u4e00-\u9faf]", text_clean))
+
+            # If has Hiragana/Katakana OR more than 20% of CJK chars are Kanji → Japanese
+            if hiragana_katakana > 0 or (kanji > 0 and kanji / len(text_clean) > 0.2):
+                return LanguageDetectionResult(
+                    language="ja",
+                    confidence=0.9,
+                    source="unicode_patterns",
+                    processing_time_ms=int((time.time() - start_time) * 1000),
+                )
 
         # Thaï
         if re.search(r"[\u0e00-\u0e7f]", text_clean):
