@@ -1,0 +1,21 @@
+{
+  "9f8a90fd82ae2d71efd9de7b8ebb4e2b6ff82a4bf4e847fe189b431143c43b18": {
+    "file_path": "C:\\Software_Development\\intelia-cognito\\data-pipelines\\documents\\Sources\\intelia\\public\\veterinary_services\\common\\ascites.pdf",
+    "file_name": "ascites.pdf",
+    "file_size_bytes": 299033,
+    "processed_timestamp": "2025-10-29T19:52:48.628640",
+    "chunks_created": 2,
+    "metadata_summary": {
+      "owner_org_id": "intelia",
+      "visibility_level": "public_global",
+      "site_type": "veterinary_services",
+      "breed": "ascites.pdf",
+      "species": "unknown",
+      "genetic_line": "unknown",
+      "document_type": "unknown",
+      "overall_confidence": 0.7124999999999998
+    },
+    "weaviate_ids": [],
+    "file_hash": "9f8a90fd82ae2d71efd9de7b8ebb4e2b6ff82a4bf4e847fe189b431143c43b18"
+  }
+}

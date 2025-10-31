@@ -1,0 +1,21 @@
+================================================================================
+STRUCTURE - VÉTÉRINAIRE
+================================================================================
+
+intelia/public/
+│
+│
+└── veterinary_services/                 [HORIZONTAL]
+    ├── common/                          [Universal services]
+    │   ├── diagnostics/
+    │   │   ├── laboratory_methods/
+    │   │   ├── necropsy_procedures/
+    │   │   └── diagnostic_imaging/
+    │   ├── disease_outbreak_management/
+    │   │   ├── outbreak_investigation/
+    │   │   ├── containment_strategies/
+    │   │   └── reporting_protocols/
+    │   └── field_monitoring/
+    │       ├── farm_visits/
+    │       └── surveillance_programs/
+

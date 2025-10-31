@@ -1,0 +1,2462 @@
+Cannot set gray non-stroke color because /'P0' is an invalid float value
+Cannot set gray non-stroke color because /'P0' is an invalid float value
+C:\Software_Development\intelia-cognito\knowledge-ingesters\document_extractor\core\metadata_enricher.py:176: DeprecationWarning: The model 'claude-3-opus-20240229' is deprecated and will reach end-of-life on January 5th, 2026.
+Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.
+  response = self.client.messages.create(
+Cannot set gray non-stroke color because /'P0' is an invalid float value
+Cannot set gray non-stroke color because /'P1' is an invalid float value
+Cannot set gray non-stroke color because /'P2' is an invalid float value
+Cannot set gray non-stroke color because /'P3' is an invalid float value
+Cannot set gray non-stroke color because /'P0' is an invalid float value
+Cannot set gray non-stroke color because /'P1' is an invalid float value
+Cannot set gray non-stroke color because /'P2' is an invalid float value
+Cannot set gray non-stroke color because /'P3' is an invalid float value
+Cannot set gray stroke color because /'P0' is an invalid float value
+Cannot set gray stroke color because /'P1' is an invalid float value
+Cannot set gray stroke color because /'P0' is an invalid float value
+================================================================================
+BATCH EXTRACTION + INGESTION - All PDFs
+FREE pdfplumber + Quality Scoring + Entity Extraction + Weaviate
+================================================================================
+Start time: 2025-10-29 22:22:10
+
+Initializing extraction pipeline...
+Initializing Multi-Format Knowledge Extraction Pipeline...
+Loaded path rules for: intelia
+Pipeline initialized successfully
+
+Connecting to Weaviate InteliaKnowledge...
+Connected successfully!
+
+Found 54 PDF files to process
+
+
+[1/54] Breeder-Management-Guide.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\breeding_farms\breed\cobb_500_breeder\Breeder-Management-Guide.pdf
+================================================================================
+
+Processing 160/160 pages from Breeder-Management-Guide.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/160...
+  Processing page 10/160...
+  Processing page 20/160...
+  Processing page 30/160...
+  Processing page 40/160...
+  Processing page 50/160...
+  Processing page 60/160...
+  Processing page 70/160...
+  Processing page 80/160...
+  Processing page 90/160...
+  Processing page 100/160...
+  Processing page 110/160...
+  Processing page 120/160...
+  Processing page 130/160...
+  Processing page 140/160...
+  Processing page 150/160...
+  Processing page 160/160...
+OK Extraction complete: 69,124 words from 160 pages
+OK Content extracted: 402118 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: breeding_farms
+  Breed: cobb_500_breeder
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Cobb
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 147 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 147 chunks ready for Weaviate
+  Extraction: SUCCESS (147 chunks created)
+  Ingesting 147 chunks to Weaviate...
+  Ingestion: SUCCESS (147 chunks ingested)
+
+[2/54] Cobb-Male-Supplement.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\breeding_farms\breed\cobb_500_breeder\Cobb-Male-Supplement.pdf
+================================================================================
+
+Processing 28/28 pages from Cobb-Male-Supplement.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/28...
+  Processing page 10/28...
+  Processing page 20/28...
+OK Extraction complete: 6,717 words from 28 pages
+OK Content extracted: 39560 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: breeding_farms
+  Breed: cobb_500_breeder
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Cobb
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 16 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 16 chunks ready for Weaviate
+  Extraction: SUCCESS (16 chunks created)
+  Ingesting 16 chunks to Weaviate...
+  Ingestion: SUCCESS (16 chunks ingested)
+
+[3/54] Cobb-MX-Male-Supplement.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\breeding_farms\breed\cobb_500_breeder\Cobb-MX-Male-Supplement.pdf
+================================================================================
+
+Processing 28/28 pages from Cobb-MX-Male-Supplement.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/28...
+  Processing page 10/28...
+  Processing page 20/28...
+OK Extraction complete: 6,901 words from 28 pages
+OK Content extracted: 40417 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: breeding_farms
+  Breed: cobb_500_breeder
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Cobb
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 16 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 16 chunks ready for Weaviate
+  Extraction: SUCCESS (16 chunks created)
+  Ingesting 16 chunks to Weaviate...
+  Ingestion: SUCCESS (16 chunks ingested)
+
+[4/54] Cobb500-Fast-Feather-Breeder-Management-Supplement.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\breeding_farms\breed\cobb_500_breeder\Cobb500-Fast-Feather-Breeder-Management-Supplement.pdf
+================================================================================
+
+Processing 15/15 pages from Cobb500-Fast-Feather-Breeder-Management-Supplement.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/15...
+  Processing page 10/15...
+OK Extraction complete: 6,438 words from 15 pages
+OK Content extracted: 32716 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: breeding_farms
+  Breed: cobb_500_breeder
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Cobb
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 12 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 12 chunks ready for Weaviate
+  Extraction: SUCCESS (12 chunks created)
+  Ingesting 12 chunks to Weaviate...
+  Ingestion: SUCCESS (12 chunks ingested)
+
+[5/54] Cobb500-Slow-Feather-Breeder-Management-Supplement.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\breeding_farms\breed\cobb_500_breeder\Cobb500-Slow-Feather-Breeder-Management-Supplement.pdf
+================================================================================
+
+Processing 15/15 pages from Cobb500-Slow-Feather-Breeder-Management-Supplement.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/15...
+  Processing page 10/15...
+OK Extraction complete: 6,408 words from 15 pages
+OK Content extracted: 32568 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: breeding_farms
+  Breed: cobb_500_breeder
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Cobb
+Cannot set gray stroke color because /'P0' is an invalid float value
+Cannot set gray stroke color because /'P1' is an invalid float value
+Cannot set gray stroke color because /'P2' is an invalid float value
+Cannot set gray stroke color because /'P3' is an invalid float value
+Cannot set gray stroke color because /'P0' is an invalid float value
+Cannot set gray stroke color because /'P0' is an invalid float value
+Cannot set gray stroke color because /'P1' is an invalid float value
+Cannot set gray stroke color because /'P0' is an invalid float value
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 12 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 12 chunks ready for Weaviate
+  Extraction: SUCCESS (12 chunks created)
+  Ingesting 12 chunks to Weaviate...
+  Ingestion: SUCCESS (12 chunks ingested)
+
+[6/54] Hyline Brown Parent Stock ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\breeding_farms\breed\hy_line_brown_parent_stock\Hyline Brown Parent Stock ENG.pdf
+================================================================================
+
+Processing 40/40 pages from Hyline Brown Parent Stock ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/40...
+  Processing page 10/40...
+  Processing page 20/40...
+  Processing page 30/40...
+  Processing page 40/40...
+OK Extraction complete: 16,411 words from 40 pages
+OK Content extracted: 98765 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: breeding_farms
+  Breed: hy_line_brown_parent_stock
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Hy-Line
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 34 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 34 chunks ready for Weaviate
+  Extraction: SUCCESS (34 chunks created)
+  Ingesting 34 chunks to Weaviate...
+  Ingestion: SUCCESS (34 chunks ingested)
+
+[7/54] Hyline W36 Parent Stock ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\breeding_farms\breed\hy_line_w36_parent_stock\Hyline W36 Parent Stock ENG.pdf
+================================================================================
+
+Processing 44/44 pages from Hyline W36 Parent Stock ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/44...
+  Processing page 10/44...
+  Processing page 20/44...
+  Processing page 30/44...
+  Processing page 40/44...
+OK Extraction complete: 19,418 words from 44 pages
+OK Content extracted: 115842 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: breeding_farms
+  Breed: hy_line_w36_parent_stock
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Hy-Line
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 37 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 37 chunks ready for Weaviate
+  Extraction: SUCCESS (37 chunks created)
+  Ingesting 37 chunks to Weaviate...
+  Ingestion: SUCCESS (37 chunks ingested)
+
+[8/54] 80 PS ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\breeding_farms\breed\hy_line_w80_parent_stock\80 PS ENG.pdf
+================================================================================
+
+Processing 40/40 pages from 80 PS ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/40...
+  Processing page 10/40...
+  Processing page 20/40...
+  Processing page 30/40...
+  Processing page 40/40...
+OK Extraction complete: 15,910 words from 40 pages
+OK Content extracted: 95618 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: breeding_farms
+  Breed: hy_line_w80_parent_stock
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Hy-Line
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 33 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 33 chunks ready for Weaviate
+  Extraction: SUCCESS (33 chunks created)
+  Ingesting 33 chunks to Weaviate...
+  Ingestion: SUCCESS (33 chunks ingested)
+
+[9/54] Aviagen_Ross_PS_Handbook_2023_Interactive_EN.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\breeding_farms\breed\ross_308_parent_stock\Aviagen_Ross_PS_Handbook_2023_Interactive_EN.pdf
+================================================================================
+
+Processing 180/180 pages from Aviagen_Ross_PS_Handbook_2023_Interactive_EN.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/180...
+  Processing page 10/180...
+  Processing page 20/180...
+  Processing page 30/180...
+  Processing page 40/180...
+  Processing page 50/180...
+  Processing page 60/180...
+  Processing page 70/180...
+  Processing page 80/180...
+  Processing page 90/180...
+  Processing page 100/180...
+  Processing page 110/180...
+  Processing page 120/180...
+  Processing page 130/180...
+  Processing page 140/180...
+  Processing page 150/180...
+  Processing page 160/180...
+  Processing page 170/180...
+  Processing page 180/180...
+OK Extraction complete: 71,956 words from 180 pages
+OK Content extracted: 459116 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: breeding_farms
+  Breed: ross_308_parent_stock
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Ross
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 148 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 148 chunks ready for Weaviate
+  Extraction: SUCCESS (148 chunks created)
+  Ingesting 148 chunks to Weaviate...
+  Ingestion: SUCCESS (148 chunks ingested)
+
+[10/54] biosec-poultry-farms.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\broiler_farms\biosecurity\biosec-poultry-farms.pdf
+================================================================================
+
+Processing 2/2 pages from biosec-poultry-farms.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/2...
+OK Extraction complete: 645 words from 2 pages
+OK Content extracted: 3975 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: broiler_farms
+  Breed: biosec-poultry-farms.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: unknown
+  Document Type: unknown
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+Cannot set non-stroke color because 5 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported
+  Overall Confidence: 0.72
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 2 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 2 chunks ready for Weaviate
+  Extraction: SUCCESS (2 chunks created)
+  Ingesting 2 chunks to Weaviate...
+  Ingestion: SUCCESS (2 chunks ingested)
+
+[11/54] 2022-Cobb500-Broiler-Performance-Nutrition-Supplement.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\broiler_farms\breed\cobb_500\2022-Cobb500-Broiler-Performance-Nutrition-Supplement.pdf
+================================================================================
+
+Processing 16/16 pages from 2022-Cobb500-Broiler-Performance-Nutrition-Supplement.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/16...
+  Processing page 10/16...
+OK Extraction complete: 4,511 words from 16 pages
+OK Content extracted: 23924 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: broiler_farms
+  Breed: cobb_500
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Cobb
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 11 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 11 chunks ready for Weaviate
+  Extraction: SUCCESS (11 chunks created)
+  Ingesting 11 chunks to Weaviate...
+  Ingestion: SUCCESS (11 chunks ingested)
+
+[12/54] Broiler-Guide_English-2021-min.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\broiler_farms\breed\cobb_500\Broiler-Guide_English-2021-min.pdf
+================================================================================
+
+Processing 104/104 pages from Broiler-Guide_English-2021-min.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/104...
+  Processing page 10/104...
+  Processing page 20/104...
+  Processing page 30/104...
+  Processing page 40/104...
+  Processing page 50/104...
+  Processing page 60/104...
+  Processing page 70/104...
+  Processing page 80/104...
+  Processing page 90/104...
+  Processing page 100/104...
+OK Extraction complete: 34,149 words from 104 pages
+OK Content extracted: 201468 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: broiler_farms
+  Breed: cobb_500
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Cobb
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 73 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 73 chunks ready for Weaviate
+  Extraction: SUCCESS (73 chunks created)
+  Ingesting 73 chunks to Weaviate...
+  Ingestion: SUCCESS (73 chunks ingested)
+
+[13/54] Aviagen-ROSS-Broiler-Handbook-EN.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\broiler_farms\breed\ross_308\Aviagen-ROSS-Broiler-Handbook-EN.pdf
+================================================================================
+
+Processing 144/144 pages from Aviagen-ROSS-Broiler-Handbook-EN.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/144...
+  Processing page 10/144...
+  Processing page 20/144...
+  Processing page 30/144...
+  Processing page 40/144...
+  Processing page 50/144...
+  Processing page 60/144...
+  Processing page 70/144...
+  Processing page 80/144...
+  Processing page 90/144...
+  Processing page 100/144...
+  Processing page 110/144...
+  Processing page 120/144...
+  Processing page 130/144...
+  Processing page 140/144...
+OK Extraction complete: 53,259 words from 144 pages
+OK Content extracted: 352687 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: broiler_farms
+  Breed: ross_308
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Ross
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 116 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 116 chunks ready for Weaviate
+  Extraction: SUCCESS (116 chunks created)
+  Ingesting 116 chunks to Weaviate...
+  Ingestion: SUCCESS (116 chunks ingested)
+
+[14/54] Aviagen_Ross_BroilerNutritionSupplement.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\broiler_farms\breed\ross_308\Aviagen_Ross_BroilerNutritionSupplement.pdf
+================================================================================
+
+Processing 20/20 pages from Aviagen_Ross_BroilerNutritionSupplement.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/20...
+  Processing page 10/20...
+  Processing page 20/20...
+OK Extraction complete: 8,332 words from 20 pages
+OK Content extracted: 55299 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: broiler_farms
+  Breed: ross_308
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Ross
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 15 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 15 chunks ready for Weaviate
+  Extraction: SUCCESS (15 chunks created)
+  Ingesting 15 chunks to Weaviate...
+  Ingestion: SUCCESS (15 chunks ingested)
+
+[15/54] Ross308FF-MgtSuppl2016EN.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\broiler_farms\breed\ross_308\Ross308FF-MgtSuppl2016EN.pdf
+================================================================================
+
+Processing 4/4 pages from Ross308FF-MgtSuppl2016EN.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/4...
+OK Extraction complete: 1,122 words from 4 pages
+OK Content extracted: 6787 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: broiler_farms
+  Breed: ross_308
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Ross
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+Cannot set gray non-stroke color because /'P0' is an invalid float value
+Cannot set gray non-stroke color because /'P0' is an invalid float value
+Cannot set gray non-stroke color because /'P0' is an invalid float value
+OK Created 3 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 3 chunks ready for Weaviate
+  Extraction: SUCCESS (3 chunks created)
+  Ingesting 3 chunks to Weaviate...
+  Ingestion: SUCCESS (3 chunks ingested)
+
+[16/54] RossxRoss308-BroilerPerformanceObjectives2022-EN (1).pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\broiler_farms\breed\ross_308\RossxRoss308-BroilerPerformanceObjectives2022-EN (1).pdf
+================================================================================
+
+Processing 16/16 pages from RossxRoss308-BroilerPerformanceObjectives2022-EN (1).pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/16...
+  Processing page 10/16...
+OK Extraction complete: 4,398 words from 16 pages
+OK Content extracted: 24147 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: broiler_farms
+  Breed: ross_308
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Ross
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 10 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 10 chunks ready for Weaviate
+  Extraction: SUCCESS (10 chunks created)
+  Ingesting 10 chunks to Weaviate...
+  Ingestion: SUCCESS (10 chunks ingested)
+
+[17/54] optimum-broiler-development.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\broiler_farms\housing\common\optimum-broiler-development.pdf
+================================================================================
+
+Processing 58/58 pages from optimum-broiler-development.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/58...
+  Processing page 10/58...
+  Processing page 20/58...
+  Processing page 30/58...
+  Processing page 40/58...
+  Processing page 50/58...
+OK Extraction complete: 9,992 words from 58 pages
+OK Content extracted: 79045 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: broiler_farms
+  Breed: None
+  Confidence: 0.80
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.58
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 14 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 14 chunks ready for Weaviate
+  Extraction: SUCCESS (14 chunks created)
+  Ingesting 14 chunks to Weaviate...
+  Ingestion: SUCCESS (14 chunks ingested)
+
+[18/54] Gut-Health-on-the-Farm-Guide-EN.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\broiler_farms\management\common\Gut-Health-on-the-Farm-Guide-EN.pdf
+================================================================================
+
+Processing 20/20 pages from Gut-Health-on-the-Farm-Guide-EN.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/20...
+  Processing page 10/20...
+  Processing page 20/20...
+OK Extraction complete: 1,727 words from 20 pages
+OK Content extracted: 10872 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: broiler_farms
+  Breed: None
+  Confidence: 0.80
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.58
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 4 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 4 chunks ready for Weaviate
+  Extraction: SUCCESS (4 chunks created)
+  Ingesting 4 chunks to Weaviate...
+  Ingestion: SUCCESS (4 chunks ingested)
+
+[19/54] 6e3727d0-bbd7-11e6-bd5d-55bb08833e29.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\hatcheries\broiler\6e3727d0-bbd7-11e6-bd5d-55bb08833e29.pdf
+================================================================================
+
+Processing 18/18 pages from 6e3727d0-bbd7-11e6-bd5d-55bb08833e29.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/18...
+  Processing page 10/18...
+OK Extraction complete: 4,078 words from 18 pages
+OK Content extracted: 24790 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: hatcheries
+  Breed: 6e3727d0-bbd7-11e6-bd5d-55bb08833e29.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Cobb
+  Document Type: guide
+  Overall Confidence: 0.95
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 10 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 10 chunks ready for Weaviate
+  Extraction: SUCCESS (10 chunks created)
+  Ingesting 10 chunks to Weaviate...
+  Ingestion: SUCCESS (10 chunks ingested)
+
+[20/54] Hatchery-Guide-Layout-R4-min.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\hatcheries\broiler\Hatchery-Guide-Layout-R4-min.pdf
+================================================================================
+
+Processing 90/90 pages from Hatchery-Guide-Layout-R4-min.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/90...
+  Processing page 10/90...
+  Processing page 20/90...
+  Processing page 30/90...
+  Processing page 40/90...
+  Processing page 50/90...
+  Processing page 60/90...
+  Processing page 70/90...
+  Processing page 80/90...
+  Processing page 90/90...
+OK Extraction complete: 11,920 words from 90 pages
+OK Content extracted: 74952 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: hatcheries
+  Breed: Hatchery-Guide-Layout-R4-min.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 28 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 28 chunks ready for Weaviate
+  Extraction: SUCCESS (28 chunks created)
+  Ingesting 28 chunks to Weaviate...
+  Ingestion: SUCCESS (28 chunks ingested)
+
+[21/54] Hyline Brown ALT STD ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\layer_farms\breed\hy_line_brown\Hyline Brown ALT STD ENG.pdf
+================================================================================
+
+Processing 20/20 pages from Hyline Brown ALT STD ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/20...
+  Processing page 10/20...
+  Processing page 20/20...
+OK Extraction complete: 7,985 words from 20 pages
+OK Content extracted: 49174 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: layer_farms
+  Breed: hy_line_brown
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Hy-Line
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 18 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 18 chunks ready for Weaviate
+  Extraction: SUCCESS (18 chunks created)
+  Ingesting 18 chunks to Weaviate...
+  Ingestion: SUCCESS (18 chunks ingested)
+
+[22/54] Hyline Brown STD ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\layer_farms\breed\hy_line_brown\Hyline Brown STD ENG.pdf
+================================================================================
+
+Processing 20/20 pages from Hyline Brown STD ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/20...
+  Processing page 10/20...
+  Processing page 20/20...
+OK Extraction complete: 7,780 words from 20 pages
+OK Content extracted: 47277 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: layer_farms
+  Breed: hy_line_brown
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Hy-Line
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 17 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 17 chunks ready for Weaviate
+  Extraction: SUCCESS (17 chunks created)
+  Ingesting 17 chunks to Weaviate...
+  Ingestion: SUCCESS (17 chunks ingested)
+
+[23/54] Hyline W36 STD ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\layer_farms\breed\hy_line_w36\Hyline W36 STD ENG.pdf
+================================================================================
+
+Processing 32/32 pages from Hyline W36 STD ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/32...
+  Processing page 10/32...
+  Processing page 20/32...
+  Processing page 30/32...
+OK Extraction complete: 14,688 words from 32 pages
+OK Content extracted: 87486 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: layer_farms
+  Breed: hy_line_w36
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Hy-Line
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 30 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 30 chunks ready for Weaviate
+  Extraction: SUCCESS (30 chunks created)
+  Ingesting 30 chunks to Weaviate...
+  Ingestion: SUCCESS (30 chunks ingested)
+
+[24/54] Hyline W36- Conventional - Performance Sell Sheet ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\layer_farms\breed\hy_line_w36\Hyline W36- Conventional - Performance Sell Sheet ENG.pdf
+================================================================================
+
+Processing 2/2 pages from Hyline W36- Conventional - Performance Sell Sheet ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/2...
+OK Extraction complete: 293 words from 2 pages
+OK Content extracted: 1742 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: layer_farms
+  Breed: hy_line_w36
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Hy-Line
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 1 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 1 chunks ready for Weaviate
+  Extraction: SUCCESS (1 chunks created)
+  Ingesting 1 chunks to Weaviate...
+  Ingestion: SUCCESS (1 chunks ingested)
+
+[25/54] 80 STD ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\layer_farms\breed\hy_line_w80\80 STD ENG.pdf
+================================================================================
+
+Processing 20/20 pages from 80 STD ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/20...
+  Processing page 10/20...
+  Processing page 20/20...
+OK Extraction complete: 7,773 words from 20 pages
+OK Content extracted: 47153 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: layer_farms
+  Breed: hy_line_w80
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Hy-Line
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 17 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 17 chunks ready for Weaviate
+  Extraction: SUCCESS (17 chunks created)
+  Ingesting 17 chunks to Weaviate...
+  Ingestion: SUCCESS (17 chunks ingested)
+
+[26/54] LOHMANN-Brown-Classic-Cage.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\layer_farms\breed\lohmann_brown\LOHMANN-Brown-Classic-Cage.pdf
+================================================================================
+
+Processing 48/48 pages from LOHMANN-Brown-Classic-Cage.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/48...
+  Processing page 10/48...
+  Processing page 20/48...
+  Processing page 30/48...
+  Processing page 40/48...
+OK Extraction complete: 10,548 words from 48 pages
+OK Content extracted: 60386 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: layer_farms
+  Breed: lohmann_brown
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Lohmann
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 25 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 25 chunks ready for Weaviate
+  Extraction: SUCCESS (25 chunks created)
+  Ingesting 25 chunks to Weaviate...
+  Ingestion: SUCCESS (25 chunks ingested)
+
+[27/54] LOHMANN-LSL-Lite-Cage-1.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\layer_farms\breed\lohmann_lsl\LOHMANN-LSL-Lite-Cage-1.pdf
+================================================================================
+
+Processing 48/48 pages from LOHMANN-LSL-Lite-Cage-1.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/48...
+  Processing page 10/48...
+  Processing page 20/48...
+  Processing page 30/48...
+  Processing page 40/48...
+OK Extraction complete: 10,754 words from 48 pages
+OK Content extracted: 61012 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: layer_farms
+  Breed: lohmann_lsl
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: Lohmann
+  Document Type: unknown
+  Overall Confidence: 0.75
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 25 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 25 chunks ready for Weaviate
+  Extraction: SUCCESS (25 chunks created)
+  Ingesting 25 chunks to Weaviate...
+  Ingestion: SUCCESS (25 chunks ingested)
+
+[28/54] ascites.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\ascites.pdf
+================================================================================
+
+Processing 3/3 pages from ascites.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/3...
+OK Extraction complete: 1,327 words from 3 pages
+OK Content extracted: 8089 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: ascites.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 3 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 3 chunks ready for Weaviate
+  Extraction: SUCCESS (3 chunks created)
+  Ingesting 3 chunks to Weaviate...
+  Ingestion: SUCCESS (3 chunks ingested)
+
+[29/54] AviaTech_Staph.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\AviaTech_Staph.pdf
+================================================================================
+
+Processing 6/6 pages from AviaTech_Staph.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/6...
+OK Extraction complete: 3,068 words from 6 pages
+OK Content extracted: 20753 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: AviaTech_Staph.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 6 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 6 chunks ready for Weaviate
+  Extraction: SUCCESS (6 chunks created)
+  Ingesting 6 chunks to Weaviate...
+  Ingestion: SUCCESS (6 chunks ingested)
+
+[30/54] COCCIDIOSIS_CONTROL_Ken_Bafundo.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\COCCIDIOSIS_CONTROL_Ken_Bafundo.pdf
+================================================================================
+
+Processing 48/48 pages from COCCIDIOSIS_CONTROL_Ken_Bafundo.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/48...
+  Processing page 10/48...
+  Processing page 20/48...
+  Processing page 30/48...
+  Processing page 40/48...
+OK Extraction complete: 1,245 words from 48 pages
+OK Content extracted: 8367 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: COCCIDIOSIS_CONTROL_Ken_Bafundo.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 3 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 3 chunks ready for Weaviate
+  Extraction: SUCCESS (3 chunks created)
+  Ingesting 3 chunks to Weaviate...
+  Ingestion: SUCCESS (3 chunks ingested)
+
+[31/54] Deep-Pectoral-Myopathy-Canadian-Poultry-Consultants-20120809.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\Deep-Pectoral-Myopathy-Canadian-Poultry-Consultants-20120809.pdf
+================================================================================
+
+Processing 2/2 pages from Deep-Pectoral-Myopathy-Canadian-Poultry-Consultants-20120809.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/2...
+OK Extraction complete: 483 words from 2 pages
+OK Content extracted: 3160 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: Deep-Pectoral-Myopathy-Canadian-Poultry-Consultants-20120809.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 1 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 1 chunks ready for Weaviate
+  Extraction: SUCCESS (1 chunks created)
+  Ingesting 1 chunks to Weaviate...
+  Ingestion: SUCCESS (1 chunks ingested)
+
+[32/54] Drinking-Water-Management.pdf
+--------------------------------------------------------------------------------
+Cannot set gray non-stroke color because /'R1644' is an invalid float value
+Cannot set gray non-stroke color because /'R1647' is an invalid float value
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\Drinking-Water-Management.pdf
+================================================================================
+
+Processing 5/5 pages from Drinking-Water-Management.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/5...
+OK Extraction complete: 1,536 words from 5 pages
+OK Content extracted: 8736 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: Drinking-Water-Management.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 4 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 4 chunks ready for Weaviate
+  Extraction: SUCCESS (4 chunks created)
+  Ingesting 4 chunks to Weaviate...
+  Ingestion: SUCCESS (4 chunks ingested)
+
+[33/54] fowl_cholera.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\fowl_cholera.pdf
+================================================================================
+
+Processing 4/4 pages from fowl_cholera.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/4...
+OK Extraction complete: 1,262 words from 4 pages
+OK Content extracted: 7781 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: fowl_cholera.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 3 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 3 chunks ready for Weaviate
+  Extraction: SUCCESS (3 chunks created)
+  Ingesting 3 chunks to Weaviate...
+  Ingestion: SUCCESS (3 chunks ingested)
+
+[34/54] ilt.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\ilt.pdf
+================================================================================
+
+Processing 11/11 pages from ilt.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/11...
+  Processing page 10/11...
+OK Extraction complete: 3,678 words from 11 pages
+OK Content extracted: 22723 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: ilt.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 9 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 9 chunks ready for Weaviate
+  Extraction: SUCCESS (9 chunks created)
+  Ingesting 9 chunks to Weaviate...
+  Ingestion: SUCCESS (9 chunks ingested)
+
+[35/54] infectious_bronchitis_virus_ibv.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\infectious_bronchitis_virus_ibv.pdf
+================================================================================
+
+Processing 5/5 pages from infectious_bronchitis_virus_ibv.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/5...
+OK Extraction complete: 1,712 words from 5 pages
+OK Content extracted: 10856 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: infectious_bronchitis_virus_ibv.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 4 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 4 chunks ready for Weaviate
+  Extraction: SUCCESS (4 chunks created)
+  Ingesting 4 chunks to Weaviate...
+  Ingestion: SUCCESS (4 chunks ingested)
+
+[36/54] infectious_bursal_disease.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\infectious_bursal_disease.pdf
+================================================================================
+
+Processing 7/7 pages from infectious_bursal_disease.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/7...
+OK Extraction complete: 2,326 words from 7 pages
+OK Content extracted: 14582 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: infectious_bursal_disease.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 6 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 6 chunks ready for Weaviate
+  Extraction: SUCCESS (6 chunks created)
+  Ingesting 6 chunks to Weaviate...
+  Ingestion: SUCCESS (6 chunks ingested)
+
+[37/54] is2014.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\is2014.pdf
+================================================================================
+
+Processing 2/2 pages from is2014.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/2...
+OK Extraction complete: 1,146 words from 2 pages
+OK Content extracted: 7471 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: is2014.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: unknown
+  Document Type: guide
+  Overall Confidence: 0.92
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 2 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 2 chunks ready for Weaviate
+  Extraction: SUCCESS (2 chunks created)
+  Ingesting 2 chunks to Weaviate...
+  Ingestion: SUCCESS (2 chunks ingested)
+
+[38/54] Manual_of_poultry_diseases_en-1-135.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\Manual_of_poultry_diseases_en-1-135.pdf
+================================================================================
+
+Processing 135/135 pages from Manual_of_poultry_diseases_en-1-135.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/135...
+  Processing page 10/135...
+  Processing page 20/135...
+  Processing page 30/135...
+  Processing page 40/135...
+  Processing page 50/135...
+  Processing page 60/135...
+  Processing page 70/135...
+  Processing page 80/135...
+  Processing page 90/135...
+  Processing page 100/135...
+  Processing page 110/135...
+  Processing page 120/135...
+  Processing page 130/135...
+OK Extraction complete: 60,396 words from 135 pages
+OK Content extracted: 380115 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: Manual_of_poultry_diseases_en-1-135.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 122 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 122 chunks ready for Weaviate
+  Extraction: SUCCESS (122 chunks created)
+  Ingesting 122 chunks to Weaviate...
+  Ingestion: SUCCESS (122 chunks ingested)
+
+[39/54] Manual_of_poultry_diseases_en-136-271.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\Manual_of_poultry_diseases_en-136-271.pdf
+================================================================================
+
+Processing 136/136 pages from Manual_of_poultry_diseases_en-136-271.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/136...
+  Processing page 10/136...
+  Processing page 20/136...
+  Processing page 30/136...
+  Processing page 40/136...
+  Processing page 50/136...
+  Processing page 60/136...
+  Processing page 70/136...
+  Processing page 80/136...
+  Processing page 90/136...
+  Processing page 100/136...
+  Processing page 110/136...
+  Processing page 120/136...
+  Processing page 130/136...
+OK Extraction complete: 56,305 words from 136 pages
+OK Content extracted: 373671 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: Manual_of_poultry_diseases_en-136-271.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+OK Metadata enrichment complete
+  Species: chicken, turkey
+  Genetic Line: unknown
+  Document Type: handbook
+  Overall Confidence: 0.92
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 129 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 129 chunks ready for Weaviate
+  Extraction: SUCCESS (129 chunks created)
+  Ingesting 129 chunks to Weaviate...
+  Ingestion: SUCCESS (129 chunks ingested)
+
+[40/54] Manual_of_poultry_diseases_en-272-389.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\Manual_of_poultry_diseases_en-272-389.pdf
+================================================================================
+
+Processing 118/118 pages from Manual_of_poultry_diseases_en-272-389.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/118...
+  Processing page 10/118...
+  Processing page 20/118...
+  Processing page 30/118...
+  Processing page 40/118...
+  Processing page 50/118...
+  Processing page 60/118...
+  Processing page 70/118...
+  Processing page 80/118...
+  Processing page 90/118...
+  Processing page 100/118...
+  Processing page 110/118...
+OK Extraction complete: 46,687 words from 118 pages
+OK Content extracted: 312812 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: Manual_of_poultry_diseases_en-272-389.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 113 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 113 chunks ready for Weaviate
+  Extraction: SUCCESS (113 chunks created)
+  Ingesting 113 chunks to Weaviate...
+  Ingestion: SUCCESS (113 chunks ingested)
+
+[41/54] Manual_of_poultry_diseases_en-390-507.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\Manual_of_poultry_diseases_en-390-507.pdf
+================================================================================
+
+Processing 118/118 pages from Manual_of_poultry_diseases_en-390-507.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/118...
+  Processing page 10/118...
+  Processing page 20/118...
+  Processing page 30/118...
+  Processing page 40/118...
+  Processing page 50/118...
+  Processing page 60/118...
+  Processing page 70/118...
+  Processing page 80/118...
+  Processing page 90/118...
+  Processing page 100/118...
+  Processing page 110/118...
+OK Extraction complete: 49,504 words from 118 pages
+OK Content extracted: 327044 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: Manual_of_poultry_diseases_en-390-507.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 111 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 111 chunks ready for Weaviate
+  Extraction: SUCCESS (111 chunks created)
+  Ingesting 111 chunks to Weaviate...
+  Ingestion: SUCCESS (111 chunks ingested)
+
+[42/54] Manual_of_poultry_diseases_en-508-582.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\Manual_of_poultry_diseases_en-508-582.pdf
+================================================================================
+
+Processing 75/75 pages from Manual_of_poultry_diseases_en-508-582.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/75...
+  Processing page 10/75...
+  Processing page 20/75...
+  Processing page 30/75...
+Cannot set gray non-stroke color because /'P0' is an invalid float value
+Cannot set gray non-stroke color because /'P0' is an invalid float value
+Cannot set gray non-stroke color because /'P1' is an invalid float value
+Cannot set gray non-stroke color because /'P2' is an invalid float value
+Cannot set gray non-stroke color because /'P3' is an invalid float value
+Cannot set gray non-stroke color because /'P0' is an invalid float value
+  Processing page 40/75...
+  Processing page 50/75...
+  Processing page 60/75...
+  Processing page 70/75...
+OK Extraction complete: 33,165 words from 75 pages
+OK Content extracted: 218869 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: Manual_of_poultry_diseases_en-508-582.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 66 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 66 chunks ready for Weaviate
+  Extraction: SUCCESS (66 chunks created)
+  Ingesting 66 chunks to Weaviate...
+  Ingestion: SUCCESS (66 chunks ingested)
+
+[43/54] Post-Mortem-Guide-_Breeders-2022-Digital-min.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\Post-Mortem-Guide-_Breeders-2022-Digital-min.pdf
+================================================================================
+
+Processing 69/69 pages from Post-Mortem-Guide-_Breeders-2022-Digital-min.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/69...
+  Processing page 10/69...
+  Processing page 20/69...
+  Processing page 30/69...
+  Processing page 40/69...
+  Processing page 50/69...
+  Processing page 60/69...
+OK Extraction complete: 9,466 words from 69 pages
+OK Content extracted: 59175 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: Post-Mortem-Guide-_Breeders-2022-Digital-min.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 20 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 20 chunks ready for Weaviate
+  Extraction: SUCCESS (20 chunks created)
+  Ingesting 20 chunks to Weaviate...
+  Ingestion: SUCCESS (20 chunks ingested)
+
+[44/54] skin_scratches.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\skin_scratches.pdf
+================================================================================
+
+Processing 4/4 pages from skin_scratches.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/4...
+OK Extraction complete: 1,549 words from 4 pages
+OK Content extracted: 9921 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: skin_scratches.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 3 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 3 chunks ready for Weaviate
+  Extraction: SUCCESS (3 chunks created)
+  Ingesting 3 chunks to Weaviate...
+  Ingestion: SUCCESS (3 chunks ingested)
+
+[45/54] TU COL ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\TU COL ENG.pdf
+================================================================================
+
+Processing 8/8 pages from TU COL ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/8...
+OK Extraction complete: 2,579 words from 8 pages
+OK Content extracted: 17530 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: TU COL ENG.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 6 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 6 chunks ready for Weaviate
+  Extraction: SUCCESS (6 chunks created)
+  Ingesting 6 chunks to Weaviate...
+  Ingestion: SUCCESS (6 chunks ingested)
+
+[46/54] TU EDS ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\TU EDS ENG.pdf
+================================================================================
+
+Processing 4/4 pages from TU EDS ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/4...
+OK Extraction complete: 1,550 words from 4 pages
+OK Content extracted: 10172 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: TU EDS ENG.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+OK Metadata enrichment complete
+  Species: chicken
+  Genetic Line: unknown
+  Document Type: technical_note
+  Overall Confidence: 0.92
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 3 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 3 chunks ready for Weaviate
+  Extraction: SUCCESS (3 chunks created)
+  Ingesting 3 chunks to Weaviate...
+  Ingestion: SUCCESS (3 chunks ingested)
+
+[47/54] TU FLY ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\TU FLY ENG.pdf
+================================================================================
+
+Processing 8/8 pages from TU FLY ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/8...
+OK Extraction complete: 3,234 words from 8 pages
+OK Content extracted: 20748 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: TU FLY ENG.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 7 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 7 chunks ready for Weaviate
+  Extraction: SUCCESS (7 chunks created)
+  Ingesting 7 chunks to Weaviate...
+  Ingestion: SUCCESS (7 chunks ingested)
+
+[48/54] TU Full beak management ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\TU Full beak management ENG.pdf
+================================================================================
+
+Processing 8/8 pages from TU Full beak management ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/8...
+OK Extraction complete: 3,617 words from 8 pages
+OK Content extracted: 22880 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: TU Full beak management ENG.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 8 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 8 chunks ready for Weaviate
+  Extraction: SUCCESS (8 chunks created)
+  Ingesting 8 chunks to Weaviate...
+  Ingestion: SUCCESS (8 chunks ingested)
+
+[49/54] TU HEAT ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\TU HEAT ENG.pdf
+================================================================================
+
+Processing 8/8 pages from TU HEAT ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/8...
+OK Extraction complete: 4,642 words from 8 pages
+OK Content extracted: 25596 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: TU HEAT ENG.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 8 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 8 chunks ready for Weaviate
+  Extraction: SUCCESS (8 chunks created)
+  Ingesting 8 chunks to Weaviate...
+  Ingestion: SUCCESS (8 chunks ingested)
+
+[50/54] TU IBD ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\TU IBD ENG.pdf
+================================================================================
+
+Processing 4/4 pages from TU IBD ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/4...
+OK Extraction complete: 2,262 words from 4 pages
+OK Content extracted: 13965 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: TU IBD ENG.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 4 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 4 chunks ready for Weaviate
+  Extraction: SUCCESS (4 chunks created)
+  Ingesting 4 chunks to Weaviate...
+  Ingestion: SUCCESS (4 chunks ingested)
+
+[51/54] TU LPAI ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\TU LPAI ENG.pdf
+================================================================================
+
+Processing 8/8 pages from TU LPAI ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/8...
+OK Extraction complete: 3,529 words from 8 pages
+OK Content extracted: 24110 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: TU LPAI ENG.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 8 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 8 chunks ready for Weaviate
+  Extraction: SUCCESS (8 chunks created)
+  Ingesting 8 chunks to Weaviate...
+  Ingestion: SUCCESS (8 chunks ingested)
+
+[52/54] TU MYCO ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\TU MYCO ENG.pdf
+================================================================================
+
+Processing 12/12 pages from TU MYCO ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/12...
+  Processing page 10/12...
+OK Extraction complete: 5,483 words from 12 pages
+OK Content extracted: 35987 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: TU MYCO ENG.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 12 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 12 chunks ready for Weaviate
+  Extraction: SUCCESS (12 chunks created)
+  Ingesting 12 chunks to Weaviate...
+  Ingestion: SUCCESS (12 chunks ingested)
+
+[53/54] TU NEST ENG.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\TU NEST ENG.pdf
+================================================================================
+
+Processing 10/10 pages from TU NEST ENG.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/10...
+  Processing page 10/10...
+OK Extraction complete: 4,557 words from 10 pages
+OK Content extracted: 28030 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: TU NEST ENG.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 10 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 10 chunks ready for Weaviate
+  Extraction: SUCCESS (10 chunks created)
+  Ingesting 10 chunks to Weaviate...
+  Ingestion: SUCCESS (10 chunks ingested)
+
+[54/54] understandingcoccidiosis.pdf
+--------------------------------------------------------------------------------
+
+================================================================================
+PROCESSING: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\public\veterinary_services\common\understandingcoccidiosis.pdf
+================================================================================
+
+Processing 7/7 pages from understandingcoccidiosis.pdf
+  Using FREE pdfplumber (no API costs!)
+  Processing page 1/7...
+OK Extraction complete: 3,351 words from 7 pages
+OK Content extracted: 21804 characters
+  Method: pdf_text
+
+Step 2: Path-based classification...
+OK Path classification complete
+  Org: intelia
+  Site: veterinary_services
+  Breed: understandingcoccidiosis.pdf
+  Confidence: 1.00
+
+Step 3: Metadata enrichment...
+Enriching metadata...
+  Warning: Vision analysis failed: Expecting value: line 1 column 1 (char 0)
+OK Metadata enrichment complete
+  Species: unknown
+  Genetic Line: unknown
+  Document Type: unknown
+  Overall Confidence: 0.71
+
+Step 4: Text chunking (600 words, 120 overlap) + Quality scoring + Entity extraction...
+OK Created 6 enriched chunks
+
+Step 5: Preparing chunks for ingestion...
+OK 6 chunks ready for Weaviate
+  Extraction: SUCCESS (6 chunks created)
+  Ingesting 6 chunks to Weaviate...
+  Ingestion: SUCCESS (6 chunks ingested)
+
+================================================================================
+BATCH PROCESSING COMPLETE
+================================================================================
+End time: 2025-10-29 22:36:19
+Duration: 0:14:06.896845
+
+Files processed: 54
+Success: 54/54 (100.0%)
+Errors: 0/54
+
+Total chunks created: 1551
+Total chunks ingested: 1551
+
+Collection: InteliaKnowledge
+Weaviate URL: https://xmlc4jvtu6hfw9zrrmnw.c0.us-east1.gcp.weaviate.cloud
+Cost: 0$ (FREE pdfplumber)
+================================================================================

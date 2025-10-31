@@ -1,0 +1,46 @@
+================================================================================
+STRUCTURE - HEALTH
+================================================================================
+
+intelia/public/
+│
+├── health/                       		 [HORIZONTAL - Tous sites]
+│   ├── common/                          [Universal diseases]
+│   │   ├── diseases/
+│   │   │   ├── bacterial/
+│   │   │   │   ├── necrotic_enteritis/
+│   │   │   │   ├── colibacillosis/
+│   │   │   │   ├── fowl_cholera/
+│   │   │   │   └── salmonellosis/
+│   │   │   ├── viral/
+│   │   │   │   ├── infectious_bronchitis/
+│   │   │   │   ├── newcastle_disease/
+│   │   │   │   ├── avian_influenza/
+│   │   │   │   └── infectious_bursal_disease/
+│   │   │   └── parasitic/
+│   │   │       ├── coccidiosis/
+│   │   │       └── intestinal_worms/
+│   │   │
+│   │   └── biosecurity_standards/       [Universal standards]
+│   │
+│   ├── broiler/                         [Broiler-specific health]
+│   │   ├── commercial/
+│   │   │   ├── ross_308/
+│   │   │   ├── cobb_500/
+│   │   │   └── general/
+│   │   ├── vaccination_programs/
+│   │   ├── treatment_protocols/         
+│   │   └── health_monitoring/
+│   │ 
+│   ├── layer/                           [Layer-specific health]
+│   │   ├── hy_line_brown/
+│   │   ├── lohmann_brown/
+│   │   ├── vaccination_programs/
+│   │   ├── treatment_protocols/
+│   │   └── health_monitoring/
+│   │
+│   └── breeder/
+│       ├── vaccination_programs/
+│       ├── treatment_protocols/
+│       └── health_monitoring/
+│

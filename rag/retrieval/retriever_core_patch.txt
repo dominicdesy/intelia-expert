@@ -1,0 +1,31 @@
+# Patch pour ajouter la lecture de WEAVIATE_VECTOR_DIMENSIONS
+
+# 1. Ajouter import os après ligne 11
+# AVANT:
+import logging
+import re
+
+# APRÈS:
+import logging
+import os
+import re
+
+# 2. Remplacer ligne 66-68
+# AVANT:
+        self.working_vector_dimension = (
+            3072  # UPDATED: OpenAI text-embedding-3-large = 3072
+        )
+
+# APRÈS:
+        self.working_vector_dimension = int(
+            os.getenv("WEAVIATE_VECTOR_DIMENSIONS", "3072")
+        )  # text-embedding-3-large native = 3072 (configurable via env)
+
+# 3. Remplacer ligne 144 (fallback)
+# AVANT:
+            self.working_vector_dimension = 3072  # UPDATED: Fallback to 3072
+
+# APRÈS:
+            self.working_vector_dimension = int(
+                os.getenv("WEAVIATE_VECTOR_DIMENSIONS", "3072")
+            )  # Fallback from env

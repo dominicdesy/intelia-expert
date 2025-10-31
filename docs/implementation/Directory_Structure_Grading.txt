@@ -1,0 +1,31 @@
+================================================================================
+STRUCTURE - GRADING
+================================================================================
+
+intelia/public/
+│
+├── grading_stations/                    [SITE TYPE - Layer only]
+│   ├── operations/
+│   │   ├── receiving/
+│   │   ├── washing/
+│   │   ├── candling/
+│   │   └── packing/
+│   ├── grading/
+│   │   ├── weight_classification/
+│   │   ├── quality_assessment/
+│   │   └── defect_detection/
+│   ├── packaging/
+│   │   ├── materials/
+│   │   ├── labeling/
+│   │   └── storage/
+│   ├── quality_assurance/
+│   │   ├── freshness_testing/
+│   │   ├── shell_quality/
+│   │   └── internal_quality/
+│   ├── traceability/
+│   │   ├── batch_coding/
+│   │   └── farm_to_consumer/
+│   └── food_safety/
+│       ├── salmonella_control/
+│       └── temperature_monitoring/│
+

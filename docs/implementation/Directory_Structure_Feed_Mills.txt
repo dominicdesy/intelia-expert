@@ -1,0 +1,36 @@
+================================================================================
+STRUCTURE - FEED MILLS
+================================================================================
+
+intelia/public/
+│
+├── feed_mills/                          [SITE TYPE]
+│   │
+│   ├── raw_materials/
+│   │   ├── grains/
+│   │   ├── protein_sources/
+│   │   ├── fats_and_oils/
+│   │   └── additives/
+│   ├── formulation/
+│   │   ├── least_cost_formulation/
+│   │   ├── nutrient_optimization/
+│   │   └── recipe_management/
+│   ├── process_control/
+│   │   ├── batching/
+│   │   ├── mixing/
+│   │   ├── pelleting/
+│   │   └── crumbling/
+│   ├── quality_assurance/
+│   │   ├── laboratory_testing/
+│   │   ├── finished_feed_analysis/
+│   │   └── mycotoxin_control/
+│   ├── logistics/
+│   │   ├── inventory_management/
+│   │   ├── delivery_scheduling/
+│   │   └── transportation/
+│   └── safety/
+│       ├── contamination_control/
+│       ├── allergen_management/
+│       └── equipment_safety/
+
+

@@ -1,0 +1,72 @@
+================================================================================
+BATCH EXTRACTION - First 10 PDFs
+With Quality Scoring + Entity Extraction (RAG Score: 98/100)
+================================================================================
+Start time: 2025-10-29 21:17:22
+Total files: 10
+
+
+[1/10] Processing: Breeder-Management-Guide.pdf
+--------------------------------------------------------------------------------
+TIMEOUT: Breeder-Management-Guide.pdf (exceeded 10 minutes)
+
+[2/10] Processing: Cobb-Male-Supplement.pdf
+--------------------------------------------------------------------------------
+SUCCESS: Cobb-Male-Supplement.pdf
+  Chunks Created: 12
+  Chunks Ingested: 0
+
+[3/10] Processing: Cobb-MX-Male-Supplement.pdf
+--------------------------------------------------------------------------------
+SUCCESS: Cobb-MX-Male-Supplement.pdf
+  Chunks Created: 13
+  Chunks Ingested: 0
+
+[4/10] Processing: Cobb500-Fast-Feather-Breeder-Management-Supplement.pdf
+--------------------------------------------------------------------------------
+SUCCESS: Cobb500-Fast-Feather-Breeder-Management-Supplement.pdf
+  Chunks Created: 7
+  Chunks Ingested: 0
+
+[5/10] Processing: Cobb500-Slow-Feather-Breeder-Management-Supplement.pdf
+--------------------------------------------------------------------------------
+SUCCESS: Cobb500-Slow-Feather-Breeder-Management-Supplement.pdf
+  Chunks Created: 5
+  Chunks Ingested: 0
+
+[6/10] Processing: Hyline Brown Parent Stock ENG.pdf
+--------------------------------------------------------------------------------
+SUCCESS: Hyline Brown Parent Stock ENG.pdf
+
+[7/10] Processing: Hyline W36 Parent Stock ENG.pdf
+--------------------------------------------------------------------------------
+SUCCESS: Hyline W36 Parent Stock ENG.pdf
+  Chunks Created: 37
+  Chunks Ingested: 0
+
+[8/10] Processing: 80 PS ENG.pdf
+--------------------------------------------------------------------------------
+SUCCESS: 80 PS ENG.pdf
+  Chunks Created: 33
+  Chunks Ingested: 0
+
+[9/10] Processing: Aviagen_Ross_PS_Handbook_2023_Interactive_EN.pdf
+--------------------------------------------------------------------------------
+SUCCESS: Aviagen_Ross_PS_Handbook_2023_Interactive_EN.pdf
+  Chunks Created: 148
+  Chunks Ingested: 0
+
+[10/10] Processing: biosec-poultry-farms.pdf
+--------------------------------------------------------------------------------
+SUCCESS: biosec-poultry-farms.pdf
+  Chunks Created: 2
+  Chunks Ingested: 0
+
+================================================================================
+BATCH EXTRACTION COMPLETE
+================================================================================
+End time: 2025-10-29 21:48:56
+Success: 9/10
+Errors: 1/10
+Success rate: 90.0%
+================================================================================

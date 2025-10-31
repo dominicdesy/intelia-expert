@@ -1,0 +1,146 @@
+# Path-based classification rules for Intelia
+# Organization: intelia
+# Structure: Sources/intelia/{visibility}/{site_type}/...
+
+organization:
+  id: intelia
+  name: Intelia Inc.
+  description: Internal Intelia document repository
+
+# Visibility level mapping
+visibility_mapping:
+  public: public_global  # Public knowledge base for all clients
+  internal: intelia_internal  # Internal Intelia documents
+  about: public_global  # Company information
+  products: public_global  # Product catalogs
+
+# Site type mapping
+site_type_mapping:
+  broiler_farms: broiler_farms
+  layer_farms: layer_farms
+  breeding_farms: breeding_farms
+  hatcheries: hatcheries
+  rearing_farms: rearing_farms
+  feed_mills: feed_mills
+  processing_plants: processing_plants
+  grading_stations: grading_stations
+  veterinary_services: veterinary_services
+  intelia_about: intelia_about
+  intelia_products: intelia_products
+
+# Breed name patterns (regex)
+breed_patterns:
+  - "^ross_\\d+.*"  # ross_308, ross_308_parent_stock
+  - "^cobb_\\d+.*"  # cobb_500, cobb_500_breeder
+  - "^hy_line_.*"  # hy_line_brown, hy_line_w36, etc.
+  - "^lohmann_.*"  # lohmann_brown, lohmann_lsl
+  - "^hubbard_.*"  # hubbard_flex, etc.
+
+# Known breeds (explicit list)
+known_breeds:
+  # Broiler breeds
+  - ross_308
+  - ross_308_parent_stock
+  - cobb_500
+  - cobb_500_breeder
+  - hubbard_flex
+
+  # Layer breeds
+  - hy_line_brown
+  - hy_line_brown_parent_stock
+  - hy_line_w36
+  - hy_line_w36_parent_stock
+  - hy_line_w80
+  - hy_line_w80_parent_stock
+  - lohmann_brown
+  - lohmann_lsl
+
+# Category definitions
+categories:
+  biosecurity:
+    description: Biosecurity protocols and guidelines
+    keywords: [biosecurity, sanitation, disinfection, quarantine]
+
+  breed:
+    description: Breed-specific management guides and standards
+    keywords: [breed, genetics, performance, standards, handbook]
+
+  housing:
+    description: Housing infrastructure and environment management
+    keywords: [housing, ventilation, temperature, environment, equipment]
+
+  management:
+    description: Daily management and operations
+    keywords: [management, feeding, health, production, operations]
+
+# Climate zone mapping
+climate_zones:
+  tropical:
+    description: Hot and humid climates
+    temperature_range: [25, 35]  # Celsius
+
+  temperate:
+    description: Moderate climates with seasons
+    temperature_range: [10, 25]
+
+  cold:
+    description: Cold climates
+    temperature_range: [-10, 15]
+
+# Default metadata values
+defaults:
+  language: en
+  unit_system: metric
+  company: unknown  # Will be extracted from document content
+  measurement_units: metric
+
+# Path structure examples (for documentation)
+examples:
+  - path: "Sources/intelia/public/broiler_farms/breed/ross_308/handbook.pdf"
+    expected:
+      owner_org_id: intelia
+      visibility_level: public_global
+      site_type: broiler_farms
+      category: breed
+      breed: ross_308
+
+  - path: "Sources/intelia/public/veterinary_services/common/ascites.pdf"
+    expected:
+      owner_org_id: intelia
+      visibility_level: public_global
+      site_type: veterinary_services
+      category: common
+      breed: null
+
+  - path: "Sources/intelia/public/layer_farms/breed/hy_line_brown/standards.pdf"
+    expected:
+      owner_org_id: intelia
+      visibility_level: public_global
+      site_type: layer_farms
+      category: breed
+      breed: hy_line_brown
+
+  - path: "Sources/intelia/public/breeding_farms/management/common/guide.pdf"
+    expected:
+      owner_org_id: intelia
+      visibility_level: public_global
+      site_type: breeding_farms
+      category: management
+      subcategory: common
+      breed: null
+
+# Special handling rules
+special_cases:
+  # Veterinary services apply to all farm types
+  veterinary_services:
+    applies_to_all_sites: true
+    default_category: common
+
+  # Company about and products
+  intelia_about:
+    site_type_override: intelia_about
+    visibility_override: public_global
+
+  intelia_products:
+    site_type_override: intelia_products
+    visibility_override: public_global

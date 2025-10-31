@@ -1,0 +1,538 @@
+================================================================================
+STRUCTURE FINALE - ULTRA SIMPLIFIÉE (3 NIVEAUX MAX)
+Architecture Site-First avec fichiers directs
+================================================================================
+
+Date: 2025-10-29
+Version: 6.0 - Ultra simplifié
+Statut: EN RÉVISION FINALE
+
+================================================================================
+PRINCIPE CLÉ
+================================================================================
+
+✓ MAXIMUM 3 NIVEAUX pour fermes (broiler/layer/breeding/rearing)
+✓ MAXIMUM 4 NIVEAUX pour sites complexes (feed_mills, processing)
+✓ FICHIERS PDF DIRECTEMENT dans breed/ ou common/
+✓ PAS de sous-catégories (health/, nutrition/, etc.) - tout au même niveau
+✓ Classification via METADATA (pas via folders)
+
+
+================================================================================
+STRUCTURE COMPLÈTE
+================================================================================
+
+Sources/
+└── intelia/
+    └── public/                                [NIVEAU 1]
+        │
+        ├── broiler_farms/                     [NIVEAU 2 - SITE]
+        │   │
+        │   ├── common/                        [NIVEAU 3 - FINAL]
+        │   │   ├── biosecurity-guide.pdf
+        │   │   ├── water-management.pdf
+        │   │   ├── gut-health-guide.pdf
+        │   │   ├── broiler-housing-guide.pdf
+        │   │   └── optimum-broiler-development.pdf
+        │   │
+        │   ├── ross_308/                      [NIVEAU 3 - FINAL]
+        │   │   ├── ross-308-handbook.pdf
+        │   │   ├── ross-308-nutrition-supplement.pdf
+        │   │   ├── ross-308-performance-objectives.pdf
+        │   │   └── ross-308-management-supplement.pdf
+        │   │
+        │   ├── cobb_500/                      [NIVEAU 3 - FINAL]
+        │   │   ├── cobb-500-broiler-guide.pdf
+        │   │   ├── cobb-500-nutrition-supplement.pdf
+        │   │   └── cobb-500-performance-objectives.pdf
+        │   │
+        │   └── hubbard_flex/                  [NIVEAU 3 - FINAL]
+        │       ├── hubbard-flex-guide.pdf
+        │       └── hubbard-flex-nutrition.pdf
+        │
+        ├── layer_farms/                       [NIVEAU 2 - SITE]
+        │   │
+        │   ├── common/                        [NIVEAU 3 - FINAL]
+        │   │   ├── layer-housing-guide.pdf
+        │   │   ├── layer-welfare-standards.pdf
+        │   │   ├── nest-management.pdf
+        │   │   └── egg-quality-guide.pdf
+        │   │
+        │   ├── hy_line_brown/                 [NIVEAU 3 - FINAL]
+        │   │   ├── hy-line-brown-standard.pdf
+        │   │   ├── hy-line-brown-alt-housing.pdf
+        │   │   └── hy-line-brown-management.pdf
+        │   │
+        │   ├── hy_line_w36/                   [NIVEAU 3 - FINAL]
+        │   │   ├── hy-line-w36-standard.pdf
+        │   │   ├── hy-line-w36-conventional.pdf
+        │   │   └── hy-line-w36-management.pdf
+        │   │
+        │   ├── hy_line_w80/                   [NIVEAU 3 - FINAL]
+        │   │   ├── hy-line-w80-standard.pdf
+        │   │   └── hy-line-w80-management.pdf
+        │   │
+        │   ├── lohmann_brown/                 [NIVEAU 3 - FINAL]
+        │   │   ├── lohmann-brown-classic-cage.pdf
+        │   │   └── lohmann-brown-management.pdf
+        │   │
+        │   └── lohmann_lsl/                   [NIVEAU 3 - FINAL]
+        │       ├── lohmann-lsl-lite-cage.pdf
+        │       └── lohmann-lsl-management.pdf
+        │
+        ├── breeding_farms/                    [NIVEAU 2 - SITE]
+        │   │
+        │   ├── common/                        [NIVEAU 3 - FINAL]
+        │   │   ├── breeder-biosecurity.pdf
+        │   │   ├── breeder-welfare.pdf
+        │   │   └── breeder-housing-standards.pdf
+        │   │
+        │   ├── ross_308_ps/                   [NIVEAU 3 - FINAL]
+        │   │   ├── ross-308-ps-handbook.pdf
+        │   │   ├── ross-308-ps-nutrition.pdf
+        │   │   └── ross-308-ps-performance.pdf
+        │   │
+        │   ├── cobb_500_breeder/              [NIVEAU 3 - FINAL]
+        │   │   ├── cobb-500-breeder-management.pdf
+        │   │   ├── cobb-500-fast-feather-supplement.pdf
+        │   │   ├── cobb-500-slow-feather-supplement.pdf
+        │   │   ├── cobb-male-supplement.pdf
+        │   │   └── cobb-mx-male-supplement.pdf
+        │   │
+        │   ├── hy_line_brown_ps/              [NIVEAU 3 - FINAL]
+        │   │   ├── hy-line-brown-parent-stock.pdf
+        │   │   └── hy-line-brown-ps-management.pdf
+        │   │
+        │   ├── hy_line_w36_ps/                [NIVEAU 3 - FINAL]
+        │   │   └── hy-line-w36-parent-stock.pdf
+        │   │
+        │   └── hy_line_w80_ps/                [NIVEAU 3 - FINAL]
+        │       └── hy-line-w80-parent-stock.pdf
+        │
+        ├── hatcheries/                        [NIVEAU 2 - SITE]
+        │   │
+        │   ├── common/                        [NIVEAU 3 - FINAL]
+        │   │   ├── hatchery-biosecurity.pdf
+        │   │   ├── hatchery-operations.pdf
+        │   │   ├── hatchery-quality-control.pdf
+        │   │   └── hatchery-equipment-guide.pdf
+        │   │
+        │   ├── broiler/                       [NIVEAU 3 - FINAL]
+        │   │   ├── broiler-hatchery-guide.pdf
+        │   │   ├── broiler-incubation.pdf
+        │   │   ├── broiler-chick-quality.pdf
+        │   │   └── broiler-vaccination-hatchery.pdf
+        │   │
+        │   └── layer/                         [NIVEAU 3 - FINAL]
+        │       ├── layer-hatchery-guide.pdf
+        │       ├── layer-incubation.pdf
+        │       ├── layer-chick-sexing.pdf
+        │       └── layer-vaccination-hatchery.pdf
+        │
+        ├── rearing_farms/                     [NIVEAU 2 - SITE]
+        │   │
+        │   ├── common/                        [NIVEAU 3 - FINAL]
+        │   │   ├── pullet-rearing-guide.pdf
+        │   │   ├── pullet-nutrition.pdf
+        │   │   ├── pullet-housing.pdf
+        │   │   ├── pullet-vaccination.pdf
+        │   │   └── pullet-welfare.pdf
+        │   │
+        │   ├── hy_line_brown/                 [NIVEAU 3 - FINAL]
+        │   │   ├── hy-line-brown-pullet-guide.pdf
+        │   │   └── hy-line-brown-rearing.pdf
+        │   │
+        │   └── lohmann_brown/                 [NIVEAU 3 - FINAL]
+        │       └── lohmann-brown-pullet-guide.pdf
+        │
+        ├── feed_mills/                        [NIVEAU 2 - SITE]
+        │   │
+        │   ├── common/                        [NIVEAU 3]
+        │   │   ├── operations/                [NIVEAU 4 - FINAL]
+        │   │   │   ├── feed-mill-operations-manual.pdf
+        │   │   │   ├── receiving-procedures.pdf
+        │   │   │   └── batching-procedures.pdf
+        │   │   │
+        │   │   ├── quality_control/           [NIVEAU 4 - FINAL]
+        │   │   │   ├── qc-procedures.pdf
+        │   │   │   ├── testing-protocols.pdf
+        │   │   │   └── sampling-methods.pdf
+        │   │   │
+        │   │   ├── safety/                    [NIVEAU 4 - FINAL]
+        │   │   │   ├── feed-safety-standards.pdf
+        │   │   │   ├── contamination-control.pdf
+        │   │   │   └── haccp-feed-mill.pdf
+        │   │   │
+        │   │   ├── equipment/                 [NIVEAU 4 - FINAL]
+        │   │   │   ├── mixer-operations.pdf
+        │   │   │   ├── pellet-mill-guide.pdf
+        │   │   │   └── maintenance-schedules.pdf
+        │   │   │
+        │   │   └── logistics/                 [NIVEAU 4 - FINAL]
+        │   │       ├── delivery-procedures.pdf
+        │   │       ├── storage-management.pdf
+        │   │       └── inventory-control.pdf
+        │   │
+        │   ├── broiler/                       [NIVEAU 3]
+        │   │   ├── formulation/               [NIVEAU 4 - FINAL]
+        │   │   │   ├── broiler-starter-formula.pdf
+        │   │   │   ├── broiler-grower-formula.pdf
+        │   │   │   └── broiler-finisher-formula.pdf
+        │   │   │
+        │   │   ├── specifications/            [NIVEAU 4 - FINAL]
+        │   │   │   ├── broiler-feed-specs.pdf
+        │   │   │   └── nutrient-requirements-broiler.pdf
+        │   │   │
+        │   │   └── ingredients/               [NIVEAU 4 - FINAL]
+        │   │       ├── broiler-ingredient-guide.pdf
+        │   │       └── broiler-premix-specs.pdf
+        │   │
+        │   └── layer/                         [NIVEAU 3]
+        │       ├── formulation/               [NIVEAU 4 - FINAL]
+        │       │   ├── layer-pullet-formula.pdf
+        │       │   ├── layer-production-formula.pdf
+        │       │   └── layer-breeder-formula.pdf
+        │       │
+        │       ├── specifications/            [NIVEAU 4 - FINAL]
+        │       │   ├── layer-feed-specs.pdf
+        │       │   └── nutrient-requirements-layer.pdf
+        │       │
+        │       └── ingredients/               [NIVEAU 4 - FINAL]
+        │           ├── layer-ingredient-guide.pdf
+        │           └── layer-premix-specs.pdf
+        │
+        ├── processing_plants/                 [NIVEAU 2 - SITE]
+        │   │
+        │   ├── operations/                    [NIVEAU 3 - FINAL]
+        │   │   ├── slaughter-procedures.pdf
+        │   │   ├── evisceration-guide.pdf
+        │   │   ├── cutting-procedures.pdf
+        │   │   └── packaging-standards.pdf
+        │   │
+        │   ├── food_safety/                   [NIVEAU 3 - FINAL]
+        │   │   ├── haccp-processing.pdf
+        │   │   ├── sanitation-procedures.pdf
+        │   │   ├── microbiology-testing.pdf
+        │   │   └── contamination-control.pdf
+        │   │
+        │   ├── quality_assurance/             [NIVEAU 3 - FINAL]
+        │   │   ├── inspection-procedures.pdf
+        │   │   ├── quality-testing.pdf
+        │   │   └── carcass-grading.pdf
+        │   │
+        │   ├── animal_welfare/                [NIVEAU 3 - FINAL]
+        │   │   ├── transport-standards.pdf
+        │   │   ├── lairage-procedures.pdf
+        │   │   ├── stunning-protocols.pdf
+        │   │   └── welfare-audits.pdf
+        │   │
+        │   └── traceability/                  [NIVEAU 3 - FINAL]
+        │       ├── traceability-systems.pdf
+        │       ├── lot-tracking.pdf
+        │       └── recall-procedures.pdf
+        │
+        ├── grading_stations/                  [NIVEAU 2 - SITE]
+        │   │
+        │   ├── operations/                    [NIVEAU 3 - FINAL]
+        │   │   ├── grading-procedures.pdf
+        │   │   ├── packing-procedures.pdf
+        │   │   ├── labeling-standards.pdf
+        │   │   └── egg-handling.pdf
+        │   │
+        │   ├── quality_assurance/             [NIVEAU 3 - FINAL]
+        │   │   ├── egg-quality-testing.pdf
+        │   │   ├── inspection-procedures.pdf
+        │   │   └── grading-standards.pdf
+        │   │
+        │   ├── food_safety/                   [NIVEAU 3 - FINAL]
+        │   │   ├── sanitation-grading.pdf
+        │   │   ├── egg-safety-protocols.pdf
+        │   │   └── traceability-eggs.pdf
+        │   │
+        │   └── logistics/                     [NIVEAU 3 - FINAL]
+        │       ├── storage-procedures.pdf
+        │       ├── cold-chain-management.pdf
+        │       └── distribution-procedures.pdf
+        │
+        └── veterinary_services/               [NIVEAU 2 - SITE]
+            │
+            ├── common/                        [NIVEAU 3 - FINAL]
+            │   ├── post-mortem-guide-breeders.pdf
+            │   ├── disease-outbreak-management.pdf
+            │   ├── field-monitoring-protocols.pdf
+            │   ├── diagnostic-procedures.pdf
+            │   ├── ascites.pdf
+            │   ├── coccidiosis.pdf
+            │   ├── infectious-bursal-disease.pdf
+            │   ├── infectious-bronchitis.pdf
+            │   ├── fowl-cholera.pdf
+            │   ├── staph-infections.pdf
+            │   ├── myco-infections.pdf
+            │   ├── ilt.pdf
+            │   ├── avian-influenza.pdf
+            │   ├── egg-drop-syndrome.pdf
+            │   ├── heat-stress-management.pdf
+            │   ├── fly-control.pdf
+            │   ├── beak-management.pdf
+            │   ├── skin-scratches.pdf
+            │   ├── pectoral-myopathy.pdf
+            │   ├── water-quality-management.pdf
+            │   └── manual-poultry-diseases.pdf
+            │
+            ├── broiler/                       [NIVEAU 3 - FINAL]
+            │   ├── broiler-disease-protocols.pdf
+            │   ├── broiler-diagnostics.pdf
+            │   └── broiler-health-monitoring.pdf
+            │
+            └── layer/                         [NIVEAU 3 - FINAL]
+                ├── layer-disease-protocols.pdf
+                ├── layer-diagnostics.pdf
+                └── layer-health-monitoring.pdf
+
+
+================================================================================
+VALIDATION PROFONDEUR
+================================================================================
+
+FERMES (Broiler, Layer, Breeding, Rearing):
+✓ intelia/public/broiler_farms/ross_308/[FICHIER.pdf]
+  = 3 NIVEAUX ✅
+
+✓ intelia/public/layer_farms/common/[FICHIER.pdf]
+  = 3 NIVEAUX ✅
+
+✓ intelia/public/breeding_farms/cobb_500_breeder/[FICHIER.pdf]
+  = 3 NIVEAUX ✅
+
+HATCHERIES:
+✓ intelia/public/hatcheries/broiler/[FICHIER.pdf]
+  = 3 NIVEAUX ✅
+
+FEED MILLS (seul à 4 niveaux):
+✓ intelia/public/feed_mills/broiler/formulation/[FICHIER.pdf]
+  = 4 NIVEAUX ✅
+
+PROCESSING & GRADING:
+✓ intelia/public/processing_plants/operations/[FICHIER.pdf]
+  = 3 NIVEAUX ✅
+
+VETERINARY:
+✓ intelia/public/veterinary_services/common/[FICHIER.pdf]
+  = 3 NIVEAUX ✅
+
+
+================================================================================
+RÈGLES DE PLACEMENT
+================================================================================
+
+QUESTION 1: Quel SITE?
+├─ Ferme broilers → broiler_farms/
+├─ Ferme layers → layer_farms/
+├─ Ferme reproducteurs → breeding_farms/
+├─ Élevage poulettes → rearing_farms/
+├─ Couvoir → hatcheries/
+├─ Usine aliment → feed_mills/
+├─ Abattoir → processing_plants/
+├─ Station classement → grading_stations/
+└─ Service vétérinaire → veterinary_services/
+
+QUESTION 2: Quelle RACE/BREED (ou common)?
+├─ Tous (générique) → common/
+├─ Ross 308 → ross_308/
+├─ Cobb 500 → cobb_500/
+├─ Hy-Line Brown → hy_line_brown/
+└─ Etc.
+
+QUESTION 3: Mettre le fichier PDF directement dans ce dossier
+✓ FIN - Pas de sous-dossiers
+
+
+================================================================================
+CLASSIFICATION VIA METADATA (Pas via folders)
+================================================================================
+
+Puisque tous les PDFs sont au même niveau (dans breed/ ou common/),
+la classification fine se fait via METADATA extraite:
+
+METADATA AUTOMATIQUE (Path-based):
+- site_type: extrait du niveau 2 (broiler_farms, layer_farms, etc.)
+- breed: extrait du niveau 3 (ross_308, cobb_500, common, etc.)
+- owner_org_id: "intelia"
+- visibility_level: "public_global"
+
+METADATA EXTRAITE (Vision + LLM):
+- category_level1: Animal_Health, Nutrition, Housing_Equipment, etc.
+- category_level2: Disease_Management, Feed_Formulation, etc.
+- species: [broiler, layer, breeder, turkey]
+- climate_zone: [tropical, temperate, cold] (si applicable)
+- document_type: handbook, guide, supplement, standard, protocol
+- topics: [nutrition, performance, health, management, welfare]
+- genetic_line: "Ross 308", "Cobb 500", "Hy-Line Brown"
+
+EXEMPLE:
+Fichier: intelia/public/broiler_farms/ross_308/ross-308-handbook.pdf
+
+Path-based metadata (automatique):
+- site_type: broiler_farms
+- breed: ross_308
+- owner_org_id: intelia
+- visibility_level: public_global
+
+Vision-extracted metadata:
+- category_level1: Management_Guide
+- category_level2: Performance_Standards
+- species: [broiler]
+- document_type: handbook
+- topics: [management, nutrition, performance, health, housing]
+- genetic_line: "Ross 308"
+- climate_zone: [multiple_zones]
+
+
+================================================================================
+MAPPING DES 50 PDFs EXISTANTS
+================================================================================
+
+COMMON HEALTH (Documents universels → veterinary_services/common/):
+1.  ascites.pdf                                    → veterinary_services/common/
+2.  AviaTech_Staph.pdf                            → veterinary_services/common/
+3.  COCCIDIOSIS_CONTROL_Ken_Bafundo.pdf           → veterinary_services/common/
+4.  Deep-Pectoral-Myopathy-...pdf                 → veterinary_services/common/
+5.  Drinking-Water-Management.pdf                  → veterinary_services/common/
+6.  fowl_cholera.pdf                              → veterinary_services/common/
+7.  ilt.pdf                                       → veterinary_services/common/
+8.  infectious_bronchitis_virus_ibv.pdf           → veterinary_services/common/
+9.  infectious_bursal_disease.pdf                 → veterinary_services/common/
+10. is2014.pdf                                    → veterinary_services/common/
+11. Manual_of_poultry_diseases_en.pdf             → veterinary_services/common/
+12. skin_scratches.pdf                            → veterinary_services/common/
+13. TU COL ENG.pdf                                → veterinary_services/common/
+14. TU EDS ENG.pdf                                → veterinary_services/common/
+15. TU FLY ENG.pdf                                → veterinary_services/common/
+16. TU Full beak management ENG.pdf               → veterinary_services/common/
+17. TU HEAT ENG.pdf                               → veterinary_services/common/
+18. TU IBD ENG.pdf                                → veterinary_services/common/
+19. TU LPAI ENG.pdf                               → veterinary_services/common/
+20. TU MYCO ENG.pdf                               → veterinary_services/common/
+21. TU NEST ENG.pdf                               → layer_farms/common/
+22. understandingcoccidiosis.pdf                  → veterinary_services/common/
+
+BROILER SPECIFIC:
+23. biosec-poultry-farms.pdf                      → broiler_farms/common/
+24. Gut-Health-on-the-Farm-Guide-EN.pdf           → broiler_farms/common/
+25. optimum-broiler-development.pdf                → broiler_farms/common/
+
+BROILER - ROSS 308:
+26. Aviagen_Ross_BroilerNutritionSupplement.pdf   → broiler_farms/ross_308/
+27. Aviagen-ROSS-Broiler-Handbook-EN.pdf          → broiler_farms/ross_308/
+28. Ross308FF-MgtSuppl2016EN.pdf                  → broiler_farms/ross_308/
+29. RossxRoss308-BroilerPerformanceObjectives...pdf → broiler_farms/ross_308/
+
+BROILER - ROSS 308 PS (Breeder):
+30. Aviagen_Ross_PS_Handbook_2023_Interactive_EN.pdf → breeding_farms/ross_308_ps/
+
+BROILER - COBB 500:
+31. 2022-Cobb500-Broiler-Performance-Nutrition-Supplement.pdf → broiler_farms/cobb_500/
+32. Broiler-Guide_English-2021-min.pdf            → broiler_farms/cobb_500/
+
+BROILER - COBB BREEDER:
+33. Breeder-Management-Guide.pdf                  → breeding_farms/cobb_500_breeder/
+34. Cobb500-Fast-Feather-Breeder-Management-Supplement.pdf → breeding_farms/cobb_500_breeder/
+35. Cobb500-Slow-Feather-Breeder-Management-Supplement.pdf → breeding_farms/cobb_500_breeder/
+36. Cobb-Male-Supplement.pdf                      → breeding_farms/cobb_500_breeder/
+37. Cobb-MX-Male-Supplement.pdf                   → breeding_farms/cobb_500_breeder/
+38. Post-Mortem-Guide-_Breeders-2022-Digital-min.pdf → veterinary_services/common/
+
+HATCHERY:
+39. 6e3727d0-bbd7-11e6-bd5d-55bb08833e29.pdf      → hatcheries/broiler/
+40. Hatchery-Guide-Layout-R4-min.pdf              → hatcheries/broiler/
+
+LAYER - HY-LINE BROWN:
+41. Hyline Brown ALT STD ENG.pdf                  → layer_farms/hy_line_brown/
+42. Hyline Brown Parent Stock ENG.pdf             → breeding_farms/hy_line_brown_ps/
+43. Hyline Brown STD ENG.pdf                      → layer_farms/hy_line_brown/
+
+LAYER - HY-LINE W-36:
+44. Hyline W36- Conventional - Performance Sell Sheet ENG.pdf → layer_farms/hy_line_w36/
+45. Hyline W36 Parent Stock ENG.pdf               → breeding_farms/hy_line_w36_ps/
+46. Hyline W36 STD ENG.pdf                        → layer_farms/hy_line_w36/
+
+LAYER - HY-LINE W-80:
+47. 80 PS ENG.pdf                                 → breeding_farms/hy_line_w80_ps/
+48. 80 STD ENG.pdf                                → layer_farms/hy_line_w80/
+
+LAYER - LOHMANN BROWN:
+49. LOHMANN-Brown-Classic-Cage.pdf                → layer_farms/lohmann_brown/
+
+LAYER - LOHMANN LSL:
+50. LOHMANN-LSL-Lite-Cage-1.pdf                   → layer_farms/lohmann_lsl/
+
+
+================================================================================
+RÉPARTITION PAR SITE (50 PDFs)
+================================================================================
+
+veterinary_services/common/         : 22 documents (44%)
+broiler_farms/common/              : 3 documents  (6%)
+broiler_farms/ross_308/            : 4 documents  (8%)
+broiler_farms/cobb_500/            : 2 documents  (4%)
+breeding_farms/ross_308_ps/        : 1 document   (2%)
+breeding_farms/cobb_500_breeder/   : 5 documents  (10%)
+breeding_farms/hy_line_brown_ps/   : 1 document   (2%)
+breeding_farms/hy_line_w36_ps/     : 1 document   (2%)
+breeding_farms/hy_line_w80_ps/     : 1 document   (2%)
+hatcheries/broiler/                : 2 documents  (4%)
+layer_farms/hy_line_brown/         : 2 documents  (4%)
+layer_farms/hy_line_w36/           : 2 documents  (4%)
+layer_farms/hy_line_w80/           : 1 document   (2%)
+layer_farms/lohmann_brown/         : 1 document   (2%)
+layer_farms/lohmann_lsl/           : 1 document   (2%)
+
+TOTAL: 50 documents
+
+
+================================================================================
+AVANTAGES DE CETTE STRUCTURE
+================================================================================
+
+✅ ULTRA SIMPLE
+   - Maximum 3 niveaux pour 90% des documents
+   - Facile à comprendre et maintenir
+
+✅ CLASSIFICATION FACILE
+   - Site = évident
+   - Breed = évident
+   - Pas besoin de deviner sous-catégories
+
+✅ PAS DE DUPLICATION
+   - Documents multi-sites vont dans veterinary_services/common/
+   - Un document = un emplacement
+
+✅ METADATA FAIT LE TRAVAIL
+   - Classification fine via metadata (pas folders)
+   - Recherche vectorielle trouve tout
+
+✅ EXTENSIBLE
+   - Facile ajouter nouveaux breeds
+   - Facile ajouter nouveaux sites
+
+✅ PATH-BASED EXTRACTION 80%+
+   - site_type automatique
+   - breed automatique
+   - owner_org_id automatique
+
+
+================================================================================
+PROCHAINES ÉTAPES
+================================================================================
+
+1. ✅ Valider cette structure finale
+2. ⏳ Créer script migration automatique (50 PDFs)
+3. ⏳ Implémenter path-based metadata extractor
+4. ⏳ Tester avec 5 PDFs pilotes
+5. ⏳ Migration complète
+6. ⏳ Implémenter Vision Extractor
+
+
+================================================================================
+FIN DU DOCUMENT
+================================================================================

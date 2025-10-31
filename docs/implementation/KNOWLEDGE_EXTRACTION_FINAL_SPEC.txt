@@ -1,0 +1,800 @@
+================================================================================
+KNOWLEDGE EXTRACTION - SPÉCIFICATION FINALE
+Architecture complète pour système de gestion documentaire Intelia Cognito
+================================================================================
+
+Date: 2025-10-29
+Version: 1.0 - FINALE
+Statut: VALIDÉ - Prêt pour implémentation
+
+================================================================================
+TABLE DES MATIÈRES
+================================================================================
+
+1. VUE D'ENSEMBLE
+2. STRUCTURE DE RÉPERTOIRES
+3. CHUNKING STRATEGY
+4. CLASSIFICATION AUTOMATIQUE
+5. ARCHITECTURE WEAVIATE
+6. SCHÉMA MÉTADONNÉES
+7. PATH-BASED CLASSIFIER CONFIGURABLE
+8. PIPELINE D'EXTRACTION
+9. MIGRATION DES DOCUMENTS
+10. PLAN D'IMPLÉMENTATION
+
+
+================================================================================
+1. VUE D'ENSEMBLE
+================================================================================
+
+OBJECTIF:
+  Système de knowledge extraction avec classification automatique (90%+)
+  pour documents techniques de l'industrie avicole.
+
+PRINCIPES CLÉS:
+  ✓ Structure simple (max 3 niveaux)
+  ✓ Classification automatique maximale
+  ✓ Multi-tenant (Intelia + clients)
+  ✓ Path-agnostic (chaque org a sa structure)
+  ✓ Extensible et maintenable
+
+COMPOSANTS:
+  1. Vision Extractor (PDF → Markdown + Metadata)
+  2. Content Segmenter (Markdown → Chunks 600 words)
+  3. Path-based Classifier (Path → Metadata auto)
+  4. Metadata Enricher (Combine path + vision + defaults)
+  5. Embedding Generator (Chunks → Vectors)
+  6. Weaviate Storage (Vectors + Metadata)
+
+
+================================================================================
+2. STRUCTURE DE RÉPERTOIRES
+================================================================================
+
+PRINCIPE:
+  - Intelia: Structure contrôlée à 3 niveaux max
+  - Clients: Structure custom définie avec chaque client
+  - Path-based classification configurable par organisation
+
+--------------------------------------------------------------------------------
+2.1 STRUCTURE INTELIA
+--------------------------------------------------------------------------------
+
+Sources/
+└── intelia/
+    │
+    ├── public/                          [NIVEAU 1 - Knowledge technique]
+    │   │
+    │   ├── broiler_farms/               [NIVEAU 2 - SITE TYPE]
+    │   │   ├── common/                  [NIVEAU 3 - FINAL]
+    │   │   │   └── [fichiers PDF directement]
+    │   │   ├── ross_308/
+    │   │   │   └── [fichiers PDF directement]
+    │   │   ├── cobb_500/
+    │   │   │   └── [fichiers PDF directement]
+    │   │   └── hubbard_flex/
+    │   │       └── [fichiers PDF directement]
+    │   │
+    │   ├── layer_farms/                 [NIVEAU 2 - SITE TYPE]
+    │   │   ├── common/
+    │   │   ├── hy_line_brown/
+    │   │   ├── hy_line_w36/
+    │   │   ├── hy_line_w80/
+    │   │   ├── lohmann_brown/
+    │   │   └── lohmann_lsl/
+    │   │
+    │   ├── breeding_farms/              [NIVEAU 2 - SITE TYPE]
+    │   │   ├── common/
+    │   │   ├── ross_308_ps/
+    │   │   ├── cobb_500_breeder/
+    │   │   ├── hy_line_brown_ps/
+    │   │   ├── hy_line_w36_ps/
+    │   │   └── hy_line_w80_ps/
+    │   │
+    │   ├── hatcheries/                  [NIVEAU 2 - SITE TYPE]
+    │   │   ├── common/
+    │   │   ├── broiler/
+    │   │   └── layer/
+    │   │
+    │   ├── rearing_farms/               [NIVEAU 2 - SITE TYPE - Layer pullets]
+    │   │   ├── common/
+    │   │   ├── hy_line_brown/
+    │   │   └── lohmann_brown/
+    │   │
+    │   ├── feed_mills/                  [NIVEAU 2 - SITE TYPE]
+    │   │   ├── common/                  [NIVEAU 3]
+    │   │   │   ├── operations/          [NIVEAU 4 - FINAL]
+    │   │   │   ├── quality_control/
+    │   │   │   ├── safety/
+    │   │   │   ├── equipment/
+    │   │   │   └── logistics/
+    │   │   ├── broiler/                 [NIVEAU 3]
+    │   │   │   ├── formulation/         [NIVEAU 4 - FINAL]
+    │   │   │   ├── specifications/
+    │   │   │   └── ingredients/
+    │   │   └── layer/                   [NIVEAU 3]
+    │   │       ├── formulation/         [NIVEAU 4 - FINAL]
+    │   │       ├── specifications/
+    │   │       └── ingredients/
+    │   │
+    │   ├── processing_plants/           [NIVEAU 2 - SITE TYPE - Broiler only]
+    │   │   ├── operations/              [NIVEAU 3 - FINAL]
+    │   │   ├── food_safety/
+    │   │   ├── quality_assurance/
+    │   │   ├── animal_welfare/
+    │   │   └── traceability/
+    │   │
+    │   ├── grading_stations/            [NIVEAU 2 - SITE TYPE - Layer only]
+    │   │   ├── operations/              [NIVEAU 3 - FINAL]
+    │   │   ├── quality_assurance/
+    │   │   ├── food_safety/
+    │   │   └── logistics/
+    │   │
+    │   └── veterinary_services/         [NIVEAU 2 - SITE TYPE]
+    │       ├── common/                  [NIVEAU 3 - FINAL]
+    │       │   └── [maladies universelles, diagnostics]
+    │       ├── broiler/
+    │       └── layer/
+    │
+    ├── intelia_about/                   [NIVEAU 1 - Présentation Intelia]
+    │   ├── company-overview.pdf         [NIVEAU 2 - FINAL]
+    │   ├── services-description.pdf
+    │   ├── team-experts.pdf
+    │   └── company-presentation.pdf
+    │
+    └── intelia_products/                [NIVEAU 1 - Catalogue produits]
+        ├── cognito_platform/            [NIVEAU 2 - FINAL]
+        │   ├── installation-manual.pdf
+        │   └── user-manual.pdf
+        ├── product_a/
+        │   ├── installation-manual.pdf
+        │   └── user-manual.pdf
+        ├── product_b/
+        │   ├── installation-manual.pdf
+        │   └── user-manual.pdf
+        └── product_c/
+            ├── installation-manual.pdf
+            └── user-manual.pdf
+
+
+PROFONDEUR:
+  ✓ 90% des documents: 3 niveaux (fermes)
+  ✓ 10% des documents: 4 niveaux (feed_mills seulement)
+
+RÈGLES:
+  ✓ Pas de general/ (redondant avec common/)
+  ✓ Documents multi-sites → veterinary_services/common/
+  ✓ Fichiers PDF directement dans breed/ ou common/
+  ✓ Classification fine via METADATA (pas via folders)
+
+
+--------------------------------------------------------------------------------
+2.2 STRUCTURE CLIENTS (Exemples)
+--------------------------------------------------------------------------------
+
+CLIENT ABC (Structure custom définie avec client):
+
+Sources/
+└── client_abc/
+    ├── fermes/
+    │   ├── poulets-de-chair/
+    │   │   ├── ross_308/
+    │   │   └── cobb_500/
+    │   └── pondeuses/
+    │       ├── hy_line/
+    │       └── lohmann/
+    ├── protocoles/
+    │   ├── vaccination/
+    │   └── biosecurite/
+    └── rapports/
+        ├── 2024/
+        └── 2025/
+
+
+CLIENT XYZ (Structure différente):
+
+Sources/
+└── client_xyz/
+    ├── production/
+    │   ├── broilers/
+    │   └── layers/
+    ├── health/
+    │   └── protocols/
+    └── documentation/
+        └── manuals/
+
+
+RÈGLES CLIENTS:
+  ✓ Structure définie en collaboration avec chaque client
+  ✓ Intelia télécharge et classe les documents
+  ✓ Path-based classifier configuré par client (fichier YAML)
+
+
+================================================================================
+3. CHUNKING STRATEGY
+================================================================================
+
+CONFIGURATION VALIDÉE (A/B Test Phase 2):
+  ✓ max_chunk_words: 600 words
+  ✓ overlap_words: 120 words (20% de 600)
+  ✓ min_chunk_words: 50 words
+
+RAISON:
+  ✓ 600 words ≈ 800 tokens (sweet spot pour text-embedding-3-large)
+  ✓ 98% plus de chunks (meilleure granularité)
+  ✓ Seulement 4.5% plus lent (acceptable)
+  ✓ Meilleure précision recherche vectorielle
+
+IMPLÉMENTATION:
+  File: knowledge-ingesters/knowledge_extractor/core/content_segmenter.py
+  Lines: 35-53
+
+CODE:
+```python
+self.chunking_service = ChunkingService(
+    config=ChunkConfig(
+        min_chunk_words=50,
+        max_chunk_words=600,      # VALIDATED: Optimal for embeddings
+        overlap_words=120,        # 20% overlap
+        prefer_markdown_sections=True,
+        prefer_paragraph_boundaries=True,
+        prefer_sentence_boundaries=True
+    )
+)
+```
+
+
+================================================================================
+4. CLASSIFICATION AUTOMATIQUE
+================================================================================
+
+ARCHITECTURE HYBRIDE EN 3 TIERS:
+
+┌─────────────────────────────────────────────────────────┐
+│              HYBRID DOCUMENT CLASSIFIER                 │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  TIER 1: Path-Based Classification                     │
+│  ├─ Coverage: 70% pour Intelia (structure contrôlée)   │
+│  ├─ Coverage: 50-60% pour clients (structure variable) │
+│  ├─ Règles déterministes (rapide, gratuit)             │
+│  └─ Champs: site_type, breed, owner_org_id, etc.       │
+│                                                         │
+│  TIER 2: Vision-Based Inference (Claude Vision)        │
+│  ├─ Coverage: 25% pour Intelia                         │
+│  ├─ Coverage: 35-45% pour clients                      │
+│  ├─ Extraction depuis contenu du document              │
+│  └─ Champs: category, species, topics, genetic_line    │
+│                                                         │
+│  TIER 3: Smart Defaults                                │
+│  ├─ Coverage: 5%                                        │
+│  ├─ Valeurs par défaut intelligentes                   │
+│  └─ Gestion des cas non couverts                       │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+
+OBJECTIF: 90%+ classification automatique
+
+
+--------------------------------------------------------------------------------
+4.1 TIER 1: PATH-BASED CLASSIFICATION
+--------------------------------------------------------------------------------
+
+PRINCIPE:
+  Extraction automatique de métadonnées depuis le chemin du fichier.
+
+EXTRACTION POUR INTELIA:
+
+  Path: intelia/public/broiler_farms/ross_308/handbook.pdf
+
+  Métadonnées extraites:
+    - owner_org_id: "intelia"
+    - visibility_level: "public_global"
+    - site_type: "broiler_farms"
+    - breed: "ross_308"
+
+  Path: intelia/intelia_about/company-overview.pdf
+
+  Métadonnées extraites:
+    - owner_org_id: "intelia"
+    - content_type: "company_info"
+
+  Path: intelia/intelia_products/cognito_platform/user-manual.pdf
+
+  Métadonnées extraites:
+    - owner_org_id: "intelia"
+    - content_type: "product_documentation"
+    - product_name: "cognito_platform"
+    - document_type: "user_manual"
+
+EXTRACTION POUR CLIENTS:
+
+  Configuré via fichier YAML par organisation (voir section 7)
+
+
+--------------------------------------------------------------------------------
+4.2 TIER 2: VISION-BASED CLASSIFICATION
+--------------------------------------------------------------------------------
+
+PRINCIPE:
+  Claude Vision analyse le contenu du PDF et extrait métadonnées complexes.
+
+CHAMPS EXTRAITS:
+  - category_level1: Animal_Health, Nutrition, Management, etc.
+  - category_level2: Disease_Management, Feed_Formulation, etc.
+  - species: [broiler, layer, breeder, turkey]
+  - climate_zone: [tropical, temperate, cold] si applicable
+  - document_type: handbook, guide, supplement, standard, protocol
+  - topics: [nutrition, performance, health, management, welfare]
+  - genetic_line: "Ross 308", "Cobb 500", "Hy-Line Brown", etc.
+  - language: "en", "fr", "es"
+
+MODÈLE:
+  Claude Sonnet 4 (ou Opus pour qualité maximale)
+
+PROMPT STRUCTURE:
+```
+Analyze this poultry industry document and extract metadata.
+
+Document image: [PDF page as image]
+
+Extract the following fields:
+1. category_level1: Primary category (Animal_Health, Nutrition, Management, etc.)
+2. category_level2: Subcategory (Disease_Management, Feed_Formulation, etc.)
+3. species: List of applicable species [broiler, layer, breeder, turkey]
+4. genetic_line: Specific breed if mentioned (Ross 308, Cobb 500, etc.)
+5. document_type: Type (handbook, guide, supplement, standard, protocol)
+6. topics: List of main topics covered
+7. climate_zone: If climate-specific [tropical, temperate, cold, subtropical, hot_arid]
+8. language: Document language code
+
+Return JSON format.
+```
+
+
+--------------------------------------------------------------------------------
+4.3 TIER 3: SMART DEFAULTS
+--------------------------------------------------------------------------------
+
+PRINCIPE:
+  Valeurs par défaut pour champs manquants.
+
+DEFAULTS:
+  - species: ["broiler", "layer"] si non détecté
+  - climate_zone: ["multiple_zones"] si non spécifié
+  - document_type: "guide" si non détecté
+  - language: "en" par défaut
+
+
+================================================================================
+5. ARCHITECTURE WEAVIATE
+================================================================================
+
+STRATÉGIE: SINGLE COLLECTION
+
+Collection Name: KnowledgeChunks
+
+AVANTAGES:
+  ✓ Simplicité: Un seul schema à maintenir
+  ✓ Flexibilité: Queries cross-domain faciles
+  ✓ Performance: Weaviate optimisé pour filtrage massif
+  ✓ Maintenance: Pas de synchronisation multi-collections
+  ✓ Évolutivité: Ajout de filtres sans créer nouvelles collections
+
+FILTRAGE MULTI-DIMENSION:
+
+```python
+# Exemple: Query pour organisation "client_abc", documents accessibles
+results = collection.query.near_text(
+    query="vaccination schedule broilers",
+    limit=10,
+    filters=(
+        Filter.by_property("visibility_level").equal("public_global") |
+        (
+            Filter.by_property("visibility_level").equal("org_internal") &
+            Filter.by_property("owner_org_id").equal("client_abc")
+        )
+    ) &
+    Filter.by_property("site_type").equal("broiler_farms") &
+    Filter.by_property("species").contains_any(["broiler"])
+)
+```
+
+MULTI-TENANT SUPPORT:
+  Via filtrage metadata (pas de collections séparées):
+  - owner_org_id: "intelia", "client_abc", "client_xyz"
+  - visibility_level: public_global, intelia_internal, org_internal, etc.
+
+
+================================================================================
+6. SCHÉMA MÉTADONNÉES
+================================================================================
+
+CHUNK PROPERTIES (Weaviate Schema):
+
+PATH-BASED (Extraction automatique):
+  - owner_org_id: string (intelia, client_abc, etc.)
+  - visibility_level: string (public_global, org_internal, etc.)
+  - site_type: string (broiler_farms, layer_farms, etc.)
+  - breed: string (ross_308, cobb_500, hy_line_brown, common)
+  - content_type: string (knowledge, company_info, product_documentation)
+  - product_name: string (cognito_platform, product_a, etc.)
+
+VISION-EXTRACTED (LLM):
+  - category_level1: string (Animal_Health, Nutrition, Management, etc.)
+  - category_level2: string (Disease_Management, Feed_Formulation, etc.)
+  - species: string[] ([broiler, layer, breeder, turkey])
+  - climate_zone: string[] ([tropical, temperate, cold, etc.])
+  - document_type: string (handbook, guide, supplement, standard, protocol)
+  - topics: string[] ([nutrition, performance, health, management, welfare])
+  - genetic_line: string (Ross 308, Cobb 500, Hy-Line Brown, etc.)
+  - language: string (en, fr, es)
+
+DOCUMENT INFO:
+  - source_document: string (filename)
+  - source_path: string (full path)
+  - chunk_index: int
+  - total_chunks: int
+  - source_url: string (si applicable)
+  - processing_date: datetime
+  - file_hash: string (SHA256)
+
+CHUNK CONTENT:
+  - text: string (chunk content)
+  - vector: float[] (embedding)
+
+
+================================================================================
+7. PATH-BASED CLASSIFIER CONFIGURABLE
+================================================================================
+
+PRINCIPE:
+  Chaque organisation a son propre fichier de configuration de règles
+  path-based.
+
+LOCALISATION:
+  config/path_rules/
+  ├── intelia.yaml
+  ├── client_abc.yaml
+  └── client_xyz.yaml
+
+
+--------------------------------------------------------------------------------
+7.1 EXEMPLE: config/path_rules/intelia.yaml
+--------------------------------------------------------------------------------
+
+```yaml
+organization: intelia
+owner_org_id: intelia
+
+rules:
+  # Public knowledge documents
+  - pattern: "^intelia/public/broiler_farms/"
+    metadata:
+      visibility_level: public_global
+      site_type: broiler_farms
+      content_type: knowledge
+
+  - pattern: "^intelia/public/broiler_farms/common/"
+    metadata:
+      breed: common
+
+  - pattern: "^intelia/public/broiler_farms/ross_308/"
+    metadata:
+      breed: ross_308
+      genetic_line: "Ross 308"
+
+  - pattern: "^intelia/public/broiler_farms/cobb_500/"
+    metadata:
+      breed: cobb_500
+      genetic_line: "Cobb 500"
+
+  - pattern: "^intelia/public/layer_farms/"
+    metadata:
+      visibility_level: public_global
+      site_type: layer_farms
+      content_type: knowledge
+
+  - pattern: "^intelia/public/layer_farms/hy_line_brown/"
+    metadata:
+      breed: hy_line_brown
+      genetic_line: "Hy-Line Brown"
+
+  - pattern: "^intelia/public/veterinary_services/"
+    metadata:
+      visibility_level: public_global
+      site_type: veterinary_services
+      content_type: knowledge
+
+  # Company info
+  - pattern: "^intelia/intelia_about/"
+    metadata:
+      visibility_level: public_global
+      content_type: company_info
+
+  # Product documentation
+  - pattern: "^intelia/intelia_products/([^/]+)/"
+    metadata:
+      visibility_level: public_global
+      content_type: product_documentation
+      product_name: "$1"  # Capture group
+```
+
+
+--------------------------------------------------------------------------------
+7.2 EXEMPLE: config/path_rules/client_abc.yaml
+--------------------------------------------------------------------------------
+
+```yaml
+organization: client_abc
+owner_org_id: client_abc
+
+rules:
+  # Fermes poulets de chair
+  - pattern: "^client_abc/fermes/poulets-de-chair/"
+    metadata:
+      visibility_level: org_internal
+      site_type: broiler_farms
+      language: fr
+
+  - pattern: "^client_abc/fermes/poulets-de-chair/ross_308/"
+    metadata:
+      breed: ross_308
+      genetic_line: "Ross 308"
+
+  - pattern: "^client_abc/fermes/poulets-de-chair/cobb_500/"
+    metadata:
+      breed: cobb_500
+      genetic_line: "Cobb 500"
+
+  # Fermes pondeuses
+  - pattern: "^client_abc/fermes/pondeuses/"
+    metadata:
+      visibility_level: org_internal
+      site_type: layer_farms
+      language: fr
+
+  # Protocoles
+  - pattern: "^client_abc/protocoles/"
+    metadata:
+      visibility_level: org_internal
+      document_type: protocol
+      language: fr
+
+  # Rapports
+  - pattern: "^client_abc/rapports/"
+    metadata:
+      visibility_level: org_internal
+      document_type: report
+      language: fr
+```
+
+
+--------------------------------------------------------------------------------
+7.3 PATH-BASED CLASSIFIER (Code Python)
+--------------------------------------------------------------------------------
+
+```python
+import re
+import yaml
+from pathlib import Path
+
+class PathBasedClassifier:
+    def __init__(self, config_dir: str = "config/path_rules"):
+        self.config_dir = Path(config_dir)
+        self.org_rules = {}
+        self._load_all_configs()
+
+    def _load_all_configs(self):
+        """Load all organization configs"""
+        for config_file in self.config_dir.glob("*.yaml"):
+            with open(config_file) as f:
+                config = yaml.safe_load(f)
+                org_id = config["owner_org_id"]
+                self.org_rules[org_id] = config["rules"]
+
+    def classify(self, file_path: str, owner_org_id: str) -> dict:
+        """Extract metadata from file path"""
+        metadata = {"owner_org_id": owner_org_id}
+
+        # Get rules for this organization
+        rules = self.org_rules.get(owner_org_id, [])
+
+        # Apply rules in order
+        for rule in rules:
+            pattern = rule["pattern"]
+            match = re.match(pattern, file_path)
+            if match:
+                # Apply metadata
+                for key, value in rule["metadata"].items():
+                    # Replace capture groups
+                    if "$" in str(value):
+                        value = match.expand(value)
+                    metadata[key] = value
+
+        return metadata
+```
+
+
+================================================================================
+8. PIPELINE D'EXTRACTION
+================================================================================
+
+FLOW COMPLET:
+
+1. INPUT
+   ├─ PDF file
+   └─ owner_org_id (intelia, client_abc, etc.)
+
+2. VISION EXTRACTOR
+   ├─ Convert PDF → Images (300 DPI)
+   ├─ Claude Vision API → Markdown + Metadata
+   └─ Output: markdown.md + vision_metadata.json
+
+3. PATH-BASED CLASSIFIER
+   ├─ Analyze file path
+   ├─ Load org-specific rules
+   └─ Output: path_metadata.json
+
+4. CONTENT SEGMENTER
+   ├─ Input: markdown.md
+   ├─ Chunk into 600-word segments
+   └─ Output: chunks[]
+
+5. METADATA ENRICHER
+   ├─ Combine: path_metadata + vision_metadata + defaults
+   ├─ Validate and normalize
+   └─ Output: enriched_metadata
+
+6. EMBEDDING GENERATOR
+   ├─ Input: chunks[]
+   ├─ OpenAI text-embedding-3-large
+   └─ Output: vectors[]
+
+7. WEAVIATE INGESTION
+   ├─ Insert chunks with vectors + metadata
+   └─ Indexed and searchable
+
+
+COMPOSANTS À IMPLÉMENTER:
+
+[✅] Content Segmenter (EXISTE - needs update to 600 words)
+[❓] Vision Extractor (adapter performance_extractor)
+[❓] Path-based Classifier (nouveau)
+[❓] Metadata Enricher (nouveau)
+[✅] Embedding Generator (EXISTE)
+[✅] Weaviate Client (EXISTE - needs schema update)
+
+
+================================================================================
+9. MIGRATION DES DOCUMENTS
+================================================================================
+
+DOCUMENTS ACTUELS: 50 PDFs
+
+RÉPARTITION:
+  - 44% (22 docs) → veterinary_services/common/
+  - 8%  (4 docs)  → broiler_farms/ross_308/
+  - 6%  (3 docs)  → broiler_farms/common/
+  - 4%  (2 docs)  → broiler_farms/cobb_500/
+  - 10% (5 docs)  → breeding_farms/cobb_500_breeder/
+  - 2%  (1 doc)   → breeding_farms/ross_308_ps/
+  - Reste         → layer_farms + hatcheries
+
+PLAN DE MIGRATION:
+
+1. Créer nouvelle structure de répertoires
+2. Créer script de migration (mapping old → new)
+3. Valider mapping avec 5 PDFs pilotes
+4. Migration complète des 50 PDFs
+5. Supprimer ancienne structure après validation
+
+SCRIPT: docs/scripts/migrate_to_new_structure.py
+
+
+ÉTAPES POST-MIGRATION:
+
+1. Supprimer collection Weaviate existante
+2. Recréer collection avec nouveau schéma
+3. Re-ingestion complète avec nouveau pipeline
+4. Validation qualité (search tests)
+
+
+================================================================================
+10. PLAN D'IMPLÉMENTATION
+================================================================================
+
+PHASE 1: FONDATIONS (2-3 jours)
+├─ [1] Créer path_based_classifier.py
+├─ [2] Créer config/path_rules/intelia.yaml
+├─ [3] Adapter Vision Extractor pour knowledge docs
+├─ [4] Créer metadata_enricher.py
+└─ [5] Update Weaviate schema
+
+PHASE 2: INTÉGRATION (1-2 jours)
+├─ [6] Intégrer composants dans knowledge_extractor.py
+├─ [7] Update content_segmenter.py (600 words)
+├─ [8] Créer migration script
+└─ [9] Migrer structure de répertoires
+
+PHASE 3: VALIDATION (1 jour)
+├─ [10] Tests end-to-end avec 5 PDFs pilotes
+├─ [11] Validation classification accuracy
+├─ [12] Validation search quality
+└─ [13] Performance benchmarks
+
+PHASE 4: PRODUCTION (1 jour)
+├─ [14] Migration des 50 PDFs complets
+├─ [15] Supprimer ancienne collection Weaviate
+├─ [16] Re-ingestion complète
+└─ [17] Tests de régression
+
+TOTAL ESTIMÉ: 5-7 jours de développement
+
+
+PRIORITÉS:
+  P0 (Critique): [1], [2], [4], [5], [6], [7]
+  P1 (Haute):    [3], [8], [9], [10], [16]
+  P2 (Moyenne):  [11], [12], [13], [14], [15], [17]
+
+
+================================================================================
+ANNEXES
+================================================================================
+
+ANNEXE A: MAPPING 50 PDFs EXISTANTS
+
+Voir: docs/implementation/migration_plan.json (à créer)
+
+ANNEXE B: WEAVIATE SCHEMA COMPLET
+
+Voir: knowledge-ingesters/knowledge_extractor/weaviate_schema.json (à créer)
+
+ANNEXE C: VISION EXTRACTOR PROMPTS
+
+Voir: knowledge-ingesters/knowledge_extractor/prompts/ (à créer)
+
+ANNEXE D: PATH RULES EXAMPLES
+
+Voir: config/path_rules/*.yaml (à créer)
+
+
+================================================================================
+VALIDATION FINALE
+================================================================================
+
+CHECKLIST COMPLÈTE:
+
+[✅] Chunking strategy validé (600 words)
+[✅] Structure de répertoires définie (3 niveaux)
+[✅] Classification automatique architecture (3-tiers)
+[✅] Weaviate architecture (single collection)
+[✅] Schéma métadonnées complet
+[✅] Path-based classifier configurable
+[✅] Support multi-tenant (Intelia + clients)
+[✅] Support structures custom par client
+[✅] Extensibilité garantie
+[✅] Plan de migration documenté
+[✅] Plan d'implémentation par phases
+
+STATUT: ✅ VALIDÉ - PRÊT POUR IMPLÉMENTATION
+
+
+================================================================================
+CONTACT & RÉVISIONS
+================================================================================
+
+Document créé par: Claude Code (Anthropic)
+Projet: Intelia Cognito - Knowledge Extraction
+Date création: 2025-10-29
+Dernière révision: 2025-10-29
+Version: 1.0 - FINALE
+
+Pour modifications futures:
+  Éditer ce fichier unique de référence
+  Archiver versions précédentes avec date
+
+
+================================================================================
+FIN DU DOCUMENT
+================================================================================

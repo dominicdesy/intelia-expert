@@ -1,0 +1,66 @@
+================================================================================
+STRUCTURE - BROILER (farm)
+================================================================================
+
+intelia/public/
+│
+├── broiler_farms/                       [SITE TYPE]
+│   ├── common/                          [All breeds]
+│   │   ├── management/
+│   │   │   ├── brooding/
+│   │   │   ├── daily_checks/
+│   │   │   ├── thinning_and_catch/
+│   │   │   └── recordkeeping/
+│   │   ├── nutrition/
+│   │   │   ├── starter/
+│   │   │   ├── grower/
+│   │   │   ├── finisher/
+│   │   │   └── water_management/
+│   │   ├── welfare/
+│   │   │   ├── lameness_scoring/
+│   │   │   ├── paw_quality_scoring/
+│   │   │   └── stocking_density/
+│   │   ├── housing/
+│   │   │   ├── common/                  [Climate-agnostic]
+│   │   │   │   ├── ventilation_basics/
+│   │   │   │   ├── litter_management/
+│   │   │   │   └── lighting/
+│   │   │   │
+│   │   │   └── by_climate/              [Climate-specific]
+│   │   │       ├── tropical/
+│   │   │       │   ├── ventilation_design/
+│   │   │       │   ├── cooling_systems/
+│   │   │       │   ├── heat_stress_prevention/
+│   │   │       │   └── humidity_control/
+│   │   │       ├── subtropical/
+│   │   │       ├── temperate/
+│   │   │       │   ├── seasonal_management/
+│   │   │       │   └── insulation/
+│   │   │       ├── cold/
+│   │   │       │   ├── heating_systems/
+│   │   │       │   ├── winter_management/
+│   │   │       │   └── ventilation_minimum/
+│   │   │       └── hot_arid/
+│   │   │           ├── evaporative_cooling/
+│   │   │           └── dust_control/
+│   │   │
+│   │   ├── environment/
+│   │   │   ├── temperature_profiles/
+│   │   │   ├── humidity_targets/
+│   │   │   └── ammonia_limits/
+│   │   │
+│   │   └── performance/
+│   │       ├── growth_targets/
+│   │       ├── FCR_targets/
+│   │       ├── uniformity_tracking/
+│   │       └── slaughter_weight_planning/
+│   │
+│   └── by_breed/                        [Breed-specific]
+│       ├── ross_308/
+│       │   ├── management/
+│       │   ├── nutrition/
+│       │   ├── health/
+│       │   └── performance/
+│       ├── cobb_500/
+│       ├── hubbard_flex/
+│       └── general/

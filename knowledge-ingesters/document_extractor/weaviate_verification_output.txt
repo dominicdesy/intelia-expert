@@ -1,0 +1,155 @@
+================================================================================
+WEAVIATE COLLECTION VERIFICATION
+================================================================================
+
+Connecting to Weaviate...
+Connected successfully!
+
+--------------------------------------------------------------------------------
+OBJECT COUNT
+--------------------------------------------------------------------------------
+Collection: InteliaKnowledge
+Total objects: 1551
+Expected: 1551
+Match: YES
+
+--------------------------------------------------------------------------------
+SAMPLE OBJECTS (First 5)
+--------------------------------------------------------------------------------
+
+--- Object 1 ---
+  Title: N/A
+  Filename: N/A
+  Chunk Index: None
+  Word Count: 356
+  Quality Score: 0.699
+  Info Density: 1.0
+  Completeness: 0.5
+  Semantic Coherence: 0.683
+  Structure Score: 0.3
+  Breeds: ['cOBB 7']
+  Diseases: []
+  Medications: []
+  Has Performance Data: False
+  Has Health Info: False
+  Has Nutrition Info: True
+  Owner Org ID: intelia
+  Visibility Level: public_global
+  Site Type: hatcheries
+  Breed: 6e3727d0-bbd7-11e6-bd5d-55bb08833e29.pdf
+  Category: broiler
+
+--- Object 2 ---
+  Title: N/A
+  Filename: N/A
+  Chunk Index: None
+  Word Count: 491
+  Quality Score: 0.56
+  Info Density: 0.407
+  Completeness: 0.5
+  Semantic Coherence: 0.693
+  Structure Score: 0.3
+  Breeds: []
+  Diseases: []
+  Medications: []
+  Has Performance Data: False
+  Has Health Info: False
+  Has Nutrition Info: False
+  Owner Org ID: intelia
+  Visibility Level: public_global
+  Site Type: veterinary_services
+  Breed: TU MYCO ENG.pdf
+  Category: common
+
+--- Object 3 ---
+  Title: N/A
+  Filename: N/A
+  Chunk Index: None
+  Word Count: 417
+  Quality Score: 0.563
+  Info Density: 0.288
+  Completeness: 0.5
+  Semantic Coherence: 0.821
+  Structure Score: 0.3
+  Breeds: []
+  Diseases: []
+  Medications: []
+  Has Performance Data: False
+  Has Health Info: False
+  Has Nutrition Info: True
+  Owner Org ID: intelia
+  Visibility Level: public_global
+  Site Type: breeding_farms
+  Breed: cobb_500_breeder
+  Category: breed
+
+--- Object 4 ---
+  Title: N/A
+  Filename: N/A
+  Chunk Index: None
+  Word Count: 331
+  Quality Score: 0.362
+  Info Density: 0.121
+  Completeness: 0.5
+  Semantic Coherence: 0.46
+  Structure Score: 0.3
+  Breeds: []
+  Diseases: []
+  Medications: ['vaccination', 'vaccine']
+  Has Performance Data: False
+  Has Health Info: True
+  Has Nutrition Info: False
+  Owner Org ID: intelia
+  Visibility Level: public_global
+  Site Type: veterinary_services
+  Breed: Post-Mortem-Guide-_Breeders-2022-Digital-min.pdf
+  Category: common
+
+--- Object 5 ---
+  Title: N/A
+  Filename: N/A
+  Chunk Index: None
+  Word Count: 714
+  Quality Score: 0.562
+  Info Density: 0.434
+  Completeness: 0.5
+  Semantic Coherence: 0.711
+  Structure Score: 0.7
+  Breeds: []
+  Diseases: []
+  Medications: ['vaccine']
+  Has Performance Data: False
+  Has Health Info: True
+  Has Nutrition Info: True
+  Owner Org ID: intelia
+  Visibility Level: public_global
+  Site Type: veterinary_services
+  Breed: Manual_of_poultry_diseases_en-136-271.pdf
+  Category: common
+
+--------------------------------------------------------------------------------
+QUALITY SCORE STATISTICS
+--------------------------------------------------------------------------------
+All quality score fields are populated for sampled objects:
+  - quality_score: OK
+  - info_density: OK
+  - completeness: OK
+  - semantic_coherence: OK
+  - structure_score: OK
+
+--------------------------------------------------------------------------------
+ENTITY EXTRACTION VERIFICATION
+--------------------------------------------------------------------------------
+Sample of 100 objects:
+  Objects with breeds: 52
+  Objects with diseases: 30
+  Objects with medications: 21
+
+================================================================================
+VERIFICATION COMPLETE
+================================================================================
+Status: SUCCESS
+Collection: InteliaKnowledge
+Total objects: 1551
+All chunks successfully ingested!
+================================================================================

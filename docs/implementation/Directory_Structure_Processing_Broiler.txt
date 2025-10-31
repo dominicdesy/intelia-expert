@@ -1,0 +1,32 @@
+================================================================================
+STRUCTURE - PROCESSING (broiler)
+================================================================================
+
+intelia/public/
+│
+├── processing_plants/                   [SITE TYPE - Broiler only]
+│   ├── operations/
+│   │   ├── receiving/
+│   │   ├── slaughter/
+│   │   ├── cutting/
+│   │   ├── packaging/
+│   │   └── cold_chain/
+│   ├── food_safety/
+│   │   ├── HACCP/
+│   │   ├── microbiological_control/
+│   │   └── contamination_prevention/
+│   ├── quality_assurance/
+│   │   ├── inspection_procedures/
+│   │   ├── grading_standards/
+│   │   └── quality_audits/
+│   ├── animal_welfare/
+│   │   ├── pre_slaughter_handling/
+│   │   ├── stunning_methods/
+│   │   └── welfare_audits/
+│   ├── traceability/
+│   │   ├── batch_tracking/
+│   │   └── recall_procedures/
+│   └── waste_management/
+│       ├── byproduct_processing/
+│       └── environmental_compliance/│
+│
