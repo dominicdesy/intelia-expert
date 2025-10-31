@@ -35,10 +35,10 @@ class CompassBarnInfo:
         parts = [f"Poulailler {self.barn_number} ({self.barn_name}):"]
 
         if self.temperature is not None:
-            parts.append(f"- Température: {self.temperature}°C")
+            parts.append(f"- Température: {self.temperature:.1f}°C")
 
         if self.humidity is not None:
-            parts.append(f"- Humidité: {self.humidity}%")
+            parts.append(f"- Humidité: {self.humidity:.1f}%")
 
         if self.average_weight is not None:
             parts.append(f"- Poids moyen: {self.average_weight:.0f}g")
