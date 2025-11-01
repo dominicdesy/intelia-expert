@@ -154,6 +154,13 @@ class ComplianceWrapper:
         """
         query_lower = query.lower()
 
+        # 🚫 EXCLUDE Intelia product questions (nano, compass, unity, farmhub, cognito)
+        # These are technical product questions, NOT biosecurity/veterinary questions
+        intelia_products = ["nano", "compass", "unity", "farmhub", "cognito"]
+        if any(product in query_lower for product in intelia_products):
+            logger.debug(f"📦 Intelia product detected in query - using MINIMAL compliance level")
+            return ComplianceLevel.MINIMAL
+
         # CRITICAL: Biosecurity or regulatory queries
         biosec_kw = self.biosecurity_keywords.get(
             language, self.biosecurity_keywords["en"]
