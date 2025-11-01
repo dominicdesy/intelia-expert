@@ -26,6 +26,8 @@ import json
 import fitz  # PyMuPDF for image extraction
 from PIL import Image
 import io
+import anthropic
+import base64
 
 # Add current directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -204,7 +206,10 @@ class MultimodalExtractor:
         text_chunks: List[Dict[str, Any]]
     ) -> str:
         """
-        Extract text context around an image for better captioning.
+        Extract rich text context around an image for better captioning.
+
+        IMPORTANT: Includes cross-page context to handle cases where image is
+        at top of page and relevant text is on previous page.
 
         Args:
             pdf_path: Path to PDF file
@@ -212,19 +217,64 @@ class MultimodalExtractor:
             text_chunks: All text chunks from the document
 
         Returns:
-            Context text (surrounding paragraphs)
+            Rich context text (current page + previous page if needed)
         """
-        # Find text chunks from the same page
-        page_chunks = [
+        context_parts = []
+
+        # Get chunks from PREVIOUS page (in case image is at top of current page)
+        if page_number > 0:
+            prev_page_chunks = [
+                chunk for chunk in text_chunks
+                if chunk.get("page_number") == page_number - 1
+            ]
+
+            if prev_page_chunks:
+                # Take last 3 chunks from previous page (most relevant)
+                prev_text = " ".join([
+                    chunk.get("content", "")
+                    for chunk in prev_page_chunks[-3:]
+                ])
+                if prev_text:
+                    context_parts.append(f"[Previous page context]: {prev_text}")
+
+        # Get chunks from CURRENT page
+        current_page_chunks = [
             chunk for chunk in text_chunks
             if chunk.get("page_number") == page_number
         ]
 
-        if page_chunks:
-            # Return combined text from this page
-            return " ".join([chunk.get("content", "") for chunk in page_chunks])
+        if current_page_chunks:
+            current_text = " ".join([
+                chunk.get("content", "")
+                for chunk in current_page_chunks
+            ])
+            context_parts.append(current_text)
 
-        return ""
+        # Get chunks from NEXT page (for completeness)
+        next_page_chunks = [
+            chunk for chunk in text_chunks
+            if chunk.get("page_number") == page_number + 1
+        ]
+
+        if next_page_chunks:
+            # Take first 2 chunks from next page
+            next_text = " ".join([
+                chunk.get("content", "")
+                for chunk in next_page_chunks[:2]
+            ])
+            if next_text:
+                context_parts.append(f"[Following context]: {next_text}")
+
+        # Combine all context
+        full_context = "\n\n".join(context_parts)
+
+        # Truncate if too long (keep first 2000 chars for prompt)
+        if len(full_context) > 2000:
+            full_context = full_context[:2000] + "..."
+
+        logger.debug(f"Extracted context for image on page {page_number}: {len(full_context)} chars")
+
+        return full_context if full_context else "No context available"
 
     def process_document(
         self,
@@ -404,22 +454,271 @@ class MultimodalExtractor:
 
     def _generate_caption(self, image: Image.Image, context: str) -> str:
         """
-        Generate caption for an image using Claude Vision API.
+        Generate caption for an image using Claude Vision API with rich context.
 
         Args:
             image: PIL Image
-            context: Surrounding text context
+            context: Surrounding text context (may include previous page text)
 
         Returns:
             Image caption/description
         """
         try:
-            # TODO: Implement Claude Vision API call
-            # For now, return generic caption
-            return f"Image extracted from document. Context: {context[:100]}..."
+            # Check if Claude API key is available
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                logger.warning("ANTHROPIC_API_KEY not found - using context-based caption")
+                return self._generate_fallback_caption(context)
+
+            # Initialize Claude client
+            client = anthropic.Anthropic(api_key=api_key)
+
+            # Convert image to base64
+            img_buffer = io.BytesIO()
+            image.save(img_buffer, format='PNG')
+            img_buffer.seek(0)
+            image_data = base64.standard_b64encode(img_buffer.read()).decode("utf-8")
+
+            # Detect document type and section from context
+            doc_type = self._detect_document_type(context)
+            section_hint = self._extract_section_hint(context)
+
+            # Build enriched prompt
+            prompt = self._build_vision_prompt(context, doc_type, section_hint)
+
+            # Call Claude Vision API
+            logger.info(f"Calling Claude Vision API for image caption...")
+            message = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=150,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "image/png",
+                                    "data": image_data,
+                                },
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
+                            }
+                        ],
+                    }
+                ],
+            )
+
+            # Extract caption from response
+            caption = message.content[0].text.strip()
+
+            # Validate and clean caption
+            caption = self._validate_caption(caption)
+
+            logger.info(f"Generated caption: {caption[:80]}...")
+            return caption
+
         except Exception as e:
-            logger.error(f"Error generating caption: {e}")
-            return "Image from document"
+            logger.error(f"Error in Claude Vision captioning: {e}", exc_info=True)
+            return self._generate_fallback_caption(context)
+
+    def _build_vision_prompt(self, context: str, doc_type: str, section_hint: str) -> str:
+        """
+        Build enriched prompt for Claude Vision based on context.
+
+        Args:
+            context: Text context around image
+            doc_type: Type of document (manual, guide, etc.)
+            section_hint: Detected section/topic
+
+        Returns:
+            Formatted prompt for Claude Vision
+        """
+        # Truncate context if too long (keep most relevant parts)
+        context_preview = self._extract_key_context(context, max_chars=800)
+
+        prompt = f"""You are analyzing an image from a poultry farm controller technical manual.
+
+DOCUMENT CONTEXT:
+{context_preview}
+
+TASK:
+Generate a concise, descriptive caption (15-25 words) that:
+
+1. **Describes what's visible**: UI elements, buttons, graphs, data displays, diagrams
+2. **Explains the purpose**: What this screen/feature does (based on surrounding text)
+3. **Uses keywords**: Include specific terms from the context for semantic search
+
+REQUIREMENTS:
+- Be specific (e.g., "Export history page" not just "Settings screen")
+- Mention key UI elements (buttons, icons, data fields)
+- Include the functional purpose (monitoring, exporting, configuring, etc.)
+- Use terminology from the context
+
+EXAMPLES OF GOOD CAPTIONS:
+- "Export history interface with USB drive icon and data type selection checkboxes for mortality, feed consumption, and environmental records"
+- "Humidity monitoring graph displaying daily readings with minimum/maximum threshold lines and alarm indicators"
+- "Main navigation menu showing icons for environment control, feed management, mortality tracking, and system settings"
+- "Alarm configuration page with threshold inputs for temperature, humidity, and feed levels with notification options"
+
+CAPTION:"""
+
+        return prompt
+
+    def _extract_key_context(self, context: str, max_chars: int = 800) -> str:
+        """
+        Extract most relevant parts of context for prompt.
+
+        Args:
+            context: Full context text
+            max_chars: Maximum characters to include
+
+        Returns:
+            Truncated context with key information
+        """
+        if len(context) <= max_chars:
+            return context
+
+        # Split into sentences
+        sentences = context.replace('\n', ' ').split('. ')
+
+        # Priority keywords for poultry farm controllers
+        priority_keywords = [
+            'export', 'history', 'monitoring', 'alarm', 'temperature', 'humidity',
+            'feed', 'mortality', 'USB', 'graph', 'chart', 'screen', 'page',
+            'menu', 'button', 'icon', 'data', 'settings', 'configuration'
+        ]
+
+        # Score sentences by keyword relevance
+        scored_sentences = []
+        for sent in sentences:
+            score = sum(1 for keyword in priority_keywords if keyword.lower() in sent.lower())
+            scored_sentences.append((score, sent))
+
+        # Sort by relevance and take top sentences
+        scored_sentences.sort(key=lambda x: x[0], reverse=True)
+        selected = [sent for score, sent in scored_sentences[:5]]  # Top 5 most relevant
+
+        result = '. '.join(selected)
+
+        # Truncate if still too long
+        if len(result) > max_chars:
+            result = result[:max_chars] + "..."
+
+        return result
+
+    def _detect_document_type(self, context: str) -> str:
+        """Detect document type from context."""
+        context_lower = context.lower()
+
+        if 'manual' in context_lower or 'installation' in context_lower:
+            return 'technical_manual'
+        elif 'guide' in context_lower:
+            return 'user_guide'
+        else:
+            return 'technical_document'
+
+    def _extract_section_hint(self, context: str) -> str:
+        """
+        Extract section/topic hint from context.
+
+        Args:
+            context: Text context
+
+        Returns:
+            Section hint (e.g., "Export History", "Monitoring", "Alarms")
+        """
+        # Look for section headers (usually in all caps or title case)
+        lines = context.split('\n')
+        for line in lines[:5]:  # Check first few lines
+            line = line.strip()
+            # Section headers are often short and in title case
+            if len(line) < 50 and len(line.split()) <= 5:
+                if line.isupper() or line.istitle():
+                    return line
+
+        # Fallback: extract topic from context
+        topics = {
+            'export': 'Data Export',
+            'history': 'History View',
+            'alarm': 'Alarm Configuration',
+            'temperature': 'Temperature Control',
+            'humidity': 'Humidity Monitoring',
+            'feed': 'Feed Management',
+            'mortality': 'Mortality Tracking',
+            'settings': 'System Settings',
+            'menu': 'Navigation'
+        }
+
+        context_lower = context.lower()
+        for keyword, topic in topics.items():
+            if keyword in context_lower:
+                return topic
+
+        return 'Unknown Section'
+
+    def _validate_caption(self, caption: str) -> str:
+        """
+        Validate and clean generated caption.
+
+        Args:
+            caption: Generated caption
+
+        Returns:
+            Cleaned caption
+        """
+        # Remove common prefix/suffix artifacts
+        caption = caption.strip('"\'').strip()
+
+        # Remove "Caption:" prefix if present
+        if caption.lower().startswith('caption:'):
+            caption = caption[8:].strip()
+
+        # Ensure reasonable length (truncate if too long)
+        if len(caption) > 150:
+            caption = caption[:147] + "..."
+
+        # Ensure minimum quality
+        if len(caption) < 10:
+            return "Interface screenshot from controller manual"
+
+        return caption
+
+    def _generate_fallback_caption(self, context: str) -> str:
+        """
+        Generate fallback caption when Claude Vision is not available.
+
+        Args:
+            context: Text context
+
+        Returns:
+            Context-based caption
+        """
+        # Extract key phrases from context
+        context_lower = context.lower()
+
+        # Detect topic
+        if 'export' in context_lower:
+            topic = 'Export history interface'
+        elif 'alarm' in context_lower:
+            topic = 'Alarm configuration screen'
+        elif 'temperature' in context_lower or 'humidity' in context_lower:
+            topic = 'Environmental monitoring display'
+        elif 'feed' in context_lower:
+            topic = 'Feed management screen'
+        elif 'mortality' in context_lower:
+            topic = 'Mortality tracking interface'
+        elif 'menu' in context_lower or 'navigation' in context_lower:
+            topic = 'Navigation menu screen'
+        else:
+            topic = 'Controller interface screen'
+
+        # Add context hint
+        context_preview = context[:100].strip()
+        return f"{topic} - {context_preview}..."
 
     def _classify_image_type(self, caption: str) -> str:
         """
