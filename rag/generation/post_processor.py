@@ -129,21 +129,22 @@ class ResponsePostProcessor:
         response = response.strip()
 
         # Add veterinary disclaimer if the question concerns health/disease
-        # CRITICAL: Detect language from the RESPONSE, not from user config
+        # CRITICAL: Detect language from the QUERY (user's question), not response
         if query and VeterinaryHandler.is_veterinary_query(query, context_docs):
-            # Detect actual response language (ignoring user's configured language)
+            # Detect language from the user's QUESTION (not the response)
+            # This ensures the disclaimer matches the user's language context
             try:
-                detection_result = detect_language_enhanced(response)
+                detection_result = detect_language_enhanced(query)
                 detected_lang = detection_result.get("language", language) if detection_result else language
-                logger.info(f"🌍 Response language detected: {detected_lang} (user config: {language})")
+                logger.info(f"🌍 Query language detected for disclaimer: {detected_lang} (user config: {language})")
             except Exception as e:
-                logger.warning(f"⚠️ Language detection failed, using fallback: {e}")
+                logger.warning(f"⚠️ Language detection failed, using user config: {e}")
                 detected_lang = language
 
-            # Get disclaimer in the detected language (not configured language)
+            # Get disclaimer in the detected query language
             disclaimer = VeterinaryHandler.get_veterinary_disclaimer(detected_lang)
             if disclaimer:  # Only if disclaimer is not empty
                 response = response + disclaimer
-                logger.info(f"🏥 Veterinary disclaimer added (detected language: {detected_lang})")
+                logger.info(f"🏥 Veterinary disclaimer added (query language: {detected_lang})")
 
         return response

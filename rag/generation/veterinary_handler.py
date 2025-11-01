@@ -157,8 +157,17 @@ class VeterinaryHandler:
             True
             >>> VeterinaryHandler.is_veterinary_query("What is the target weight?", [])
             False
+            >>> VeterinaryHandler.is_veterinary_query("Comment activer le nano ?", [])
+            False  # Intelia product - no disclaimer needed
         """
         query_lower = query.lower()
+
+        # 🚫 EXCLUDE Intelia product questions (nano, compass, unity, farmhub, cognito)
+        # These are technical product questions, NOT veterinary questions
+        intelia_products = ["nano", "compass", "unity", "farmhub", "cognito"]
+        if any(product in query_lower for product in intelia_products):
+            logger.debug(f"📦 Intelia product detected in query - skipping veterinary disclaimer")
+            return False
 
         # Use centralized veterinary keywords from config
         # (loaded from config/veterinary_terms.json)

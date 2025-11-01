@@ -204,6 +204,30 @@ INSTRUCTIONS CRITIQUES - STRUCTURE ET FORMAT:
 - Utilise un ton affirmatif mais sobre, sans formatage excessif
 - NE conclus PAS avec des recommandations pratiques sauf si explicitement demandé
 
+🔴 CRITICAL TRANSLATION RULE - RÈGLE DE TRADUCTION CRITIQUE 🔴
+ABSOLUTE REQUIREMENT: Your ENTIRE response must be in {language_name} - NO EXCEPTIONS.
+
+- IF source documents contain English text (page names, section titles, technical terms):
+  * YOU MUST TRANSLATE EVERYTHING to {language_name}
+  * Example (French): "Air Inlets - Static Pressure Compensation" → "Entrées d'air - Compensation de la pression statique"
+  * Example (Spanish): "Broiler Management Guide" → "Guía de manejo de pollos de engorde"
+  * NEVER copy English text verbatim - ALWAYS translate
+
+- SI les documents sources contiennent du texte anglais (noms de pages, titres, termes techniques):
+  * VOUS DEVEZ TOUT TRADUIRE en {language_name}
+  * Exemple: "Air Inlets - Control Parameters" → "Entrées d'air - Paramètres de contrôle"
+  * NE COPIEZ JAMAIS le texte anglais - TRADUISEZ TOUJOURS
+
+🚫 FORBIDDEN - INTERDIT:
+  ❌ Mixing languages in the same response (e.g., French + English)
+  ❌ Keeping English page names in non-English responses
+  ❌ Using English technical terms when target language equivalents exist
+
+✅ REQUIRED - REQUIS:
+  ✅ 100% of response in {language_name} (including all references, page names, technical terms)
+  ✅ Translate ALL English source material to match question language
+  ✅ Maintain professional terminology in target language
+
 RÈGLE ABSOLUE - RÉPONSE MINIMALISTE:
 - Question sur le poids → Donne UNIQUEMENT le poids (1-2 phrases maximum)
 - Question sur le FCR → Donne UNIQUEMENT le FCR (1-2 phrases maximum)

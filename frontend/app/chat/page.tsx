@@ -1305,6 +1305,13 @@ function ChatInterface() {
 			  }
 			: undefined;
 
+		  // 🖼️ Log images received from backend
+		  if (response.images && response.images.length > 0) {
+			console.log(`🖼️ [Chat] Received ${response.images.length} images from backend:`, response.images);
+		  } else {
+			console.log('🖼️ [Chat] No images in backend response');
+		  }
+
 		  updateMessage(assistantId, {
 			conversation_id: response.conversation_id,
 			// Add images from API response
