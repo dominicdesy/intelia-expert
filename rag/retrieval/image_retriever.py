@@ -107,7 +107,7 @@ class ImageRetriever:
 
         # Strategy 1: Semantic search if query provided
         if query:
-            logger.info(f"Using semantic search with query: '{query}'")
+            logger.info(f"Using semantic search with query: '{query[:50]}...'")
             try:
                 # Search images by caption similarity, filtered by source files
                 for source_file in source_files:
@@ -136,10 +136,15 @@ class ImageRetriever:
                                 "relevance_score": obj.metadata.distance if hasattr(obj.metadata, 'distance') else None
                             })
 
-                    logger.debug(f"Found {len(response.objects)} semantically relevant images for {source_file}")
+                    logger.info(f"Found {len(response.objects)} semantically relevant images for source file")
+
+                # If semantic search worked, we're done
+                if len(images) > 0:
+                    logger.info(f"✅ Semantic search successful: {len(images)} relevant images found")
+                    return images
 
             except Exception as e:
-                logger.error(f"Error in semantic image search: {e}")
+                logger.error(f"Error in semantic image search: {e}", exc_info=True)
                 logger.info("Falling back to source_file matching only")
                 # Fallback to strategy 2
                 query = None
