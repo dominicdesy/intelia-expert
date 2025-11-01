@@ -351,6 +351,12 @@ class ChatHandlers:
             if documents_used == 0:
                 documents_used = len(context_docs)
 
+            # 🖼️ Extraction des images associées
+            images = safe_get_attribute(rag_result, "images", [])
+            if not isinstance(images, list):
+                images = []
+            logger.info(f"🖼️ Retrieved {len(images)} images for response")
+
             # Event END
             # 🔍 DEBUG: Extract CoT fields before building end_data
             cot_thinking = safe_get_attribute(rag_result, "cot_thinking", None)
@@ -387,6 +393,8 @@ class ChatHandlers:
                 "cot_thinking": cot_thinking,
                 "cot_analysis": cot_analysis,
                 "has_cot_structure": has_cot_structure,
+                # 🖼️ Associated images
+                "images": images,
             }
 
             serialized_data = safe_serialize_for_json(end_data)
