@@ -115,17 +115,13 @@ class SpacesUploader:
             # Upload to Spaces
             self.s3_client.put_object(**upload_params)
 
-            # Generate public URL
+            # Generate public URL (origin endpoint - CDN is disabled)
             # Format: https://bucket.region.digitaloceanspaces.com/folder/filename
             public_url = f"https://{self.bucket}.{self.region}.digitaloceanspaces.com/{s3_key}"
 
-            # Or use CDN endpoint if configured
-            # Format: https://bucket.region.cdn.digitaloceanspaces.com/folder/filename
-            cdn_url = f"https://{self.bucket}.{self.region}.cdn.digitaloceanspaces.com/{s3_key}"
+            logger.info(f"Uploaded: {filename} → {public_url}")
 
-            logger.info(f"Uploaded: {filename} → {cdn_url}")
-
-            return cdn_url
+            return public_url
 
         except ClientError as e:
             logger.error(f"Failed to upload {filename}: {e}")

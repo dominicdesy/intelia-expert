@@ -13,7 +13,8 @@
       "Bash(node implement_all_images.js:*)",
       "Bash(Out-File -Encoding utf8 output.txt)",
       "Bash(cat:*)",
-      "Bash(set PYTHONIOENCODING=utf-8:*)"
+      "Bash(set PYTHONIOENCODING=utf-8:*)",
+      "Bash(Select-String -Pattern \"Migration complete|Total images|Fixed|Already correct\")"
     ],
     "deny": [],
     "ask": []
