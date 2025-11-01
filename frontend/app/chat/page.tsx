@@ -1330,11 +1330,23 @@ function ChatInterface() {
 			  }
 			: undefined;
 
-		  // 🖼️ Log images received from backend
-		  const extractedImageUrls = response.images?.map(img => img.image_url) || [];
+		  // 🖼️ Log images received from backend and encode URLs properly
+		  const extractedImageUrls = response.images?.map(img => {
+			// Encode spaces and special characters in URL
+			const url = img.image_url;
+			// Only encode the filename part after the last slash
+			const lastSlashIndex = url.lastIndexOf('/');
+			if (lastSlashIndex !== -1) {
+			  const baseUrl = url.substring(0, lastSlashIndex + 1);
+			  const filename = url.substring(lastSlashIndex + 1);
+			  return baseUrl + encodeURIComponent(filename);
+			}
+			return url;
+		  }) || [];
+
 		  if (response.images && response.images.length > 0) {
 			console.log(`🖼️ [Chat] Received ${response.images.length} images from backend:`, response.images);
-			console.log(`🖼️ [Chat] Extracted imageUrls:`, extractedImageUrls);
+			console.log(`🖼️ [Chat] Extracted imageUrls (encoded):`, extractedImageUrls);
 		  } else {
 			console.log('🖼️ [Chat] No images in backend response');
 		  }
