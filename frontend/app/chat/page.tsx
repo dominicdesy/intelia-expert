@@ -1217,6 +1217,7 @@ function ChatInterface() {
 					content: chunk,
 					isUser: false,
 					timestamp: new Date(),
+					imageUrls: [], // Initialize imageUrls array for later updates
 				  });
 				  messageCreated = true;
 				  setIsLoadingChat(false);
@@ -1306,8 +1307,10 @@ function ChatInterface() {
 			: undefined;
 
 		  // 🖼️ Log images received from backend
+		  const extractedImageUrls = response.images?.map(img => img.image_url) || [];
 		  if (response.images && response.images.length > 0) {
 			console.log(`🖼️ [Chat] Received ${response.images.length} images from backend:`, response.images);
+			console.log(`🖼️ [Chat] Extracted imageUrls:`, extractedImageUrls);
 		  } else {
 			console.log('🖼️ [Chat] No images in backend response');
 		  }
@@ -1315,12 +1318,16 @@ function ChatInterface() {
 		  updateMessage(assistantId, {
 			conversation_id: response.conversation_id,
 			// Add images from API response
-			imageUrls: response.images?.map(img => img.image_url) || [],
+			imageUrls: extractedImageUrls,
 			...(safeResponseVersions && {
 			  response_versions: safeResponseVersions,
 			}),
 			originalResponse: response.response,
 		  });
+
+		  // 🖼️ Verify message was updated with images
+		  const updatedMessage = useChatStore.getState().currentConversation?.messages.find(m => m.id === assistantId);
+		  console.log(`🖼️ [Chat] Message after update - imageUrls length:`, updatedMessage?.imageUrls?.length || 0);
 		}
 
 		// ✅ AJOUT: Refresh automatique si nouvelle conversation créée
