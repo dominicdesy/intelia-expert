@@ -262,6 +262,7 @@ class SearchMixin:
                 metadata={
                     "title": properties.get("title", ""),
                     "source": properties.get("source", ""),
+                    "source_file": properties.get("source_file", ""),  # For image retrieval
                     "geneticLine": properties.get("geneticLine", ""),
                     "species": properties.get("species", ""),
                     "phase": properties.get("phase", ""),
