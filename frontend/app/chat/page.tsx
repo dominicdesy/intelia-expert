@@ -417,6 +417,30 @@ const MessageList = React.memo(
                     onTypingComplete={() => handleTypingComplete(message.id)}
                   />
 
+                  {/* 🖼️ Display images from RAG for assistant messages */}
+                  {message.imageUrls && message.imageUrls.length > 0 && (
+                    <div className="mt-3">
+                      {message.imageUrls.length === 1 ? (
+                        <img
+                          src={message.imageUrls[0]}
+                          alt="Retrieved image"
+                          className="max-w-[400px] max-h-[300px] rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 max-w-[600px]">
+                          {message.imageUrls.map((url, idx) => (
+                            <img
+                              key={idx}
+                              src={url}
+                              alt={`Retrieved image ${idx + 1}`}
+                              className="w-full h-48 rounded-lg object-cover"
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Feedback buttons inside the message bubble at the bottom */}
                   {!message.isUser && index > 0 && message.conversation_id && (
                     <div className="flex items-center space-x-2 mt-3 pt-2 border-t border-gray-100">
