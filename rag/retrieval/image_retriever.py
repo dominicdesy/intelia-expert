@@ -67,19 +67,32 @@ class ImageRetriever:
 
         # Extract unique source files from chunks
         source_files = set()
-        for chunk in chunks:
+        logger.debug(f"Processing {len(chunks)} chunks to extract source files")
+
+        for i, chunk in enumerate(chunks):
             # Handle both dict and Document objects
             if isinstance(chunk, dict):
                 source_file = chunk.get("source_file") or chunk.get("metadata", {}).get("source_file")
+                if i < 3:  # Log first 3 for debugging
+                    logger.debug(f"Chunk {i} (dict): source_file = {source_file}")
             else:
                 # Document object - use .get() method which checks metadata
                 source_file = chunk.get("source_file") if hasattr(chunk, 'get') else None
+                if i < 3:  # Log first 3 for debugging
+                    chunk_type = type(chunk).__name__
+                    has_get = hasattr(chunk, 'get')
+                    has_metadata = hasattr(chunk, 'metadata')
+                    logger.debug(f"Chunk {i} ({chunk_type}): has_get={has_get}, has_metadata={has_metadata}, source_file={source_file}")
+                    if has_metadata:
+                        metadata_keys = list(chunk.metadata.keys())[:10]
+                        logger.debug(f"  metadata keys: {metadata_keys}")
 
             if source_file:
                 source_files.add(source_file)
 
+        logger.info(f"Extracted {len(source_files)} unique source files from {len(chunks)} chunks")
         if not source_files:
-            logger.debug("No source files found in chunks")
+            logger.warning("No source files found in chunks - cannot retrieve images")
             return []
 
         logger.info(f"Searching for images from {len(source_files)} source file(s)")
