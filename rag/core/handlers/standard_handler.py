@@ -821,6 +821,18 @@ class StandardQueryHandler(BaseQueryHandler):
                 result.metadata["language_used"] = language
                 result.metadata["filters_applied"] = filters
 
+                # 🖼️ Retrieve associated images
+                if result.context_docs and self.weaviate_core and self.weaviate_core.weaviate_client:
+                    try:
+                        from retrieval.image_retriever import ImageRetriever
+                        image_retriever = ImageRetriever(self.weaviate_core.weaviate_client)
+                        result.images = image_retriever.get_images_for_chunks(result.context_docs, max_images_per_chunk=3)
+                        if result.images:
+                            logger.info(f"🖼️ Retrieved {len(result.images)} images for query")
+                    except Exception as e:
+                        logger.warning(f"🖼️ Error retrieving images: {e}")
+                        result.images = []
+
                 return result
             elif result:
                 # LOW_CONFIDENCE or NO_RESULTS - return with empty message

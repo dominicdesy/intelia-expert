@@ -202,6 +202,7 @@ class OptimizedHybridRetriever:
                     "metadata": {
                         "title": obj.properties.get("title", ""),
                         "source": obj.properties.get("source", ""),
+                        "source_file": obj.properties.get("source_file", ""),  # For image retrieval
                         "geneticLine": obj.properties.get("geneticLine", ""),
                         "species": obj.properties.get("species", ""),
                         "phase": obj.properties.get("phase", ""),
@@ -254,6 +255,7 @@ class OptimizedHybridRetriever:
                     "metadata": {
                         "title": obj.properties.get("title", ""),
                         "source": obj.properties.get("source", ""),
+                        "source_file": obj.properties.get("source_file", ""),  # For image retrieval
                         "geneticLine": obj.properties.get("geneticLine", ""),
                         "species": obj.properties.get("species", ""),
                         "phase": obj.properties.get("phase", ""),
@@ -323,6 +325,7 @@ class OptimizedHybridRetriever:
                     "metadata": {
                         "title": obj.properties.get("title", ""),
                         "source": obj.properties.get("source", ""),
+                        "source_file": obj.properties.get("source_file", ""),  # For image retrieval
                         "geneticLine": obj.properties.get("geneticLine", ""),
                         "species": obj.properties.get("species", ""),
                         "phase": obj.properties.get("phase", ""),
