@@ -171,9 +171,14 @@ class RAGResponseGenerator:
                         logger.info(f"🖼️ Attempting to retrieve images for {len(result.context_docs)} chunks...")
                         from retrieval.image_retriever import ImageRetriever
                         image_retriever = ImageRetriever(self.weaviate_client)
-                        result.images = image_retriever.get_images_for_chunks(result.context_docs, max_images_per_chunk=3)
+                        # Pass query for semantic image search
+                        result.images = image_retriever.get_images_for_chunks(
+                            result.context_docs,
+                            max_images_per_chunk=3,
+                            query=query  # Enable semantic search on captions
+                        )
                         if result.images:
-                            logger.info(f"🖼️ Retrieved {len(result.images)} images for {len(result.context_docs)} chunks")
+                            logger.info(f"🖼️ Retrieved {len(result.images)} semantically relevant images for {len(result.context_docs)} chunks")
                         else:
                             logger.info(f"🖼️ No images found for {len(result.context_docs)} chunks")
                     except Exception as e:

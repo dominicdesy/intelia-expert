@@ -38,14 +38,20 @@ class ImageRetriever:
     def get_images_for_chunks(
         self,
         chunks: List[Dict[str, Any]],
-        max_images_per_chunk: int = 3
+        max_images_per_chunk: int = 3,
+        query: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Retrieve images associated with text chunks.
 
+        Strategy:
+        1. If query provided: Use semantic search on image captions for relevance
+        2. Fallback: Match by source_file only
+
         Args:
             chunks: List of text chunk dictionaries from RAG retrieval
             max_images_per_chunk: Maximum images to retrieve per document
+            query: Optional user query for semantic image search
 
         Returns:
             List of image metadata dictionaries with URLs
@@ -97,40 +103,81 @@ class ImageRetriever:
 
         logger.info(f"Searching for images from {len(source_files)} source file(s)")
 
-        # Query images for each source file
         collection = self.client.collections.get(self.images_collection_name)
 
-        for source_file in source_files:
+        # Strategy 1: Semantic search if query provided
+        if query:
+            logger.info(f"Using semantic search with query: '{query}'")
             try:
-                # Query images from this source file
-                response = collection.query.fetch_objects(
-                    filters=wvc.query.Filter.by_property("source_file").contains_any([source_file]),
-                    limit=max_images_per_chunk
-                )
+                # Search images by caption similarity, filtered by source files
+                for source_file in source_files:
+                    response = collection.query.near_text(
+                        query=query,
+                        filters=wvc.query.Filter.by_property("source_file").contains_any([source_file]),
+                        limit=max_images_per_chunk
+                    )
 
-                for obj in response.objects:
-                    image_id = obj.properties.get("image_id")
+                    for obj in response.objects:
+                        image_id = obj.properties.get("image_id")
 
-                    # Avoid duplicates
-                    if image_id and image_id not in seen_image_ids:
-                        seen_image_ids.add(image_id)
+                        # Avoid duplicates
+                        if image_id and image_id not in seen_image_ids:
+                            seen_image_ids.add(image_id)
 
-                        images.append({
-                            "image_id": image_id,
-                            "image_url": obj.properties.get("image_url"),
-                            "caption": obj.properties.get("caption"),
-                            "image_type": obj.properties.get("image_type"),
-                            "source_file": obj.properties.get("source_file"),
-                            "width": obj.properties.get("width"),
-                            "height": obj.properties.get("height"),
-                            "format": obj.properties.get("format"),
-                        })
+                            images.append({
+                                "image_id": image_id,
+                                "image_url": obj.properties.get("image_url"),
+                                "caption": obj.properties.get("caption"),
+                                "image_type": obj.properties.get("image_type"),
+                                "source_file": obj.properties.get("source_file"),
+                                "width": obj.properties.get("width"),
+                                "height": obj.properties.get("height"),
+                                "format": obj.properties.get("format"),
+                                "relevance_score": obj.metadata.distance if hasattr(obj.metadata, 'distance') else None
+                            })
 
-                logger.debug(f"Found {len(response.objects)} images for {source_file}")
+                    logger.debug(f"Found {len(response.objects)} semantically relevant images for {source_file}")
 
             except Exception as e:
-                logger.error(f"Error retrieving images for {source_file}: {e}")
-                continue
+                logger.error(f"Error in semantic image search: {e}")
+                logger.info("Falling back to source_file matching only")
+                # Fallback to strategy 2
+                query = None
+
+        # Strategy 2: Match by source_file only (fallback or when no query)
+        if not query or len(images) == 0:
+            logger.info("Using source_file matching only")
+            for source_file in source_files:
+                try:
+                    # Query images from this source file
+                    response = collection.query.fetch_objects(
+                        filters=wvc.query.Filter.by_property("source_file").contains_any([source_file]),
+                        limit=max_images_per_chunk
+                    )
+
+                    for obj in response.objects:
+                        image_id = obj.properties.get("image_id")
+
+                        # Avoid duplicates
+                        if image_id and image_id not in seen_image_ids:
+                            seen_image_ids.add(image_id)
+
+                            images.append({
+                                "image_id": image_id,
+                                "image_url": obj.properties.get("image_url"),
+                                "caption": obj.properties.get("caption"),
+                                "image_type": obj.properties.get("image_type"),
+                                "source_file": obj.properties.get("source_file"),
+                                "width": obj.properties.get("width"),
+                                "height": obj.properties.get("height"),
+                                "format": obj.properties.get("format"),
+                            })
+
+                    logger.debug(f"Found {len(response.objects)} images for {source_file}")
+
+                except Exception as e:
+                    logger.error(f"Error retrieving images for {source_file}: {e}")
+                    continue
 
         logger.info(f"Retrieved {len(images)} total images for {len(chunks)} chunks")
         return images
