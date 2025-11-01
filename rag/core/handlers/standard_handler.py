@@ -826,11 +826,16 @@ class StandardQueryHandler(BaseQueryHandler):
                     try:
                         from retrieval.image_retriever import ImageRetriever
                         image_retriever = ImageRetriever(self.weaviate_core.weaviate_client)
-                        result.images = image_retriever.get_images_for_chunks(result.context_docs, max_images_per_chunk=3)
+                        # Pass query for semantic image search based on captions
+                        result.images = image_retriever.get_images_for_chunks(
+                            result.context_docs,
+                            max_images_per_chunk=3,
+                            query=query  # Enable semantic search on image captions
+                        )
                         if result.images:
-                            logger.info(f"🖼️ Retrieved {len(result.images)} images for query")
+                            logger.info(f"🖼️ Retrieved {len(result.images)} semantically relevant images for query")
                     except Exception as e:
-                        logger.warning(f"🖼️ Error retrieving images: {e}")
+                        logger.warning(f"🖼️ Error retrieving images: {e}", exc_info=True)
                         result.images = []
 
                 return result
