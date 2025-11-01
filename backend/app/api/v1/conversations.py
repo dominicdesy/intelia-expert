@@ -209,6 +209,12 @@ async def save_conversation(
             except Exception as inc_error:
                 logger.error(f"[Quota] Erreur incrémentation (non bloquant): {inc_error}")
 
+            # Extract images from metadata if available
+            images = []
+            if conversation_data.metadata:
+                agent_metadata = conversation_data.metadata.get("agent_metadata", {})
+                images = agent_metadata.get("images", [])
+
             return {
                 "status": "updated",
                 "conversation_id": existing_conv["id"],
@@ -217,6 +223,7 @@ async def save_conversation(
                 "message_count": existing_conv["message_count"] + 2,
                 "action": "messages_added",
                 "timestamp": datetime.utcnow().isoformat(),
+                "images": images,  # 🖼️ Include images in response
             }
 
         else:
@@ -249,6 +256,14 @@ async def save_conversation(
             except Exception as inc_error:
                 logger.error(f"[Quota] Erreur incrémentation (non bloquant): {inc_error}")
 
+            # Extract images from metadata if available
+            images = []
+            if conversation_data.metadata:
+                agent_metadata = conversation_data.metadata.get("agent_metadata", {})
+                images = agent_metadata.get("images", [])
+                if images:
+                    logger.info(f"🖼️ Including {len(images)} images in response to frontend")
+
             return {
                 "status": "created",
                 "conversation_id": result["conversation_id"],
@@ -257,6 +272,7 @@ async def save_conversation(
                 "message_count": result["message_count"],
                 "action": "conversation_created",
                 "timestamp": datetime.utcnow().isoformat(),
+                "images": images,  # 🖼️ Include images in response
             }
 
     except HTTPException:
