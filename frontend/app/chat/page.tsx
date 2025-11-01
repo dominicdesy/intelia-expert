@@ -420,11 +420,17 @@ const MessageList = React.memo(
                   {/* 🖼️ Display images from RAG for assistant messages */}
                   {message.imageUrls && message.imageUrls.length > 0 && (
                     <div className="mt-3">
+                      {(() => {
+                        console.log(`🖼️ [Render] Assistant message ${message.id} imageUrls:`, message.imageUrls);
+                        return null;
+                      })()}
                       {message.imageUrls.length === 1 ? (
                         <img
                           src={message.imageUrls[0]}
                           alt="Retrieved image"
                           className="max-w-[400px] max-h-[300px] rounded-lg object-cover"
+                          onError={(e) => console.error('🖼️ [Error] Failed to load image:', message.imageUrls[0], e)}
+                          onLoad={() => console.log('🖼️ [Success] Image loaded:', message.imageUrls[0])}
                         />
                       ) : (
                         <div className="grid grid-cols-2 gap-2 max-w-[600px]">
@@ -434,6 +440,8 @@ const MessageList = React.memo(
                               src={url}
                               alt={`Retrieved image ${idx + 1}`}
                               className="w-full h-48 rounded-lg object-cover"
+                              onError={(e) => console.error(`🖼️ [Error] Failed to load image ${idx + 1}:`, url, e)}
+                              onLoad={() => console.log(`🖼️ [Success] Image ${idx + 1} loaded:`, url)}
                             />
                           ))}
                         </div>
