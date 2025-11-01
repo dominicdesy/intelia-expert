@@ -159,9 +159,36 @@ async def generate(
                 max_terminology_tokens=1000,  # Limit terminology to 1000 tokens
             )
 
+            # 🔴 CRITICAL FIX: Include context documents in user message
+            # Format context_docs into a readable context section
+            user_content = request.query
+            if request.context_docs and len(request.context_docs) > 0:
+                context_section = "\n\n---\n\nRELEVANT CONTEXT DOCUMENTS:\n\n"
+                for i, doc in enumerate(request.context_docs, 1):
+                    # Extract content and metadata from each document
+                    content = doc.get("content", "")
+                    metadata = doc.get("metadata", {})
+                    source = metadata.get("source_file", metadata.get("source", "Unknown"))
+                    page = metadata.get("page_number", "")
+
+                    # Format document entry
+                    context_section += f"[Document {i}]\n"
+                    if source:
+                        context_section += f"Source: {source}"
+                        if page:
+                            context_section += f" (Page {page})"
+                        context_section += "\n"
+                    context_section += f"Content: {content}\n\n"
+
+                # Prepend context to the query
+                user_content = f"{context_section}---\n\nUSER QUESTION: {request.query}"
+                logger.info(f"📄 Formatted {len(request.context_docs)} context documents for LLM")
+            else:
+                logger.warning("⚠️ No context_docs provided - LLM will answer without context")
+
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": request.query},
+                {"role": "user", "content": user_content},
             ]
 
         # Get generation parameters from domain config if not provided
@@ -394,9 +421,36 @@ async def generate_stream(
                     max_terminology_tokens=1000,
                 )
 
+                # 🔴 CRITICAL FIX: Include context documents in user message
+                # Format context_docs into a readable context section
+                user_content = request.query
+                if request.context_docs and len(request.context_docs) > 0:
+                    context_section = "\n\n---\n\nRELEVANT CONTEXT DOCUMENTS:\n\n"
+                    for i, doc in enumerate(request.context_docs, 1):
+                        # Extract content and metadata from each document
+                        content = doc.get("content", "")
+                        metadata = doc.get("metadata", {})
+                        source = metadata.get("source_file", metadata.get("source", "Unknown"))
+                        page = metadata.get("page_number", "")
+
+                        # Format document entry
+                        context_section += f"[Document {i}]\n"
+                        if source:
+                            context_section += f"Source: {source}"
+                            if page:
+                                context_section += f" (Page {page})"
+                            context_section += "\n"
+                        context_section += f"Content: {content}\n\n"
+
+                    # Prepend context to the query
+                    user_content = f"{context_section}---\n\nUSER QUESTION: {request.query}"
+                    logger.info(f"[STREAM] Formatted {len(request.context_docs)} context documents for LLM")
+                else:
+                    logger.warning("[STREAM] No context_docs provided - LLM will answer without context")
+
                 messages = [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": request.query},
+                    {"role": "user", "content": user_content},
                 ]
 
             # Get generation parameters
