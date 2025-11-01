@@ -397,8 +397,20 @@ class ChatHandlers:
                 "images": images,
             }
 
+            # 🖼️ Log images before serialization
+            logger.info(f"🖼️ END event - images count in end_data: {len(images)}")
+            if images:
+                logger.info(f"🖼️ END event - first image ID: {images[0].get('image_id', 'N/A')}")
+
             serialized_data = safe_serialize_for_json(end_data)
             logger.info(f"🔍 END event full data: {str(serialized_data)[:500]}")
+
+            # 🖼️ Log images after serialization
+            if 'images' in serialized_data:
+                logger.info(f"🖼️ END event SERIALIZED - images key exists: {len(serialized_data['images'])} images")
+            else:
+                logger.warning(f"🖼️ END event SERIALIZED - images key MISSING!")
+
             yield sse_event(serialized_data)
 
             # Sauvegarder dans les deux systèmes de mémoire
