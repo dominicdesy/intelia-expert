@@ -185,16 +185,20 @@ class WebBatchProcessor:
 
         return False
 
-    def process_all(self, delay_seconds: int = 3, force_reprocess: bool = False) -> Dict[str, Any]:
+    def process_all(self, force_reprocess: bool = False) -> Dict[str, Any]:
         """
         Process all URLs in Excel file.
 
         Args:
-            delay_seconds: Delay between requests (rate limiting)
             force_reprocess: If True, reprocess even if marked as processed
 
         Returns:
             Processing statistics
+
+        Note:
+            Rate limiting is handled automatically per domain (3 minutes between
+            requests to the same domain). URLs from different domains can be
+            processed immediately without delay.
         """
         print("\n" + "="*80)
         print("WEB BATCH PROCESSING - START")
@@ -292,9 +296,8 @@ class WebBatchProcessor:
             # Save after each row (incremental save)
             self.save_urls(df)
 
-            # Rate limiting delay
-            if idx < len(df) - 1:
-                time.sleep(delay_seconds)
+            # No fixed delay needed - rate limiting is handled per domain
+            # in _wait_for_domain_rate_limit() method
 
         # Final statistics
         end_time = datetime.now()
@@ -433,7 +436,6 @@ if __name__ == "__main__":
 
     # Process all URLs
     stats = processor.process_all(
-        delay_seconds=3,  # 3 second delay between requests
         force_reprocess=force_reprocess
     )
 

@@ -16,6 +16,13 @@ Usage:
 
 import os
 import sys
+import io
+
+# Fix encoding for Windows console
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 import asyncio
 import argparse
 from pathlib import Path
@@ -26,6 +33,15 @@ import httpx
 from bs4 import BeautifulSoup
 import anthropic
 import yaml
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement depuis le répertoire parent
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+    print(f"✓ Loaded .env from {env_path}")
+else:
+    print(f"⚠️  No .env file found at {env_path}")
 
 # Ajouter le répertoire parent au path pour importer les modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "document_extractor"))
@@ -231,7 +247,7 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après."""
 
         try:
             response = await self.claude.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-5-haiku-20241022",
                 max_tokens=1000,
                 messages=[{
                     "role": "user",
@@ -333,8 +349,11 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après."""
 
         df = pd.read_excel(self.excel_file, sheet_name=self.sheet_name)
 
-        # Filtrer les URLs à analyser
-        to_analyze = df[df['Classification'].str.lower() == 'to be analyzed'].copy()
+        # Filtrer les URLs à analyser (vides ou "To be analyzed")
+        to_analyze = df[
+            df['Classification'].isna() |
+            (df['Classification'].str.lower() == 'to be analyzed')
+        ].copy()
 
         if limit:
             to_analyze = to_analyze.head(limit)

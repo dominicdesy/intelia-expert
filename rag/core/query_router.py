@@ -1058,6 +1058,20 @@ class QueryRouter:
                         f"✅ LLM calculation_type: {llm_entities['calculation_type']}"
                     )
 
+                # 🆕 Intelia product detection (CRITICAL for routing!)
+                if llm_entities.get("intelia_product"):
+                    entities["intelia_product"] = llm_entities["intelia_product"]
+                    logger.info(
+                        f"📦 LLM Intelia product detected: {llm_entities['intelia_product']} → FORCE Weaviate routing"
+                    )
+
+                # 🆕 Barn number detection (triggers Compass extension)
+                if llm_entities.get("barn_number") is not None:
+                    entities["barn_number"] = llm_entities["barn_number"]
+                    logger.info(
+                        f"🏚️ LLM Barn number detected: {llm_entities['barn_number']} → FORCE Compass extension routing"
+                    )
+
             # Log classification
             logger.info(
                 f"🤖 LLM Classification: intent={intent}, "
@@ -1265,6 +1279,11 @@ class QueryRouter:
                         f"🤖 LLM routing (confidence={llm_confidence:.2f}): postgresql for {llm_intent}"
                     )
                     return ("postgresql", f"llm_classifier_{llm_intent}")
+                elif llm_target == "compass_extension":
+                    logger.info(
+                        f"🤖 LLM routing (confidence={llm_confidence:.2f}): compass_extension for {llm_intent}"
+                    )
+                    return ("compass_extension", f"llm_classifier_{llm_intent}")
 
         # FALLBACK: Keyword-based routing (ancien comportement)
         logger.debug(

@@ -1,0 +1,54 @@
+ERROR:retrieval.postgresql.retriever:PostgreSQL initialization error: [WinError 121] Le délai de temporisation de sémaphore a expiré
+WARNING:core.rag_engine:PostgreSQL Retriever failed: [WinError 121] Le délai de temporisation de sémaphore a expiré
+WARNING:core.base:Initialization error in InteliaRAGEngine: PostgreSQLRetriever: [WinError 121] Le délai de temporisation de sémaphore a expiré
+WARNING:core.rag_engine:Initialization warnings: ['PostgreSQLRetriever: [WinError 121] Le délai de temporisation de sémaphore a expiré']
+
+================================================================================
+END-TO-END IMAGE RETRIEVAL TEST
+================================================================================
+
+Query: Comment installer le systeme Nano pour volailles?
+Language: fr
+
+2025-10-31 22:14:53 [info     ] query_started                  has_context=False has_preextracted_entities=False language=fr query_length=49 request_id=8b04b11d-aa2a-418d-aaec-bd97f593c7cd tenant_id=default
+2025-10-31 22:14:53 [info     ] hybrid_extraction_completed    domain=nutrition_query keyword_count=0 llm_used=False regex_count=0 total_entities=1
+2025-10-31 22:14:58 [info     ] routing_completed              confidence=1.0 destination=weaviate duration_ms=4316.423416137695 has_missing_fields=False query_type=knowledge_query request_id=8b04b11d-aa2a-418d-aaec-bd97f593c7cd
+ERROR:retrieval.reranker:Reranking failed: Server disconnected without sending a response., returning original documents
+ERROR:generation.llm_service_client:\u274c LLM service connection error: All connection attempts failed
+ERROR:generation.llm_router:\u274c Intelia Llama service error: Cannot connect to LLM service at http://localhost:8081
+ERROR:generation.llm_router:\u274c intelia-llama generation failed: Cannot connect to LLM service at http://localhost:8081, fallback to GPT-4o
+WARNING:core.handlers.standard_handler:\u26a0\ufe0f Re-ranking returned 0 docs - keeping original
+WARNING:external_sources.fetchers.base_fetcher:\u26a0\ufe0f [semantic_scholar] Rate limited, waiting 5s
+WARNING:external_sources.fetchers.base_fetcher:\u26a0\ufe0f [semantic_scholar] Rate limited, waiting 10s
+2025-10-31 22:15:36 [info     ] external_search_activity       best_document_found=False best_document_score=None best_document_source=None document_already_existed=False document_ingested=False documents_found=0 estimated_cost_usd=None language=fr query='Comment installer le systeme Nano pour volailles?' request_id=8b04b11d-aa2a-418d-aaec-bd97f593c7cd search_duration_ms=15916.914224624634 sources_queried=[] tenant_id=default triggered_reason=low_confidence weaviate_confidence=0.31738600349639107
+2025-10-31 22:15:36 [info     ] query_completed                handler_duration_ms=22073.004722595215 handler_type=weaviate request_id=8b04b11d-aa2a-418d-aaec-bd97f593c7cd response_length=870 sources_count=0 total_duration_ms=43009.37628746033
+WARNING:retrieval.weaviate.core:Erreur fermeture Weaviate: object NoneType can't be used in 'await' expression
+Results:
+  Answer length: 870 chars
+  Context docs: 97
+  Images: 3
+
+  First doc source: C:\Software_Development\intelia-cognito\knowledge-ingesters\Sources\intelia\intelia_products\nano\30-008-00096-605 Installation and Operation Manual Nano EN.docx
+
+  [SUCCESS] Retrieved 3 images!
+
+    Image 1:
+      ID: nano_manual_img008
+      Caption: Image 8 from Nano Installation and Operation Manual
+      Type: diagram
+
+    Image 2:
+      ID: nano_manual_img009
+      Caption: Image 9 from Nano Installation and Operation Manual
+      Type: diagram
+
+    Image 3:
+      ID: nano_manual_img010
+      Caption: Image 10 from Nano Installation and Operation Manual
+      Type: diagram
+
+================================================================================
+TEST COMPLETE
+================================================================================
+
+C:\Python311\Lib\asyncio\proactor_events.py:116: ResourceWarning: unclosed transport <_ProactorSocketTransport fd=4596 read=<_OverlappedFuture cancelled>>

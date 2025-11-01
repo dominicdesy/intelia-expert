@@ -111,6 +111,8 @@ Your task: Analyze the user's query and return a structured classification in JS
 - **treatment_type**: Treatment type (antibiotic, vaccine, feed additive, etc.)
 - **target_weight**: Target weight in kg or g (for reverse lookup calculations)
 - **calculation_type**: Type of calculation (reverse_lookup, cumulative_feed, projection, flock_calculation)
+- **intelia_product**: Intelia product name if mentioned (nano, compass, unity, farmhub, cognito) - CRITICAL for routing to Weaviate documentation
+- **barn_number**: Barn/house number if mentioned (1, 2, 3, etc.) - triggers Compass extension routing for real-time data
 
 # ROUTING LOGIC:
 
@@ -139,6 +141,9 @@ For **general_knowledge**, **disease_info**, **treatment_info**, **management_in
 ⚠️ "How to improve weight for Ross 308 at 16 days?" → intent:management_info (NOT performance_query! asking for advice, not data)
 ⚠️ "Comment améliorer le poids pour Ross 308 à 16 jours (mâle) ?" → intent:management_info (optimization/advice query)
 ✅ "My chickens are 17 days old. How much feed do I need to reach day 35? Cobb 500" → intent:calculation_query, calculation_type:cumulative_feed, age_days:17, age_end:35, breed:Cobb 500
+🔴 "Comment voir les températures dans le nano ?" → intent:management_info, intelia_product:nano, target:weaviate (Intelia product = ALWAYS Weaviate documentation!)
+🔴 "Comment configurer une alarme sur le compass ?" → intent:management_info, intelia_product:compass, target:weaviate
+🔴 "Quelle est la température du poulailler 2 ?" → barn_number:2, target:compass_extension (real-time data query)
 
 User query: "{query}"
 Language: {language}
@@ -155,7 +160,9 @@ Return a JSON object with this EXACT structure:
     "disease_name": "string or null",
     "treatment_type": "string or null",
     "target_weight": "number or null (in grams)",
-    "calculation_type": "reverse_lookup|cumulative_feed|projection|flock_calculation|null"
+    "calculation_type": "reverse_lookup|cumulative_feed|projection|flock_calculation|null",
+    "intelia_product": "nano|compass|unity|farmhub|cognito|null",
+    "barn_number": "number or null"
   }},
   "requirements": {{
     "needs_breed": true/false,
@@ -163,9 +170,9 @@ Return a JSON object with this EXACT structure:
     "needs_sex": false
   }},
   "routing": {{
-    "target": "postgresql|weaviate|hybrid",
+    "target": "postgresql|weaviate|compass_extension|hybrid",
     "confidence": 0.0-1.0,
-    "reason": "brief explanation"
+    "reason": "brief explanation - IMPORTANT: If intelia_product is detected, MUST route to weaviate (product documentation). If barn_number is detected, MUST route to compass_extension (real-time data)"
   }},
   "missing_entities": ["list of missing required entities"],
   "is_complete": true/false,

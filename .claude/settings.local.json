@@ -1,12 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python test_improvements.py:*)",
-      "Bash(git mv:*)",
-      "Bash(git add:*)",
-      "Bash(git push:*)",
-      "Bash(lsof +D:*)",
-      "Bash(fuser:*)"
+      "Bash(timeout /t 60)",
+      "Bash(timeout:*)",
+      "Bash(powershell -Command \"Get-Content ''C:\\Software_Development\\intelia-cognito\\rag\\retrieval\\retriever_core.py'' | Select-Object -Last 100\")",
+      "Bash(nul)",
+      "Bash(powershell -Command \"Get-Content ''C:\\Software_Development\\intelia-cognito\\rag\\core\\response_generator.py'' | Select-String -Pattern ''def '' -Context 0,3 | Select-Object -First 20\")",
+      "Bash(powershell -Command \"Get-Content ''C:\\Software_Development\\intelia-cognito\\rag\\core\\handlers\\standard_handler.py'' | Select-String -Pattern ''return result'' -Context 3,0 | Select-Object -Last 5\")",
+      "Bash(dir \"C:\\Software_Development\\intelia-cognito\\rag\\core\\handlers\\standard_handler.py\")",
+      "Bash(test_output.txt)",
+      "Bash(node implement_images.js:*)",
+      "Bash(node implement_all_images.js:*)",
+      "Bash(Out-File -Encoding utf8 output.txt)",
+      "Bash(cat:*)",
+      "Bash(set PYTHONIOENCODING=utf-8:*)"
     ],
     "deny": [],
     "ask": []
