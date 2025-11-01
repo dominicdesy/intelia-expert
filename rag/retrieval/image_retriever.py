@@ -1,16 +1,22 @@
 # -*- coding: utf-8 -*-
 """
 image_retriever.py - Retrieves images associated with text chunks
-Version: 1.0.0
-Last modified: 2025-10-31
+Version: 1.1.0
+Last modified: 2025-11-01
 
 Retrieves images from Weaviate InteliaImages collection that are related to
 retrieved text chunks based on source_file matching.
+
+Changes in v1.1.0:
+- Added Cohere reranking for adaptive image filtering
+- Images now filtered by relevance score (only highly relevant images returned)
+- Supports 1-N images based on actual relevance (not fixed count)
 """
 
 import logging
 from typing import List, Dict, Any, Optional
 from utils.imports_and_dependencies import wvc
+from retrieval.cohere_reranker import get_cohere_reranker
 
 logger = logging.getLogger(__name__)
 
@@ -23,17 +29,28 @@ class ImageRetriever:
     same source document that provide visual context.
     """
 
-    def __init__(self, client, images_collection_name: str = "InteliaImages"):
+    def __init__(
+        self,
+        client,
+        images_collection_name: str = "InteliaImages",
+        rerank_threshold: float = 0.5
+    ):
         """
         Initialize image retriever.
 
         Args:
             client: Weaviate client instance
             images_collection_name: Name of the images collection
+            rerank_threshold: Minimum Cohere rerank score (0-1) to include image
+                            Default 0.5 = only moderately relevant images
+                            Higher = stricter filtering (fewer images)
+                            Lower = more permissive (more images)
         """
         self.client = client
         self.images_collection_name = images_collection_name
         self.is_v4 = hasattr(client, "collections")
+        self.rerank_threshold = rerank_threshold
+        self.reranker = get_cohere_reranker()
 
     def get_images_for_chunks(
         self,
@@ -105,46 +122,93 @@ class ImageRetriever:
 
         collection = self.client.collections.get(self.images_collection_name)
 
-        # Strategy 1: Semantic search if query provided
+        # Strategy 1: Semantic search + Reranking if query provided
         if query:
-            logger.info(f"Using semantic search with query: '{query[:50]}...'")
+            logger.info(f"Using semantic search + reranking with query: '{query[:50]}...'")
             try:
-                # Search images by caption similarity, filtered by source files
+                # Step 1: Retrieve more images (10x) for reranking
+                # This gives Cohere a larger pool to select from
+                candidate_images = []
                 for source_file in source_files:
                     response = collection.query.near_text(
                         query=query,
                         filters=wvc.query.Filter.by_property("source_file").contains_any([source_file]),
-                        limit=max_images_per_chunk
+                        limit=max_images_per_chunk * 3  # Get 3x more candidates for reranking
                     )
 
                     for obj in response.objects:
                         image_id = obj.properties.get("image_id")
+                        caption = obj.properties.get("caption", "")
 
                         # Avoid duplicates
-                        if image_id and image_id not in seen_image_ids:
+                        if image_id and image_id not in seen_image_ids and caption:
                             seen_image_ids.add(image_id)
-
-                            images.append({
+                            candidate_images.append({
                                 "image_id": image_id,
                                 "image_url": obj.properties.get("image_url"),
-                                "caption": obj.properties.get("caption"),
+                                "caption": caption,
                                 "image_type": obj.properties.get("image_type"),
                                 "source_file": obj.properties.get("source_file"),
                                 "width": obj.properties.get("width"),
                                 "height": obj.properties.get("height"),
                                 "format": obj.properties.get("format"),
-                                "relevance_score": obj.metadata.distance if hasattr(obj.metadata, 'distance') else None
+                                "vector_distance": obj.metadata.distance if hasattr(obj.metadata, 'distance') else None
                             })
 
-                    logger.info(f"Found {len(response.objects)} semantically relevant images for source file")
+                logger.info(f"Retrieved {len(candidate_images)} candidate images for reranking")
 
-                # If semantic search worked, we're done
+                # Step 2: Rerank by caption relevance using Cohere
+                if candidate_images:
+                    captions = [img["caption"] for img in candidate_images]
+
+                    # Rerank captions by relevance to query
+                    reranked = self.reranker.rerank(
+                        query=query,
+                        documents=captions,
+                        top_k=None,  # Get all with scores
+                        return_scores=True
+                    )
+
+                    logger.info(f"Cohere reranking: {len(candidate_images)} images → {len(reranked)} scored")
+
+                    # Step 3: Filter by threshold and map back to images
+                    caption_to_image = {img["caption"]: img for img in candidate_images}
+
+                    # Handle both tuple (caption, score) and string (fallback) formats
+                    for item in reranked:
+                        if isinstance(item, tuple) and len(item) == 2:
+                            caption, score = item
+                            # Only include images above relevance threshold
+                            if score >= self.rerank_threshold:
+                                img = caption_to_image.get(caption)
+                                if img:
+                                    img["rerank_score"] = score
+                                    images.append(img)
+                                    logger.debug(f"✅ Image kept: score={score:.3f} caption={caption[:60]}...")
+                            else:
+                                logger.debug(f"❌ Image filtered: score={score:.3f} (below {self.rerank_threshold})")
+                        else:
+                            # Fallback: Cohere API failed, item is just a caption string
+                            # Return all candidate images (no filtering)
+                            caption = item if isinstance(item, str) else str(item)
+                            img = caption_to_image.get(caption)
+                            if img:
+                                img["rerank_score"] = None  # No score available
+                                images.append(img)
+                                logger.debug(f"⚠️ Image added (no reranking): caption={caption[:60]}...")
+
+                    logger.info(
+                        f"✅ Reranking complete: {len(candidate_images)} candidates → "
+                        f"{len(images)} relevant images (threshold={self.rerank_threshold})"
+                    )
+
+                # If reranking worked, return filtered images
                 if len(images) > 0:
-                    logger.info(f"✅ Semantic search successful: {len(images)} relevant images found")
+                    logger.info(f"✅ Semantic search + reranking: {len(images)} highly relevant images")
                     return images
 
             except Exception as e:
-                logger.error(f"Error in semantic image search: {e}", exc_info=True)
+                logger.error(f"Error in semantic image search + reranking: {e}", exc_info=True)
                 logger.info("Falling back to source_file matching only")
                 # Fallback to strategy 2
                 query = None
