@@ -220,6 +220,14 @@ interface EnhancedAIResponse {
 
   // NOUVELLES PROPRIÉTÉS AGENT
   agent_metadata?: AgentMetadata;
+
+  // Images associated with response
+  images?: Array<{
+    image_id: string;
+    image_url: string;
+    caption?: string;
+    image_type?: string;
+  }>;
 }
 
 // ✅ CORRECTION 1: Interface pour le résultat de streaming
@@ -444,6 +452,11 @@ async function streamAIResponseInternal(
               if (endEvent.source) {
                 agentMetadata.response_source = endEvent.source;
                 secureLog.log(`[apiService] Source capturée: ${endEvent.source}`);
+              }
+              // Capture images from END event
+              if (endEvent.images && Array.isArray(endEvent.images)) {
+                (agentMetadata as any).images = endEvent.images;
+                secureLog.log(`[apiService] ${endEvent.images.length} images retrieved`);
               }
               break;
 
@@ -720,6 +733,9 @@ export const generateAIResponse = async (
 
       // NOUVELLES MÉTADONNÉES AGENT
       agent_metadata: agentMetadata,
+
+      // Include images from agent metadata if available
+      images: (agentMetadata as any).images || [],
 
       // Génération automatique des versions de réponse
       response_versions: {

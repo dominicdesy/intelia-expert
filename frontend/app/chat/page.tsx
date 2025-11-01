@@ -1179,6 +1179,8 @@ function ChatInterface() {
 			isUser: false,
 			timestamp: new Date(),
 			conversation_id: response.conversation_id,
+			// Add images from vision response if available
+			imageUrls: response.images?.map(img => img.image_url) || [],
 		  });
 		  messageCreated = true;
 
@@ -1305,6 +1307,8 @@ function ChatInterface() {
 
 		  updateMessage(assistantId, {
 			conversation_id: response.conversation_id,
+			// Add images from API response
+			imageUrls: response.images?.map(img => img.image_url) || [],
 			...(safeResponseVersions && {
 			  response_versions: safeResponseVersions,
 			}),

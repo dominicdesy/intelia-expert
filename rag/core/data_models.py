@@ -116,12 +116,17 @@ class RAGResult:
     cot_analysis: Optional[str] = None
     has_cot_structure: bool = False
 
+    # Image support
+    images: List[Dict] = field(default_factory=list)
+
     def __post_init__(self):
         """Post-initialisation avec validation"""
         if self.context_docs is None:
             self.context_docs = []
         if self.metadata is None:
             self.metadata = {}
+        if self.images is None:
+            self.images = []
 
         # Ajout métadonnées système automatiques
         self.metadata.setdefault("result_type", self.source.value)
@@ -131,6 +136,7 @@ class RAGResult:
             "is_clarification_needed", self.source.is_clarification_needed
         )
         self.metadata.setdefault("timestamp", self.timestamp)
+        self.metadata.setdefault("has_images", len(self.images) > 0)
 
     @property
     def is_valid(self) -> bool:
@@ -176,6 +182,7 @@ class RAGResult:
             "is_valid": self.is_valid,
             "should_retry": self.should_retry,
             "needs_clarification": self.needs_clarification,
+            "images": self.images,
         }
 
 

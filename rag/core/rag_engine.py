@@ -228,7 +228,8 @@ class InteliaRAGEngine(InitializableMixin):
                 )
 
             self.response_generator = RAGResponseGenerator(
-                llm_generator=self.core.generator
+                llm_generator=self.core.generator,
+                weaviate_client=self.weaviate_core.weaviate_client if self.weaviate_core else None
             )
 
             await super().initialize()

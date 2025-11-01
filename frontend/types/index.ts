@@ -536,6 +536,12 @@ export type EndEvent = {
   confidence?: number;
   documents_used?: number;
   source?: string;
+  images?: Array<{
+    image_id: string;
+    image_url: string;
+    caption?: string;
+    image_type?: string;
+  }>;
 };
 
 export type StreamEvent =

@@ -40,16 +40,18 @@ except ImportError:
 class RAGResponseGenerator:
     """Generates LLM responses from retrieved documents"""
 
-    def __init__(self, llm_generator, enable_proactive: bool = True):
+    def __init__(self, llm_generator, enable_proactive: bool = True, weaviate_client=None):
         """
         Initialize response generator
 
         Args:
             llm_generator: LLM generator instance
             enable_proactive: Enable proactive follow-up questions (default: True)
+            weaviate_client: Weaviate client for image retrieval (optional)
         """
         self.generator = llm_generator
         self.enable_proactive = enable_proactive
+        self.weaviate_client = weaviate_client
 
         # Initialize ProactiveAssistant if available
         self.proactive_assistant = None
@@ -159,6 +161,31 @@ class RAGResponseGenerator:
 
             # If documents present but no answer, generate via LLM
             # Robust check: handle both None and empty list cases
+            logger.info(f"🖼️ DEBUG - context_docs type: {type(result.context_docs)}, length: {len(result.context_docs) if result.context_docs else 0}")
+            logger.info(f"🖼️ DEBUG - weaviate_client: {self.weaviate_client is not None}")
+
+            if result.context_docs:
+                # 🖼️ NEW: Retrieve associated images
+                if self.weaviate_client:
+                    try:
+                        logger.info(f"🖼️ Attempting to retrieve images for {len(result.context_docs)} chunks...")
+                        from retrieval.image_retriever import ImageRetriever
+                        image_retriever = ImageRetriever(self.weaviate_client)
+                        result.images = image_retriever.get_images_for_chunks(result.context_docs, max_images_per_chunk=3)
+                        if result.images:
+                            logger.info(f"🖼️ Retrieved {len(result.images)} images for {len(result.context_docs)} chunks")
+                        else:
+                            logger.info(f"🖼️ No images found for {len(result.context_docs)} chunks")
+                    except Exception as e:
+                        logger.warning(f"🖼️ Error retrieving images: {e}", exc_info=True)
+                        result.images = []
+                else:
+                    logger.warning("🖼️ Weaviate client not available for image retrieval")
+                    result.images = []
+            else:
+                logger.info("🖼️ No context_docs available for image retrieval")
+                result.images = []
+
             if result.context_docs:
                 if not self.generator:
                     logger.warning(

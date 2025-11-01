@@ -238,6 +238,7 @@ class WeaviateCore(InitializableMixin):
                                 weaviate_api_key
                             ),
                             headers=headers,
+                            skip_init_checks=True  # Skip gRPC health checks to avoid timeout
                         )
                         logger.info("Connexion Weaviate v4 avec API Key réussie")
 
